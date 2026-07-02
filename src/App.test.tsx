@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 
 import { App } from './App';
+import { pl } from './i18n/pl';
 import { AppProviders } from './providers/AppProviders';
 
 describe('App', () => {
@@ -18,7 +19,9 @@ describe('App', () => {
       screen.getByRole('navigation', { name: 'Primary navigation' }),
     ).toBeInTheDocument();
     expect(
-      screen.getAllByRole('link', { name: /Employees/i }).length,
+      screen.getAllByRole('link', {
+        name: pl.navigation.employees.label,
+      }).length,
     ).toBeGreaterThan(0);
     expect(screen.getByText('Current Absences')).toBeInTheDocument();
   });

@@ -6,6 +6,7 @@ import SettingsOutlined from '@mui/icons-material/SettingsOutlined';
 import SummarizeOutlined from '@mui/icons-material/SummarizeOutlined';
 import TuneOutlined from '@mui/icons-material/TuneOutlined';
 
+import { pl } from '../i18n/pl';
 import type { NavigationItem } from '../types/navigation';
 import { routes } from '../utils/routes';
 
@@ -17,10 +18,10 @@ export const primaryNavigation: NavigationItem[] = [
     description: 'A concise overview of the current payroll workspace.',
   },
   {
-    label: 'Employees',
+    label: pl.navigation.employees.label,
     path: routes.employees,
     icon: GroupsOutlined,
-    description: 'Employee records, identifiers, and employment details.',
+    description: pl.navigation.employees.description,
   },
   {
     label: 'Monthly Settlement',

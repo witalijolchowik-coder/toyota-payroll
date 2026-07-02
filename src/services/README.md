@@ -9,6 +9,7 @@ Step 3 adds:
 - canonical path and document-ID helpers;
 - typed collection/document boundaries for future repositories.
 
-The application shell still performs no reads or writes. Future feature
-services should compose these boundaries and accept the restricted client-write
-types from `src/types/firestore/writes.ts`.
+The Employees module composes these boundaries in `employeesService.ts` for
+subscribed reads, creates, edits, and deactivation. Future feature services
+should follow the same pattern and accept the restricted client-write types
+from `src/types/firestore/writes.ts`.

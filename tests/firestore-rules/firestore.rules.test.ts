@@ -5,6 +5,7 @@ import {
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import {
+  deleteDoc,
   doc,
   getDoc,
   serverTimestamp,
@@ -31,6 +32,23 @@ async function seedMonth(monthId: string, isSettled: boolean) {
       year: Number(monthId.slice(0, 4)),
       month: Number(monthId.slice(5, 7)),
       is_settled: isSettled,
+      created_at: new Date('2026-07-01T00:00:00.000Z'),
+      created_by: 'system',
+      updated_at: new Date('2026-07-01T00:00:00.000Z'),
+      updated_by: 'system',
+    });
+  });
+}
+
+async function seedEmployee(employeeId: string) {
+  await testEnvironment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), 'employees', employeeId), {
+      teta_number: 'TETA-1001',
+      first_name: 'Jan',
+      last_name: 'Kowalski',
+      is_active: true,
+      employment_start_date: null,
+      employment_end_date: null,
       created_at: new Date('2026-07-01T00:00:00.000Z'),
       created_by: 'system',
       updated_at: new Date('2026-07-01T00:00:00.000Z'),
@@ -75,6 +93,58 @@ describe('Firestore security rules', () => {
         employment_start_date: null,
         employment_end_date: null,
         ...modificationMetadata(uid),
+      }),
+    );
+  });
+
+  it('allows employee edits and deactivation but denies deletion', async () => {
+    await seedEmployee('employee-1');
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const employee = doc(firestore, 'employees', 'employee-1');
+
+    await assertSucceeds(
+      updateDoc(employee, {
+        first_name: 'Anna',
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(employee, {
+        is_active: false,
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertFails(deleteDoc(employee));
+  });
+
+  it('rejects invalid employee fields and metadata actor spoofing', async () => {
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+
+    await assertFails(
+      setDoc(doc(firestore, 'employees', 'employee-empty-teta'), {
+        teta_number: '',
+        first_name: 'Jan',
+        last_name: 'Kowalski',
+        is_active: true,
+        employment_start_date: null,
+        employment_end_date: null,
+        ...modificationMetadata(uid),
+      }),
+    );
+
+    await assertFails(
+      setDoc(doc(firestore, 'employees', 'employee-spoofed-actor'), {
+        teta_number: 'TETA-2002',
+        first_name: 'Anna',
+        last_name: 'Nowak',
+        is_active: true,
+        employment_start_date: null,
+        employment_end_date: null,
+        ...modificationMetadata('another-user'),
       }),
     );
   });

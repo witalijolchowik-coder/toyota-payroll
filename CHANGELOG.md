@@ -23,6 +23,10 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Runtime-validating Firestore converters, domain mappers, canonical path
   helpers, and typed repository boundaries.
 - Emulator-backed Firestore Security Rules tests using synthetic data.
+- Polish Firestore-backed employee register with create, edit, deactivate,
+  search, and status-filtering workflows.
+- Employee input validation and active-TETA uniqueness preflight checks.
+- Typed Polish translation resources for the Employees module.
 
 ### Changed
 
@@ -38,6 +42,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Enforced read-only settled months and append-only audit entries.
 - Restricted client daily values and absences to explicit manual facts; virtual
   defaults and imported pipeline records cannot be written by the client.
+- Verified employee create, update, and deactivation permissions while keeping
+  employee deletion and metadata spoofing denied.
 
 ## [0.1.0] - 2026-07-02
 

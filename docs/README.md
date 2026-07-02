@@ -15,6 +15,7 @@ The attached design history contains several generations of the architecture. Th
 - [ADR 0002: Employee identifiers](decisions/0002-employee-identifiers.md)
 - [ADR 0003: Application shell structure](decisions/0003-application-shell.md)
 - [ADR 0004: Firestore foundation](decisions/0004-firestore-foundation.md)
+- [ADR 0005: Employees module](decisions/0005-employees-module.md)
 
 ## Authority order
 

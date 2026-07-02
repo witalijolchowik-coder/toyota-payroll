@@ -3,9 +3,10 @@
 Foundation for the Toyota Payroll Engine MVP: a browser-based coordinator
 workspace built with React, Vite, TypeScript, Material UI, and Firebase.
 
-The repository currently includes the approved Step 3 Firestore foundation.
-Authentication screens, employees, monthly settlement, absences, adjustments,
-payroll calculations, imports, and reports remain intentionally unimplemented.
+The repository currently includes the approved Step 4 Employees module and
+Step 3 Firestore foundation. Authentication screens, monthly settlement,
+absences, adjustments, payroll calculations, imports, and reports remain
+intentionally unimplemented.
 
 ## Prerequisites
 
@@ -70,7 +71,18 @@ The responsive shell includes:
 
 Firebase clients are initialized, and typed Firestore converters, domain
 mappers, repository boundaries, and path helpers are available for future
-modules. The application shell still performs no Firestore reads or writes.
+modules.
+
+## Employees
+
+The Polish employee register reads and writes `/employees` through the typed
+Firestore repository boundary. Coordinators can add, edit, search, filter, and
+deactivate employees. TETA is normalized and checked for uniqueness among
+active employees before writes; internal Firestore employee IDs are never
+shown.
+
+Firestore access still requires an existing Firebase Authentication session.
+The module does not add anonymous sign-in or an authentication screen.
 
 ## Firestore foundation
 
@@ -94,3 +106,4 @@ modules. The application shell still performs no Firestore reads or writes.
 - [Bootstrap decisions](docs/decisions/0001-bootstrap-stack.md)
 - [Employee identifier decision](docs/decisions/0002-employee-identifiers.md)
 - [Firestore foundation decision](docs/decisions/0004-firestore-foundation.md)
+- [Employees module decision](docs/decisions/0005-employees-module.md)

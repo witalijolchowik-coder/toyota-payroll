@@ -5,8 +5,8 @@
 | 1    | Project bootstrap, Firebase boundaries, GitHub Pages, documentation | Complete    |
 | 2    | Responsive application shell and module placeholders                | Complete    |
 | 3    | Firestore foundation and security-rule tests                        | Complete    |
-| 4    | Authentication                                                      | Not started |
-| 5    | Employees                                                           | Not started |
+| 4    | Employees                                                           | Complete    |
+| 5    | Authentication and access experience                                | Not started |
 | 6    | Month initialization and settlement shell                           | Not started |
 | 7    | Daily value entry                                                   | Not started |
 | 8    | Absences                                                            | Not started |
@@ -18,6 +18,10 @@
 
 The Firestore-foundation sequencing amendment was approved on 2026-07-02. The
 repository must not proceed to Step 4 without explicit approval.
+
+The Step 4 scope was explicitly approved as the Employees module on
+2026-07-02. A dedicated authentication experience remains deferred; employee
+writes require an existing Firebase Authentication session.
 
 ## Step 1 acceptance criteria
 
@@ -46,3 +50,13 @@ repository must not proceed to Step 4 without explicit approval.
 - Append-only audit log and pipeline-owned field protection.
 - Converter, helper, and emulator-backed Security Rules tests.
 - No production data, business screens, or payroll calculations.
+
+## Step 4 acceptance criteria
+
+- Polish employee register backed by the typed Step 3 Firestore boundaries.
+- Create, edit, deactivate, search, and active-status filtering.
+- Required-field validation and active-TETA uniqueness preflight checks.
+- No employee deletion, payroll calculations, or writes to operational
+  documents.
+- Unit tests for employee validation and TETA uniqueness plus emulator-backed
+  employee Security Rules tests.
