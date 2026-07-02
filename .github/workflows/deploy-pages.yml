@@ -33,6 +33,12 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: Set up Java for Firebase emulators
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 

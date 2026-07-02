@@ -19,11 +19,25 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Protected route boundary with a temporary authenticated shell identity.
 - Dashboard placeholder cards for future operational widgets.
 - Firebase Auth and Firestore service boundaries without data access.
+- Typed Firestore document and domain models for all MVP collections.
+- Runtime-validating Firestore converters, domain mappers, canonical path
+  helpers, and typed repository boundaries.
+- Emulator-backed Firestore Security Rules tests using synthetic data.
 
 ### Changed
 
 - Updated the implementation roadmap to include the approved application-shell
   step before authentication.
+- Updated the implementation sequence so the approved Firestore foundation is
+  Step 3 and authentication follows as Step 4.
+
+### Security
+
+- Denied anonymous Firestore access and all client writes to calculated
+  settlements, reports, and pipeline-owned fields.
+- Enforced read-only settled months and append-only audit entries.
+- Restricted client daily values and absences to explicit manual facts; virtual
+  defaults and imported pipeline records cannot be written by the client.
 
 ## [0.1.0] - 2026-07-02
 

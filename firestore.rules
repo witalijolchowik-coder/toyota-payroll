@@ -6,30 +6,414 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function monthIsOpen(monthId) {
-      return !exists(/databases/$(database)/documents/months/$(monthId))
-        || get(/databases/$(database)/documents/months/$(monthId)).data.is_settled != true;
+    // Reserved for future role-based policies. Current MVP access remains
+    // authenticated-user based, while server Admin SDK operations bypass rules.
+    function isAdmin() {
+      return isAuthenticated()
+        && (request.auth.token.admin == true
+          || request.auth.token.role == 'admin');
+    }
+
+    function isNonEmptyString(value) {
+      return value is string && value.size() > 0;
+    }
+
+    function isNullableString(value) {
+      return value == null || value is string;
+    }
+
+    function isNullableTimestamp(value) {
+      return value == null || value is timestamp;
+    }
+
+    function isIsoDate(value) {
+      return value is string
+        && value.matches('^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$');
+    }
+
+    function hasEmployeeReference(data) {
+      return isNonEmptyString(data.employee_id)
+        && isNonEmptyString(data.teta_number);
+    }
+
+    function hasModificationMetadata(data) {
+      return data.created_at is timestamp
+        && isNonEmptyString(data.created_by)
+        && data.updated_at is timestamp
+        && isNonEmptyString(data.updated_by);
+    }
+
+    function hasCreateMetadata(data) {
+      return hasModificationMetadata(data)
+        && data.created_at == request.time
+        && data.updated_at == request.time
+        && data.created_by == request.auth.uid
+        && data.updated_by == request.auth.uid;
+    }
+
+    function hasUpdateMetadata(data) {
+      return hasModificationMetadata(data)
+        && data.created_at == resource.data.created_at
+        && data.created_by == resource.data.created_by
+        && data.updated_at == request.time
+        && data.updated_by == request.auth.uid;
+    }
+
+    function monthExistsAndIsOpen(monthId) {
+      return exists(/databases/$(database)/documents/months/$(monthId))
+        && get(/databases/$(database)/documents/months/$(monthId)).data.is_settled == false;
+    }
+
+    function validEmployee(data) {
+      return data.keys().hasAll([
+          'teta_number',
+          'first_name',
+          'last_name',
+          'is_active',
+          'employment_start_date',
+          'employment_end_date',
+          'created_at',
+          'created_by',
+          'updated_at',
+          'updated_by'
+        ])
+        && data.keys().hasOnly([
+          'teta_number',
+          'first_name',
+          'last_name',
+          'is_active',
+          'employment_start_date',
+          'employment_end_date',
+          'created_at',
+          'created_by',
+          'updated_at',
+          'updated_by'
+        ])
+        && isNonEmptyString(data.teta_number)
+        && isNonEmptyString(data.first_name)
+        && isNonEmptyString(data.last_name)
+        && data.is_active is bool
+        && isNullableTimestamp(data.employment_start_date)
+        && isNullableTimestamp(data.employment_end_date)
+        && hasModificationMetadata(data);
+    }
+
+    function validDailyValue(data) {
+      return data.keys().hasAll([
+          'employee_id',
+          'teta_number',
+          'date',
+          'hours',
+          'source',
+          'import_id',
+          'note',
+          'created_at',
+          'created_by',
+          'updated_at',
+          'updated_by'
+        ])
+        && data.keys().hasOnly([
+          'employee_id',
+          'teta_number',
+          'date',
+          'hours',
+          'source',
+          'import_id',
+          'note',
+          'created_at',
+          'created_by',
+          'updated_at',
+          'updated_by'
+        ])
+        && hasEmployeeReference(data)
+        && isIsoDate(data.date)
+        && data.hours is number
+        && data.hours >= 0
+        && data.hours <= 24
+        && data.source == 'manual'
+        && data.import_id == null
+        && isNullableString(data.note)
+        && hasModificationMetadata(data);
+    }
+
+    function validAbsence(data) {
+      return data.keys().hasAll([
+          'employee_id',
+          'teta_number',
+          'absence_code',
+          'start_date',
+          'end_date',
+          'hours_per_day',
+          'source',
+          'import_id',
+          'note',
+          'created_at',
+          'created_by',
+          'updated_at',
+          'updated_by'
+        ])
+        && data.keys().hasOnly([
+          'employee_id',
+          'teta_number',
+          'absence_code',
+          'start_date',
+          'end_date',
+          'hours_per_day',
+          'source',
+          'import_id',
+          'note',
+          'created_at',
+          'created_by',
+          'updated_at',
+          'updated_by'
+        ])
+        && hasEmployeeReference(data)
+        && isNonEmptyString(data.absence_code)
+        && isIsoDate(data.start_date)
+        && isIsoDate(data.end_date)
+        && (data.hours_per_day == null
+          || (data.hours_per_day is number
+            && data.hours_per_day >= 0
+            && data.hours_per_day <= 24))
+        && data.source == 'manual'
+        && data.import_id == null
+        && isNullableString(data.note)
+        && hasModificationMetadata(data);
+    }
+
+    function validAdjustment(data) {
+      return data.keys().hasAll([
+          'employee_id',
+          'teta_number',
+          'adjustment_code',
+          'amount',
+          'unit',
+          'reason',
+          'created_at',
+          'created_by',
+          'updated_at',
+          'updated_by'
+        ])
+        && data.keys().hasOnly([
+          'employee_id',
+          'teta_number',
+          'adjustment_code',
+          'amount',
+          'unit',
+          'reason',
+          'created_at',
+          'created_by',
+          'updated_at',
+          'updated_by'
+        ])
+        && hasEmployeeReference(data)
+        && isNonEmptyString(data.adjustment_code)
+        && data.amount is number
+        && data.unit in ['hours', 'currency', 'count']
+        && isNonEmptyString(data.reason)
+        && hasModificationMetadata(data);
     }
 
     match /employees/{employeeId} {
-      allow read, create, update: if isAuthenticated();
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated()
+        && validEmployee(request.resource.data)
+        && hasCreateMetadata(request.resource.data);
+      allow update: if isAuthenticated()
+        && validEmployee(request.resource.data)
+        && hasUpdateMetadata(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'teta_number',
+          'first_name',
+          'last_name',
+          'is_active',
+          'employment_start_date',
+          'employment_end_date',
+          'updated_at',
+          'updated_by'
+        ]);
       allow delete: if false;
     }
 
     match /months/{monthId} {
-      allow read, create: if isAuthenticated();
-      allow update: if isAuthenticated() && resource.data.is_settled != true;
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated()
+        && monthId.matches('^\\d{4}-(0[1-9]|1[0-2])$')
+        && request.resource.data.keys().hasAll([
+          'year',
+          'month',
+          'is_settled',
+          'created_at',
+          'created_by',
+          'updated_at',
+          'updated_by'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'year',
+          'month',
+          'is_settled',
+          'created_at',
+          'created_by',
+          'updated_at',
+          'updated_by'
+        ])
+        && request.resource.data.year is int
+        && request.resource.data.month is int
+        && request.resource.data.month >= 1
+        && request.resource.data.month <= 12
+        && request.resource.data.is_settled == false
+        && hasCreateMetadata(request.resource.data);
+      allow update: if isAuthenticated()
+        && resource.data.is_settled == false
+        && request.resource.data.is_settled == false
+        && hasUpdateMetadata(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'updated_at',
+          'updated_by'
+        ]);
       allow delete: if false;
 
-      match /{collection}/{document=**} {
+      match /employeeSettlements/{settlementId} {
         allow read: if isAuthenticated();
-        allow write: if isAuthenticated() && monthIsOpen(monthId);
+        allow write: if false;
+      }
+
+      match /dailyValues/{dailyValueId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated()
+          && monthExistsAndIsOpen(monthId)
+          && validDailyValue(request.resource.data)
+          && hasCreateMetadata(request.resource.data);
+        allow update: if isAuthenticated()
+          && monthExistsAndIsOpen(monthId)
+          && resource.data.source == 'manual'
+          && validDailyValue(request.resource.data)
+          && hasUpdateMetadata(request.resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'hours',
+            'note',
+            'updated_at',
+            'updated_by'
+          ]);
+        allow delete: if isAuthenticated()
+          && monthExistsAndIsOpen(monthId)
+          && resource.data.source == 'manual';
+      }
+
+      match /absences/{absenceId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated()
+          && monthExistsAndIsOpen(monthId)
+          && validAbsence(request.resource.data)
+          && hasCreateMetadata(request.resource.data);
+        allow update: if isAuthenticated()
+          && monthExistsAndIsOpen(monthId)
+          && resource.data.source == 'manual'
+          && validAbsence(request.resource.data)
+          && hasUpdateMetadata(request.resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'absence_code',
+            'start_date',
+            'end_date',
+            'hours_per_day',
+            'note',
+            'updated_at',
+            'updated_by'
+          ]);
+        allow delete: if isAuthenticated()
+          && monthExistsAndIsOpen(monthId)
+          && resource.data.source == 'manual';
+      }
+
+      match /adjustments/{adjustmentId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated()
+          && monthExistsAndIsOpen(monthId)
+          && validAdjustment(request.resource.data)
+          && hasCreateMetadata(request.resource.data);
+        allow update: if isAuthenticated()
+          && monthExistsAndIsOpen(monthId)
+          && validAdjustment(request.resource.data)
+          && hasUpdateMetadata(request.resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'adjustment_code',
+            'amount',
+            'unit',
+            'reason',
+            'updated_at',
+            'updated_by'
+          ]);
+        allow delete: if isAuthenticated()
+          && monthExistsAndIsOpen(monthId);
+      }
+
+      match /imports/{importId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated()
+          && monthExistsAndIsOpen(monthId)
+          && request.resource.data.keys().hasAll([
+            'import_type',
+            'file_name',
+            'storage_path',
+            'status',
+            'uploaded_at',
+            'uploaded_by'
+          ])
+          && request.resource.data.keys().hasOnly([
+            'import_type',
+            'file_name',
+            'storage_path',
+            'status',
+            'uploaded_at',
+            'uploaded_by'
+          ])
+          && request.resource.data.import_type in [
+            'attendance',
+            'absences',
+            'l4'
+          ]
+          && isNonEmptyString(request.resource.data.file_name)
+          && isNonEmptyString(request.resource.data.storage_path)
+          && request.resource.data.status == 'pending'
+          && request.resource.data.uploaded_at == request.time
+          && request.resource.data.uploaded_by == request.auth.uid;
+        allow update, delete: if false;
       }
     }
 
     match /reports/{reportId} {
       allow read: if isAuthenticated();
       allow write: if false;
+    }
+
+    match /auditLog/{entryId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated()
+        && request.resource.data.keys().hasAll([
+          'entity_path',
+          'action',
+          'actor_uid',
+          'occurred_at',
+          'changes'
+        ])
+        && request.resource.data.keys().hasOnly([
+          'entity_path',
+          'action',
+          'actor_uid',
+          'occurred_at',
+          'changes'
+        ])
+        && isNonEmptyString(request.resource.data.entity_path)
+        && request.resource.data.action in [
+          'create',
+          'update',
+          'delete',
+          'settle'
+        ]
+        && request.resource.data.actor_uid == request.auth.uid
+        && request.resource.data.occurred_at == request.time
+        && request.resource.data.changes is map;
+      allow update, delete: if false;
     }
 
     match /{document=**} {

@@ -5,7 +5,15 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: 'jsdom',
-    exclude: ['**/node_modules/**', '**/dist/**', 'outputs/**', 'work/**'],
+    maxWorkers: 1,
+    pool: 'threads',
+    exclude: [
+      '**/node_modules/**',
+      '**/dist/**',
+      'outputs/**',
+      'work/**',
+      'tests/firestore-rules/**',
+    ],
     globals: true,
     setupFiles: './src/test/setup.ts',
   },

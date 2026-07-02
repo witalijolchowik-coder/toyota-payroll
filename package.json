@@ -14,7 +14,9 @@
     "preview": "vite preview",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc -b --pretty false",
-    "test": "vitest run",
+    "test": "pnpm test:unit && pnpm test:rules",
+    "test:unit": "vitest run",
+    "test:rules": "firebase emulators:exec --only firestore --project toyota-payroll \"vitest run --config vitest.rules.config.ts\"",
     "test:watch": "vitest",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -36,6 +38,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@firebase/rules-unit-testing": "5.0.1",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@types/node": "^26.1.0",

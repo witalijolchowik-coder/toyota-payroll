@@ -3,9 +3,9 @@
 Foundation for the Toyota Payroll Engine MVP: a browser-based coordinator
 workspace built with React, Vite, TypeScript, Material UI, and Firebase.
 
-The repository currently includes the approved Step 2 application shell.
+The repository currently includes the approved Step 3 Firestore foundation.
 Authentication screens, employees, monthly settlement, absences, adjustments,
-payroll calculations, imports, and reports are intentionally not implemented.
+payroll calculations, imports, and reports remain intentionally unimplemented.
 
 ## Prerequisites
 
@@ -34,7 +34,8 @@ pnpm build
 pnpm build:functions
 ```
 
-`pnpm check` runs formatting, linting, TypeScript checks, and unit tests.
+`pnpm check` runs formatting, linting, TypeScript checks, unit tests, and
+Firestore Security Rules tests against the emulator.
 
 ## Firebase
 
@@ -67,8 +68,21 @@ The responsive shell includes:
 - global loading, notification, theme, authentication, and error providers;
 - placeholder dashboard and module pages.
 
-Firebase clients are initialized, but Step 2 performs no Firestore reads or
-writes.
+Firebase clients are initialized, and typed Firestore converters, domain
+mappers, repository boundaries, and path helpers are available for future
+modules. The application shell still performs no Firestore reads or writes.
+
+## Firestore foundation
+
+- Firestore documents use snake_case and `Timestamp`; domain models use
+  camelCase and `Date`.
+- Every operational employee reference contains `employee_id` and
+  `teta_number`, never a copied employee name.
+- Calculated settlements, reports, and pipeline fields have no client-write
+  input types.
+- Security Rules deny anonymous access, protect settled months, and keep
+  `auditLog` append-only.
+- `pnpm test:rules` validates the rules with synthetic emulator data.
 
 ## Documentation
 
@@ -79,3 +93,4 @@ writes.
 - [Implementation roadmap](docs/roadmap.md)
 - [Bootstrap decisions](docs/decisions/0001-bootstrap-stack.md)
 - [Employee identifier decision](docs/decisions/0002-employee-identifiers.md)
+- [Firestore foundation decision](docs/decisions/0004-firestore-foundation.md)
