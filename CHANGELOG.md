@@ -27,6 +27,11 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   search, and status-filtering workflows.
 - Employee input validation and active-TETA uniqueness preflight checks.
 - Typed Polish translation resources for the Employees module.
+- Polish month selector and read-only monthly settlement calendar.
+- Transactional initialization of canonical month documents.
+- Employment-overlap population filtering and presentation-only daily defaults.
+- Calendar classification for working days, weekends, future dates, and a
+  public-holiday provider boundary.
 
 ### Changed
 
@@ -36,6 +41,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Step 3 and authentication follows as Step 4.
 - Distinguished current employee HR status from historical payroll-period
   participation and locked monthly inclusion to employment-date overlap.
+- Added canonical UTC month boundaries and numeric calculation version zero to
+  newly initialized month documents.
 
 ### Security
 
@@ -46,6 +53,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   defaults and imported pipeline records cannot be written by the client.
 - Verified employee create, update, and deactivation permissions while keeping
   employee deletion and metadata spoofing denied.
+- Restricted browser month creation to canonical boundaries, an open state,
+  caller-bound metadata, and calculation version zero.
 
 ## [0.1.0] - 2026-07-02
 

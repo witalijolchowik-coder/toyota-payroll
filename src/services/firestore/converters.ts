@@ -91,6 +91,8 @@ export const employeeConverter = createConverter<EmployeeDocument>(
 export const monthConverter = createConverter<MonthDocument>((data, path) => ({
   year: readNumber(data, 'year', path),
   month: readNumber(data, 'month', path),
+  month_start: readTimestamp(data, 'month_start', path),
+  month_end: readTimestamp(data, 'month_end', path),
   is_settled: readBoolean(data, 'is_settled', path),
   calculation_status: readOptionalEnum(data, 'calculation_status', path, [
     'not_started',
@@ -109,11 +111,7 @@ export const monthConverter = createConverter<MonthDocument>((data, path) => ({
     'calculation_completed_at',
     path,
   ),
-  calculation_version: readOptionalNullableString(
-    data,
-    'calculation_version',
-    path,
-  ),
+  calculation_version: readNumber(data, 'calculation_version', path),
   calculation_error: readOptionalNullableString(
     data,
     'calculation_error',

@@ -242,7 +242,10 @@ service cloud.firestore {
         && request.resource.data.keys().hasAll([
           'year',
           'month',
+          'month_start',
+          'month_end',
           'is_settled',
+          'calculation_version',
           'created_at',
           'created_by',
           'updated_at',
@@ -251,7 +254,10 @@ service cloud.firestore {
         && request.resource.data.keys().hasOnly([
           'year',
           'month',
+          'month_start',
+          'month_end',
           'is_settled',
+          'calculation_version',
           'created_at',
           'created_by',
           'updated_at',
@@ -261,7 +267,36 @@ service cloud.firestore {
         && request.resource.data.month is int
         && request.resource.data.month >= 1
         && request.resource.data.month <= 12
+        && int(monthId[0:4]) == request.resource.data.year
+        && int(monthId[5:7]) == request.resource.data.month
+        && request.resource.data.month_start is timestamp
+        && request.resource.data.month_end is timestamp
+        && request.resource.data.month_start == timestamp.date(
+          request.resource.data.year,
+          request.resource.data.month,
+          1
+        )
+        && (
+          (
+            request.resource.data.month < 12
+            && request.resource.data.month_end == timestamp.date(
+              request.resource.data.year,
+              request.resource.data.month + 1,
+              1
+            ) - duration.value(1, 'ms')
+          )
+          || (
+            request.resource.data.month == 12
+            && request.resource.data.month_end == timestamp.date(
+              request.resource.data.year + 1,
+              1,
+              1
+            ) - duration.value(1, 'ms')
+          )
+        )
         && request.resource.data.is_settled == false
+        && request.resource.data.calculation_version is int
+        && request.resource.data.calculation_version == 0
         && hasCreateMetadata(request.resource.data);
       allow update: if isAuthenticated()
         && resource.data.is_settled == false

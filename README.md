@@ -3,10 +3,10 @@
 Foundation for the Toyota Payroll Engine MVP: a browser-based coordinator
 workspace built with React, Vite, TypeScript, Material UI, and Firebase.
 
-The repository currently includes the approved Step 4 Employees module and
-Step 3 Firestore foundation. Authentication screens, monthly settlement,
-absences, adjustments, payroll calculations, imports, and reports remain
-intentionally unimplemented.
+The repository currently includes the approved Step 5 month initialization and
+settlement shell, Step 4 Employees module, and Step 3 Firestore foundation.
+Authentication screens, daily editing, absences, adjustments, payroll
+calculations, imports, and reports remain intentionally unimplemented.
 
 ## Prerequisites
 
@@ -84,6 +84,18 @@ shown.
 Firestore access still requires an existing Firebase Authentication session.
 The module does not add anonymous sign-in or an authentication screen.
 
+## Monthly settlement shell
+
+The Polish monthly screen creates or reads a canonical `/months/{monthId}`
+document and renders a horizontally scrollable, read-only calendar grid.
+Employees are included through employment-date overlap, regardless of their
+current `is_active` value.
+
+Explicit daily values are displayed when present. Otherwise, eligible elapsed
+working days show a virtual `8h`; this value is never written to Firestore.
+Weekend, future-day, and public-holiday placeholder states are visually
+separated. Settled months display a read-only banner.
+
 ## Firestore foundation
 
 - Firestore documents use snake_case and `Timestamp`; domain models use
@@ -107,3 +119,5 @@ The module does not add anonymous sign-in or an authentication screen.
 - [Employee identifier decision](docs/decisions/0002-employee-identifiers.md)
 - [Firestore foundation decision](docs/decisions/0004-firestore-foundation.md)
 - [Employees module decision](docs/decisions/0005-employees-module.md)
+- [Payroll-period participation decision](docs/decisions/0006-payroll-period-participation.md)
+- [Month settlement shell decision](docs/decisions/0007-month-settlement-shell.md)

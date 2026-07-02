@@ -5,6 +5,11 @@ export const pl = {
       description:
         'Rejestr pracowników, numery TETA i informacje o zatrudnieniu.',
     },
+    settlement: {
+      label: 'Rozliczenie miesięczne',
+      description:
+        'Kalendarz obecności i wizualna przestrzeń rozliczenia wybranego miesiąca.',
+    },
   },
   employees: {
     page: {
@@ -88,6 +93,68 @@ export const pl = {
       created: 'Pracownik został dodany.',
       updated: 'Dane pracownika zostały zapisane.',
       deactivated: 'Pracownik został dezaktywowany.',
+    },
+  },
+  settlement: {
+    page: {
+      eyebrow: 'Rozliczenia',
+      title: 'Rozliczenie miesięczne',
+      description:
+        'Wybierz miesiąc i sprawdź pracowników należących do danego okresu rozliczeniowego.',
+    },
+    monthSelector: {
+      label: 'Miesiąc rozliczeniowy',
+      helper:
+        'Miesiąc zostanie utworzony automatycznie, jeśli jeszcze nie istnieje.',
+    },
+    summary: {
+      employees: 'Liczba pracowników w miesiącu: {{count}}',
+      calculationVersion: 'Wersja obliczeń: {{version}}',
+    },
+    settled: {
+      title: 'Miesiąc został zamknięty',
+      description:
+        'Dane tego miesiąca są tylko do odczytu. Zmiany w okresie rozliczeniowym są zablokowane.',
+    },
+    incompleteEmployment: {
+      title: 'Niekompletne dane zatrudnienia',
+      description:
+        'Liczba pracowników bez daty rozpoczęcia, których nie można przypisać do miesiąca: {{count}}.',
+    },
+    grid: {
+      teta: 'TETA',
+      employee: 'Pracownik',
+      empty: '—',
+      hours: '{{hours}} h',
+      virtualDefault:
+        'Wirtualna wartość domyślna — nie jest zapisana w Firestore.',
+      persistedValue: 'Wartość zapisana w Firestore.',
+    },
+    legend: {
+      title: 'Oznaczenia kalendarza',
+      workingDay: 'Dzień roboczy',
+      weekend: 'Weekend',
+      publicHoliday: 'Święto (obsługa przygotowana)',
+      futureDay: 'Dzień przyszły',
+      virtualDefault: 'Wirtualne 8 h',
+      virtualDefaultValue: '8',
+    },
+    empty: {
+      title: 'Brak pracowników w wybranym miesiącu',
+      description:
+        'Żaden pracownik z kompletnymi datami zatrudnienia nie pokrywa się z wybranym okresem.',
+    },
+    loading: 'Ładowanie rozliczenia miesięcznego',
+    errors: {
+      title: 'Nie udało się otworzyć miesiąca',
+      firebaseUnavailable:
+        'Konfiguracja Firebase jest niekompletna. Uzupełnij klucz API aplikacji.',
+      authenticationRequired:
+        'Do odczytu i utworzenia miesiąca wymagane jest aktywne uwierzytelnienie Firebase.',
+      monthUnavailable:
+        'Dokument miesiąca nie jest dostępny. Spróbuj ponownie.',
+      generic:
+        'Sprawdź połączenie z Firebase oraz uprawnienia i spróbuj ponownie.',
     },
   },
 } as const;

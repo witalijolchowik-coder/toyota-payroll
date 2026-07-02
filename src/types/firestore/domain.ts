@@ -35,11 +35,13 @@ export interface PayrollMonth extends ModificationMetadata {
   id: MonthId;
   year: number;
   month: number;
+  monthStart: Date;
+  monthEnd: Date;
   isSettled: boolean;
   calculationStatus: CalculationStatus | null;
   calculationStartedAt: Date | null;
   calculationCompletedAt: Date | null;
-  calculationVersion: string | null;
+  calculationVersion: number;
   calculationError: string | null;
   settledAt: Date | null;
   settledBy: string | null;

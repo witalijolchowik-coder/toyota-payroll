@@ -6,15 +6,14 @@
 | 2    | Responsive application shell and module placeholders                | Complete    |
 | 3    | Firestore foundation and security-rule tests                        | Complete    |
 | 4    | Employees                                                           | Complete    |
-| 5    | Authentication and access experience                                | Not started |
-| 6    | Month initialization and settlement shell                           | Not started |
-| 7    | Daily value entry                                                   | Not started |
-| 8    | Absences                                                            | Not started |
-| 9    | Recalculation function                                              | Not started |
-| 10   | Adjustments                                                         | Not started |
-| 11   | L4 and attendance import                                            | Not started |
-| 12   | Reports                                                             | Not started |
-| 13   | Month settlement and usability polish                               | Not started |
+| 5    | Month initialization and settlement shell                           | Complete    |
+| 6    | Daily value entry                                                   | Not started |
+| 7    | Absences                                                            | Not started |
+| 8    | Recalculation function                                              | Not started |
+| 9    | Adjustments                                                         | Not started |
+| 10   | L4 and attendance import                                            | Not started |
+| 11   | Reports                                                             | Not started |
+| 12   | Month settlement and usability polish                               | Not started |
 
 The Firestore-foundation sequencing amendment was approved on 2026-07-02. The
 repository must not proceed to Step 4 without explicit approval.
@@ -22,6 +21,11 @@ repository must not proceed to Step 4 without explicit approval.
 The Step 4 scope was explicitly approved as the Employees module on
 2026-07-02. A dedicated authentication experience remains deferred; employee
 writes require an existing Firebase Authentication session.
+
+The Step 5 scope was explicitly approved as month initialization and the
+read-only settlement shell on 2026-07-02. A dedicated authentication
+experience remains deferred; month access requires an existing Firebase
+Authentication session.
 
 ## Step 1 acceptance criteria
 
@@ -60,3 +64,14 @@ writes require an existing Firebase Authentication session.
   documents.
 - Unit tests for employee validation and TETA uniqueness plus emulator-backed
   employee Security Rules tests.
+
+## Step 5 acceptance criteria
+
+- Polish month selector with transactional creation of missing canonical month
+  documents.
+- Read-only calendar grid with TETA and employee names in leading columns.
+- Employee participation based on employment-date overlap, never current
+  `is_active`.
+- Weekend, public-holiday placeholder, and future-day presentation states.
+- Virtual `8h` display without persisted default documents.
+- Settled-month read-only banner and focused unit and Security Rules tests.

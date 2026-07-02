@@ -47,6 +47,29 @@ TETA is the only import-matching and external-report identifier. Firestore IDs m
 
 Firestore does not provide unique field constraints. TETA uniqueness therefore requires an application or server-side check when the Employees module is implemented; rules alone cannot guarantee it safely under concurrent writes.
 
+## Month documents
+
+`/months/{monthId}` uses a canonical `YYYY-MM` document ID and stores:
+
+```text
+year
+month
+month_start
+month_end
+is_settled
+calculation_version
+created_at / created_by
+updated_at / updated_by
+```
+
+`month_start` is the first instant of the month in UTC and `month_end` is the
+last millisecond of the month in UTC. A newly initialized month starts with
+`is_settled: false` and `calculation_version: 0`.
+
+The browser may create this initial canonical document when it is missing.
+Calculation state, later calculation versions, and settlement state remain
+server-owned.
+
 ## Current status and payroll-period participation
 
 `employees.is_active` represents the employee's current HR status for
@@ -76,6 +99,12 @@ resolution rather than using current status as a fallback.
 An empty working day does not create a daily-value document. The future UI renders the appropriate default, and recalculation applies the same rule in memory.
 
 A daily-value document exists only for an explicit fact such as a manual edit or applied attendance import. An absence remains governed by its absence document rather than a duplicate daily-value fact.
+
+The settlement shell may display a virtual `8h` only for a non-future working
+day that falls inside the employee's employment period and has no persisted
+daily value. Weekends, configured public holidays, future days, and dates
+outside employment remain empty. Displaying this default never creates a
+Firestore document.
 
 ## Settlement lock
 

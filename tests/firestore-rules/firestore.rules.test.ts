@@ -27,11 +27,16 @@ function modificationMetadata(uid: string) {
 }
 
 async function seedMonth(monthId: string, isSettled: boolean) {
+  const year = Number(monthId.slice(0, 4));
+  const month = Number(monthId.slice(5, 7));
   await testEnvironment.withSecurityRulesDisabled(async (context) => {
     await setDoc(doc(context.firestore(), 'months', monthId), {
-      year: Number(monthId.slice(0, 4)),
-      month: Number(monthId.slice(5, 7)),
+      year,
+      month,
+      month_start: new Date(Date.UTC(year, month - 1, 1)),
+      month_end: new Date(Date.UTC(year, month, 1) - 1),
       is_settled: isSettled,
+      calculation_version: 0,
       created_at: new Date('2026-07-01T00:00:00.000Z'),
       created_by: 'system',
       updated_at: new Date('2026-07-01T00:00:00.000Z'),
@@ -149,6 +154,40 @@ describe('Firestore security rules', () => {
     );
   });
 
+  it('allows an authenticated user to create a canonical month document', async () => {
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+
+    await assertSucceeds(
+      setDoc(doc(firestore, 'months', '2026-07'), {
+        year: 2026,
+        month: 7,
+        month_start: new Date('2026-07-01T00:00:00.000Z'),
+        month_end: new Date('2026-07-31T23:59:59.999Z'),
+        is_settled: false,
+        calculation_version: 0,
+        ...modificationMetadata(uid),
+      }),
+    );
+  });
+
+  it('rejects month metadata that does not match the document ID', async () => {
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+
+    await assertFails(
+      setDoc(doc(firestore, 'months', '2026-07'), {
+        year: 2026,
+        month: 6,
+        month_start: new Date('2026-06-01T00:00:00.000Z'),
+        month_end: new Date('2026-06-30T23:59:59.999Z'),
+        is_settled: false,
+        calculation_version: 0,
+        ...modificationMetadata(uid),
+      }),
+    );
+  });
+
   it('denies child writes beneath a settled month', async () => {
     await seedMonth('2026-07', true);
     const uid = 'coordinator-1';
@@ -168,6 +207,20 @@ describe('Firestore security rules', () => {
           ...modificationMetadata(uid),
         },
       ),
+    );
+  });
+
+  it('prevents a settled month from being reopened or modified', async () => {
+    await seedMonth('2026-07', true);
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+
+    await assertFails(
+      updateDoc(doc(firestore, 'months', '2026-07'), {
+        is_settled: false,
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
     );
   });
 
@@ -237,8 +290,23 @@ describe('Firestore security rules', () => {
       setDoc(doc(firestore, 'months', '2026-07'), {
         year: 2026,
         month: 7,
+        month_start: new Date('2026-07-01T00:00:00.000Z'),
+        month_end: new Date('2026-07-31T23:59:59.999Z'),
         is_settled: false,
+        calculation_version: 0,
         calculation_status: 'completed',
+        ...modificationMetadata(uid),
+      }),
+    );
+
+    await assertFails(
+      setDoc(doc(firestore, 'months', '2026-08'), {
+        year: 2026,
+        month: 8,
+        month_start: new Date('2026-08-01T00:00:00.000Z'),
+        month_end: new Date('2026-08-31T23:59:59.999Z'),
+        is_settled: false,
+        calculation_version: 1,
         ...modificationMetadata(uid),
       }),
     );

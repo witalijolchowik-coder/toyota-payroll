@@ -32,11 +32,13 @@ export type CalculationStatus =
 export interface MonthDocument extends ModificationMetadataDocument {
   year: number;
   month: number;
+  month_start: Timestamp;
+  month_end: Timestamp;
   is_settled: boolean;
   calculation_status?: CalculationStatus;
   calculation_started_at?: Timestamp | null;
   calculation_completed_at?: Timestamp | null;
-  calculation_version?: string | null;
+  calculation_version: number;
   calculation_error?: string | null;
   settled_at?: Timestamp | null;
   settled_by?: string | null;

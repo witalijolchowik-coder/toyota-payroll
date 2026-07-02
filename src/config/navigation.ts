@@ -24,10 +24,10 @@ export const primaryNavigation: NavigationItem[] = [
     description: pl.navigation.employees.description,
   },
   {
-    label: 'Monthly Settlement',
+    label: pl.navigation.settlement.label,
     path: routes.settlement,
     icon: AssessmentOutlined,
-    description: 'The main monthly attendance and settlement workspace.',
+    description: pl.navigation.settlement.description,
   },
   {
     label: 'Absences',

@@ -4,8 +4,16 @@ import type {
   DailyValueDocument,
   EmployeeDocument,
 } from '../../types/firestore';
-import { dailyValueConverter, employeeConverter } from './converters';
-import { mapDailyValueDocument, mapEmployeeDocument } from './mappers';
+import {
+  dailyValueConverter,
+  employeeConverter,
+  monthConverter,
+} from './converters';
+import {
+  mapDailyValueDocument,
+  mapEmployeeDocument,
+  mapMonthDocument,
+} from './mappers';
 import {
   assertIsoDate,
   assertMonthId,
@@ -70,6 +78,33 @@ describe('Firestore converters', () => {
         {},
       ),
     ).toThrow(InvalidFirestoreDocumentError);
+  });
+
+  it('validates and maps canonical month boundaries', () => {
+    const monthStart = Timestamp.fromDate(new Date('2026-07-01T00:00:00.000Z'));
+    const monthEnd = Timestamp.fromDate(new Date('2026-07-31T23:59:59.999Z'));
+    const document = monthConverter.fromFirestore(
+      snapshot('months/2026-07', {
+        year: 2026,
+        month: 7,
+        month_start: monthStart,
+        month_end: monthEnd,
+        is_settled: false,
+        calculation_version: 0,
+        created_at: now,
+        created_by: 'test-user',
+        updated_at: now,
+        updated_by: 'test-user',
+      }),
+      {},
+    );
+
+    expect(mapMonthDocument('2026-07', document)).toMatchObject({
+      id: '2026-07',
+      monthStart: new Date('2026-07-01T00:00:00.000Z'),
+      monthEnd: new Date('2026-07-31T23:59:59.999Z'),
+      calculationVersion: 0,
+    });
   });
 
   it('maps an explicit daily value without adding employee names', () => {
