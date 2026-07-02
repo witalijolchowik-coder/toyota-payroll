@@ -1,12 +1,7 @@
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { RouterProvider } from 'react-router-dom';
 
-import { BootstrapPage } from './pages/BootstrapPage';
+import { router } from './router/router';
 
 export function App() {
-  return (
-    <Routes>
-      <Route path="/" element={<BootstrapPage />} />
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
-  );
+  return <RouterProvider router={router} />;
 }

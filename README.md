@@ -1,8 +1,11 @@
 # Toyota Payroll
 
-Bootstrap for the Toyota Payroll Engine MVP: a browser-based coordinator workspace built with React, Vite, TypeScript, and Firebase.
+Foundation for the Toyota Payroll Engine MVP: a browser-based coordinator
+workspace built with React, Vite, TypeScript, Material UI, and Firebase.
 
-This repository currently contains only the Step 1 foundation. Authentication screens, employees, monthly settlement, absences, adjustments, payroll calculations, imports, and reports are intentionally not implemented.
+The repository currently includes the approved Step 2 application shell.
+Authentication screens, employees, monthly settlement, absences, adjustments,
+payroll calculations, imports, and reports are intentionally not implemented.
 
 ## Prerequisites
 
@@ -53,6 +56,19 @@ Pushes to `main` run the quality checks, build the static application, and deplo
 3. Add the deployed Pages origin to Firebase Authentication's authorized domains before Step 2.
 
 The app uses hash-based routing to avoid project-page refresh failures.
+
+## Application shell
+
+The responsive shell includes:
+
+- top application bar and user placeholder;
+- collapsible desktop navigation and mobile drawer;
+- routes for every planned MVP module;
+- global loading, notification, theme, authentication, and error providers;
+- placeholder dashboard and module pages.
+
+Firebase clients are initialized, but Step 2 performs no Firestore reads or
+writes.
 
 ## Documentation
 

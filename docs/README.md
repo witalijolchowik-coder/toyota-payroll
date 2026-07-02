@@ -13,6 +13,7 @@ The attached design history contains several generations of the architecture. Th
 
 - [ADR 0001: Bootstrap stack](decisions/0001-bootstrap-stack.md)
 - [ADR 0002: Employee identifiers](decisions/0002-employee-identifiers.md)
+- [ADR 0003: Application shell structure](decisions/0003-application-shell.md)
 
 ## Authority order
 

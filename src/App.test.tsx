@@ -1,19 +1,25 @@
 import { render, screen } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
 
 import { App } from './App';
+import { AppProviders } from './providers/AppProviders';
 
 describe('App', () => {
-  it('renders the Step 1 bootstrap shell', () => {
+  it('renders the application shell and dashboard', async () => {
     render(
-      <MemoryRouter>
+      <AppProviders>
         <App />
-      </MemoryRouter>,
+      </AppProviders>,
     );
 
     expect(
-      screen.getByRole('heading', { name: 'Foundation ready' }),
+      await screen.findByRole('heading', { name: 'Dashboard', level: 1 }),
     ).toBeInTheDocument();
-    expect(screen.getByText('Step 1 of 12')).toBeInTheDocument();
+    expect(
+      screen.getByRole('navigation', { name: 'Primary navigation' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getAllByRole('link', { name: /Employees/i }).length,
+    ).toBeGreaterThan(0);
+    expect(screen.getByText('Current Absences')).toBeInTheDocument();
   });
 });
