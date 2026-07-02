@@ -47,6 +47,30 @@ TETA is the only import-matching and external-report identifier. Firestore IDs m
 
 Firestore does not provide unique field constraints. TETA uniqueness therefore requires an application or server-side check when the Employees module is implemented; rules alone cannot guarantee it safely under concurrent writes.
 
+## Current status and payroll-period participation
+
+`employees.is_active` represents the employee's current HR status for
+day-to-day coordination. It may be used by current-workforce views and
+workflows, but it is not historical evidence that the employee did or did not
+participate in an earlier payroll month.
+
+Monthly participation is determined only by overlap between the employment
+period and the selected payroll month:
+
+```text
+employment_start <= month_end
+AND
+(employment_end is null OR employment_end >= month_start)
+```
+
+For example, an employee whose employment ended on 15 June is inactive in
+July, but must still be included when June payroll is calculated in July.
+
+Future month initialization and payroll calculation must not filter employees
+by their current `is_active` value. If `employment_start` is missing, the
+future monthly workflow must surface the incomplete employment data for
+resolution rather than using current status as a fallback.
+
 ## Virtual daily defaults
 
 An empty working day does not create a daily-value document. The future UI renders the appropriate default, and recalculation applies the same rule in memory.

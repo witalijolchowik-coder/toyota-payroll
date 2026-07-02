@@ -34,6 +34,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   step before authentication.
 - Updated the implementation sequence so the approved Firestore foundation is
   Step 3 and authentication follows as Step 4.
+- Distinguished current employee HR status from historical payroll-period
+  participation and locked monthly inclusion to employment-date overlap.
 
 ### Security
 

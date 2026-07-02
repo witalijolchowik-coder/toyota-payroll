@@ -16,6 +16,7 @@ The attached design history contains several generations of the architecture. Th
 - [ADR 0003: Application shell structure](decisions/0003-application-shell.md)
 - [ADR 0004: Firestore foundation](decisions/0004-firestore-foundation.md)
 - [ADR 0005: Employees module](decisions/0005-employees-module.md)
+- [ADR 0006: Payroll-period participation](decisions/0006-payroll-period-participation.md)
 
 ## Authority order
 

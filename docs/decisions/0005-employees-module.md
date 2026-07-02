@@ -23,6 +23,9 @@ document and domain contracts established in Step 3.
   coordinator UI.
 - Deactivate employees by setting `is_active` to false. Do not expose a delete
   operation.
+- Treat `is_active` only as the current HR status for daily coordination.
+  Historical payroll-period participation is determined from employment-date
+  overlap and must not depend on the current status.
 - Store Polish UI copy in a typed translation resource rather than in React
   components. A full locale-switching framework is deferred until another
   locale is required.
