@@ -1,0 +1,39 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function monthIsOpen(monthId) {
+      return !exists(/databases/$(database)/documents/months/$(monthId))
+        || get(/databases/$(database)/documents/months/$(monthId)).data.is_settled != true;
+    }
+
+    match /employees/{employeeId} {
+      allow read, create, update: if isAuthenticated();
+      allow delete: if false;
+    }
+
+    match /months/{monthId} {
+      allow read, create: if isAuthenticated();
+      allow update: if isAuthenticated() && resource.data.is_settled != true;
+      allow delete: if false;
+
+      match /{collection}/{document=**} {
+        allow read: if isAuthenticated();
+        allow write: if isAuthenticated() && monthIsOpen(monthId);
+      }
+    }
+
+    match /reports/{reportId} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

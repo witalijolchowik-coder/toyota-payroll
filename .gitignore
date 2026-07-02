@@ -1,0 +1,31 @@
+# Dependencies and build output
+node_modules/
+.pnpm-store/
+dist/
+functions/lib/
+coverage/
+
+# Local Firebase and emulator state
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+*.local
+
+# Environment files
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Editor and operating system files
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+.DS_Store
+Thumbs.db
+
+# Codex working folders
+outputs/
+work/

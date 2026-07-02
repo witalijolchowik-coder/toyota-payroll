@@ -1,0 +1,8 @@
+packages:
+  - functions
+allowBuilds:
+  '@firebase/util': true
+  protobufjs: true
+minimumReleaseAgeExclude:
+  - '@types/node@26.1.0'
+  - firebase-tools@15.22.4

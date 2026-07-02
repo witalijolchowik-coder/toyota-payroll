@@ -1,0 +1,28 @@
+# Project documentation
+
+The attached design history contains several generations of the architecture. These files capture only the final decisions that govern implementation.
+
+## Authoritative documents
+
+- [MVP architecture](architecture/mvp-architecture.md) — product shape, boundaries, and final simplifications
+- [Platform](architecture/platform.md) — React, Firebase, GitHub Pages, and logic placement
+- [Data model](architecture/data-model.md) — final MVP Firestore paths and amendments
+- [Roadmap](roadmap.md) — approved implementation sequence and current status
+
+## Decision records
+
+- [ADR 0001: Bootstrap stack](decisions/0001-bootstrap-stack.md)
+- [ADR 0002: Employee identifiers](decisions/0002-employee-identifiers.md)
+
+## Authority order
+
+When documents appear to conflict, use this order:
+
+1. MVP Scope Definition v1.0
+2. TETA Identifier Amendment
+3. Phase 1 Implementation Plan amendments
+4. Phase 1 Implementation Plan
+5. Technical Platform Baseline v1.0
+6. Earlier locked enterprise architecture as future-reference material only
+
+Earlier Python/Pandas batch processing, FastAPI with SQL, and immediate construction of the six-stage enterprise pipeline are obsolete as MVP implementation directions.

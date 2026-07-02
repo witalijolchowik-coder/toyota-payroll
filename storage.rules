@@ -1,0 +1,28 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    match /imports/{monthId}/{importId}/{filename} {
+      allow read, create: if isAuthenticated();
+      allow update, delete: if false;
+    }
+
+    match /reports/{monthId}/{reportType}/{filename} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+
+    match /exports/{monthId}/{exportType}/{filename} {
+      allow read: if isAuthenticated();
+      allow write: if false;
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
