@@ -12,10 +12,12 @@ server-owned.
 
 ## Decision
 
-- Select months by canonical `YYYY-MM` IDs, defaulting the UI to the current
-  month.
-- Create a missing month document transactionally with canonical UTC
-  `month_start` and `month_end`, `is_settled: false`, and
+- Select months by canonical `YYYY-MM` IDs, defaulting the UI to the previous
+  month because payroll is normally prepared in the following month.
+- Reading or selecting a missing month performs no write. Show a compact empty
+  calendar preview and require the coordinator to choose **Utwórz miesiąc**.
+- After that explicit action, create the month transactionally with canonical
+  UTC `month_start` and `month_end`, `is_settled: false`, and
   `calculation_version: 0`.
 - Allow the browser to set that calculation version only during initial
   creation. Later calculation and settlement changes remain denied by
@@ -39,5 +41,6 @@ client calculation updates remain denied.
 ## Consequences
 
 The application now has a Firestore-backed monthly calendar foundation without
-implementing payroll calculations or daily editing. Virtual defaults remain
-presentation-only and do not create `dailyValues` documents.
+implementing payroll calculations or daily editing. Selecting or viewing a
+month is side-effect free. Virtual defaults remain presentation-only and do
+not create `dailyValues` documents.

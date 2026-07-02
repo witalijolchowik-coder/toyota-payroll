@@ -6,6 +6,7 @@ import {
   formatMonthId,
   getMonthDateRange,
   parseMonthId,
+  previousMonthId,
   resolveSettlementCellValue,
 } from './monthUtils';
 
@@ -35,6 +36,8 @@ describe('payroll month identifiers and date ranges', () => {
     expect(formatMonthId(2026, 7)).toBe('2026-07');
     expect(parseMonthId('2026-07')).toEqual({ year: 2026, month: 7 });
     expect(currentMonthId(new Date(2026, 6, 2))).toBe('2026-07');
+    expect(previousMonthId(new Date(2026, 6, 2))).toBe('2026-06');
+    expect(previousMonthId(new Date(2026, 0, 10))).toBe('2025-12');
   });
 
   it('rejects malformed month IDs and month numbers', () => {

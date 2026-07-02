@@ -43,6 +43,10 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   participation and locked monthly inclusion to employment-date overlap.
 - Added canonical UTC month boundaries and numeric calculation version zero to
   newly initialized month documents.
+- Changed the settlement default to the previous month and made month creation
+  an explicit coordinator action instead of a page-load side effect.
+- Replaced technical Firebase configuration wording with coordinator-friendly
+  Polish copy.
 
 ### Security
 

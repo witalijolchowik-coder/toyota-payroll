@@ -86,10 +86,12 @@ The module does not add anonymous sign-in or an authentication screen.
 
 ## Monthly settlement shell
 
-The Polish monthly screen creates or reads a canonical `/months/{monthId}`
-document and renders a horizontally scrollable, read-only calendar grid.
-Employees are included through employment-date overlap, regardless of their
-current `is_active` value.
+The Polish monthly screen defaults to the previous payroll month and reads a
+canonical `/months/{monthId}` document. A missing month is created only after
+the coordinator chooses **Utwórz miesiąc**; selecting or viewing it is
+side-effect free. The screen renders a horizontally scrollable, read-only
+calendar grid. Employees are included through employment-date overlap,
+regardless of their current `is_active` value.
 
 Explicit daily values are displayed when present. Otherwise, eligible elapsed
 working days show a virtual `8h`; this value is never written to Firestore.

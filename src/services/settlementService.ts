@@ -55,9 +55,40 @@ async function requireActorUid(): Promise<string> {
   return uid;
 }
 
-export async function loadOrCreateSettlementMonth(
+export async function loadSettlementMonth(
   monthId: MonthId,
-): Promise<SettlementMonthData> {
+): Promise<SettlementMonthData | null> {
+  const repositories = getFirestoreRepositories();
+  if (!repositories) {
+    throw new SettlementServiceError('firebase-unavailable');
+  }
+
+  await requireActorUid();
+  const monthRepository = repositories.forMonth(monthId);
+  const monthSnapshot = await getDoc(monthRepository.month);
+
+  if (!monthSnapshot.exists()) {
+    return null;
+  }
+
+  const employeesQuery = query(repositories.employees, orderBy('teta_number'));
+  const [employeesSnapshot, dailyValuesSnapshot] = await Promise.all([
+    getDocs(employeesQuery),
+    getDocs(monthRepository.dailyValues),
+  ]);
+
+  return {
+    month: mapMonthDocument(monthId, monthSnapshot.data()),
+    employees: employeesSnapshot.docs.map((document) =>
+      mapEmployeeDocument(document.id, document.data()),
+    ),
+    dailyValues: dailyValuesSnapshot.docs.map((document) =>
+      mapDailyValueDocument(document.id, monthId, document.data()),
+    ),
+  };
+}
+
+export async function createSettlementMonth(monthId: MonthId): Promise<void> {
   const firestore = getFirestoreClient();
   const repositories = getFirestoreRepositories();
   if (!firestore || !repositories) {
@@ -87,26 +118,4 @@ export async function loadOrCreateSettlementMonth(
       updated_by: actorUid,
     });
   });
-
-  const employeesQuery = query(repositories.employees, orderBy('teta_number'));
-  const [monthSnapshot, employeesSnapshot, dailyValuesSnapshot] =
-    await Promise.all([
-      getDoc(monthRepository.month),
-      getDocs(employeesQuery),
-      getDocs(monthRepository.dailyValues),
-    ]);
-
-  if (!monthSnapshot.exists()) {
-    throw new SettlementServiceError('month-unavailable');
-  }
-
-  return {
-    month: mapMonthDocument(monthId, monthSnapshot.data()),
-    employees: employeesSnapshot.docs.map((document) =>
-      mapEmployeeDocument(document.id, document.data()),
-    ),
-    dailyValues: dailyValuesSnapshot.docs.map((document) =>
-      mapDailyValueDocument(document.id, monthId, document.data()),
-    ),
-  };
 }

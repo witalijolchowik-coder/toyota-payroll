@@ -66,9 +66,10 @@ updated_at / updated_by
 last millisecond of the month in UTC. A newly initialized month starts with
 `is_settled: false` and `calculation_version: 0`.
 
-The browser may create this initial canonical document when it is missing.
-Calculation state, later calculation versions, and settlement state remain
-server-owned.
+After a coordinator explicitly selects **Utwórz miesiąc**, the browser may
+create this initial canonical document when it is missing. Merely opening the
+settlement page or selecting a month performs no write. Calculation state,
+later calculation versions, and settlement state remain server-owned.
 
 ## Current status and payroll-period participation
 

@@ -4,13 +4,13 @@ import { Stack } from '@mui/material';
 import { PageHeader } from '../components/layout/PageHeader';
 import { MonthSelector } from '../features/settlement/MonthSelector';
 import { SettlementMonthView } from '../features/settlement/SettlementMonthView';
-import { currentMonthId } from '../features/settlement/monthUtils';
+import { previousMonthId } from '../features/settlement/monthUtils';
 import { useTranslations } from '../hooks/useTranslations';
 import type { MonthId } from '../types/firestore';
 
 export function MonthlySettlementPage() {
   const t = useTranslations();
-  const [monthId, setMonthId] = useState<MonthId>(() => currentMonthId());
+  const [monthId, setMonthId] = useState<MonthId>(() => previousMonthId());
 
   return (
     <Stack spacing={3}>

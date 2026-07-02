@@ -1,16 +1,20 @@
+import CalendarMonthOutlined from '@mui/icons-material/CalendarMonthOutlined';
 import GroupsOutlined from '@mui/icons-material/GroupsOutlined';
 import {
   Alert,
   Box,
+  Button,
   Card,
   CardContent,
   Chip,
+  CircularProgress,
   Skeleton,
   Stack,
   Typography,
 } from '@mui/material';
 
 import { useTranslations } from '../../hooks/useTranslations';
+import { useNotification } from '../../hooks/useNotification';
 import { interpolate } from '../../i18n/pl';
 import {
   SettlementServiceError,
@@ -39,7 +43,9 @@ const monthFormatter = new Intl.DateTimeFormat('pl-PL', {
 
 export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
   const t = useTranslations();
-  const { data, error, isLoading } = useSettlementMonth(monthId);
+  const { notify } = useNotification();
+  const { data, error, isLoading, isCreating, createMonth } =
+    useSettlementMonth(monthId);
 
   if (isLoading) {
     return (
@@ -54,7 +60,7 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
     );
   }
 
-  if (error || !data) {
+  if (error) {
     return (
       <Alert severity="error">
         <strong>{t.settlement.errors.title}</strong>
@@ -68,6 +74,61 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
   const days = createCalendarDays(monthId, {
     publicHolidays: getPublicHolidaysForYear(range.year),
   });
+
+  if (!data) {
+    const handleCreateMonth = () => {
+      void createMonth()
+        .then(() => {
+          notify({
+            message: t.settlement.notifications.created,
+            severity: 'success',
+          });
+        })
+        .catch(() => undefined);
+    };
+
+    return (
+      <Stack spacing={2}>
+        <Card>
+          <CardContent sx={{ py: 2.5 }}>
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              spacing={2}
+              sx={{
+                alignItems: { xs: 'flex-start', sm: 'center' },
+                justifyContent: 'space-between',
+              }}
+            >
+              <div>
+                <Typography variant="h6">
+                  {t.settlement.missingMonth.title}
+                </Typography>
+                <Typography color="text.secondary">
+                  {t.settlement.missingMonth.description}
+                </Typography>
+              </div>
+              <Button
+                variant="contained"
+                onClick={handleCreateMonth}
+                disabled={isCreating}
+                startIcon={
+                  isCreating ? (
+                    <CircularProgress size={16} color="inherit" />
+                  ) : (
+                    <CalendarMonthOutlined />
+                  )
+                }
+              >
+                {t.settlement.missingMonth.create}
+              </Button>
+            </Stack>
+          </CardContent>
+        </Card>
+        <SettlementGrid employees={[]} days={days} dailyValues={[]} />
+      </Stack>
+    );
+  }
+
   const employeesWithoutStartDate = data.employees.filter(
     (employee) => !employee.employmentStartDate,
   );

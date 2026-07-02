@@ -73,6 +73,13 @@ export function currentMonthId(today = new Date()): MonthId {
   return formatMonthId(today.getFullYear(), today.getMonth() + 1);
 }
 
+export function previousMonthId(today = new Date()): MonthId {
+  const previousMonth = new Date(today);
+  previousMonth.setDate(1);
+  previousMonth.setMonth(previousMonth.getMonth() - 1);
+  return currentMonthId(previousMonth);
+}
+
 export function getMonthDateRange(monthId: string): MonthDateRange {
   const { year, month } = parseMonthId(monthId);
   const start = new Date(0);

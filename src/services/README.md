@@ -15,5 +15,5 @@ should follow the same pattern and accept the restricted client-write types
 from `src/types/firestore/writes.ts`.
 
 The settlement shell composes the month, employee, and daily-value boundaries
-in `settlementService.ts`. It transactionally creates only the initial
-canonical month document and otherwise performs read-only settlement loading.
+in `settlementService.ts`. Loading is read-only; a separate coordinator action
+transactionally creates only the initial canonical month document.

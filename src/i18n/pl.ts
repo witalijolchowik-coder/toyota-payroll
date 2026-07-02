@@ -56,7 +56,7 @@ export const pl = {
       loadDescription:
         'Sprawdź połączenie z Firebase oraz stan uwierzytelnienia i spróbuj ponownie.',
       firebaseUnavailable:
-        'Konfiguracja Firebase jest niekompletna. Uzupełnij klucz API aplikacji.',
+        'Nie można połączyć się z Firebase. Sprawdź konfigurację aplikacji.',
       authenticationRequired:
         'Do zapisu danych wymagane jest aktywne uwierzytelnienie Firebase.',
       saveFailed:
@@ -104,8 +104,7 @@ export const pl = {
     },
     monthSelector: {
       label: 'Miesiąc rozliczeniowy',
-      helper:
-        'Miesiąc zostanie utworzony automatycznie, jeśli jeszcze nie istnieje.',
+      helper: 'Domyślnie wybrano poprzedni miesiąc. Możesz wskazać inny okres.',
     },
     summary: {
       employees: 'Liczba pracowników w miesiącu: {{count}}',
@@ -123,7 +122,7 @@ export const pl = {
     },
     grid: {
       teta: 'TETA',
-      employee: 'Pracownik',
+      employee: 'Nazwisko i imię',
       empty: '—',
       hours: '{{hours}} h',
       virtualDefault:
@@ -144,11 +143,20 @@ export const pl = {
       description:
         'Żaden pracownik z kompletnymi datami zatrudnienia nie pokrywa się z wybranym okresem.',
     },
+    missingMonth: {
+      title: 'Miesiąc nie został jeszcze utworzony.',
+      description:
+        'Utwórz dokument miesiąca, aby przygotować przestrzeń rozliczeniową.',
+      create: 'Utwórz miesiąc',
+    },
     loading: 'Ładowanie rozliczenia miesięcznego',
+    notifications: {
+      created: 'Miesiąc został utworzony.',
+    },
     errors: {
       title: 'Nie udało się otworzyć miesiąca',
       firebaseUnavailable:
-        'Konfiguracja Firebase jest niekompletna. Uzupełnij klucz API aplikacji.',
+        'Nie można połączyć się z Firebase. Sprawdź konfigurację aplikacji.',
       authenticationRequired:
         'Do odczytu i utworzenia miesiąca wymagane jest aktywne uwierzytelnienie Firebase.',
       monthUnavailable:
