@@ -101,11 +101,23 @@ An empty working day does not create a daily-value document. The future UI rende
 
 A daily-value document exists only for an explicit fact such as a manual edit or applied attendance import. An absence remains governed by its absence document rather than a duplicate daily-value fact.
 
-The settlement shell may display a virtual `8h` only for a non-future working
-day that falls inside the employee's employment period and has no persisted
-daily value. Weekends, configured public holidays, future days, and dates
-outside employment remain empty. Displaying this default never creates a
-Firestore document.
+The settlement shell displays virtual `8h` for a non-future working day and
+virtual `0h` for a non-future weekend or configured public holiday when the day
+falls inside the employee's employment period and has no persisted daily
+value. Future days and dates outside employment remain empty. Displaying these
+defaults never creates a Firestore document.
+
+Manual daily-value edits use the canonical document ID
+`{employeeId}_{YYYY-MM-DD}`, source `manual`, and modification metadata. A
+manual value may be updated or deleted while the month is open. Clearing it, or
+returning it to the applicable virtual default, deletes the manual document so
+the virtual value becomes visible again. Imported daily values remain
+client-read-only.
+
+Daily values are worked-hour facts only. They do not define nominal month
+hours, employee-specific nominal hours, bonuses, absence calculations, or
+payroll results. Those concepts remain deferred until an approved Business
+Rules Specification exists.
 
 ## Settlement lock
 

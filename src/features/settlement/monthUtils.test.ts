@@ -111,14 +111,22 @@ describe('virtual daily values', () => {
         employee: employeeRecord,
         day: workingDay,
       }),
-    ).toEqual({ kind: 'virtual-default', hours: 8 });
+    ).toEqual({
+      kind: 'virtual-default',
+      calendarState: 'working',
+      hours: 8,
+    });
   });
 
   it('includes the current working day in virtual defaults', () => {
     const today = calendar.find((day) => day.isoDate === '2026-07-15')!;
     expect(
       resolveSettlementCellValue({ employee: employeeRecord, day: today }),
-    ).toEqual({ kind: 'virtual-default', hours: 8 });
+    ).toEqual({
+      kind: 'virtual-default',
+      calendarState: 'working',
+      hours: 8,
+    });
   });
 
   it('keeps future working days and weekends empty', () => {
@@ -127,10 +135,14 @@ describe('virtual daily values', () => {
 
     expect(
       resolveSettlementCellValue({ employee: employeeRecord, day: futureDay }),
-    ).toEqual({ kind: 'empty', hours: null });
+    ).toEqual({ kind: 'empty', calendarState: 'future', hours: null });
     expect(
       resolveSettlementCellValue({ employee: employeeRecord, day: weekend }),
-    ).toEqual({ kind: 'empty', hours: null });
+    ).toEqual({
+      kind: 'virtual-default',
+      calendarState: 'non-working',
+      hours: 0,
+    });
   });
 
   it('supports public-holiday placeholders as non-working days', () => {
@@ -148,7 +160,11 @@ describe('virtual daily values', () => {
     });
     expect(
       resolveSettlementCellValue({ employee: employeeRecord, day: holiday }),
-    ).toEqual({ kind: 'empty', hours: null });
+    ).toEqual({
+      kind: 'virtual-default',
+      calendarState: 'non-working',
+      hours: 0,
+    });
   });
 
   it('uses a persisted value before the virtual default', () => {
@@ -172,7 +188,31 @@ describe('virtual daily values', () => {
         day,
         persistedValue,
       }),
-    ).toEqual({ kind: 'persisted', hours: 6 });
+    ).toEqual({ kind: 'manual', calendarState: 'working', hours: 6 });
+  });
+
+  it('distinguishes an imported persisted value', () => {
+    const day = calendar.find((item) => item.isoDate === '2026-07-14')!;
+    const importedValue = {
+      id: 'employee-1_2026-07-14',
+      monthId: '2026-07',
+      employeeId: 'employee-1',
+      tetaNumber: 'TETA-1001',
+      date: '2026-07-14',
+      hours: 7,
+      source: 'attendance_import',
+      importId: 'import-1',
+      note: null,
+      ...metadata,
+    } satisfies DailyValue;
+
+    expect(
+      resolveSettlementCellValue({
+        employee: employeeRecord,
+        day,
+        persistedValue: importedValue,
+      }),
+    ).toEqual({ kind: 'imported', calendarState: 'working', hours: 7 });
   });
 
   it('does not show a virtual default outside the employment period', () => {
@@ -184,6 +224,10 @@ describe('virtual daily values', () => {
         }),
         day,
       }),
-    ).toEqual({ kind: 'empty', hours: null });
+    ).toEqual({
+      kind: 'empty',
+      calendarState: 'outside-employment',
+      hours: null,
+    });
   });
 });

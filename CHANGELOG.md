@@ -32,6 +32,10 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Employment-overlap population filtering and presentation-only daily defaults.
 - Calendar classification for working days, weekends, future dates, and a
   public-holiday provider boundary.
+- Polish manual daily-hours editor with create, update, and clear workflows.
+- Distinct virtual, manual, imported, non-working, future,
+  outside-employment, and settled cell states.
+- Daily-hours validation and virtual-default mutation planning.
 
 ### Changed
 
@@ -47,6 +51,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   an explicit coordinator action instead of a page-load side effect.
 - Replaced technical Firebase configuration wording with coordinator-friendly
   Polish copy.
+- Displayed non-working-day `0h` alongside working-day `8h` as virtual,
+  non-persisted defaults.
 
 ### Security
 
@@ -59,6 +65,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   employee deletion and metadata spoofing denied.
 - Restricted browser month creation to canonical boundaries, an open state,
   caller-bound metadata, and calculation version zero.
+- Enforced canonical manual daily-value IDs and kept imported and settled
+  values read-only.
 
 ## [0.1.0] - 2026-07-02
 

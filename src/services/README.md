@@ -17,3 +17,7 @@ from `src/types/firestore/writes.ts`.
 The settlement shell composes the month, employee, and daily-value boundaries
 in `settlementService.ts`. Loading is read-only; a separate coordinator action
 transactionally creates only the initial canonical month document.
+
+`dailyValueService.ts` transactionally creates, updates, and clears canonical
+manual daily-value documents. It refuses imported values and relies on
+Firestore Rules for open-month enforcement.

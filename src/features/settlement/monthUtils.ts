@@ -28,10 +28,15 @@ export interface CalendarDay {
   isFuture: boolean;
 }
 
-export type SettlementCellKind = 'persisted' | 'virtual-default' | 'empty';
+export type SettlementCellKind =
+  'manual' | 'imported' | 'virtual-default' | 'empty';
+
+export type SettlementCalendarState =
+  'working' | 'non-working' | 'future' | 'outside-employment';
 
 export interface SettlementCellValue {
   kind: SettlementCellKind;
+  calendarState: SettlementCalendarState;
   hours: number | null;
 }
 
@@ -179,19 +184,34 @@ export function resolveSettlementCellValue({
   day: CalendarDay;
   persistedValue?: DailyValue;
 }): SettlementCellValue {
+  const calendarState: SettlementCalendarState = !isDayWithinEmployment(
+    employee,
+    day,
+  )
+    ? 'outside-employment'
+    : day.isFuture
+      ? 'future'
+      : day.isWorkingDay
+        ? 'working'
+        : 'non-working';
+
   if (persistedValue) {
-    return { kind: 'persisted', hours: persistedValue.hours };
+    return {
+      kind: persistedValue.source === 'manual' ? 'manual' : 'imported',
+      calendarState,
+      hours: persistedValue.hours,
+    };
   }
 
-  if (
-    day.isWorkingDay &&
-    !day.isFuture &&
-    isDayWithinEmployment(employee, day)
-  ) {
-    return { kind: 'virtual-default', hours: 8 };
+  if (calendarState === 'working' || calendarState === 'non-working') {
+    return {
+      kind: 'virtual-default',
+      calendarState,
+      hours: calendarState === 'working' ? 8 : 0,
+    };
   }
 
-  return { kind: 'empty', hours: null };
+  return { kind: 'empty', calendarState, hours: null };
 }
 
 export function dailyValueLookupKey(

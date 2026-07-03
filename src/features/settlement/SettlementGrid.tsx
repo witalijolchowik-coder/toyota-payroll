@@ -1,5 +1,6 @@
 import {
   Box,
+  ButtonBase,
   Card,
   Table,
   TableBody,
@@ -27,6 +28,12 @@ interface SettlementGridProps {
   employees: Employee[];
   days: CalendarDay[];
   dailyValues: DailyValue[];
+  isSettled?: boolean;
+  onEditCell?: (
+    employee: Employee,
+    day: CalendarDay,
+    value: ReturnType<typeof resolveSettlementCellValue>,
+  ) => void;
 }
 
 const weekdayFormatter = new Intl.DateTimeFormat('pl-PL', {
@@ -41,6 +48,8 @@ export function SettlementGrid({
   employees,
   days,
   dailyValues,
+  isSettled = false,
+  onEditCell,
 }: SettlementGridProps) {
   const t = useTranslations();
   const dailyValuesByEmployeeAndDate = new Map(
@@ -147,12 +156,30 @@ export function SettlementGrid({
                       : interpolate(t.settlement.grid.hours, {
                           hours: value.hours.toLocaleString('pl-PL'),
                         });
-                  const tooltip =
-                    value.kind === 'virtual-default'
-                      ? t.settlement.grid.virtualDefault
-                      : value.kind === 'persisted'
-                        ? t.settlement.grid.persistedValue
-                        : '';
+                  const tooltip = isSettled
+                    ? t.settlement.grid.settledMonth
+                    : value.calendarState === 'future'
+                      ? t.settlement.grid.futureDay
+                      : value.calendarState === 'outside-employment'
+                        ? t.settlement.grid.outsideEmployment
+                        : value.kind === 'imported'
+                          ? t.settlement.grid.importedValue
+                          : value.kind === 'manual'
+                            ? t.settlement.grid.manualValue
+                            : value.calendarState === 'non-working'
+                              ? t.settlement.grid.nonWorkingDay
+                              : t.settlement.grid.virtualDefault;
+                  const canEdit =
+                    !isSettled &&
+                    value.kind !== 'imported' &&
+                    value.calendarState !== 'future' &&
+                    value.calendarState !== 'outside-employment' &&
+                    Boolean(onEditCell);
+                  const employeeName = `${employee.lastName} ${employee.firstName}`;
+                  const editLabel = interpolate(t.settlement.grid.edit, {
+                    employee: employeeName,
+                    date: day.isoDate,
+                  });
 
                   return (
                     <TableCell
@@ -163,20 +190,29 @@ export function SettlementGrid({
                         minWidth: 56,
                         px: 0.5,
                         py: 1,
-                        ...calendarBackground(day),
+                        ...cellBackground(value.calendarState, day),
                       }}
                     >
-                      {tooltip ? (
-                        <Tooltip title={tooltip}>
-                          <Box component="span" sx={cellValueSx(value.kind)}>
-                            {label}
-                          </Box>
-                        </Tooltip>
-                      ) : (
-                        <Box component="span" sx={cellValueSx(value.kind)}>
-                          {label}
+                      <Tooltip title={tooltip}>
+                        <Box component="span" sx={{ display: 'block' }}>
+                          <ButtonBase
+                            disabled={!canEdit}
+                            aria-label={canEdit ? editLabel : undefined}
+                            onClick={() => onEditCell?.(employee, day, value)}
+                            sx={{
+                              width: '100%',
+                              minHeight: 30,
+                              borderRadius: 1,
+                              cursor: canEdit ? 'pointer' : 'default',
+                              '&.Mui-disabled': { opacity: 1 },
+                            }}
+                          >
+                            <Box component="span" sx={cellValueSx(value.kind)}>
+                              {label}
+                            </Box>
+                          </ButtonBase>
                         </Box>
-                      )}
+                      </Tooltip>
                     </TableCell>
                   );
                 })}
@@ -211,6 +247,19 @@ function leadingCellSx({
   };
 }
 
+function cellBackground(
+  state: ReturnType<typeof resolveSettlementCellValue>['calendarState'],
+  day: CalendarDay,
+): SxProps<Theme> {
+  if (state === 'outside-employment') {
+    return { bgcolor: 'action.disabledBackground', color: 'text.disabled' };
+  }
+  if (state === 'future') {
+    return { bgcolor: 'action.disabledBackground', color: 'text.disabled' };
+  }
+  return calendarBackground(day);
+}
+
 function calendarBackground(day: CalendarDay): SxProps<Theme> {
   if (day.isFuture) {
     return { bgcolor: 'action.disabledBackground', color: 'text.disabled' };
@@ -232,8 +281,17 @@ function cellValueSx(
   if (kind === 'virtual-default') {
     return { color: 'text.secondary', fontStyle: 'italic' };
   }
-  if (kind === 'persisted') {
-    return { color: 'text.primary', fontWeight: 700 };
+  if (kind === 'manual') {
+    return {
+      color: 'primary.main',
+      fontWeight: 750,
+      textDecoration: 'underline',
+      textDecorationThickness: '2px',
+      textUnderlineOffset: '3px',
+    };
+  }
+  if (kind === 'imported') {
+    return { color: 'secondary.main', fontWeight: 700 };
   }
   return { color: 'text.disabled' };
 }

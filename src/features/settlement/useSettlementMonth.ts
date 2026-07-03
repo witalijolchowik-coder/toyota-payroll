@@ -59,6 +59,27 @@ export function useSettlementMonth(monthId: MonthId) {
     };
   }, [hideLoading, monthId, showLoading]);
 
+  const reload = useCallback(async () => {
+    showLoading();
+    try {
+      const data = await loadSettlementMonth(monthId);
+      setState({
+        data,
+        error: null,
+        isLoading: false,
+        isCreating: false,
+      });
+    } catch (error) {
+      setState((current) => ({
+        ...current,
+        error: error instanceof Error ? error : new Error(String(error)),
+      }));
+      throw error;
+    } finally {
+      hideLoading();
+    }
+  }, [hideLoading, monthId, showLoading]);
+
   const createMonth = useCallback(async () => {
     setState((current) => ({
       ...current,
@@ -91,5 +112,5 @@ export function useSettlementMonth(monthId: MonthId) {
     }
   }, [hideLoading, monthId, showLoading]);
 
-  return { ...state, createMonth };
+  return { ...state, createMonth, reload };
 }

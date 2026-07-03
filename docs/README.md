@@ -18,6 +18,7 @@ The attached design history contains several generations of the architecture. Th
 - [ADR 0005: Employees module](decisions/0005-employees-module.md)
 - [ADR 0006: Payroll-period participation](decisions/0006-payroll-period-participation.md)
 - [ADR 0007: Month initialization and settlement shell](decisions/0007-month-settlement-shell.md)
+- [ADR 0008: Manual daily-value entry](decisions/0008-daily-value-entry.md)
 
 ## Authority order
 

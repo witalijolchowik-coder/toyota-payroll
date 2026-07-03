@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import CalendarMonthOutlined from '@mui/icons-material/CalendarMonthOutlined';
 import GroupsOutlined from '@mui/icons-material/GroupsOutlined';
 import {
@@ -20,11 +21,18 @@ import {
   SettlementServiceError,
   type SettlementServiceErrorCode,
 } from '../../services/settlementService';
-import type { MonthId } from '../../types/firestore';
+import {
+  clearManualDailyValue,
+  saveManualDailyValue,
+} from '../../services/dailyValueService';
+import type { Employee, MonthId } from '../../types/firestore';
+import { DailyValueEditorDialog } from './DailyValueEditorDialog';
 import {
   createCalendarDays,
   employeeParticipatesInMonth,
   getMonthDateRange,
+  type CalendarDay,
+  type SettlementCellValue,
 } from './monthUtils';
 import { getPublicHolidaysForYear } from './publicHolidays';
 import { SettlementGrid } from './SettlementGrid';
@@ -44,8 +52,13 @@ const monthFormatter = new Intl.DateTimeFormat('pl-PL', {
 export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
   const t = useTranslations();
   const { notify } = useNotification();
-  const { data, error, isLoading, isCreating, createMonth } =
+  const { data, error, isLoading, isCreating, createMonth, reload } =
     useSettlementMonth(monthId);
+  const [editingCell, setEditingCell] = useState<{
+    employee: Employee;
+    day: CalendarDay;
+    value: SettlementCellValue;
+  } | null>(null);
 
   if (isLoading) {
     return (
@@ -204,6 +217,10 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
           employees={participatingEmployees}
           days={days}
           dailyValues={participatingDailyValues}
+          isSettled={data.month.isSettled}
+          onEditCell={(employee, day, value) =>
+            setEditingCell({ employee, day, value })
+          }
         />
       ) : (
         <Card>
@@ -218,6 +235,41 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
           </CardContent>
         </Card>
       )}
+
+      {editingCell ? (
+        <DailyValueEditorDialog
+          employee={editingCell.employee}
+          day={editingCell.day}
+          value={editingCell.value}
+          onClose={() => setEditingCell(null)}
+          onSave={async (hours) => {
+            await saveManualDailyValue(monthId, {
+              employeeId: editingCell.employee.id,
+              tetaNumber: editingCell.employee.tetaNumber,
+              date: editingCell.day.isoDate,
+              hours,
+              note: null,
+            });
+            await reload();
+            notify({
+              message: t.settlement.notifications.dailyValueSaved,
+              severity: 'success',
+            });
+          }}
+          onClear={async () => {
+            await clearManualDailyValue(
+              monthId,
+              editingCell.employee.id,
+              editingCell.day.isoDate,
+            );
+            await reload();
+            notify({
+              message: t.settlement.notifications.dailyValueCleared,
+              severity: 'success',
+            });
+          }}
+        />
+      ) : null}
     </Stack>
   );
 }

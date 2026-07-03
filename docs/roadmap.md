@@ -7,7 +7,7 @@
 | 3    | Firestore foundation and security-rule tests                        | Complete    |
 | 4    | Employees                                                           | Complete    |
 | 5    | Month initialization and settlement shell                           | Complete    |
-| 6    | Daily value entry                                                   | Not started |
+| 6    | Daily value entry                                                   | Complete    |
 | 7    | Absences                                                            | Not started |
 | 8    | Recalculation function                                              | Not started |
 | 9    | Adjustments                                                         | Not started |
@@ -75,3 +75,16 @@ Authentication session.
 - Weekend, public-holiday placeholder, and future-day presentation states.
 - Virtual `8h` display without persisted default documents.
 - Settled-month read-only banner and focused unit and Security Rules tests.
+
+## Step 6 acceptance criteria
+
+- Polish manual-hours editor integrated with eligible monthly-grid cells.
+- Explicit manual create and update with canonical IDs and modification
+  metadata.
+- Clearing or restoring a virtual default deletes only the manual document.
+- Distinct virtual, manual, imported, non-working, future,
+  outside-employment, and settled states.
+- Numeric validation from `0` through `24`.
+- Unit and emulator-backed Security Rules tests for create, update, and clear.
+- No nominal-hours, bonus, absence, or payroll-engine logic before a separate
+  approved Business Rules Specification.

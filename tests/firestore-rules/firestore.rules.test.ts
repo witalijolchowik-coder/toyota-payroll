@@ -192,22 +192,45 @@ describe('Firestore security rules', () => {
     await seedMonth('2026-07', true);
     const uid = 'coordinator-1';
     const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const dailyValuePath = 'months/2026-07/dailyValues/employee-1_2026-07-02';
 
     await assertFails(
-      setDoc(
-        doc(firestore, 'months/2026-07/dailyValues/employee-1_2026-07-02'),
-        {
-          employee_id: 'employee-1',
-          teta_number: 'TETA-1001',
-          date: '2026-07-02',
-          hours: 6,
-          source: 'manual',
-          import_id: null,
-          note: null,
-          ...modificationMetadata(uid),
-        },
-      ),
+      setDoc(doc(firestore, dailyValuePath), {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        date: '2026-07-02',
+        hours: 6,
+        source: 'manual',
+        import_id: null,
+        note: null,
+        ...modificationMetadata(uid),
+      }),
     );
+
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), dailyValuePath), {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        date: '2026-07-02',
+        hours: 6,
+        source: 'manual',
+        import_id: null,
+        note: null,
+        created_at: new Date('2026-07-01T00:00:00.000Z'),
+        created_by: uid,
+        updated_at: new Date('2026-07-01T00:00:00.000Z'),
+        updated_by: uid,
+      });
+    });
+
+    await assertFails(
+      updateDoc(doc(firestore, dailyValuePath), {
+        hours: 7,
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertFails(deleteDoc(doc(firestore, dailyValuePath)));
   });
 
   it('prevents a settled month from being reopened or modified', async () => {
@@ -242,6 +265,96 @@ describe('Firestore security rules', () => {
     );
   });
 
+  it('allows manual daily value create, update, and delete in an open month', async () => {
+    await seedMonth('2026-07', false);
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const dailyValue = doc(
+      firestore,
+      'months/2026-07/dailyValues/employee-1_2026-07-14',
+    );
+
+    await assertSucceeds(
+      setDoc(dailyValue, {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        date: '2026-07-14',
+        hours: 0,
+        source: 'manual',
+        import_id: null,
+        note: null,
+        ...modificationMetadata(uid),
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(dailyValue, {
+        hours: 7.5,
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertSucceeds(deleteDoc(dailyValue));
+  });
+
+  it('rejects non-canonical daily value document IDs', async () => {
+    await seedMonth('2026-07', false);
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+
+    await assertFails(
+      setDoc(doc(firestore, 'months/2026-07/dailyValues/non-canonical-id'), {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        date: '2026-07-14',
+        hours: 6,
+        source: 'manual',
+        import_id: null,
+        note: null,
+        ...modificationMetadata(uid),
+      }),
+    );
+  });
+
+  it('keeps imported daily values read-only for clients', async () => {
+    await seedMonth('2026-07', false);
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(
+          context.firestore(),
+          'months/2026-07/dailyValues/employee-1_2026-07-14',
+        ),
+        {
+          employee_id: 'employee-1',
+          teta_number: 'TETA-1001',
+          date: '2026-07-14',
+          hours: 6,
+          source: 'attendance_import',
+          import_id: 'import-1',
+          note: null,
+          created_at: new Date('2026-07-15T00:00:00.000Z'),
+          created_by: 'system',
+          updated_at: new Date('2026-07-15T00:00:00.000Z'),
+          updated_by: 'system',
+        },
+      );
+    });
+
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const dailyValue = doc(
+      firestore,
+      'months/2026-07/dailyValues/employee-1_2026-07-14',
+    );
+    await assertFails(
+      updateDoc(dailyValue, {
+        hours: 8,
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertFails(deleteDoc(dailyValue));
+  });
+
   it('rejects virtual defaults and absence data in daily values', async () => {
     await seedMonth('2026-07', false);
     const uid = 'coordinator-1';
@@ -257,6 +370,22 @@ describe('Firestore security rules', () => {
           hours: 8,
           source: 'default',
           absence_code: 'SICK',
+          import_id: null,
+          note: null,
+          ...modificationMetadata(uid),
+        },
+      ),
+    );
+
+    await assertFails(
+      setDoc(
+        doc(firestore, 'months/2026-07/dailyValues/employee-1_2026-07-03'),
+        {
+          employee_id: 'employee-1',
+          teta_number: 'TETA-1001',
+          date: '2026-07-03',
+          hours: 25,
+          source: 'manual',
           import_id: null,
           note: null,
           ...modificationMetadata(uid),

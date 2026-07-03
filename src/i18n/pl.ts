@@ -127,7 +127,14 @@ export const pl = {
       hours: '{{hours}} h',
       virtualDefault:
         'Wirtualna wartość domyślna — nie jest zapisana w Firestore.',
-      persistedValue: 'Wartość zapisana w Firestore.',
+      manualValue: 'Ręczna wartość koordynatora.',
+      importedValue:
+        'Wartość z importu — edycja ręczna jest obecnie zablokowana.',
+      nonWorkingDay: 'Dzień wolny — domyślna wartość 0 h jest wirtualna.',
+      futureDay: 'Nie można edytować przyszłego dnia.',
+      outsideEmployment: 'Data poza okresem zatrudnienia pracownika.',
+      settledMonth: 'Zamknięty miesiąc jest tylko do odczytu.',
+      edit: 'Edytuj godziny: {{employee}}, {{date}}',
     },
     legend: {
       title: 'Oznaczenia kalendarza',
@@ -135,8 +142,8 @@ export const pl = {
       weekend: 'Weekend',
       publicHoliday: 'Święto (obsługa przygotowana)',
       futureDay: 'Dzień przyszły',
-      virtualDefault: 'Wirtualne 8 h',
-      virtualDefaultValue: '8',
+      virtualDefault: 'Wirtualne 8 h / 0 h',
+      virtualDefaultValue: '8/0',
     },
     empty: {
       title: 'Brak pracowników w wybranym miesiącu',
@@ -149,9 +156,36 @@ export const pl = {
         'Utwórz dokument miesiąca, aby przygotować przestrzeń rozliczeniową.',
       create: 'Utwórz miesiąc',
     },
+    editor: {
+      title: 'Godziny pracy',
+      description: '{{employee}} · {{date}}',
+      hours: 'Liczba godzin',
+      helper:
+        'Wprowadź wartość od 0 do 24. Wartość domyślna nie zostanie zapisana.',
+      cancel: 'Anuluj',
+      save: 'Zapisz',
+      clear: 'Usuń wartość ręczną',
+      validation: {
+        notNumber: 'Wprowadź prawidłową liczbę.',
+        negative: 'Liczba godzin nie może być ujemna.',
+        aboveMaximum: 'Liczba godzin nie może przekraczać 24.',
+      },
+      errors: {
+        save: 'Nie udało się zapisać wartości. Spróbuj ponownie.',
+        clear: 'Nie udało się usunąć wartości. Spróbuj ponownie.',
+        imported:
+          'Wartość z importu jest tylko do odczytu i nie może zostać nadpisana.',
+        authentication:
+          'Do zapisu wymagane jest aktywne uwierzytelnienie Firebase.',
+        firebase:
+          'Nie można połączyć się z Firebase. Sprawdź konfigurację aplikacji.',
+      },
+    },
     loading: 'Ładowanie rozliczenia miesięcznego',
     notifications: {
       created: 'Miesiąc został utworzony.',
+      dailyValueSaved: 'Godziny zostały zapisane.',
+      dailyValueCleared: 'Wartość ręczna została usunięta.',
     },
     errors: {
       title: 'Nie udało się otworzyć miesiąca',

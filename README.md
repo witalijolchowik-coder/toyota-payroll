@@ -3,9 +3,9 @@
 Foundation for the Toyota Payroll Engine MVP: a browser-based coordinator
 workspace built with React, Vite, TypeScript, Material UI, and Firebase.
 
-The repository currently includes the approved Step 5 month initialization and
-settlement shell, Step 4 Employees module, and Step 3 Firestore foundation.
-Authentication screens, daily editing, absences, adjustments, payroll
+The repository currently includes the approved Step 6 manual daily-value
+entry, Step 5 month settlement shell, Step 4 Employees module, and Step 3
+Firestore foundation. Authentication screens, absences, adjustments, payroll
 calculations, imports, and reports remain intentionally unimplemented.
 
 ## Prerequisites
@@ -94,9 +94,10 @@ calendar grid. Employees are included through employment-date overlap,
 regardless of their current `is_active` value.
 
 Explicit daily values are displayed when present. Otherwise, eligible elapsed
-working days show a virtual `8h`; this value is never written to Firestore.
-Weekend, future-day, and public-holiday placeholder states are visually
-separated. Settled months display a read-only banner.
+working days show a virtual `8h`, and non-working days show virtual `0h`; these
+values are never written to Firestore. Coordinators can create, update, or
+clear explicit manual hours in eligible open-month cells. Imported, future,
+outside-employment, and settled cells remain read-only.
 
 ## Firestore foundation
 
@@ -123,3 +124,4 @@ separated. Settled months display a read-only banner.
 - [Employees module decision](docs/decisions/0005-employees-module.md)
 - [Payroll-period participation decision](docs/decisions/0006-payroll-period-participation.md)
 - [Month settlement shell decision](docs/decisions/0007-month-settlement-shell.md)
+- [Manual daily-value entry decision](docs/decisions/0008-daily-value-entry.md)

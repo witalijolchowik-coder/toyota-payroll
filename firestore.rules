@@ -136,6 +136,11 @@ service cloud.firestore {
         && hasModificationMetadata(data);
     }
 
+    function hasCanonicalDailyValueIdentity(monthId, dailyValueId, data) {
+      return data.date[0:7] == monthId
+        && dailyValueId == data.employee_id + '_' + data.date;
+    }
+
     function validAbsence(data) {
       return data.keys().hasAll([
           'employee_id',
@@ -318,6 +323,11 @@ service cloud.firestore {
         allow create: if isAuthenticated()
           && monthExistsAndIsOpen(monthId)
           && validDailyValue(request.resource.data)
+          && hasCanonicalDailyValueIdentity(
+            monthId,
+            dailyValueId,
+            request.resource.data
+          )
           && hasCreateMetadata(request.resource.data);
         allow update: if isAuthenticated()
           && monthExistsAndIsOpen(monthId)
