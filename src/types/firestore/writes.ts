@@ -1,9 +1,12 @@
 import type {
-  AdjustmentUnit,
+  AdjustmentCategory,
+  AdjustmentDirection,
   AuditAction,
   EmployeeId,
   ImportType,
   IsoDate,
+  MonthId,
+  PayrollSettingKey,
   TetaNumber,
 } from './documents';
 
@@ -47,12 +50,27 @@ export type AbsenceUpdateInput = Pick<
   'absenceCode' | 'startDate' | 'endDate' | 'hoursPerDay' | 'note'
 >;
 
-export interface AdjustmentUpsertInput extends EmployeeReferenceInput {
-  adjustmentCode: string;
+export interface PayrollSettingCreateInput {
+  settingKey: PayrollSettingKey;
+  variantKey: string | null;
+  variantName: string | null;
   amount: number;
-  unit: AdjustmentUnit;
-  reason: string;
+  validFrom: MonthId;
+  validTo: MonthId | null;
+  description: string;
 }
+
+export interface AdjustmentCreateInput extends EmployeeReferenceInput {
+  category: AdjustmentCategory;
+  direction: AdjustmentDirection;
+  amount: number;
+  note: string;
+}
+
+export type AdjustmentUpdateInput = Pick<
+  AdjustmentCreateInput,
+  'category' | 'direction' | 'amount' | 'note'
+>;
 
 export interface ImportCreateInput {
   importType: ImportType;

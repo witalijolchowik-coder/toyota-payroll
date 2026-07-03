@@ -15,6 +15,8 @@ import type {
   ImportRecord,
   MonthDocument,
   MonthId,
+  PayrollSetting,
+  PayrollSettingDocument,
   PayrollMonth,
   Report,
   ReportDocument,
@@ -138,6 +140,24 @@ export function mapAbsenceDocument(
   };
 }
 
+export function mapPayrollSettingDocument(
+  id: string,
+  document: PayrollSettingDocument,
+): PayrollSetting {
+  return {
+    id,
+    settingKey: document.setting_key,
+    variantKey: document.variant_key,
+    variantName: document.variant_name,
+    amount: document.amount,
+    validFrom: document.valid_from,
+    validTo: document.valid_to,
+    active: document.active,
+    description: document.description,
+    ...modificationMetadata(document),
+  };
+}
+
 export function mapAdjustmentDocument(
   id: string,
   monthId: MonthId,
@@ -148,10 +168,11 @@ export function mapAdjustmentDocument(
     monthId,
     employeeId: document.employee_id,
     tetaNumber: document.teta_number,
-    adjustmentCode: document.adjustment_code,
+    category: document.category,
+    direction: document.direction,
     amount: document.amount,
-    unit: document.unit,
-    reason: document.reason,
+    note: document.note,
+    status: document.status,
     ...modificationMetadata(document),
   };
 }

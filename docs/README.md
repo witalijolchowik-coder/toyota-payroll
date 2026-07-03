@@ -19,6 +19,9 @@ The attached design history contains several generations of the architecture. Th
 - [Attendance and hours rules — Block 3](business-rules/attendance-hours-rules.md)
   — explicit worked-hour facts, imported-value overrides, precedence, and
   warning states
+- [Payroll settings and employee adjustments - Block 4](business-rules/payroll-settings-adjustments.md)
+  - effective-dated global configuration, frequency bonus, and monthly
+    coordinator adjustments
 
 Approved business-rules specifications govern payroll semantics. Architecture
 documents continue to govern system structure and implementation boundaries.
@@ -34,6 +37,7 @@ documents continue to govern system structure and implementation boundaries.
 - [ADR 0007: Month initialization and settlement shell](decisions/0007-month-settlement-shell.md)
 - [ADR 0008: Manual daily-value entry](decisions/0008-daily-value-entry.md)
 - [ADR 0009: Attendance facts and imported-value overrides](decisions/0009-attendance-hours-rules.md)
+- [ADR 0010: Versioned payroll settings and monthly adjustments](decisions/0010-payroll-settings-adjustments.md)
 
 ## Authority order
 

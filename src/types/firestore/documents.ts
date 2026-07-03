@@ -92,14 +92,46 @@ export interface AbsenceDocument
   note: string | null;
 }
 
-export type AdjustmentUnit = 'hours' | 'currency' | 'count';
+export const PAYROLL_SETTING_KEYS = [
+  'frequency_bonus',
+  'transport_allowance',
+  'accommodation_allowance',
+  'udt_allowance',
+] as const;
+
+export type KnownPayrollSettingKey = (typeof PAYROLL_SETTING_KEYS)[number];
+export type PayrollSettingKey = KnownPayrollSettingKey | (string & {});
+
+export interface PayrollSettingDocument extends ModificationMetadataDocument {
+  setting_key: PayrollSettingKey;
+  variant_key: string | null;
+  variant_name: string | null;
+  amount: number;
+  valid_from: MonthId;
+  valid_to: MonthId | null;
+  active: boolean;
+  description: string;
+}
+
+export const ADJUSTMENT_CATEGORIES = [
+  'MANUAL_BONUS',
+  'MANUAL_DEDUCTION',
+  'OTHER',
+] as const;
+
+export const ADJUSTMENT_DIRECTIONS = ['INCREASE', 'DECREASE'] as const;
+
+export type AdjustmentCategory = (typeof ADJUSTMENT_CATEGORIES)[number];
+export type AdjustmentDirection = (typeof ADJUSTMENT_DIRECTIONS)[number];
+export type AdjustmentStatus = 'ACTIVE' | 'CANCELLED';
 
 export interface AdjustmentDocument
   extends EmployeeReferenceDocument, ModificationMetadataDocument {
-  adjustment_code: string;
+  category: AdjustmentCategory;
+  direction: AdjustmentDirection;
   amount: number;
-  unit: AdjustmentUnit;
-  reason: string;
+  note: string;
+  status: AdjustmentStatus;
 }
 
 export type ImportType = 'attendance' | 'absences' | 'l4';

@@ -50,6 +50,12 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   conflicts, non-working days, and facts outside employment.
 - Audited manual corrections that preserve original imported attendance
   values in one canonical employee-day document.
+- Append-only global payroll setting versions with effective-month resolution
+  and accommodation-type variants.
+- Reusable frequency-bonus helper for full-month employment, L4 records, and
+  NN disqualification.
+- Polish Payroll Settings and Employee Adjustments workspaces.
+- ACTIVE/CANCELLED monthly adjustment lifecycle with non-negative amounts.
 
 ### Changed
 
@@ -89,6 +95,9 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   values read-only.
 - Denied absence deletion, non-canonical owner months, invalid lifecycle
   creation, and mutation after cancellation.
+- Kept payroll setting versions append-only and denied adjustment deletion,
+  negative amounts, invalid category-direction pairs, and settled-month
+  changes.
 
 ## [0.1.0] - 2026-07-02
 

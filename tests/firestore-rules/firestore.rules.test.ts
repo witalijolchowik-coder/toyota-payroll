@@ -600,6 +600,137 @@ describe('Firestore security rules', () => {
     );
   });
 
+  it('allows append-only global payroll setting versions', async () => {
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const setting = doc(firestore, 'payrollSettings/frequency-2026-08');
+
+    await assertSucceeds(
+      setDoc(setting, {
+        setting_key: 'frequency_bonus',
+        variant_key: null,
+        variant_name: null,
+        amount: 400,
+        valid_from: '2026-08',
+        valid_to: null,
+        active: true,
+        description: 'Premia bazowa',
+        ...modificationMetadata(uid),
+      }),
+    );
+    await assertFails(
+      updateDoc(setting, {
+        amount: 450,
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertFails(deleteDoc(setting));
+  });
+
+  it('rejects invalid payroll setting amounts and accommodation types', async () => {
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const base = {
+      setting_key: 'accommodation_allowance',
+      variant_key: null,
+      variant_name: null,
+      amount: -1,
+      valid_from: '2026-08',
+      valid_to: '2026-07',
+      active: true,
+      description: '',
+      ...modificationMetadata(uid),
+    };
+
+    await assertFails(
+      setDoc(doc(firestore, 'payrollSettings/invalid-accommodation'), base),
+    );
+  });
+
+  it('allows adjustment editing and cancellation but denies deletion', async () => {
+    await seedMonth('2026-07', false);
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const adjustment = doc(
+      firestore,
+      'months/2026-07/adjustments/adjustment-1',
+    );
+
+    await assertSucceeds(
+      setDoc(adjustment, {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        category: 'MANUAL_BONUS',
+        direction: 'INCREASE',
+        amount: 100,
+        note: '',
+        status: 'ACTIVE',
+        ...modificationMetadata(uid),
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(adjustment, {
+        amount: 125,
+        note: 'Korekta',
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertFails(
+      updateDoc(adjustment, {
+        amount: -1,
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(adjustment, {
+        status: 'CANCELLED',
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertFails(
+      updateDoc(adjustment, {
+        amount: 200,
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertFails(deleteDoc(adjustment));
+  });
+
+  it('rejects invalid adjustment direction and settled-month writes', async () => {
+    await seedMonth('2026-07', false);
+    await seedMonth('2026-08', true);
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const payload = {
+      employee_id: 'employee-1',
+      teta_number: 'TETA-1001',
+      category: 'MANUAL_DEDUCTION',
+      direction: 'INCREASE',
+      amount: 100,
+      note: '',
+      status: 'ACTIVE',
+      ...modificationMetadata(uid),
+    };
+
+    await assertFails(
+      setDoc(
+        doc(firestore, 'months/2026-07/adjustments/wrong-direction'),
+        payload,
+      ),
+    );
+    await assertFails(
+      setDoc(doc(firestore, 'months/2026-08/adjustments/settled'), {
+        ...payload,
+        direction: 'DECREASE',
+      }),
+    );
+  });
+
   it('keeps audit entries append-only and tied to the actor', async () => {
     const uid = 'coordinator-1';
     const firestore = testEnvironment.authenticatedContext(uid).firestore();

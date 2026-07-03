@@ -31,6 +31,11 @@ service cloud.firestore {
         && value.matches('^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$');
     }
 
+    function isMonthId(value) {
+      return value is string
+        && value.matches('^\\d{4}-(0[1-9]|1[0-2])$');
+    }
+
     function hasEmployeeReference(data) {
       return isNonEmptyString(data.employee_id)
         && isNonEmptyString(data.teta_number);
@@ -249,10 +254,11 @@ service cloud.firestore {
       return data.keys().hasAll([
           'employee_id',
           'teta_number',
-          'adjustment_code',
+          'category',
+          'direction',
           'amount',
-          'unit',
-          'reason',
+          'note',
+          'status',
           'created_at',
           'created_by',
           'updated_at',
@@ -261,21 +267,92 @@ service cloud.firestore {
         && data.keys().hasOnly([
           'employee_id',
           'teta_number',
-          'adjustment_code',
+          'category',
+          'direction',
           'amount',
-          'unit',
-          'reason',
+          'note',
+          'status',
           'created_at',
           'created_by',
           'updated_at',
           'updated_by'
         ])
         && hasEmployeeReference(data)
-        && isNonEmptyString(data.adjustment_code)
+        && data.category in [
+          'MANUAL_BONUS',
+          'MANUAL_DEDUCTION',
+          'OTHER'
+        ]
+        && data.direction in ['INCREASE', 'DECREASE']
+        && (
+          (data.category == 'MANUAL_BONUS' && data.direction == 'INCREASE')
+          || (data.category == 'MANUAL_DEDUCTION'
+            && data.direction == 'DECREASE')
+          || data.category == 'OTHER'
+        )
         && data.amount is number
-        && data.unit in ['hours', 'currency', 'count']
-        && isNonEmptyString(data.reason)
+        && data.amount >= 0
+        && data.note is string
+        && data.status in ['ACTIVE', 'CANCELLED']
         && hasModificationMetadata(data);
+    }
+
+    function validPayrollSetting(data) {
+      return data.keys().hasAll([
+          'setting_key',
+          'variant_key',
+          'variant_name',
+          'amount',
+          'valid_from',
+          'valid_to',
+          'active',
+          'description',
+          'created_at',
+          'created_by',
+          'updated_at',
+          'updated_by'
+        ])
+        && data.keys().hasOnly([
+          'setting_key',
+          'variant_key',
+          'variant_name',
+          'amount',
+          'valid_from',
+          'valid_to',
+          'active',
+          'description',
+          'created_at',
+          'created_by',
+          'updated_at',
+          'updated_by'
+        ])
+        && isNonEmptyString(data.setting_key)
+        && isNullableString(data.variant_key)
+        && isNullableString(data.variant_name)
+        && (
+          data.setting_key != 'accommodation_allowance'
+          || (
+            isNonEmptyString(data.variant_key)
+            && isNonEmptyString(data.variant_name)
+          )
+        )
+        && data.amount is number
+        && data.amount >= 0
+        && isMonthId(data.valid_from)
+        && (data.valid_to == null || isMonthId(data.valid_to))
+        && (data.valid_to == null || data.valid_to >= data.valid_from)
+        && data.active is bool
+        && data.description is string
+        && hasModificationMetadata(data);
+    }
+
+    match /payrollSettings/{settingId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated()
+        && validPayrollSetting(request.resource.data)
+        && request.resource.data.active == true
+        && hasCreateMetadata(request.resource.data);
+      allow update, delete: if false;
     }
 
     match /employees/{employeeId} {
@@ -467,21 +544,35 @@ service cloud.firestore {
         allow create: if isAuthenticated()
           && monthExistsAndIsOpen(monthId)
           && validAdjustment(request.resource.data)
+          && request.resource.data.status == 'ACTIVE'
           && hasCreateMetadata(request.resource.data);
         allow update: if isAuthenticated()
           && monthExistsAndIsOpen(monthId)
+          && resource.data.status == 'ACTIVE'
           && validAdjustment(request.resource.data)
           && hasUpdateMetadata(request.resource.data)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'adjustment_code',
-            'amount',
-            'unit',
-            'reason',
-            'updated_at',
-            'updated_by'
-          ]);
-        allow delete: if isAuthenticated()
-          && monthExistsAndIsOpen(monthId);
+          && (
+            (
+              request.resource.data.status == 'ACTIVE'
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'category',
+                'direction',
+                'amount',
+                'note',
+                'updated_at',
+                'updated_by'
+              ])
+            )
+            || (
+              request.resource.data.status == 'CANCELLED'
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'status',
+                'updated_at',
+                'updated_by'
+              ])
+            )
+          );
+        allow delete: if false;
       }
 
       match /imports/{importId} {

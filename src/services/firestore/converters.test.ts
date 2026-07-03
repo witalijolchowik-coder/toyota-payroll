@@ -5,16 +5,20 @@ import type {
   EmployeeDocument,
 } from '../../types/firestore';
 import {
+  adjustmentConverter,
   absenceConverter,
   dailyValueConverter,
   employeeConverter,
   monthConverter,
+  payrollSettingConverter,
 } from './converters';
 import {
+  mapAdjustmentDocument,
   mapAbsenceDocument,
   mapDailyValueDocument,
   mapEmployeeDocument,
   mapMonthDocument,
+  mapPayrollSettingDocument,
 } from './mappers';
 import {
   assertIsoDate,
@@ -233,6 +237,64 @@ describe('Firestore converters', () => {
     expect(document).not.toHaveProperty('employee_name');
   });
 
+  it('validates and maps a versioned payroll setting', () => {
+    const document = payrollSettingConverter.fromFirestore(
+      snapshot('payrollSettings/frequency-2026-07', {
+        setting_key: 'frequency_bonus',
+        variant_key: null,
+        variant_name: null,
+        amount: 400,
+        valid_from: '2026-07',
+        valid_to: null,
+        active: true,
+        description: 'Premia bazowa',
+        created_at: now,
+        created_by: 'test-user',
+        updated_at: now,
+        updated_by: 'test-user',
+      }),
+      {},
+    );
+
+    expect(
+      mapPayrollSettingDocument('frequency-2026-07', document),
+    ).toMatchObject({
+      settingKey: 'frequency_bonus',
+      amount: 400,
+      validFrom: '2026-07',
+      validTo: null,
+    });
+  });
+
+  it('validates and maps an active employee adjustment', () => {
+    const document = adjustmentConverter.fromFirestore(
+      snapshot('months/2026-07/adjustments/adjustment-1', {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        category: 'MANUAL_BONUS',
+        direction: 'INCREASE',
+        amount: 125.5,
+        note: 'Premia koordynatora',
+        status: 'ACTIVE',
+        created_at: now,
+        created_by: 'test-user',
+        updated_at: now,
+        updated_by: 'test-user',
+      }),
+      {},
+    );
+
+    expect(
+      mapAdjustmentDocument('adjustment-1', '2026-07', document),
+    ).toMatchObject({
+      employeeId: 'employee-1',
+      category: 'MANUAL_BONUS',
+      direction: 'INCREASE',
+      amount: 125.5,
+      status: 'ACTIVE',
+    });
+  });
+
   it('preserves typed document writes', () => {
     const employee: EmployeeDocument = {
       teta_number: 'TETA-1001',
@@ -253,6 +315,7 @@ describe('Firestore converters', () => {
 
 describe('Firestore path helpers', () => {
   it('builds canonical collection and daily-value paths', () => {
+    expect(firestorePaths.payrollSettings).toBe('payrollSettings');
     expect(firestorePaths.absences('2026-07')).toBe('months/2026-07/absences');
     expect(dailyValueDocumentId('employee-1', '2026-07-02')).toBe(
       'employee-1_2026-07-02',

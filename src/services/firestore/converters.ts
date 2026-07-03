@@ -15,6 +15,7 @@ import type {
   EmployeeSettlementDocument,
   ImportDocument,
   MonthDocument,
+  PayrollSettingDocument,
   ReportDocument,
   SettlementTotalsDocument,
 } from '../../types/firestore';
@@ -28,6 +29,7 @@ import {
   readNumber,
   readNumberMap,
   readObject,
+  readString,
   readOptionalEnum,
   readOptionalNullableNumber,
   readOptionalNullableString,
@@ -216,13 +218,35 @@ export const absenceConverter = createConverter<AbsenceDocument>(
   }),
 );
 
+export const payrollSettingConverter = createConverter<PayrollSettingDocument>(
+  (data, path) => ({
+    setting_key: readNonEmptyString(data, 'setting_key', path),
+    variant_key: readNullableString(data, 'variant_key', path),
+    variant_name: readNullableString(data, 'variant_name', path),
+    amount: readNumber(data, 'amount', path),
+    valid_from: readNonEmptyString(data, 'valid_from', path),
+    valid_to: readNullableString(data, 'valid_to', path),
+    active: readBoolean(data, 'active', path),
+    description: readString(data, 'description', path),
+    ...metadata(data, path),
+  }),
+);
+
 export const adjustmentConverter = createConverter<AdjustmentDocument>(
   (data, path) => ({
     ...employeeReference(data, path),
-    adjustment_code: readNonEmptyString(data, 'adjustment_code', path),
+    category: readEnum(data, 'category', path, [
+      'MANUAL_BONUS',
+      'MANUAL_DEDUCTION',
+      'OTHER',
+    ] as const),
+    direction: readEnum(data, 'direction', path, [
+      'INCREASE',
+      'DECREASE',
+    ] as const),
     amount: readNumber(data, 'amount', path),
-    unit: readEnum(data, 'unit', path, ['hours', 'currency', 'count'] as const),
-    reason: readNonEmptyString(data, 'reason', path),
+    note: readString(data, 'note', path),
+    status: readEnum(data, 'status', path, ['ACTIVE', 'CANCELLED'] as const),
     ...metadata(data, path),
   }),
 );

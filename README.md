@@ -3,12 +3,14 @@
 Foundation for the Toyota Payroll Engine MVP: a browser-based coordinator
 workspace built with React, Vite, TypeScript, Material UI, and Firebase.
 
-The repository currently includes the approved Absence and Attendance/Hours
-business-rule blocks, the Step 7 Absences workspace, Step 6 daily-value entry,
-a pure payroll-calendar and nominal-hours foundation, the Step 5 month
-settlement shell, Step 4 Employees module, and Step 3 Firestore foundation.
-Authentication screens, adjustments, payroll amount calculations, import
-parsing, and reports remain intentionally unimplemented.
+The repository currently includes the approved Payroll Settings/Adjustments,
+Absence, and Attendance/Hours business-rule blocks, the versioned Payroll
+Settings and monthly Adjustments workspaces, the Step 7 Absences workspace,
+Step 6 daily-value entry, a pure payroll-calendar and nominal-hours
+foundation, the Step 5 month settlement shell, Step 4 Employees module, and
+Step 3 Firestore foundation. Authentication screens, payroll aggregation,
+allowance calculations, import parsing, and reports remain intentionally
+unimplemented.
 
 ## Prerequisites
 
@@ -104,6 +106,18 @@ without losing the original import. Attendance facts that conflict with an
 absence, occur on a non-working day, or fall outside employment are visibly
 flagged. Future, outside-employment, and settled cells remain read-only.
 
+## Payroll settings and adjustments
+
+Global payroll amounts are stored as append-only versions under
+`/payrollSettings`. The Settings screen prepares frequency, transport,
+accommodation-type, and UDT values with inclusive month validity. A pure
+resolver selects the latest version effective for a payroll month.
+
+The Adjustments screen stores coordinator-entered monthly bonuses, deductions,
+and other corrections beneath the selected month. Open-month ACTIVE records
+may be edited or cancelled; settled and cancelled records remain read-only.
+This module does not aggregate or calculate salary.
+
 ## Firestore foundation
 
 - Firestore documents use snake_case and `Timestamp`; domain models use
@@ -130,3 +144,4 @@ flagged. Future, outside-employment, and settled cells remain read-only.
 - [Payroll-period participation decision](docs/decisions/0006-payroll-period-participation.md)
 - [Month settlement shell decision](docs/decisions/0007-month-settlement-shell.md)
 - [Manual daily-value entry decision](docs/decisions/0008-daily-value-entry.md)
+- [Payroll settings and adjustments decision](docs/decisions/0010-payroll-settings-adjustments.md)

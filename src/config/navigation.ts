@@ -36,10 +36,10 @@ export const primaryNavigation: NavigationItem[] = [
     description: pl.navigation.absences.description,
   },
   {
-    label: 'Adjustments',
+    label: 'Korekty',
     path: routes.adjustments,
     icon: TuneOutlined,
-    description: 'System-calculated and coordinator-entered adjustments.',
+    description: 'Miesięczne premie, potrącenia i inne korekty pracowników.',
   },
   {
     label: 'Reports',
@@ -51,10 +51,10 @@ export const primaryNavigation: NavigationItem[] = [
 
 export const secondaryNavigation: NavigationItem[] = [
   {
-    label: 'Settings',
+    label: 'Ustawienia płacowe',
     path: routes.settings,
     icon: SettingsOutlined,
-    description: 'Application preferences and administrative configuration.',
+    description: 'Historyczne globalne stawki i konfiguracja płacowa.',
   },
 ];
 

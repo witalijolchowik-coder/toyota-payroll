@@ -27,3 +27,11 @@ and immutable-base-field boundaries.
 `absencesService.ts` owns cross-month absence reads plus manual create, edit,
 and cancellation. L4 overlap prevention is currently a client-side preflight
 backed by reusable pure helpers.
+
+`payrollSettingsService.ts` creates and reads append-only global setting
+versions. It rejects versions that would begin in settled history and leaves
+effective-month resolution to the pure payroll helper.
+
+`adjustmentsService.ts` owns monthly employee adjustment reads, creates,
+edits, and lifecycle cancellation. Every mutation verifies that the owning
+month exists and remains open.

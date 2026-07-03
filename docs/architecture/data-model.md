@@ -5,13 +5,15 @@ This is the final MVP shape. It supersedes the earlier enterprise collection hie
 ## Collections
 
 ```text
+/payrollSettings/{settingVersionId}
+
 /employees/{employeeId}
 
 /months/{monthId}
   /employeeSettlements/{employeeId}
   /dailyValues/{employeeId_YYYY-MM-DD}
   /absences/{absenceId}
-  /adjustments/{employeeId}
+  /adjustments/{adjustmentId}
   /imports/{importId}
 
 /reports/{reportId}
@@ -20,6 +22,14 @@ This is the final MVP shape. It supersedes the earlier enterprise collection hie
 
 The paths are prepared in code and Security Rules; the foundation creates no
 production documents.
+
+## Payroll setting versions
+
+`/payrollSettings` stores append-only global amount versions. Validity uses
+inclusive canonical month IDs (`valid_from`, `valid_to`) so future payroll
+work can resolve configuration for a selected month without changing earlier
+versions. Accommodation types use `variant_key` and `variant_name`; other
+settings leave both fields null.
 
 ## Type boundaries
 
@@ -141,6 +151,9 @@ The month document carries `is_settled`. Client writes beneath a settled month a
   output are server-owned.
 - `auditLog` accepts authenticated append operations tied to the caller UID;
   updates and deletes are denied.
+- global payroll setting versions are client-create-only and cannot be updated
+  or deleted;
+- monthly adjustments use ACTIVE/CANCELLED lifecycle and cannot be deleted.
 
 ## Absence ownership and lifecycle
 

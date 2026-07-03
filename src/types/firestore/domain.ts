@@ -1,7 +1,9 @@
 import type {
+  AdjustmentCategory,
+  AdjustmentDirection,
+  AdjustmentStatus,
   AbsenceSource,
   AbsenceStatus,
-  AdjustmentUnit,
   AuditAction,
   CalculationStatus,
   DailyValueSource,
@@ -10,6 +12,7 @@ import type {
   ImportType,
   IsoDate,
   MonthId,
+  PayrollSettingKey,
   ReportStatus,
   SettlementTotalsDocument,
   TetaNumber,
@@ -92,15 +95,28 @@ export interface Absence extends ModificationMetadata {
   note: string | null;
 }
 
+export interface PayrollSetting extends ModificationMetadata {
+  id: string;
+  settingKey: PayrollSettingKey;
+  variantKey: string | null;
+  variantName: string | null;
+  amount: number;
+  validFrom: MonthId;
+  validTo: MonthId | null;
+  active: boolean;
+  description: string;
+}
+
 export interface Adjustment extends ModificationMetadata {
   id: string;
   monthId: MonthId;
   employeeId: EmployeeId;
   tetaNumber: TetaNumber;
-  adjustmentCode: string;
+  category: AdjustmentCategory;
+  direction: AdjustmentDirection;
   amount: number;
-  unit: AdjustmentUnit;
-  reason: string;
+  note: string;
+  status: AdjustmentStatus;
 }
 
 export interface ImportRecord {

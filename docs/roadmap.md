@@ -10,7 +10,7 @@
 | 6    | Daily value entry                                                   | Complete    |
 | 7    | Absences                                                            | Complete    |
 | 8    | Recalculation function                                              | Not started |
-| 9    | Adjustments                                                         | Not started |
+| 9    | Adjustments                                                         | Complete    |
 | 10   | L4 and attendance import                                            | Not started |
 | 11   | Reports                                                             | Not started |
 | 12   | Month settlement and usability polish                               | Not started |
@@ -111,3 +111,13 @@ Authentication session.
 - Absence conflicts, non-working-day facts, and outside-employment facts are
   visible without introducing payroll consequences.
 - No import engine, payroll aggregation, or overtime calculation.
+
+## Business Rules Block 4 implementation
+
+- Append-only global payroll setting versions with month-based effective-date
+  resolution.
+- Initial keys for frequency, transport, accommodation, and UDT amounts.
+- Accommodation type variants without employee assignment.
+- Reusable full-month, L4-record, and NN frequency-bonus helper.
+- Monthly ACTIVE/CANCELLED employee adjustments with open-month editing.
+- No payroll aggregation or allowance/deduction calculations.
