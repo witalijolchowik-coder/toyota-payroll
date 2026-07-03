@@ -4,11 +4,12 @@
 - Status: Approved
 - Scope: calendar, nominal hours, employment-period participation, and virtual
   defaults
-- Implementation status: documentation only
+- Implementation status: pure TypeScript foundation implemented
 
 This document defines the general payroll rules that future calculation and
-attendance modules must follow. It does not authorize or implement payroll
-calculation code.
+attendance modules must follow. Its implementation is limited to reusable
+calendar, participation, nominal-hours, and virtual-default utilities; it does
+not authorize payroll amount calculation or orchestration.
 
 ## 1. Calendar basis
 
@@ -176,7 +177,23 @@ This block does not define:
 - bonuses or adjustments;
 - payroll totals or calculation sequencing;
 - calendar-override UI or persistence;
-- calculation implementation.
+- payroll amount calculation or orchestration.
 
 Those subjects require their own approved business-rules blocks before
 implementation.
+
+## Implementation mapping
+
+The approved rules are implemented as reusable pure functions under
+`src/utils/payroll/`:
+
+- `month.ts` owns payroll-month identifiers, UTC date ranges, and date lists;
+- `calendar.ts` owns working-day classification, effective override input,
+  and month nominal hours;
+- `employment.ts` owns period overlap, inclusive employment dates, and
+  individual nominal hours;
+- `virtualDefaults.ts` owns payroll and UI virtual-default applicability.
+
+The utilities receive public holidays and effective calendar overrides as
+inputs. The official holiday registry, override persistence, coordinator UI,
+and calculation orchestration remain outside this block's implementation.

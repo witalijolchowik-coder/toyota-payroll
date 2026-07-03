@@ -36,6 +36,10 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Distinct virtual, manual, imported, non-working, future,
   outside-employment, and settled cell states.
 - Daily-hours validation and virtual-default mutation planning.
+- Pure payroll-month, working-calendar, employment-overlap, nominal-hours, and
+  virtual-default foundation utilities.
+- Effective public-holiday and calendar-override inputs for future payroll
+  orchestration.
 
 ### Changed
 
