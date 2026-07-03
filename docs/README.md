@@ -9,6 +9,15 @@ The attached design history contains several generations of the architecture. Th
 - [Data model](architecture/data-model.md) — final MVP Firestore paths and amendments
 - [Roadmap](roadmap.md) — approved implementation sequence and current status
 
+## Business rules specifications
+
+- [General payroll rules — Block 1](business-rules/general-payroll-rules.md) —
+  payroll calendar, nominal hours, employment-period participation, and
+  virtual defaults
+
+Approved business-rules specifications govern payroll semantics. Architecture
+documents continue to govern system structure and implementation boundaries.
+
 ## Decision records
 
 - [ADR 0001: Bootstrap stack](decisions/0001-bootstrap-stack.md)
