@@ -1,5 +1,6 @@
 import type {
   AbsenceSource,
+  AbsenceStatus,
   AdjustmentUnit,
   AuditAction,
   CalculationStatus,
@@ -81,6 +82,7 @@ export interface Absence extends ModificationMetadata {
   hoursPerDay: number | null;
   source: AbsenceSource;
   importId: string | null;
+  status: AbsenceStatus;
   note: string | null;
 }
 

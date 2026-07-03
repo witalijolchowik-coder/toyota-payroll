@@ -124,6 +124,7 @@ export function mapAbsenceDocument(
     hoursPerDay: document.hours_per_day,
     source: document.source,
     importId: document.import_id,
+    status: document.status,
     note: document.note,
     ...modificationMetadata(document),
   };

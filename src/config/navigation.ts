@@ -30,10 +30,10 @@ export const primaryNavigation: NavigationItem[] = [
     description: pl.navigation.settlement.description,
   },
   {
-    label: 'Absences',
+    label: pl.navigation.absences.label,
     path: routes.absences,
     icon: EventBusyOutlined,
-    description: 'Absence entry, imports, and current-status monitoring.',
+    description: pl.navigation.absences.description,
   },
   {
     label: 'Adjustments',

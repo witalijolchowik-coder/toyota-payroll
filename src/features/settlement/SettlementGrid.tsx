@@ -17,7 +17,8 @@ import {
 
 import { useTranslations } from '../../hooks/useTranslations';
 import { interpolate } from '../../i18n/pl';
-import type { DailyValue, Employee } from '../../types/firestore';
+import type { Absence, DailyValue, Employee } from '../../types/firestore';
+import { resolveGoverningAbsence } from '../../utils/absences';
 import {
   dailyValueLookupKey,
   resolveSettlementCellValue,
@@ -28,6 +29,7 @@ interface SettlementGridProps {
   employees: Employee[];
   days: CalendarDay[];
   dailyValues: DailyValue[];
+  absences?: Absence[];
   isSettled?: boolean;
   onEditCell?: (
     employee: Employee,
@@ -48,6 +50,7 @@ export function SettlementGrid({
   employees,
   days,
   dailyValues,
+  absences = [],
   isSettled = false,
   onEditCell,
 }: SettlementGridProps) {
@@ -58,6 +61,12 @@ export function SettlementGrid({
       value,
     ]),
   );
+  const absencesByEmployee = new Map<string, Absence[]>();
+  absences.forEach((absence) => {
+    const employeeAbsences = absencesByEmployee.get(absence.employeeId) ?? [];
+    employeeAbsences.push(absence);
+    absencesByEmployee.set(absence.employeeId, employeeAbsences);
+  });
 
   return (
     <Card>
@@ -150,27 +159,46 @@ export function SettlementGrid({
                       dailyValueLookupKey(employee.id, day.isoDate),
                     ),
                   });
-                  const label =
-                    value.hours === null
+                  const absenceResolution = resolveGoverningAbsence(
+                    absencesByEmployee.get(employee.id) ?? [],
+                    day.isoDate,
+                  );
+                  const absenceLabel =
+                    absenceResolution.kind === 'governed'
+                      ? absenceResolution.code
+                      : absenceResolution.kind === 'ambiguous'
+                        ? absenceResolution.codes.join('/')
+                        : null;
+                  const label = absenceLabel
+                    ? absenceLabel
+                    : value.hours === null
                       ? t.settlement.grid.empty
                       : interpolate(t.settlement.grid.hours, {
                           hours: value.hours.toLocaleString('pl-PL'),
                         });
-                  const tooltip = isSettled
-                    ? t.settlement.grid.settledMonth
-                    : value.calendarState === 'future'
-                      ? t.settlement.grid.futureDay
-                      : value.calendarState === 'outside-employment'
-                        ? t.settlement.grid.outsideEmployment
-                        : value.kind === 'imported'
-                          ? t.settlement.grid.importedValue
-                          : value.kind === 'manual'
-                            ? t.settlement.grid.manualValue
-                            : value.calendarState === 'non-working'
-                              ? t.settlement.grid.nonWorkingDay
-                              : t.settlement.grid.virtualDefault;
+                  const tooltip =
+                    absenceResolution.kind === 'ambiguous'
+                      ? t.settlement.grid.absenceAmbiguous
+                      : absenceResolution.kind === 'governed'
+                        ? interpolate(t.settlement.grid.absence, {
+                            code: absenceResolution.code,
+                          })
+                        : isSettled
+                          ? t.settlement.grid.settledMonth
+                          : value.calendarState === 'future'
+                            ? t.settlement.grid.futureDay
+                            : value.calendarState === 'outside-employment'
+                              ? t.settlement.grid.outsideEmployment
+                              : value.kind === 'imported'
+                                ? t.settlement.grid.importedValue
+                                : value.kind === 'manual'
+                                  ? t.settlement.grid.manualValue
+                                  : value.calendarState === 'non-working'
+                                    ? t.settlement.grid.nonWorkingDay
+                                    : t.settlement.grid.virtualDefault;
                   const canEdit =
                     !isSettled &&
+                    absenceResolution.kind === 'none' &&
                     value.kind !== 'imported' &&
                     value.calendarState !== 'future' &&
                     value.calendarState !== 'outside-employment' &&
@@ -207,7 +235,20 @@ export function SettlementGrid({
                               '&.Mui-disabled': { opacity: 1 },
                             }}
                           >
-                            <Box component="span" sx={cellValueSx(value.kind)}>
+                            <Box
+                              component="span"
+                              sx={
+                                absenceLabel
+                                  ? {
+                                      color:
+                                        absenceResolution.kind === 'ambiguous'
+                                          ? 'warning.main'
+                                          : 'error.main',
+                                      fontWeight: 800,
+                                    }
+                                  : cellValueSx(value.kind)
+                              }
+                            >
                               {label}
                             </Box>
                           </ButtonBase>

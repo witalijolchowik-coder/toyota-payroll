@@ -3,11 +3,11 @@
 Foundation for the Toyota Payroll Engine MVP: a browser-based coordinator
 workspace built with React, Vite, TypeScript, Material UI, and Firebase.
 
-The repository currently includes the approved Step 6 manual daily-value
-entry, a pure payroll-calendar and nominal-hours foundation, the Step 5 month
-settlement shell, Step 4 Employees module, and Step 3 Firestore foundation.
-Authentication screens, absences, adjustments, payroll amount calculations,
-imports, and reports remain intentionally unimplemented.
+The repository currently includes the approved Step 7 Absences workspace,
+Step 6 manual daily-value entry, a pure payroll-calendar and nominal-hours
+foundation, the Step 5 month settlement shell, Step 4 Employees module, and
+Step 3 Firestore foundation. Authentication screens, adjustments, payroll
+amount calculations, imports, and reports remain intentionally unimplemented.
 
 ## Prerequisites
 

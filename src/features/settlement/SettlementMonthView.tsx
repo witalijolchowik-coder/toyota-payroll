@@ -154,6 +154,9 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
   const participatingDailyValues = data.dailyValues.filter((value) =>
     participatingEmployeeIds.has(value.employeeId),
   );
+  const participatingAbsences = data.absences.filter((absence) =>
+    participatingEmployeeIds.has(absence.employeeId),
+  );
 
   return (
     <Stack spacing={2.5}>
@@ -217,6 +220,7 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
           employees={participatingEmployees}
           days={days}
           dailyValues={participatingDailyValues}
+          absences={participatingAbsences}
           isSettled={data.month.isSettled}
           onEditCell={(employee, day, value) =>
             setEditingCell({ employee, day, value })

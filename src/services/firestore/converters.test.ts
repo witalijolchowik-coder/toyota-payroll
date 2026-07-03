@@ -5,11 +5,13 @@ import type {
   EmployeeDocument,
 } from '../../types/firestore';
 import {
+  absenceConverter,
   dailyValueConverter,
   employeeConverter,
   monthConverter,
 } from './converters';
 import {
+  mapAbsenceDocument,
   mapDailyValueDocument,
   mapEmployeeDocument,
   mapMonthDocument,
@@ -159,6 +161,37 @@ describe('Firestore converters', () => {
         {},
       ),
     ).toThrow(InvalidFirestoreDocumentError);
+  });
+
+  it('validates and maps an active absence lifecycle record', () => {
+    const document = absenceConverter.fromFirestore(
+      snapshot('months/2026-06/absences/absence-1', {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        absence_code: 'L4',
+        start_date: '2026-06-28',
+        end_date: '2026-07-05',
+        hours_per_day: null,
+        source: 'manual',
+        import_id: null,
+        status: 'ACTIVE',
+        note: null,
+        created_at: now,
+        created_by: 'test-user',
+        updated_at: now,
+        updated_by: 'test-user',
+      }),
+      {},
+    );
+
+    expect(mapAbsenceDocument('absence-1', '2026-06', document)).toMatchObject({
+      monthId: '2026-06',
+      employeeId: 'employee-1',
+      absenceCode: 'L4',
+      status: 'ACTIVE',
+      endDate: '2026-07-05',
+    });
+    expect(document).not.toHaveProperty('employee_name');
   });
 
   it('preserves typed document writes', () => {

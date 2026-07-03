@@ -14,6 +14,8 @@ The attached design history contains several generations of the architecture. Th
 - [General payroll rules — Block 1](business-rules/general-payroll-rules.md) —
   payroll calendar, nominal hours, employment-period participation, and
   virtual defaults
+- [Absence rules — Block 2](business-rules/absence-rules.md) — absence
+  identity, lifecycle, priority, ownership, and workspace behavior
 
 Approved business-rules specifications govern payroll semantics. Architecture
 documents continue to govern system structure and implementation boundaries.

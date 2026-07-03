@@ -135,3 +135,20 @@ The month document carries `is_settled`. Client writes beneath a settled month a
   output are server-owned.
 - `auditLog` accepts authenticated append operations tied to the caller UID;
   updates and deletes are denied.
+
+## Absence ownership and lifecycle
+
+An absence is stored once under the month containing its `start_date`:
+
+```text
+/months/{startDate YYYY-MM}/absences/{absenceId}
+```
+
+Cross-month reads use the `absences` collection group and include a document
+whenever its inclusive date range overlaps the displayed month. Operational
+documents continue to store only `employee_id` and `teta_number`; employee
+names are resolved from `/employees`.
+
+Absence lifecycle status is `ACTIVE` or `CANCELLED`. Client deletion is denied.
+Manual ACTIVE records may be edited or cancelled while their owning month is
+open. Imported records and records owned by settled months remain read-only.

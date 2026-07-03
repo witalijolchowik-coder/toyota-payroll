@@ -8,7 +8,7 @@
 | 4    | Employees                                                           | Complete    |
 | 5    | Month initialization and settlement shell                           | Complete    |
 | 6    | Daily value entry                                                   | Complete    |
-| 7    | Absences                                                            | Not started |
+| 7    | Absences                                                            | Complete    |
 | 8    | Recalculation function                                              | Not started |
 | 9    | Adjustments                                                         | Not started |
 | 10   | L4 and attendance import                                            | Not started |
@@ -88,3 +88,15 @@ Authentication session.
 - Unit and emulator-backed Security Rules tests for create, update, and clear.
 - No nominal-hours, bonus, absence, or payroll-engine logic before a separate
   approved Business Rules Specification.
+
+## Step 7 acceptance criteria
+
+- Polish Absences workspace with month, employee, type, and lifecycle filters.
+- Manual create, edit, and cancellation; no client deletion.
+- One source record per document, owned by the month of `start_date`.
+- Cross-month collection-group reads and read-only absence codes in settlement
+  cells.
+- ACTIVE L4 client-side overlap blocking and pure day-by-day priority helpers.
+- Employment-period warnings and current-day summary cards.
+- No payroll amounts, imports, reports, ZUS integration, or server-side
+  overlap enforcement.

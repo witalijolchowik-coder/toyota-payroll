@@ -178,6 +178,7 @@ export const absenceConverter = createConverter<AbsenceDocument>(
       'absence_import',
     ] as const),
     import_id: readNullableString(data, 'import_id', path),
+    status: readEnum(data, 'status', path, ['ACTIVE', 'CANCELLED'] as const),
     note: readNullableString(data, 'note', path),
     ...metadata(data, path),
   }),

@@ -70,6 +70,7 @@ export interface DailyValueDocument
 }
 
 export type AbsenceSource = 'manual' | 'absence_import';
+export type AbsenceStatus = 'ACTIVE' | 'CANCELLED';
 
 export interface AbsenceDocument
   extends EmployeeReferenceDocument, ModificationMetadataDocument {
@@ -79,6 +80,7 @@ export interface AbsenceDocument
   hours_per_day: number | null;
   source: AbsenceSource;
   import_id: string | null;
+  status: AbsenceStatus;
   note: string | null;
 }
 

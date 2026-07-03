@@ -1,5 +1,6 @@
 import {
   collection,
+  collectionGroup,
   doc,
   type CollectionReference,
   type DocumentReference,
@@ -44,6 +45,7 @@ export interface FirestoreRepositoryBoundaries {
   readonly employees: CollectionReference<EmployeeDocument>;
   employee(employeeId: string): DocumentReference<EmployeeDocument>;
   readonly months: CollectionReference<MonthDocument>;
+  readonly allAbsences: Query<AbsenceDocument>;
   forMonth(monthId: string): MonthRepositoryBoundary;
   readonly reports: Query<ReportDocument>;
   readonly auditLog: CollectionReference<AuditLogDocument>;
@@ -65,6 +67,9 @@ export function createFirestoreRepositoryBoundaries(
   const auditLog = collection(firestore, firestorePaths.auditLog).withConverter(
     auditLogConverter,
   );
+  const allAbsences = collectionGroup(firestore, 'absences').withConverter(
+    absenceConverter,
+  );
 
   return {
     employees,
@@ -74,6 +79,7 @@ export function createFirestoreRepositoryBoundaries(
       );
     },
     months,
+    allAbsences,
     forMonth(monthId) {
       return {
         month: doc(firestore, firestorePaths.month(monthId)).withConverter(

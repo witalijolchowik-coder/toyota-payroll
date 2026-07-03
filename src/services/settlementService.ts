@@ -11,11 +11,13 @@ import {
 import { auth } from '../config/firebase';
 import { getMonthDateRange } from '../features/settlement/monthUtils';
 import type {
+  Absence,
   DailyValue,
   Employee,
   MonthId,
   PayrollMonth,
 } from '../types/firestore';
+import { loadAbsencesOverlappingMonth } from './absencesService';
 import {
   mapDailyValueDocument,
   mapEmployeeDocument,
@@ -40,6 +42,7 @@ export interface SettlementMonthData {
   month: PayrollMonth;
   employees: Employee[];
   dailyValues: DailyValue[];
+  absences: Absence[];
 }
 
 async function requireActorUid(): Promise<string> {
@@ -72,9 +75,10 @@ export async function loadSettlementMonth(
   }
 
   const employeesQuery = query(repositories.employees, orderBy('teta_number'));
-  const [employeesSnapshot, dailyValuesSnapshot] = await Promise.all([
+  const [employeesSnapshot, dailyValuesSnapshot, absences] = await Promise.all([
     getDocs(employeesQuery),
     getDocs(monthRepository.dailyValues),
+    loadAbsencesOverlappingMonth(monthId),
   ]);
 
   return {
@@ -85,6 +89,7 @@ export async function loadSettlementMonth(
     dailyValues: dailyValuesSnapshot.docs.map((document) =>
       mapDailyValueDocument(document.id, monthId, document.data()),
     ),
+    absences,
   };
 }
 

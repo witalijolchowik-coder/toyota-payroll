@@ -151,6 +151,7 @@ service cloud.firestore {
           'hours_per_day',
           'source',
           'import_id',
+          'status',
           'note',
           'created_at',
           'created_by',
@@ -166,6 +167,7 @@ service cloud.firestore {
           'hours_per_day',
           'source',
           'import_id',
+          'status',
           'note',
           'created_at',
           'created_by',
@@ -173,17 +175,33 @@ service cloud.firestore {
           'updated_by'
         ])
         && hasEmployeeReference(data)
-        && isNonEmptyString(data.absence_code)
+        && data.absence_code in [
+          'L4',
+          'UW',
+          'UZ',
+          'NN',
+          'NU',
+          'NI',
+          'OPD',
+          'KRW',
+          'WZN'
+        ]
         && isIsoDate(data.start_date)
         && isIsoDate(data.end_date)
+        && data.start_date <= data.end_date
         && (data.hours_per_day == null
           || (data.hours_per_day is number
             && data.hours_per_day >= 0
             && data.hours_per_day <= 24))
         && data.source == 'manual'
         && data.import_id == null
+        && data.status in ['ACTIVE', 'CANCELLED']
         && isNullableString(data.note)
         && hasModificationMetadata(data);
+    }
+
+    function hasCanonicalAbsenceOwner(monthId, data) {
+      return data.start_date[0:7] == monthId;
     }
 
     function validAdjustment(data) {
@@ -350,24 +368,39 @@ service cloud.firestore {
         allow create: if isAuthenticated()
           && monthExistsAndIsOpen(monthId)
           && validAbsence(request.resource.data)
+          && hasCanonicalAbsenceOwner(monthId, request.resource.data)
+          && request.resource.data.status == 'ACTIVE'
           && hasCreateMetadata(request.resource.data);
         allow update: if isAuthenticated()
           && monthExistsAndIsOpen(monthId)
           && resource.data.source == 'manual'
+          && resource.data.status == 'ACTIVE'
           && validAbsence(request.resource.data)
+          && hasCanonicalAbsenceOwner(monthId, request.resource.data)
           && hasUpdateMetadata(request.resource.data)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'absence_code',
-            'start_date',
-            'end_date',
-            'hours_per_day',
-            'note',
-            'updated_at',
-            'updated_by'
-          ]);
-        allow delete: if isAuthenticated()
-          && monthExistsAndIsOpen(monthId)
-          && resource.data.source == 'manual';
+          && (
+            (
+              request.resource.data.status == 'ACTIVE'
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'absence_code',
+                'start_date',
+                'end_date',
+                'hours_per_day',
+                'note',
+                'updated_at',
+                'updated_by'
+              ])
+            )
+            || (
+              request.resource.data.status == 'CANCELLED'
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'status',
+                'updated_at',
+                'updated_by'
+              ])
+            )
+          );
+        allow delete: if false;
       }
 
       match /adjustments/{adjustmentId} {

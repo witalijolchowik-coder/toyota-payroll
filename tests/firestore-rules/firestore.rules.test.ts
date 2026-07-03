@@ -394,6 +394,103 @@ describe('Firestore security rules', () => {
     );
   });
 
+  it('allows manual absence edits and cancellation but denies deletion', async () => {
+    await seedMonth('2026-06', false);
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const reference = doc(firestore, 'months/2026-06/absences/absence-1');
+
+    await assertSucceeds(
+      setDoc(reference, {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        absence_code: 'UW',
+        start_date: '2026-06-28',
+        end_date: '2026-07-05',
+        hours_per_day: null,
+        source: 'manual',
+        import_id: null,
+        status: 'ACTIVE',
+        note: null,
+        ...modificationMetadata(uid),
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(reference, {
+        absence_code: 'UZ',
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(reference, {
+        status: 'CANCELLED',
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertFails(
+      updateDoc(reference, {
+        status: 'ACTIVE',
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertFails(deleteDoc(reference));
+  });
+
+  it('requires ACTIVE creation and ownership by the start month', async () => {
+    await seedMonth('2026-06', false);
+    await seedMonth('2026-07', false);
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const payload = {
+      employee_id: 'employee-1',
+      teta_number: 'TETA-1001',
+      absence_code: 'L4',
+      start_date: '2026-06-28',
+      end_date: '2026-07-05',
+      hours_per_day: null,
+      source: 'manual',
+      import_id: null,
+      status: 'ACTIVE',
+      note: null,
+      ...modificationMetadata(uid),
+    };
+
+    await assertFails(
+      setDoc(doc(firestore, 'months/2026-07/absences/wrong-owner'), payload),
+    );
+    await assertFails(
+      setDoc(doc(firestore, 'months/2026-06/absences/cancelled'), {
+        ...payload,
+        status: 'CANCELLED',
+      }),
+    );
+  });
+
+  it('denies absence writes beneath a settled owner month', async () => {
+    await seedMonth('2026-06', true);
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+
+    await assertFails(
+      setDoc(doc(firestore, 'months/2026-06/absences/absence-1'), {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        absence_code: 'L4',
+        start_date: '2026-06-28',
+        end_date: '2026-07-05',
+        hours_per_day: null,
+        source: 'manual',
+        import_id: null,
+        status: 'ACTIVE',
+        note: null,
+        ...modificationMetadata(uid),
+      }),
+    );
+  });
+
   it('keeps audit entries append-only and tied to the actor', async () => {
     const uid = 'coordinator-1';
     const firestore = testEnvironment.authenticatedContext(uid).firestore();

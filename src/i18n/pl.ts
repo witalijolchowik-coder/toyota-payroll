@@ -10,6 +10,11 @@ export const pl = {
       description:
         'Kalendarz obecności i wizualna przestrzeń rozliczenia wybranego miesiąca.',
     },
+    absences: {
+      label: 'Nieobecności',
+      description:
+        'Rejestr nieobecności, dokumentów L4 i bieżącego statusu pracowników.',
+    },
   },
   employees: {
     page: {
@@ -95,6 +100,106 @@ export const pl = {
       deactivated: 'Pracownik został dezaktywowany.',
     },
   },
+  absences: {
+    page: {
+      eyebrow: 'Czas pracy',
+      title: 'Nieobecności',
+      description:
+        'Zarządzaj dokumentami nieobecności bez zmieniania danych bezpośrednio w kalendarzu rozliczenia.',
+      add: 'Dodaj nieobecność',
+    },
+    summary: {
+      l4: 'Na L4 dzisiaj',
+      excused: 'Na urlopie / usprawiedliwione',
+      unexplained: 'Nieobecności niewyjaśnione',
+    },
+    filters: {
+      month: 'Miesiąc',
+      employee: 'Pracownik',
+      allEmployees: 'Wszyscy pracownicy',
+      type: 'Rodzaj',
+      allTypes: 'Wszystkie rodzaje',
+      status: 'Status',
+      allStatuses: 'Wszystkie statusy',
+    },
+    types: {
+      UZ: 'UŻ / UZ',
+    },
+    status: {
+      ACTIVE: 'Aktywna',
+      CANCELLED: 'Anulowana',
+    },
+    table: {
+      teta: 'TETA',
+      employee: 'Pracownik',
+      type: 'Rodzaj',
+      period: 'Okres',
+      status: 'Status',
+      review: 'Weryfikacja',
+      actions: 'Działania',
+      outsideEmployment: 'Poza okresem zatrudnienia',
+      noIssues: 'Brak uwag',
+      unknownEmployee: 'Nieznany pracownik',
+      edit: 'Edytuj nieobecność',
+      cancel: 'Anuluj nieobecność',
+      readOnly: 'Tylko odczyt',
+    },
+    empty: {
+      title: 'Brak nieobecności',
+      description:
+        'Brak dokumentów pasujących do wybranego miesiąca i filtrów.',
+    },
+    form: {
+      addTitle: 'Dodaj nieobecność',
+      editTitle: 'Edytuj nieobecność',
+      description: 'Każdy dokument źródłowy zapisuj jako osobną nieobecność.',
+      employee: 'Pracownik',
+      type: 'Rodzaj nieobecności',
+      startDate: 'Data od',
+      endDate: 'Data do',
+      note: 'Notatka',
+      cancel: 'Anuluj',
+      create: 'Dodaj',
+      save: 'Zapisz zmiany',
+      validation: {
+        required: 'To pole jest wymagane.',
+        'unsupported-code': 'Wybierz obsługiwany rodzaj nieobecności.',
+        'invalid-date': 'Wprowadź prawidłową datę.',
+        'invalid-range':
+          'Data zakończenia nie może być wcześniejsza niż data rozpoczęcia.',
+        'ownership-month-change':
+          'Zmiana miesiąca rozpoczęcia wymaga anulowania starego dokumentu i utworzenia nowego.',
+      },
+    },
+    cancel: {
+      title: 'Anulować nieobecność?',
+      description:
+        'Dokument {{code}} pozostanie w historii ze statusem anulowanym.',
+      back: 'Wróć',
+      confirm: 'Anuluj nieobecność',
+    },
+    notifications: {
+      created: 'Nieobecność została dodana.',
+      updated: 'Nieobecność została zaktualizowana.',
+      cancelled: 'Nieobecność została anulowana.',
+    },
+    errors: {
+      loadTitle: 'Nie udało się pobrać nieobecności',
+      loadDescription: 'Sprawdź połączenie z Firebase i spróbuj ponownie.',
+      firebaseUnavailable:
+        'Nie można połączyć się z Firebase. Sprawdź konfigurację aplikacji.',
+      authenticationRequired:
+        'Do zarządzania nieobecnościami wymagane jest uwierzytelnienie Firebase.',
+      saveFailed: 'Nie udało się zapisać nieobecności.',
+      cancelFailed: 'Nie udało się anulować nieobecności.',
+      l4Overlap:
+        'Nie można dodać tej nieobecności, ponieważ wybrany okres obejmuje aktywne L4.',
+      ownershipMonthChange:
+        'Nie można zmienić miesiąca rozpoczęcia. Anuluj dokument i utwórz poprawny.',
+      monthUnavailable: 'Miesiąc rozpoczęcia nie został jeszcze utworzony.',
+      monthSettled: 'Miesiąc rozpoczęcia jest zamknięty i tylko do odczytu.',
+    },
+  },
   settlement: {
     page: {
       eyebrow: 'Rozliczenia',
@@ -135,6 +240,10 @@ export const pl = {
       outsideEmployment: 'Data poza okresem zatrudnienia pracownika.',
       settledMonth: 'Zamknięty miesiąc jest tylko do odczytu.',
       edit: 'Edytuj godziny: {{employee}}, {{date}}',
+      absence:
+        'Nieobecność {{code}} — edycja jest dostępna w module Nieobecności.',
+      absenceAmbiguous:
+        'Kilka różnych nieobecności obejmuje ten dzień. Wymagana jest weryfikacja.',
     },
     legend: {
       title: 'Oznaczenia kalendarza',

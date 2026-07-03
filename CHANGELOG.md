@@ -40,6 +40,12 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   virtual-default foundation utilities.
 - Effective public-holiday and calendar-override inputs for future payroll
   orchestration.
+- Polish Absences workspace with manual create, edit, cancellation, filters,
+  employment-period warnings, and current-day summary cards.
+- Pure absence validation, overlap, L4 priority, governing-day, and employment
+  boundary helpers.
+- Cross-month absence collection-group reads and read-only absence rendering
+  in the monthly settlement grid.
 
 ### Changed
 
@@ -57,6 +63,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   Polish copy.
 - Displayed non-working-day `0h` alongside working-day `8h` as virtual,
   non-persisted defaults.
+- Added ACTIVE/CANCELLED absence lifecycle and start-month ownership without
+  duplicating cross-month records.
 
 ### Security
 
@@ -71,6 +79,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   caller-bound metadata, and calculation version zero.
 - Enforced canonical manual daily-value IDs and kept imported and settled
   values read-only.
+- Denied absence deletion, non-canonical owner months, invalid lifecycle
+  creation, and mutation after cancellation.
 
 ## [0.1.0] - 2026-07-02
 
