@@ -46,6 +46,10 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   boundary helpers.
 - Cross-month absence collection-group reads and read-only absence rendering
   in the monthly settlement grid.
+- Attendance precedence and warning helpers for imported overrides, absence
+  conflicts, non-working days, and facts outside employment.
+- Audited manual corrections that preserve original imported attendance
+  values in one canonical employee-day document.
 
 ### Changed
 
@@ -65,6 +69,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   non-persisted defaults.
 - Added ACTIVE/CANCELLED absence lifecycle and start-month ownership without
   duplicating cross-month records.
+- Extended settlement cells to show imported overrides and explicit-hours
+  warnings without introducing payroll consequences.
 
 ### Security
 
@@ -77,6 +83,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   employee deletion and metadata spoofing denied.
 - Restricted browser month creation to canonical boundaries, an open state,
   caller-bound metadata, and calculation version zero.
+- Allowed narrowly scoped `manual_override` updates on imported daily values
+  while keeping all imported base fields client-immutable.
 - Enforced canonical manual daily-value IDs and kept imported and settled
   values read-only.
 - Denied absence deletion, non-canonical owner months, invalid lifecycle

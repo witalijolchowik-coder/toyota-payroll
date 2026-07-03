@@ -231,6 +231,36 @@ describe('Firestore security rules', () => {
       }),
     );
     await assertFails(deleteDoc(doc(firestore, dailyValuePath)));
+
+    const importedPath = 'months/2026-07/dailyValues/employee-2_2026-07-02';
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), importedPath), {
+        employee_id: 'employee-2',
+        teta_number: 'TETA-1002',
+        date: '2026-07-02',
+        hours: 7,
+        source: 'attendance_import',
+        import_id: 'import-1',
+        note: null,
+        manual_override: null,
+        created_at: new Date('2026-07-01T00:00:00.000Z'),
+        created_by: 'system',
+        updated_at: new Date('2026-07-01T00:00:00.000Z'),
+        updated_by: 'system',
+      });
+    });
+    await assertFails(
+      updateDoc(doc(firestore, importedPath), {
+        manual_override: {
+          hours: 8,
+          note: null,
+          actor_uid: uid,
+          updated_at: serverTimestamp(),
+        },
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
   });
 
   it('prevents a settled month from being reopened or modified', async () => {
@@ -315,7 +345,7 @@ describe('Firestore security rules', () => {
     );
   });
 
-  it('keeps imported daily values read-only for clients', async () => {
+  it('allows only audited manual overrides on imported daily values', async () => {
     await seedMonth('2026-07', false);
     await testEnvironment.withSecurityRulesDisabled(async (context) => {
       await setDoc(
@@ -331,6 +361,7 @@ describe('Firestore security rules', () => {
           source: 'attendance_import',
           import_id: 'import-1',
           note: null,
+          manual_override: null,
           created_at: new Date('2026-07-15T00:00:00.000Z'),
           created_by: 'system',
           updated_at: new Date('2026-07-15T00:00:00.000Z'),
@@ -346,12 +377,90 @@ describe('Firestore security rules', () => {
       'months/2026-07/dailyValues/employee-1_2026-07-14',
     );
     await assertFails(
+      setDoc(
+        doc(firestore, 'months/2026-07/dailyValues/employee-2_2026-07-14'),
+        {
+          employee_id: 'employee-2',
+          teta_number: 'TETA-1002',
+          date: '2026-07-14',
+          hours: 7,
+          source: 'attendance_import',
+          import_id: 'import-2',
+          note: null,
+          manual_override: null,
+          ...modificationMetadata(uid),
+        },
+      ),
+    );
+    await assertSucceeds(
+      updateDoc(dailyValue, {
+        manual_override: {
+          hours: 8.5,
+          note: 'Korekta koordynatora',
+          actor_uid: uid,
+          updated_at: serverTimestamp(),
+        },
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    const overridden = await getDoc(dailyValue);
+    expect(overridden.data()).toMatchObject({
+      hours: 6,
+      source: 'attendance_import',
+      import_id: 'import-1',
+      manual_override: {
+        hours: 8.5,
+        note: 'Korekta koordynatora',
+        actor_uid: uid,
+      },
+    });
+
+    await assertFails(
       updateDoc(dailyValue, {
         hours: 8,
         updated_at: serverTimestamp(),
         updated_by: uid,
       }),
     );
+    await assertFails(
+      updateDoc(dailyValue, {
+        manual_override: {
+          hours: 25,
+          note: null,
+          actor_uid: uid,
+          updated_at: serverTimestamp(),
+        },
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertFails(
+      updateDoc(dailyValue, {
+        manual_override: {
+          hours: 7,
+          note: null,
+          actor_uid: 'different-user',
+          updated_at: serverTimestamp(),
+        },
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(dailyValue, {
+        manual_override: null,
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    const restored = await getDoc(dailyValue);
+    expect(restored.data()).toMatchObject({
+      hours: 6,
+      source: 'attendance_import',
+      import_id: 'import-1',
+      manual_override: null,
+    });
     await assertFails(deleteDoc(dailyValue));
   });
 

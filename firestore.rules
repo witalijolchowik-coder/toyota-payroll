@@ -120,6 +120,7 @@ service cloud.firestore {
           'source',
           'import_id',
           'note',
+          'manual_override',
           'created_at',
           'created_by',
           'updated_at',
@@ -130,10 +131,50 @@ service cloud.firestore {
         && data.hours is number
         && data.hours >= 0
         && data.hours <= 24
-        && data.source == 'manual'
-        && data.import_id == null
+        && data.source in ['manual', 'attendance_import']
         && isNullableString(data.note)
+        && (
+          (
+            data.source == 'manual'
+            && data.import_id == null
+            && (
+              !data.keys().hasAny(['manual_override'])
+              || data.manual_override == null
+            )
+          )
+          || (
+            data.source == 'attendance_import'
+            && isNonEmptyString(data.import_id)
+            && validManualOverride(data)
+          )
+        )
         && hasModificationMetadata(data);
+    }
+
+    function validManualOverride(data) {
+      return !data.keys().hasAny(['manual_override'])
+        || data.manual_override == null
+        || (
+          data.manual_override is map
+          && data.manual_override.keys().hasAll([
+            'hours',
+            'note',
+            'actor_uid',
+            'updated_at'
+          ])
+          && data.manual_override.keys().hasOnly([
+            'hours',
+            'note',
+            'actor_uid',
+            'updated_at'
+          ])
+          && data.manual_override.hours is number
+          && data.manual_override.hours >= 0
+          && data.manual_override.hours <= 24
+          && isNullableString(data.manual_override.note)
+          && data.manual_override.actor_uid == request.auth.uid
+          && data.manual_override.updated_at == request.time
+        );
     }
 
     function hasCanonicalDailyValueIdentity(monthId, dailyValueId, data) {
@@ -341,6 +382,7 @@ service cloud.firestore {
         allow create: if isAuthenticated()
           && monthExistsAndIsOpen(monthId)
           && validDailyValue(request.resource.data)
+          && request.resource.data.source == 'manual'
           && hasCanonicalDailyValueIdentity(
             monthId,
             dailyValueId,
@@ -349,15 +391,32 @@ service cloud.firestore {
           && hasCreateMetadata(request.resource.data);
         allow update: if isAuthenticated()
           && monthExistsAndIsOpen(monthId)
-          && resource.data.source == 'manual'
           && validDailyValue(request.resource.data)
           && hasUpdateMetadata(request.resource.data)
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-            'hours',
-            'note',
-            'updated_at',
-            'updated_by'
-          ]);
+          && (
+            (
+              resource.data.source == 'manual'
+              && request.resource.data.source == 'manual'
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'hours',
+                'note',
+                'updated_at',
+                'updated_by'
+              ])
+            )
+            || (
+              resource.data.source == 'attendance_import'
+              && request.resource.data.source == 'attendance_import'
+              && request.resource.data.diff(resource.data).affectedKeys().hasAny([
+                'manual_override'
+              ])
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'manual_override',
+                'updated_at',
+                'updated_by'
+              ])
+            )
+          );
         allow delete: if isAuthenticated()
           && monthExistsAndIsOpen(monthId)
           && resource.data.source == 'manual';

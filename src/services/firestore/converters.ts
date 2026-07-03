@@ -152,18 +152,50 @@ export const employeeSettlementConverter =
   });
 
 export const dailyValueConverter = createConverter<DailyValueDocument>(
-  (data, path) => ({
-    ...employeeReference(data, path),
-    date: readNonEmptyString(data, 'date', path),
-    hours: readNumber(data, 'hours', path),
-    source: readEnum(data, 'source', path, [
-      'manual',
-      'attendance_import',
-    ] as const),
-    import_id: readNullableString(data, 'import_id', path),
-    note: readNullableString(data, 'note', path),
-    ...metadata(data, path),
-  }),
+  (data, path) => {
+    const rawOverride: unknown = data.manual_override;
+    const manualOverride =
+      rawOverride === undefined || rawOverride === null
+        ? null
+        : readObject(data, 'manual_override', path);
+
+    return {
+      ...employeeReference(data, path),
+      date: readNonEmptyString(data, 'date', path),
+      hours: readNumber(data, 'hours', path),
+      source: readEnum(data, 'source', path, [
+        'manual',
+        'attendance_import',
+      ] as const),
+      import_id: readNullableString(data, 'import_id', path),
+      note: readNullableString(data, 'note', path),
+      manual_override: manualOverride
+        ? {
+            hours: readNumber(
+              manualOverride,
+              'hours',
+              `${path}.manual_override`,
+            ),
+            note: readNullableString(
+              manualOverride,
+              'note',
+              `${path}.manual_override`,
+            ),
+            actor_uid: readNonEmptyString(
+              manualOverride,
+              'actor_uid',
+              `${path}.manual_override`,
+            ),
+            updated_at: readTimestamp(
+              manualOverride,
+              'updated_at',
+              `${path}.manual_override`,
+            ),
+          }
+        : null,
+      ...metadata(data, path),
+    };
+  },
 );
 
 export const absenceConverter = createConverter<AbsenceDocument>(

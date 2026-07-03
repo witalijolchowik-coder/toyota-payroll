@@ -34,24 +34,33 @@ export function decideDailyValueMutation({
   parsed,
   currentKind,
   currentHours,
-  virtualDefaultHours,
+  currentNote,
+  nextNote,
+  fallbackHours,
 }: {
   parsed: Exclude<ParsedDailyHours, { kind: 'error' }>;
   currentKind: SettlementCellKind;
   currentHours: number | null;
-  virtualDefaultHours: number | null;
+  currentNote: string | null;
+  nextNote: string | null;
+  fallbackHours: number | null;
 }): DailyValueMutation {
-  const hasManualValue = currentKind === 'manual';
+  const hasCoordinatorValue =
+    currentKind === 'manual' || currentKind === 'imported-override';
 
   if (parsed.kind === 'clear') {
-    return hasManualValue ? 'clear' : 'none';
+    return hasCoordinatorValue ? 'clear' : 'none';
   }
 
-  if (virtualDefaultHours !== null && parsed.hours === virtualDefaultHours) {
-    return hasManualValue ? 'clear' : 'none';
+  if (fallbackHours !== null && parsed.hours === fallbackHours) {
+    return hasCoordinatorValue ? 'clear' : 'none';
   }
 
-  if (hasManualValue && parsed.hours === currentHours) {
+  if (
+    hasCoordinatorValue &&
+    parsed.hours === currentHours &&
+    nextNote === currentNote
+  ) {
     return 'none';
   }
 

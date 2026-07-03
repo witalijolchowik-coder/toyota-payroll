@@ -104,6 +104,14 @@ export function mapDailyValueDocument(
     source: document.source,
     importId: document.import_id,
     note: document.note,
+    manualOverride: document.manual_override
+      ? {
+          hours: document.manual_override.hours,
+          note: document.manual_override.note,
+          actorUid: document.manual_override.actor_uid,
+          updatedAt: document.manual_override.updated_at.toDate(),
+        }
+      : null,
     ...modificationMetadata(document),
   };
 }

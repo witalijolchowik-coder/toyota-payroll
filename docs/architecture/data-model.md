@@ -111,8 +111,14 @@ Manual daily-value edits use the canonical document ID
 `{employeeId}_{YYYY-MM-DD}`, source `manual`, and modification metadata. A
 manual value may be updated or deleted while the month is open. Clearing it, or
 returning it to the applicable virtual default, deletes the manual document so
-the virtual value becomes visible again. Imported daily values remain
-client-read-only.
+the virtual value becomes visible again.
+
+Imported daily values remain read-only at the base-fact level. An imported
+document may contain an optional audited `manual_override` map with `hours`,
+`note`, `actor_uid`, and `updated_at`. Effective hours are
+`manual_override.hours ?? hours`. The browser may add, change, or clear only
+this override in an open month; imported hours, source, import linkage,
+identity, and base creation metadata remain preserved.
 
 Daily values are worked-hour facts only. They do not define nominal month
 hours, employee-specific nominal hours, bonuses, absence calculations, or

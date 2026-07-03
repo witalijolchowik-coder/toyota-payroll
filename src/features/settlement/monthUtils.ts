@@ -13,6 +13,7 @@ import {
   type PayrollMonthDateRange,
   type ParsedPayrollMonth,
 } from '../../utils/payroll';
+import { resolveEffectiveAttendanceValue } from '../../utils/attendance';
 
 export type ParsedMonthId = ParsedPayrollMonth;
 export type MonthDateRange = PayrollMonthDateRange;
@@ -28,7 +29,7 @@ export interface CalendarDay {
 }
 
 export type SettlementCellKind =
-  'manual' | 'imported' | 'virtual-default' | 'empty';
+  'manual' | 'imported' | 'imported-override' | 'virtual-default' | 'empty';
 
 export type SettlementCalendarState =
   'working' | 'non-working' | 'future' | 'outside-employment';
@@ -37,6 +38,8 @@ export interface SettlementCellValue {
   kind: SettlementCellKind;
   calendarState: SettlementCalendarState;
   hours: number | null;
+  fallbackHours: number | null;
+  coordinatorNote: string | null;
 }
 
 export const parseMonthId = parsePayrollMonthId;
@@ -121,10 +124,21 @@ export function resolveSettlementCellValue({
         : 'non-working';
 
   if (persistedValue) {
+    const effective = resolveEffectiveAttendanceValue(persistedValue);
     return {
-      kind: persistedValue.source === 'manual' ? 'manual' : 'imported',
+      kind: effective.kind,
       calendarState,
-      hours: persistedValue.hours,
+      hours: effective.hours,
+      fallbackHours:
+        persistedValue.source === 'attendance_import'
+          ? persistedValue.hours
+          : getUiVirtualDefaultHours({
+              isWorkingDay: day.isWorkingDay,
+              isWithinEmployment,
+              hasGoverningValue: false,
+              isFuture: day.isFuture,
+            }),
+      coordinatorNote: effective.kind === 'imported' ? null : effective.note,
     };
   }
 
@@ -139,10 +153,18 @@ export function resolveSettlementCellValue({
       kind: 'virtual-default',
       calendarState,
       hours: virtualHours,
+      fallbackHours: virtualHours,
+      coordinatorNote: null,
     };
   }
 
-  return { kind: 'empty', calendarState, hours: null };
+  return {
+    kind: 'empty',
+    calendarState,
+    hours: null,
+    fallbackHours: null,
+    coordinatorNote: null,
+  };
 }
 
 export function dailyValueLookupKey(

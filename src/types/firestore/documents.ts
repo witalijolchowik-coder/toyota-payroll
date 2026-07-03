@@ -60,6 +60,13 @@ export interface EmployeeSettlementDocument extends EmployeeReferenceDocument {
 
 export type DailyValueSource = 'manual' | 'attendance_import';
 
+export interface DailyValueManualOverrideDocument {
+  hours: number;
+  note: string | null;
+  actor_uid: string;
+  updated_at: Timestamp;
+}
+
 export interface DailyValueDocument
   extends EmployeeReferenceDocument, ModificationMetadataDocument {
   date: IsoDate;
@@ -67,6 +74,7 @@ export interface DailyValueDocument
   source: DailyValueSource;
   import_id: string | null;
   note: string | null;
+  manual_override?: DailyValueManualOverrideDocument | null;
 }
 
 export type AbsenceSource = 'manual' | 'absence_import';

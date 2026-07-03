@@ -12,12 +12,10 @@ import type {
   IsoDate,
   MonthId,
 } from '../types/firestore';
+import { isValidWorkedHours } from '../utils/attendance';
 
 export type DailyValueServiceErrorCode =
-  | 'firebase-unavailable'
-  | 'authentication-required'
-  | 'imported-read-only'
-  | 'invalid-hours';
+  'firebase-unavailable' | 'authentication-required' | 'invalid-hours';
 
 export class DailyValueServiceError extends Error {
   constructor(readonly code: DailyValueServiceErrorCode) {
@@ -40,7 +38,7 @@ async function requireActorUid(): Promise<string> {
 }
 
 function assertHours(hours: number) {
-  if (!Number.isFinite(hours) || hours < 0 || hours > 24) {
+  if (!isValidWorkedHours(hours)) {
     throw new DailyValueServiceError('invalid-hours');
   }
 }
@@ -65,13 +63,25 @@ export async function saveManualDailyValue(
 
   await runTransaction(firestore, async (transaction) => {
     const snapshot = await transaction.get(reference);
-    if (snapshot.exists() && snapshot.data().source !== 'manual') {
-      throw new DailyValueServiceError('imported-read-only');
-    }
 
     if (snapshot.exists()) {
+      if (snapshot.data().source === 'attendance_import') {
+        transaction.update(reference, {
+          manual_override: {
+            hours: input.hours,
+            note: input.note,
+            actor_uid: actorUid,
+            updated_at: serverTimestamp(),
+          },
+          updated_at: serverTimestamp(),
+          updated_by: actorUid,
+        });
+        return;
+      }
+
       transaction.update(reference, {
         hours: input.hours,
+        note: input.note,
         updated_at: serverTimestamp(),
         updated_by: actorUid,
       });
@@ -86,6 +96,7 @@ export async function saveManualDailyValue(
       source: 'manual',
       import_id: null,
       note: input.note,
+      manual_override: null,
       created_at: serverTimestamp(),
       created_by: actorUid,
       updated_at: serverTimestamp(),
@@ -105,7 +116,7 @@ export async function clearManualDailyValue(
     throw new DailyValueServiceError('firebase-unavailable');
   }
 
-  await requireActorUid();
+  const actorUid = await requireActorUid();
   const dailyValues = repositories.forMonth(monthId).dailyValues;
   const reference = doc(dailyValues, dailyValueDocumentId(employeeId, date));
 
@@ -114,8 +125,16 @@ export async function clearManualDailyValue(
     if (!snapshot.exists()) {
       return;
     }
-    if (snapshot.data().source !== 'manual') {
-      throw new DailyValueServiceError('imported-read-only');
+    if (snapshot.data().source === 'attendance_import') {
+      if (!snapshot.data().manual_override) {
+        return;
+      }
+      transaction.update(reference, {
+        manual_override: null,
+        updated_at: serverTimestamp(),
+        updated_by: actorUid,
+      });
+      return;
     }
     transaction.delete(reference);
   });

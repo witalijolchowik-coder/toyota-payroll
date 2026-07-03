@@ -234,7 +234,9 @@ export const pl = {
         'Wirtualna wartość domyślna — nie jest zapisana w Firestore.',
       manualValue: 'Ręczna wartość koordynatora.',
       importedValue:
-        'Wartość z importu — edycja ręczna jest obecnie zablokowana.',
+        'Oryginalna wartość z importu. Możesz dodać korektę bez nadpisywania importu.',
+      importedOverride:
+        'Ręczna korekta wartości z importu. Oryginalna wartość: {{original}} h.',
       nonWorkingDay: 'Dzień wolny — domyślna wartość 0 h jest wirtualna.',
       futureDay: 'Nie można edytować przyszłego dnia.',
       outsideEmployment: 'Data poza okresem zatrudnienia pracownika.',
@@ -244,6 +246,14 @@ export const pl = {
         'Nieobecność {{code}} — edycja jest dostępna w module Nieobecności.',
       absenceAmbiguous:
         'Kilka różnych nieobecności obejmuje ten dzień. Wymagana jest weryfikacja.',
+      warnings: {
+        'absence-conflict':
+          'Uwaga: dla tego dnia istnieją jednocześnie godziny pracy i aktywna nieobecność.',
+        'non-working-explicit':
+          'Uwaga: jawne godziny pracy zapisano w dniu wolnym.',
+        'outside-employment':
+          'Uwaga: jawne godziny znajdują się poza okresem zatrudnienia.',
+      },
     },
     legend: {
       title: 'Oznaczenia kalendarza',
@@ -253,6 +263,10 @@ export const pl = {
       futureDay: 'Dzień przyszły',
       virtualDefault: 'Wirtualne 8 h / 0 h',
       virtualDefaultValue: '8/0',
+      manualValue: 'Wartość ręczna',
+      importedValue: 'Wartość z importu',
+      importedOverride: 'Ręczna korekta importu',
+      warning: 'Wymaga weryfikacji',
     },
     empty: {
       title: 'Brak pracowników w wybranym miesiącu',
@@ -271,9 +285,12 @@ export const pl = {
       hours: 'Liczba godzin',
       helper:
         'Wprowadź wartość od 0 do 24. Wartość domyślna nie zostanie zapisana.',
+      note: 'Powód lub notatka',
+      noteHelper:
+        'Opcjonalnie opisz ręczny wpis lub przyczynę korekty wartości z importu.',
       cancel: 'Anuluj',
       save: 'Zapisz',
-      clear: 'Usuń wartość ręczną',
+      clear: 'Usuń korektę ręczną',
       validation: {
         notNumber: 'Wprowadź prawidłową liczbę.',
         negative: 'Liczba godzin nie może być ujemna.',
@@ -282,8 +299,6 @@ export const pl = {
       errors: {
         save: 'Nie udało się zapisać wartości. Spróbuj ponownie.',
         clear: 'Nie udało się usunąć wartości. Spróbuj ponownie.',
-        imported:
-          'Wartość z importu jest tylko do odczytu i nie może zostać nadpisana.',
         authentication:
           'Do zapisu wymagane jest aktywne uwierzytelnienie Firebase.',
         firebase:

@@ -100,3 +100,14 @@ Authentication session.
 - Employment-period warnings and current-day summary cards.
 - No payroll amounts, imports, reports, ZUS integration, or server-side
   overlap enforcement.
+
+## Business Rules Block 3 implementation
+
+- One canonical DailyValue document per employee-day.
+- Imported base facts remain immutable to the browser.
+- Audited manual overrides preserve and restore the original imported value.
+- Effective-value precedence and attendance warning states are reusable pure
+  helpers.
+- Absence conflicts, non-working-day facts, and outside-employment facts are
+  visible without introducing payroll consequences.
+- No import engine, payroll aggregation, or overtime calculation.

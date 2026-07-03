@@ -67,7 +67,62 @@ export function SettlementLegend() {
             {t.settlement.legend.virtualDefault}
           </Typography>
         </Stack>
+        <LegendValue
+          value="7,5"
+          label={t.settlement.legend.manualValue}
+          sx={{ color: 'primary.main', textDecoration: 'underline' }}
+        />
+        <LegendValue
+          value="7,5"
+          label={t.settlement.legend.importedValue}
+          sx={{ color: 'secondary.main', fontWeight: 700 }}
+        />
+        <LegendValue
+          value="7,5"
+          label={t.settlement.legend.importedOverride}
+          sx={{
+            color: 'warning.dark',
+            fontWeight: 800,
+            textDecoration: 'underline',
+          }}
+        />
+        <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+          <Box
+            aria-hidden="true"
+            sx={{
+              width: 16,
+              height: 16,
+              borderRadius: 0.75,
+              boxShadow: (theme) =>
+                `inset 0 0 0 2px ${theme.palette.warning.main}`,
+            }}
+          />
+          <Typography variant="caption" color="text.secondary">
+            {t.settlement.legend.warning}
+          </Typography>
+        </Stack>
       </Stack>
+    </Stack>
+  );
+}
+
+function LegendValue({
+  value,
+  label,
+  sx,
+}: {
+  value: string;
+  label: string;
+  sx: Record<string, string | number>;
+}) {
+  return (
+    <Stack direction="row" spacing={0.75} sx={{ alignItems: 'center' }}>
+      <Typography variant="caption" sx={{ minWidth: 20, ...sx }}>
+        {value}
+      </Typography>
+      <Typography variant="caption" color="text.secondary">
+        {label}
+      </Typography>
     </Stack>
   );
 }

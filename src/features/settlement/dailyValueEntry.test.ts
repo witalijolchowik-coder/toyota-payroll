@@ -43,7 +43,9 @@ describe('daily value mutation decisions', () => {
         parsed: { kind: 'value', hours: 8 },
         currentKind: 'virtual-default',
         currentHours: 8,
-        virtualDefaultHours: 8,
+        currentNote: null,
+        nextNote: null,
+        fallbackHours: 8,
       }),
     ).toBe('none');
   });
@@ -54,7 +56,9 @@ describe('daily value mutation decisions', () => {
         parsed: { kind: 'value', hours: 0 },
         currentKind: 'virtual-default',
         currentHours: 0,
-        virtualDefaultHours: 0,
+        currentNote: null,
+        nextNote: null,
+        fallbackHours: 0,
       }),
     ).toBe('none');
   });
@@ -65,7 +69,9 @@ describe('daily value mutation decisions', () => {
         parsed: { kind: 'value', hours: 8 },
         currentKind: 'manual',
         currentHours: 6,
-        virtualDefaultHours: 8,
+        currentNote: null,
+        nextNote: null,
+        fallbackHours: 8,
       }),
     ).toBe('clear');
   });
@@ -76,7 +82,9 @@ describe('daily value mutation decisions', () => {
         parsed: { kind: 'clear' },
         currentKind: 'manual',
         currentHours: 6,
-        virtualDefaultHours: 8,
+        currentNote: null,
+        nextNote: null,
+        fallbackHours: 8,
       }),
     ).toBe('clear');
     expect(
@@ -84,7 +92,9 @@ describe('daily value mutation decisions', () => {
         parsed: { kind: 'clear' },
         currentKind: 'virtual-default',
         currentHours: 8,
-        virtualDefaultHours: 8,
+        currentNote: null,
+        nextNote: null,
+        fallbackHours: 8,
       }),
     ).toBe('none');
     expect(
@@ -92,7 +102,9 @@ describe('daily value mutation decisions', () => {
         parsed: { kind: 'value', hours: 0 },
         currentKind: 'virtual-default',
         currentHours: 8,
-        virtualDefaultHours: 8,
+        currentNote: null,
+        nextNote: null,
+        fallbackHours: 8,
       }),
     ).toBe('save');
   });
@@ -103,8 +115,66 @@ describe('daily value mutation decisions', () => {
         parsed: { kind: 'value', hours: 6 },
         currentKind: 'manual',
         currentHours: 6,
-        virtualDefaultHours: 8,
+        currentNote: null,
+        nextNote: null,
+        fallbackHours: 8,
       }),
     ).toBe('none');
+  });
+
+  it('creates, preserves, and clears an imported-value override', () => {
+    expect(
+      decideDailyValueMutation({
+        parsed: { kind: 'value', hours: 8 },
+        currentKind: 'imported',
+        currentHours: 7,
+        currentNote: null,
+        nextNote: null,
+        fallbackHours: 7,
+      }),
+    ).toBe('save');
+    expect(
+      decideDailyValueMutation({
+        parsed: { kind: 'value', hours: 8 },
+        currentKind: 'imported-override',
+        currentHours: 8,
+        currentNote: null,
+        nextNote: null,
+        fallbackHours: 7,
+      }),
+    ).toBe('none');
+    expect(
+      decideDailyValueMutation({
+        parsed: { kind: 'value', hours: 7 },
+        currentKind: 'imported-override',
+        currentHours: 8,
+        currentNote: null,
+        nextNote: null,
+        fallbackHours: 7,
+      }),
+    ).toBe('clear');
+    expect(
+      decideDailyValueMutation({
+        parsed: { kind: 'clear' },
+        currentKind: 'imported-override',
+        currentHours: 8,
+        currentNote: null,
+        nextNote: null,
+        fallbackHours: 7,
+      }),
+    ).toBe('clear');
+  });
+
+  it('updates the note without requiring an hours change', () => {
+    expect(
+      decideDailyValueMutation({
+        parsed: { kind: 'value', hours: 8 },
+        currentKind: 'imported-override',
+        currentHours: 8,
+        currentNote: 'Stara notatka',
+        nextNote: 'Nowa notatka',
+        fallbackHours: 7,
+      }),
+    ).toBe('save');
   });
 });

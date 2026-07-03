@@ -58,6 +58,7 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
     employee: Employee;
     day: CalendarDay;
     value: SettlementCellValue;
+    hasGoverningAbsence: boolean;
   } | null>(null);
 
   if (isLoading) {
@@ -222,8 +223,13 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
           dailyValues={participatingDailyValues}
           absences={participatingAbsences}
           isSettled={data.month.isSettled}
-          onEditCell={(employee, day, value) =>
-            setEditingCell({ employee, day, value })
+          onEditCell={(employee, day, value, hasGoverningAbsence) =>
+            setEditingCell({
+              employee,
+              day,
+              value,
+              hasGoverningAbsence,
+            })
           }
         />
       ) : (
@@ -245,14 +251,15 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
           employee={editingCell.employee}
           day={editingCell.day}
           value={editingCell.value}
+          hasGoverningAbsence={editingCell.hasGoverningAbsence}
           onClose={() => setEditingCell(null)}
-          onSave={async (hours) => {
+          onSave={async (hours, note) => {
             await saveManualDailyValue(monthId, {
               employeeId: editingCell.employee.id,
               tetaNumber: editingCell.employee.tetaNumber,
               date: editingCell.day.isoDate,
               hours,
-              note: null,
+              note,
             });
             await reload();
             notify({

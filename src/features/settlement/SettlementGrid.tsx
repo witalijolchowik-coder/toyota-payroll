@@ -20,6 +20,10 @@ import { interpolate } from '../../i18n/pl';
 import type { Absence, DailyValue, Employee } from '../../types/firestore';
 import { resolveGoverningAbsence } from '../../utils/absences';
 import {
+  resolveAttendanceWarnings,
+  type AttendanceWarning,
+} from '../../utils/attendance';
+import {
   dailyValueLookupKey,
   resolveSettlementCellValue,
   type CalendarDay,
@@ -35,6 +39,7 @@ interface SettlementGridProps {
     employee: Employee,
     day: CalendarDay,
     value: ReturnType<typeof resolveSettlementCellValue>,
+    hasGoverningAbsence: boolean,
   ) => void;
 }
 
@@ -152,12 +157,13 @@ export function SettlementGrid({
                   </Typography>
                 </TableCell>
                 {days.map((day) => {
+                  const persistedValue = dailyValuesByEmployeeAndDate.get(
+                    dailyValueLookupKey(employee.id, day.isoDate),
+                  );
                   const value = resolveSettlementCellValue({
                     employee,
                     day,
-                    persistedValue: dailyValuesByEmployeeAndDate.get(
-                      dailyValueLookupKey(employee.id, day.isoDate),
-                    ),
+                    persistedValue,
                   });
                   const absenceResolution = resolveGoverningAbsence(
                     absencesByEmployee.get(employee.id) ?? [],
@@ -169,37 +175,29 @@ export function SettlementGrid({
                       : absenceResolution.kind === 'ambiguous'
                         ? absenceResolution.codes.join('/')
                         : null;
-                  const label = absenceLabel
-                    ? absenceLabel
-                    : value.hours === null
+                  const hoursLabel =
+                    value.hours === null
                       ? t.settlement.grid.empty
                       : interpolate(t.settlement.grid.hours, {
                           hours: value.hours.toLocaleString('pl-PL'),
                         });
-                  const tooltip =
-                    absenceResolution.kind === 'ambiguous'
-                      ? t.settlement.grid.absenceAmbiguous
-                      : absenceResolution.kind === 'governed'
-                        ? interpolate(t.settlement.grid.absence, {
-                            code: absenceResolution.code,
-                          })
-                        : isSettled
-                          ? t.settlement.grid.settledMonth
-                          : value.calendarState === 'future'
-                            ? t.settlement.grid.futureDay
-                            : value.calendarState === 'outside-employment'
-                              ? t.settlement.grid.outsideEmployment
-                              : value.kind === 'imported'
-                                ? t.settlement.grid.importedValue
-                                : value.kind === 'manual'
-                                  ? t.settlement.grid.manualValue
-                                  : value.calendarState === 'non-working'
-                                    ? t.settlement.grid.nonWorkingDay
-                                    : t.settlement.grid.virtualDefault;
+                  const hasGoverningAbsence = absenceResolution.kind !== 'none';
+                  const warnings = resolveAttendanceWarnings({
+                    hasExplicitValue: Boolean(persistedValue),
+                    hasActiveAbsence: hasGoverningAbsence,
+                    isWorkingDay: day.isWorkingDay,
+                    isWithinEmployment:
+                      value.calendarState !== 'outside-employment',
+                  });
+                  const tooltip = buildTooltip({
+                    value,
+                    absenceResolution,
+                    warnings,
+                    isSettled,
+                    t,
+                  });
                   const canEdit =
                     !isSettled &&
-                    absenceResolution.kind === 'none' &&
-                    value.kind !== 'imported' &&
                     value.calendarState !== 'future' &&
                     value.calendarState !== 'outside-employment' &&
                     Boolean(onEditCell);
@@ -219,6 +217,12 @@ export function SettlementGrid({
                         px: 0.5,
                         py: 1,
                         ...cellBackground(value.calendarState, day),
+                        ...(warnings.length > 0
+                          ? {
+                              boxShadow: (theme) =>
+                                `inset 0 0 0 2px ${theme.palette.warning.main}`,
+                            }
+                          : {}),
                       }}
                     >
                       <Tooltip title={tooltip}>
@@ -226,7 +230,14 @@ export function SettlementGrid({
                           <ButtonBase
                             disabled={!canEdit}
                             aria-label={canEdit ? editLabel : undefined}
-                            onClick={() => onEditCell?.(employee, day, value)}
+                            onClick={() =>
+                              onEditCell?.(
+                                employee,
+                                day,
+                                value,
+                                hasGoverningAbsence,
+                              )
+                            }
                             sx={{
                               width: '100%',
                               minHeight: 30,
@@ -249,7 +260,31 @@ export function SettlementGrid({
                                   : cellValueSx(value.kind)
                               }
                             >
-                              {label}
+                              {absenceLabel ? (
+                                <>
+                                  <Box
+                                    component="span"
+                                    sx={{ display: 'block', lineHeight: 1.1 }}
+                                  >
+                                    {absenceLabel}
+                                  </Box>
+                                  {persistedValue ? (
+                                    <Box
+                                      component="span"
+                                      sx={{
+                                        display: 'block',
+                                        color: 'warning.dark',
+                                        fontSize: '0.65rem',
+                                        lineHeight: 1.1,
+                                      }}
+                                    >
+                                      {hoursLabel}
+                                    </Box>
+                                  ) : null}
+                                </>
+                              ) : (
+                                hoursLabel
+                              )}
                             </Box>
                           </ButtonBase>
                         </Box>
@@ -334,5 +369,73 @@ function cellValueSx(
   if (kind === 'imported') {
     return { color: 'secondary.main', fontWeight: 700 };
   }
+  if (kind === 'imported-override') {
+    return {
+      color: 'warning.dark',
+      fontWeight: 800,
+      textDecoration: 'underline',
+      textDecorationThickness: '2px',
+      textUnderlineOffset: '3px',
+    };
+  }
   return { color: 'text.disabled' };
+}
+
+function buildTooltip({
+  value,
+  absenceResolution,
+  warnings,
+  isSettled,
+  t,
+}: {
+  value: ReturnType<typeof resolveSettlementCellValue>;
+  absenceResolution: ReturnType<typeof resolveGoverningAbsence>;
+  warnings: AttendanceWarning[];
+  isSettled: boolean;
+  t: ReturnType<typeof useTranslations>;
+}): string {
+  const parts: string[] = [];
+
+  if (absenceResolution.kind === 'ambiguous') {
+    parts.push(t.settlement.grid.absenceAmbiguous);
+  } else if (absenceResolution.kind === 'governed') {
+    parts.push(
+      interpolate(t.settlement.grid.absence, {
+        code: absenceResolution.code,
+      }),
+    );
+  }
+
+  warnings.forEach((warning) => {
+    parts.push(t.settlement.grid.warnings[warning]);
+  });
+
+  if (value.kind === 'imported-override') {
+    parts.push(
+      interpolate(t.settlement.grid.importedOverride, {
+        original: (value.fallbackHours ?? 0).toLocaleString('pl-PL'),
+      }),
+    );
+  } else if (value.kind === 'imported') {
+    parts.push(t.settlement.grid.importedValue);
+  } else if (value.kind === 'manual') {
+    parts.push(t.settlement.grid.manualValue);
+  }
+
+  if (isSettled) {
+    parts.push(t.settlement.grid.settledMonth);
+  } else if (value.calendarState === 'future') {
+    parts.push(t.settlement.grid.futureDay);
+  } else if (value.calendarState === 'outside-employment') {
+    parts.push(t.settlement.grid.outsideEmployment);
+  } else if (
+    value.kind === 'virtual-default' &&
+    value.calendarState === 'non-working'
+  ) {
+    parts.push(t.settlement.grid.nonWorkingDay);
+  } else if (value.kind === 'virtual-default') {
+    parts.push(t.settlement.grid.virtualDefault);
+  }
+
+  return parts.join(' ');
 }

@@ -16,6 +16,9 @@ The attached design history contains several generations of the architecture. Th
   virtual defaults
 - [Absence rules — Block 2](business-rules/absence-rules.md) — absence
   identity, lifecycle, priority, ownership, and workspace behavior
+- [Attendance and hours rules — Block 3](business-rules/attendance-hours-rules.md)
+  — explicit worked-hour facts, imported-value overrides, precedence, and
+  warning states
 
 Approved business-rules specifications govern payroll semantics. Architecture
 documents continue to govern system structure and implementation boundaries.
@@ -30,6 +33,7 @@ documents continue to govern system structure and implementation boundaries.
 - [ADR 0006: Payroll-period participation](decisions/0006-payroll-period-participation.md)
 - [ADR 0007: Month initialization and settlement shell](decisions/0007-month-settlement-shell.md)
 - [ADR 0008: Manual daily-value entry](decisions/0008-daily-value-entry.md)
+- [ADR 0009: Attendance facts and imported-value overrides](decisions/0009-attendance-hours-rules.md)
 
 ## Authority order
 

@@ -115,6 +115,8 @@ describe('virtual daily values', () => {
       kind: 'virtual-default',
       calendarState: 'working',
       hours: 8,
+      fallbackHours: 8,
+      coordinatorNote: null,
     });
   });
 
@@ -126,6 +128,8 @@ describe('virtual daily values', () => {
       kind: 'virtual-default',
       calendarState: 'working',
       hours: 8,
+      fallbackHours: 8,
+      coordinatorNote: null,
     });
   });
 
@@ -135,13 +139,21 @@ describe('virtual daily values', () => {
 
     expect(
       resolveSettlementCellValue({ employee: employeeRecord, day: futureDay }),
-    ).toEqual({ kind: 'empty', calendarState: 'future', hours: null });
+    ).toEqual({
+      kind: 'empty',
+      calendarState: 'future',
+      hours: null,
+      fallbackHours: null,
+      coordinatorNote: null,
+    });
     expect(
       resolveSettlementCellValue({ employee: employeeRecord, day: weekend }),
     ).toEqual({
       kind: 'virtual-default',
       calendarState: 'non-working',
       hours: 0,
+      fallbackHours: 0,
+      coordinatorNote: null,
     });
   });
 
@@ -164,6 +176,8 @@ describe('virtual daily values', () => {
       kind: 'virtual-default',
       calendarState: 'non-working',
       hours: 0,
+      fallbackHours: 0,
+      coordinatorNote: null,
     });
   });
 
@@ -179,6 +193,7 @@ describe('virtual daily values', () => {
       source: 'manual',
       importId: null,
       note: null,
+      manualOverride: null,
       ...metadata,
     } satisfies DailyValue;
 
@@ -188,7 +203,13 @@ describe('virtual daily values', () => {
         day,
         persistedValue,
       }),
-    ).toEqual({ kind: 'manual', calendarState: 'working', hours: 6 });
+    ).toEqual({
+      kind: 'manual',
+      calendarState: 'working',
+      hours: 6,
+      fallbackHours: 8,
+      coordinatorNote: null,
+    });
   });
 
   it('distinguishes an imported persisted value', () => {
@@ -203,6 +224,7 @@ describe('virtual daily values', () => {
       source: 'attendance_import',
       importId: 'import-1',
       note: null,
+      manualOverride: null,
       ...metadata,
     } satisfies DailyValue;
 
@@ -212,7 +234,49 @@ describe('virtual daily values', () => {
         day,
         persistedValue: importedValue,
       }),
-    ).toEqual({ kind: 'imported', calendarState: 'working', hours: 7 });
+    ).toEqual({
+      kind: 'imported',
+      calendarState: 'working',
+      hours: 7,
+      fallbackHours: 7,
+      coordinatorNote: null,
+    });
+  });
+
+  it('uses a manual override while preserving the imported fallback', () => {
+    const day = calendar.find((item) => item.isoDate === '2026-07-14')!;
+    const importedValue = {
+      id: 'employee-1_2026-07-14',
+      monthId: '2026-07',
+      employeeId: 'employee-1',
+      tetaNumber: 'TETA-1001',
+      date: '2026-07-14',
+      hours: 7,
+      source: 'attendance_import',
+      importId: 'import-1',
+      note: null,
+      manualOverride: {
+        hours: 8.5,
+        note: 'Korekta',
+        actorUid: 'coordinator-1',
+        updatedAt: new Date('2026-07-15T08:00:00.000Z'),
+      },
+      ...metadata,
+    } satisfies DailyValue;
+
+    expect(
+      resolveSettlementCellValue({
+        employee: employeeRecord,
+        day,
+        persistedValue: importedValue,
+      }),
+    ).toEqual({
+      kind: 'imported-override',
+      calendarState: 'working',
+      hours: 8.5,
+      fallbackHours: 7,
+      coordinatorNote: 'Korekta',
+    });
   });
 
   it('does not show a virtual default outside the employment period', () => {
@@ -228,6 +292,8 @@ describe('virtual daily values', () => {
       kind: 'empty',
       calendarState: 'outside-employment',
       hours: null,
+      fallbackHours: null,
+      coordinatorNote: null,
     });
   });
 });

@@ -30,8 +30,9 @@ interface DailyValueEditorDialogProps {
   employee: Employee;
   day: CalendarDay;
   value: SettlementCellValue;
+  hasGoverningAbsence: boolean;
   onClose: () => void;
-  onSave: (hours: number) => Promise<void>;
+  onSave: (hours: number, note: string | null) => Promise<void>;
   onClear: () => Promise<void>;
 }
 
@@ -46,12 +47,14 @@ export function DailyValueEditorDialog({
   employee,
   day,
   value,
+  hasGoverningAbsence,
   onClose,
   onSave,
   onClear,
 }: DailyValueEditorDialogProps) {
   const t = useTranslations();
   const [input, setInput] = useState(() => value.hours?.toString() ?? '');
+  const [note, setNote] = useState(() => value.coordinatorNote ?? '');
   const [validationError, setValidationError] =
     useState<DailyHoursValidationError | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -79,12 +82,19 @@ export function DailyValueEditorDialog({
       return;
     }
 
+    const normalizedNote = note.trim() || null;
     const mutation = decideDailyValueMutation({
       parsed,
       currentKind: value.kind,
       currentHours: value.hours,
-      virtualDefaultHours:
-        value.kind === 'virtual-default' ? value.hours : virtualDefault(value),
+      currentNote: value.coordinatorNote,
+      nextNote: normalizedNote,
+      fallbackHours:
+        hasGoverningAbsence &&
+        value.kind !== 'imported' &&
+        value.kind !== 'imported-override'
+          ? null
+          : value.fallbackHours,
     });
 
     if (mutation === 'none') {
@@ -105,7 +115,7 @@ export function DailyValueEditorDialog({
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      await onSave(parsed.hours);
+      await onSave(parsed.hours, normalizedNote);
       onClose();
     } catch (error) {
       setSubmitError(serviceErrorMessage(error, 'save', t));
@@ -154,10 +164,21 @@ export function DailyValueEditorDialog({
                 },
               }}
             />
+            <TextField
+              label={t.settlement.editor.note}
+              value={note}
+              onChange={(event) => {
+                setNote(event.target.value);
+                setSubmitError(null);
+              }}
+              multiline
+              minRows={2}
+              helperText={t.settlement.editor.noteHelper}
+            />
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
-          {value.kind === 'manual' ? (
+          {value.kind === 'manual' || value.kind === 'imported-override' ? (
             <Button
               color="error"
               onClick={() => void clearValue()}
@@ -188,16 +209,6 @@ export function DailyValueEditorDialog({
   );
 }
 
-function virtualDefault(value: SettlementCellValue): number | null {
-  if (value.calendarState === 'working') {
-    return 8;
-  }
-  if (value.calendarState === 'non-working') {
-    return 0;
-  }
-  return null;
-}
-
 function validationMessage(
   code: DailyHoursValidationError,
   t: ReturnType<typeof useTranslations>,
@@ -225,9 +236,6 @@ function serviceCodeMessage(
   operation: 'save' | 'clear',
   t: ReturnType<typeof useTranslations>,
 ): string {
-  if (code === 'imported-read-only') {
-    return t.settlement.editor.errors.imported;
-  }
   if (code === 'authentication-required') {
     return t.settlement.editor.errors.authentication;
   }

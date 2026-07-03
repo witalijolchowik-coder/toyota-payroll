@@ -24,7 +24,8 @@ months must remain protected.
 - Do not write when the entered value equals an unchanged virtual default.
 - Delete an existing manual document when it is cleared or returned to its
   virtual default.
-- Keep `attendance_import` documents read-only for the browser.
+- Keep imported base facts read-only for the browser. ADR 0009 later permits a
+  separate audited `manual_override` without changing those base fields.
 - Keep every daily-value cell read-only when the month is settled.
 
 ## Security
@@ -32,8 +33,9 @@ months must remain protected.
 Firestore Rules continue to require authentication and an open month. Manual
 creates must use a canonical ID and a date belonging to the parent month.
 Updates preserve employee identity, date, source, import linkage, and creation
-metadata. Deletes are allowed only for manual documents. Imported and settled
-records remain protected.
+metadata. Deletes are allowed only for manual documents. Imported documents
+cannot be deleted or have their base fields changed; ADR 0009 permits only a
+narrowly scoped override update. Settled records remain protected.
 
 ## Consequences
 

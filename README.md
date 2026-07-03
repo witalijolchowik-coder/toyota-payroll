@@ -3,11 +3,12 @@
 Foundation for the Toyota Payroll Engine MVP: a browser-based coordinator
 workspace built with React, Vite, TypeScript, Material UI, and Firebase.
 
-The repository currently includes the approved Step 7 Absences workspace,
-Step 6 manual daily-value entry, a pure payroll-calendar and nominal-hours
-foundation, the Step 5 month settlement shell, Step 4 Employees module, and
-Step 3 Firestore foundation. Authentication screens, adjustments, payroll
-amount calculations, imports, and reports remain intentionally unimplemented.
+The repository currently includes the approved Absence and Attendance/Hours
+business-rule blocks, the Step 7 Absences workspace, Step 6 daily-value entry,
+a pure payroll-calendar and nominal-hours foundation, the Step 5 month
+settlement shell, Step 4 Employees module, and Step 3 Firestore foundation.
+Authentication screens, adjustments, payroll amount calculations, import
+parsing, and reports remain intentionally unimplemented.
 
 ## Prerequisites
 
@@ -97,8 +98,11 @@ regardless of their current `is_active` value.
 Explicit daily values are displayed when present. Otherwise, eligible elapsed
 working days show a virtual `8h`, and non-working days show virtual `0h`; these
 values are never written to Firestore. Coordinators can create, update, or
-clear explicit manual hours in eligible open-month cells. Imported, future,
-outside-employment, and settled cells remain read-only.
+clear explicit manual hours in eligible open-month cells. Imported base values
+remain immutable, while an audited manual override may be added or cleared
+without losing the original import. Attendance facts that conflict with an
+absence, occur on a non-working day, or fall outside employment are visibly
+flagged. Future, outside-employment, and settled cells remain read-only.
 
 ## Firestore foundation
 

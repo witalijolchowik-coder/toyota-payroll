@@ -136,8 +136,47 @@ describe('Firestore converters', () => {
       employeeId: 'employee-1',
       tetaNumber: 'TETA-1001',
       hours: 6,
+      manualOverride: null,
     });
     expect(document).not.toHaveProperty('employee_name');
+  });
+
+  it('maps an audited manual override without replacing imported hours', () => {
+    const document = dailyValueConverter.fromFirestore(
+      snapshot('months/2026-07/dailyValues/employee-1_2026-07-02', {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        date: '2026-07-02',
+        hours: 7,
+        source: 'attendance_import',
+        import_id: 'import-1',
+        note: null,
+        manual_override: {
+          hours: 8.5,
+          note: 'Korekta',
+          actor_uid: 'coordinator-1',
+          updated_at: now,
+        },
+        created_at: now,
+        created_by: 'system',
+        updated_at: now,
+        updated_by: 'coordinator-1',
+      }),
+      {},
+    );
+
+    expect(
+      mapDailyValueDocument('employee-1_2026-07-02', '2026-07', document),
+    ).toMatchObject({
+      hours: 7,
+      source: 'attendance_import',
+      manualOverride: {
+        hours: 8.5,
+        note: 'Korekta',
+        actorUid: 'coordinator-1',
+        updatedAt: new Date('2026-07-02T08:00:00.000Z'),
+      },
+    });
   });
 
   it('does not accept a virtual default as a persisted daily value', () => {

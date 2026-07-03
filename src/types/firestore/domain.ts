@@ -69,6 +69,12 @@ export interface DailyValue extends ModificationMetadata {
   source: DailyValueSource;
   importId: string | null;
   note: string | null;
+  manualOverride: {
+    hours: number;
+    note: string | null;
+    actorUid: string;
+    updatedAt: Date;
+  } | null;
 }
 
 export interface Absence extends ModificationMetadata {
