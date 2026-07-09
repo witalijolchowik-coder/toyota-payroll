@@ -1,6 +1,7 @@
 import type { DailyValue } from '../../types/firestore';
 import {
   isValidWorkedHours,
+  resolveManualAttendanceClearOperation,
   resolveAttendanceWarnings,
   resolveEffectiveAttendanceValue,
 } from './attendanceRules';
@@ -124,5 +125,40 @@ describe('worked-hours validation', () => {
     expect(isValidWorkedHours(Number.NaN)).toBe(false);
     expect(isValidWorkedHours(-0.01)).toBe(false);
     expect(isValidWorkedHours(24.01)).toBe(false);
+  });
+});
+
+describe('manual attendance clearing', () => {
+  it('deletes standalone manual values', () => {
+    expect(
+      resolveManualAttendanceClearOperation({
+        source: 'manual',
+        manualOverride: null,
+      }),
+    ).toBe('delete-manual-daily-value');
+  });
+
+  it('clears only manual overrides on imported values', () => {
+    expect(
+      resolveManualAttendanceClearOperation({
+        source: 'attendance_import',
+        manualOverride: {
+          hours: 6,
+          note: 'Korekta',
+          actorUid: 'coordinator-1',
+          updatedAt: new Date('2026-07-02T08:00:00.000Z'),
+        },
+      }),
+    ).toBe('clear-imported-override');
+  });
+
+  it('preserves imported values without an override', () => {
+    expect(
+      resolveManualAttendanceClearOperation({
+        source: 'attendance_import',
+        manualOverride: null,
+      }),
+    ).toBe('preserve-imported-value');
+    expect(resolveManualAttendanceClearOperation(null)).toBe('noop');
   });
 });

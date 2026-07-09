@@ -132,3 +132,15 @@ Authentication session.
 - Adds a read-only verification panel in Monthly Settlement.
 - No final salary, payroll closing, reports, exports, import engine, overtime,
   transport, accommodation, UDT, tax, ZUS, or Cloud Functions.
+
+## Business Rules Block 6 implementation
+
+- Calendar Constructor added as a visual planning and correction layer over
+  existing `DailyValue` and `Absence` documents.
+- Single-employee continuous range selection supports hours, L4, UW, UZ, NN,
+  and manual-attendance clearing.
+- Employee-focused calendar dialog provides detailed daily review and
+  daily-hour editing.
+- Settled months remain read-only and outside-employment writes are blocked.
+- Department/shift filtering and multi-row painting remain deferred because the
+  required data and review workflow are not yet modeled.

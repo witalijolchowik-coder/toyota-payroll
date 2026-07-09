@@ -24,6 +24,10 @@ import {
   type AttendanceWarning,
 } from '../../utils/attendance';
 import {
+  isDateInRangeSelection,
+  type CalendarRangeSelection,
+} from './calendarConstructor';
+import {
   dailyValueLookupKey,
   resolveSettlementCellValue,
   type CalendarDay,
@@ -36,6 +40,13 @@ interface SettlementGridProps {
   absences?: Absence[];
   isSettled?: boolean;
   onEditCell?: (
+    employee: Employee,
+    day: CalendarDay,
+    value: ReturnType<typeof resolveSettlementCellValue>,
+    hasGoverningAbsence: boolean,
+  ) => void;
+  selection?: CalendarRangeSelection | null;
+  onSelectCell?: (
     employee: Employee,
     day: CalendarDay,
     value: ReturnType<typeof resolveSettlementCellValue>,
@@ -58,6 +69,8 @@ export function SettlementGrid({
   absences = [],
   isSettled = false,
   onEditCell,
+  selection = null,
+  onSelectCell,
 }: SettlementGridProps) {
   const t = useTranslations();
   const dailyValuesByEmployeeAndDate = new Map(
@@ -200,7 +213,12 @@ export function SettlementGrid({
                     !isSettled &&
                     value.calendarState !== 'future' &&
                     value.calendarState !== 'outside-employment' &&
-                    Boolean(onEditCell);
+                    Boolean(onSelectCell ?? onEditCell);
+                  const isSelected = isDateInRangeSelection(
+                    selection,
+                    employee.id,
+                    day.isoDate,
+                  );
                   const employeeName = `${employee.lastName} ${employee.firstName}`;
                   const editLabel = interpolate(t.settlement.grid.edit, {
                     employee: employeeName,
@@ -223,6 +241,13 @@ export function SettlementGrid({
                                 `inset 0 0 0 2px ${theme.palette.warning.main}`,
                             }
                           : {}),
+                        ...(isSelected
+                          ? {
+                              outline: (theme) =>
+                                `3px solid ${theme.palette.primary.main}`,
+                              outlineOffset: -3,
+                            }
+                          : {}),
                       }}
                     >
                       <Tooltip title={tooltip}>
@@ -231,7 +256,7 @@ export function SettlementGrid({
                             disabled={!canEdit}
                             aria-label={canEdit ? editLabel : undefined}
                             onClick={() =>
-                              onEditCell?.(
+                              (onSelectCell ?? onEditCell)?.(
                                 employee,
                                 day,
                                 value,

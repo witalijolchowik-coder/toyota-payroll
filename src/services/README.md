@@ -30,6 +30,11 @@ and immutable-base-field boundaries.
 and cancellation. L4 overlap prevention is currently a client-side preflight
 backed by reusable pure helpers.
 
+The Calendar Constructor in the settlement workspace composes
+`dailyValueService.ts` and `absencesService.ts` for range-based coordinator
+corrections. It does not introduce a separate service or persisted calendar
+status model.
+
 `payrollSettingsService.ts` creates and reads append-only global setting
 versions. It rejects versions that would begin in settled history and leaves
 effective-month resolution to the pure payroll helper.

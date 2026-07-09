@@ -59,6 +59,9 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - In-memory payroll-engine foundation for employee-month calculation drafts.
 - Read-only Monthly Settlement draft panel with safe totals, warnings,
   frequency-bonus status, and adjustment breakdowns.
+- Calendar Constructor toolbar for range-based hours, L4, UW, UZ, NN, and
+  manual-attendance clearing in the Monthly Settlement grid.
+- Employee-focused month calendar dialog for daily review and hour editing.
 
 ### Changed
 
@@ -80,6 +83,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   duplicating cross-month records.
 - Extended settlement cells to show imported overrides and explicit-hours
   warnings without introducing payroll consequences.
+- Reused existing DailyValue/manual_override and Absence semantics for visual
+  calendar corrections instead of adding a separate calendar status model.
 
 ### Security
 

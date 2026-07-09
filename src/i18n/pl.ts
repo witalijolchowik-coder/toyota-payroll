@@ -261,6 +261,64 @@ export const pl = {
           'Nie znaleziono aktywnej konfiguracji premii frekwencyjnej.',
       },
     },
+    constructor: {
+      title: 'Konstruktor kalendarza',
+      description:
+        'Wybierz narzędzie, zaznacz dzień lub zakres dla jednego pracownika i zastosuj zmianę w istniejących dokumentach czasu pracy lub nieobecności.',
+      settledReadOnly:
+        'Zamknięty miesiąc jest tylko do odczytu. Narzędzia zapisu są zablokowane.',
+      tools: {
+        review: 'Przegląd',
+        hours: 'Godziny',
+        L4: 'L4',
+        UW: 'Urlop',
+        UZ: 'UŻ / UZ',
+        NN: 'NN',
+        'clear-manual': 'Wyczyść',
+      },
+      hours: 'Liczba godzin',
+      note: 'Notatka / powód',
+      apply: 'Zastosuj',
+      clearSelection: 'Wyczyść zaznaczenie',
+      noSelection:
+        'Kliknij komórkę, aby otworzyć kalendarz pracownika albo zaznaczyć zakres dla wybranego narzędzia.',
+      selection: '{{employee}}: {{start}} – {{end}}',
+      blocked: {
+        'settled-month': 'Nie można zapisywać zmian w zamkniętym miesiącu.',
+        'outside-employment':
+          'Zaznaczony zakres wychodzi poza okres zatrudnienia pracownika.',
+      },
+      filters: {
+        employee: 'Szukaj pracownika',
+        type: 'Filtr kalendarza',
+        all: 'Wszyscy uczestnicy miesiąca',
+        conflicts: 'Konflikty',
+        warnings: 'Uwagi',
+        result: 'Widoczni pracownicy: {{count}}',
+      },
+      notifications: {
+        applied: 'Zmiana została zastosowana.',
+      },
+      errors: {
+        invalidHours: 'Wprowadź prawidłową liczbę godzin od 0 do 24.',
+        applyFailed:
+          'Nie udało się zastosować zmiany. Sprawdź zakres, uprawnienia i reguły nieobecności.',
+      },
+    },
+    employeeCalendar: {
+      title: 'Kalendarz pracownika',
+      teta: 'TETA: {{teta}}',
+      employment: 'Zatrudnienie: {{start}} – {{end}}',
+      noStartDate: 'brak daty rozpoczęcia',
+      noEndDate: 'bez daty końcowej',
+      departmentUnavailable: 'Dział / zmiana: brak w modelu danych',
+      helper:
+        'Kliknij dzień, aby edytować godziny. Nieobecności dodawaj z konstruktora kalendarza w widoku ogólnym.',
+      settledReadOnly:
+        'Ten miesiąc jest zamknięty, dlatego kalendarz pracownika jest tylko do odczytu.',
+      warning: 'Wymaga weryfikacji',
+      close: 'Zamknij',
+    },
     settled: {
       title: 'Miesiąc został zamknięty',
       description:

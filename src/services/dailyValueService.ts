@@ -7,12 +7,16 @@ import {
   getFirestoreRepositories,
 } from './firestoreService';
 import type {
+  DailyValueDocument,
   DailyValueUpsertInput,
   EmployeeId,
   IsoDate,
   MonthId,
 } from '../types/firestore';
-import { isValidWorkedHours } from '../utils/attendance';
+import {
+  isValidWorkedHours,
+  resolveManualAttendanceClearOperation,
+} from '../utils/attendance';
 
 export type DailyValueServiceErrorCode =
   'firebase-unavailable' | 'authentication-required' | 'invalid-hours';
@@ -122,13 +126,15 @@ export async function clearManualDailyValue(
 
   await runTransaction(firestore, async (transaction) => {
     const snapshot = await transaction.get(reference);
-    if (!snapshot.exists()) {
-      return;
-    }
-    if (snapshot.data().source === 'attendance_import') {
-      if (!snapshot.data().manual_override) {
-        return;
-      }
+    const operation = resolveManualAttendanceClearOperation(
+      snapshot.exists()
+        ? {
+            source: snapshot.data().source,
+            manualOverride: dailyValueManualOverride(snapshot.data()),
+          }
+        : null,
+    );
+    if (operation === 'clear-imported-override') {
       transaction.update(reference, {
         manual_override: null,
         updated_at: serverTimestamp(),
@@ -136,6 +142,19 @@ export async function clearManualDailyValue(
       });
       return;
     }
-    transaction.delete(reference);
+    if (operation === 'delete-manual-daily-value') {
+      transaction.delete(reference);
+    }
   });
+}
+
+function dailyValueManualOverride(document: DailyValueDocument) {
+  return document.manual_override
+    ? {
+        hours: document.manual_override.hours,
+        note: document.manual_override.note,
+        actorUid: document.manual_override.actor_uid,
+        updatedAt: document.manual_override.updated_at.toDate(),
+      }
+    : null;
 }

@@ -24,6 +24,9 @@ The attached design history contains several generations of the architecture. Th
     coordinator adjustments
 - [Payroll engine foundation - Block 5](business-rules/payroll-engine-foundation.md)
   - in-memory monthly calculation drafts, safe totals, and warning breakdowns
+- [Calendar Constructor - Block 6](business-rules/calendar-constructor.md) -
+  visual monthly planning and corrections over existing attendance and absence
+  documents
 
 Approved business-rules specifications govern payroll semantics. Architecture
 documents continue to govern system structure and implementation boundaries.
@@ -41,6 +44,7 @@ documents continue to govern system structure and implementation boundaries.
 - [ADR 0009: Attendance facts and imported-value overrides](decisions/0009-attendance-hours-rules.md)
 - [ADR 0010: Versioned payroll settings and monthly adjustments](decisions/0010-payroll-settings-adjustments.md)
 - [ADR 0011: In-memory monthly payroll calculation draft](decisions/0011-payroll-engine-draft.md)
+- [ADR 0012: Calendar Constructor reuses attendance and absence documents](decisions/0012-calendar-constructor.md)
 
 ## Authority order
 
