@@ -121,3 +121,14 @@ Authentication session.
 - Reusable full-month, L4-record, and NN frequency-bonus helper.
 - Monthly ACTIVE/CANCELLED employee adjustments with open-month editing.
 - No payroll aggregation or allowance/deduction calculations.
+
+## Business Rules Block 5 implementation
+
+- In-memory payroll-engine foundation for employee-month calculation drafts.
+- Reuses existing employment, calendar, virtual-default, attendance, absence,
+  settings, frequency-bonus, and adjustment helpers.
+- Produces safe draft totals, warnings, absence grouping, and adjustment
+  breakdowns without persisting authoritative payroll results.
+- Adds a read-only verification panel in Monthly Settlement.
+- No final salary, payroll closing, reports, exports, import engine, overtime,
+  transport, accommodation, UDT, tax, ZUS, or Cloud Functions.

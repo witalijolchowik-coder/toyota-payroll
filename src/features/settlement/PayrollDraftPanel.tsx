@@ -1,0 +1,273 @@
+import {
+  Alert,
+  Card,
+  CardContent,
+  Chip,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Typography,
+} from '@mui/material';
+
+import { useTranslations } from '../../hooks/useTranslations';
+import { interpolate } from '../../i18n/pl';
+import type { Employee } from '../../types/firestore';
+import type {
+  EmployeeMonthlyCalculationDraft,
+  PayrollDraftWarningCode,
+} from '../../utils/payroll';
+
+interface PayrollDraftPanelProps {
+  drafts: EmployeeMonthlyCalculationDraft[];
+  employees: Employee[];
+}
+
+const currencyFormatter = new Intl.NumberFormat('pl-PL', {
+  style: 'currency',
+  currency: 'PLN',
+});
+
+export function PayrollDraftPanel({
+  drafts,
+  employees,
+}: PayrollDraftPanelProps) {
+  const t = useTranslations();
+  const employeesById = new Map(
+    employees.map((employee) => [employee.id, employee]),
+  );
+  const totals = drafts.reduce(
+    (current, draft) => ({
+      workedHours: current.workedHours + draft.totals.workedHours,
+      nominalHours: current.nominalHours + draft.totals.nominalHours,
+      virtualHours: current.virtualHours + draft.attendance.virtualHours,
+      frequencyBonus:
+        current.frequencyBonus + (draft.totals.frequencyBonusAmount ?? 0),
+      increases: current.increases + draft.totals.manualIncreases,
+      decreases: current.decreases + draft.totals.manualDecreases,
+      warnings: current.warnings + draft.warnings.length,
+    }),
+    {
+      workedHours: 0,
+      nominalHours: 0,
+      virtualHours: 0,
+      frequencyBonus: 0,
+      increases: 0,
+      decreases: 0,
+      warnings: 0,
+    },
+  );
+  const hasMissingFrequencySetting = drafts.some((draft) =>
+    draft.warnings.some(
+      (warning) => warning.code === 'unresolved-frequency-bonus-setting',
+    ),
+  );
+
+  return (
+    <Card>
+      <CardContent>
+        <Stack spacing={2.5}>
+          <div>
+            <Typography variant="h6">{t.settlement.draft.title}</Typography>
+            <Typography color="text.secondary">
+              {t.settlement.draft.description}
+            </Typography>
+          </div>
+
+          {hasMissingFrequencySetting ? (
+            <Alert severity="warning">
+              {t.settlement.draft.missingFrequencySetting}
+            </Alert>
+          ) : null}
+
+          <Stack
+            direction="row"
+            useFlexGap
+            spacing={1}
+            sx={{ flexWrap: 'wrap' }}
+          >
+            <SummaryChip
+              label={t.settlement.draft.totals.nominal}
+              value={formatHours(totals.nominalHours, t)}
+            />
+            <SummaryChip
+              label={t.settlement.draft.totals.worked}
+              value={formatHours(totals.workedHours, t)}
+            />
+            <SummaryChip
+              label={t.settlement.draft.totals.virtual}
+              value={formatHours(totals.virtualHours, t)}
+            />
+            <SummaryChip
+              label={t.settlement.draft.totals.frequencyBonus}
+              value={currencyFormatter.format(totals.frequencyBonus)}
+            />
+            <SummaryChip
+              label={t.settlement.draft.totals.increases}
+              value={currencyFormatter.format(totals.increases)}
+            />
+            <SummaryChip
+              label={t.settlement.draft.totals.decreases}
+              value={currencyFormatter.format(totals.decreases)}
+            />
+            <SummaryChip
+              label={t.settlement.draft.totals.warnings}
+              value={totals.warnings.toLocaleString('pl-PL')}
+              color={totals.warnings > 0 ? 'warning' : 'default'}
+            />
+          </Stack>
+
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>{t.settlement.draft.table.teta}</TableCell>
+                  <TableCell>{t.settlement.draft.table.employee}</TableCell>
+                  <TableCell align="right">
+                    {t.settlement.draft.table.nominal}
+                  </TableCell>
+                  <TableCell align="right">
+                    {t.settlement.draft.table.worked}
+                  </TableCell>
+                  <TableCell align="right">
+                    {t.settlement.draft.table.virtual}
+                  </TableCell>
+                  <TableCell align="right">
+                    {t.settlement.draft.table.frequencyBonus}
+                  </TableCell>
+                  <TableCell align="right">
+                    {t.settlement.draft.table.adjustments}
+                  </TableCell>
+                  <TableCell>{t.settlement.draft.table.warnings}</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {drafts.map((draft) => {
+                  const employee = employeesById.get(draft.employeeId);
+                  const employeeName = employee
+                    ? `${employee.lastName} ${employee.firstName}`
+                    : t.settlement.draft.table.unknownEmployee;
+                  const adjustmentBalance =
+                    draft.totals.manualIncreases - draft.totals.manualDecreases;
+
+                  return (
+                    <TableRow key={draft.employeeId} hover>
+                      <TableCell>{draft.tetaNumber}</TableCell>
+                      <TableCell>{employeeName}</TableCell>
+                      <TableCell align="right">
+                        {formatHours(draft.totals.nominalHours, t)}
+                      </TableCell>
+                      <TableCell align="right">
+                        {formatHours(draft.totals.workedHours, t)}
+                      </TableCell>
+                      <TableCell align="right">
+                        {formatHours(draft.attendance.virtualHours, t)}
+                      </TableCell>
+                      <TableCell align="right">
+                        {draft.totals.frequencyBonusAmount === null
+                          ? t.settlement.grid.empty
+                          : currencyFormatter.format(
+                              draft.totals.frequencyBonusAmount,
+                            )}
+                      </TableCell>
+                      <TableCell align="right">
+                        {currencyFormatter.format(adjustmentBalance)}
+                      </TableCell>
+                      <TableCell>
+                        {draft.warnings.length === 0 ? (
+                          <Typography variant="body2" color="text.secondary">
+                            {t.settlement.draft.table.noWarnings}
+                          </Typography>
+                        ) : (
+                          <Stack spacing={0.5}>
+                            {draft.warnings.slice(0, 3).map((warning) => (
+                              <Typography
+                                key={`${warning.code}:${warning.date ?? ''}`}
+                                variant="caption"
+                                color="warning.dark"
+                              >
+                                {warning.date
+                                  ? interpolate(
+                                      t.settlement.draft.warningWithDate,
+                                      {
+                                        date: warning.date,
+                                        warning: warningMessage(
+                                          warning.code,
+                                          t,
+                                        ),
+                                      },
+                                    )
+                                  : warningMessage(warning.code, t)}
+                              </Typography>
+                            ))}
+                            {draft.warnings.length > 3 ? (
+                              <Typography
+                                variant="caption"
+                                color="text.secondary"
+                              >
+                                {interpolate(t.settlement.draft.moreWarnings, {
+                                  count: (draft.warnings.length - 3).toString(),
+                                })}
+                              </Typography>
+                            ) : null}
+                          </Stack>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Stack>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SummaryChip({
+  label,
+  value,
+  color = 'default',
+}: {
+  label: string;
+  value: string;
+  color?: 'default' | 'warning';
+}) {
+  return (
+    <Chip
+      variant="outlined"
+      color={color}
+      label={
+        <Stack component="span" direction="row" spacing={0.5}>
+          <Typography component="span" variant="caption">
+            {label}
+          </Typography>
+          <Typography
+            component="span"
+            variant="caption"
+            sx={{ fontWeight: 800 }}
+          >
+            {value}
+          </Typography>
+        </Stack>
+      }
+    />
+  );
+}
+
+function formatHours(hours: number, t: ReturnType<typeof useTranslations>) {
+  return interpolate(t.settlement.grid.hours, {
+    hours: hours.toLocaleString('pl-PL'),
+  });
+}
+
+function warningMessage(
+  code: PayrollDraftWarningCode,
+  t: ReturnType<typeof useTranslations>,
+): string {
+  return t.settlement.draft.warnings[code];
+}

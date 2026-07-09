@@ -26,6 +26,7 @@ import {
   saveManualDailyValue,
 } from '../../services/dailyValueService';
 import type { Employee, MonthId } from '../../types/firestore';
+import { calculateMonthlyDrafts } from '../../utils/payroll';
 import { DailyValueEditorDialog } from './DailyValueEditorDialog';
 import {
   createCalendarDays,
@@ -34,6 +35,7 @@ import {
   type CalendarDay,
   type SettlementCellValue,
 } from './monthUtils';
+import { PayrollDraftPanel } from './PayrollDraftPanel';
 import { getPublicHolidaysForYear } from './publicHolidays';
 import { SettlementGrid } from './SettlementGrid';
 import { SettlementLegend } from './SettlementLegend';
@@ -85,8 +87,9 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
   }
 
   const range = getMonthDateRange(monthId);
+  const publicHolidays = getPublicHolidaysForYear(range.year);
   const days = createCalendarDays(monthId, {
-    publicHolidays: getPublicHolidaysForYear(range.year),
+    publicHolidays,
   });
 
   if (!data) {
@@ -158,6 +161,15 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
   const participatingAbsences = data.absences.filter((absence) =>
     participatingEmployeeIds.has(absence.employeeId),
   );
+  const calculationDrafts = calculateMonthlyDrafts({
+    monthId,
+    employees: participatingEmployees,
+    dailyValues: participatingDailyValues,
+    absences: participatingAbsences,
+    payrollSettings: data.payrollSettings,
+    adjustments: data.adjustments,
+    calendarOptions: { publicHolidays },
+  });
 
   return (
     <Stack spacing={2.5}>
@@ -217,21 +229,27 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
       </Card>
 
       {participatingEmployees.length > 0 ? (
-        <SettlementGrid
-          employees={participatingEmployees}
-          days={days}
-          dailyValues={participatingDailyValues}
-          absences={participatingAbsences}
-          isSettled={data.month.isSettled}
-          onEditCell={(employee, day, value, hasGoverningAbsence) =>
-            setEditingCell({
-              employee,
-              day,
-              value,
-              hasGoverningAbsence,
-            })
-          }
-        />
+        <>
+          <SettlementGrid
+            employees={participatingEmployees}
+            days={days}
+            dailyValues={participatingDailyValues}
+            absences={participatingAbsences}
+            isSettled={data.month.isSettled}
+            onEditCell={(employee, day, value, hasGoverningAbsence) =>
+              setEditingCell({
+                employee,
+                day,
+                value,
+                hasGoverningAbsence,
+              })
+            }
+          />
+          <PayrollDraftPanel
+            drafts={calculationDrafts}
+            employees={participatingEmployees}
+          />
+        </>
       ) : (
         <Card>
           <CardContent sx={{ py: 7, textAlign: 'center' }}>

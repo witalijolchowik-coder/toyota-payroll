@@ -12,16 +12,20 @@ import { auth } from '../config/firebase';
 import { getMonthDateRange } from '../features/settlement/monthUtils';
 import type {
   Absence,
+  Adjustment,
   DailyValue,
   Employee,
   MonthId,
+  PayrollSetting,
   PayrollMonth,
 } from '../types/firestore';
 import { loadAbsencesOverlappingMonth } from './absencesService';
 import {
+  mapAdjustmentDocument,
   mapDailyValueDocument,
   mapEmployeeDocument,
   mapMonthDocument,
+  mapPayrollSettingDocument,
 } from './firestore/mappers';
 import {
   getFirestoreClient,
@@ -43,6 +47,8 @@ export interface SettlementMonthData {
   employees: Employee[];
   dailyValues: DailyValue[];
   absences: Absence[];
+  payrollSettings: PayrollSetting[];
+  adjustments: Adjustment[];
 }
 
 async function requireActorUid(): Promise<string> {
@@ -75,10 +81,18 @@ export async function loadSettlementMonth(
   }
 
   const employeesQuery = query(repositories.employees, orderBy('teta_number'));
-  const [employeesSnapshot, dailyValuesSnapshot, absences] = await Promise.all([
+  const [
+    employeesSnapshot,
+    dailyValuesSnapshot,
+    absences,
+    payrollSettingsSnapshot,
+    adjustmentsSnapshot,
+  ] = await Promise.all([
     getDocs(employeesQuery),
     getDocs(monthRepository.dailyValues),
     loadAbsencesOverlappingMonth(monthId),
+    getDocs(repositories.payrollSettings),
+    getDocs(monthRepository.adjustments),
   ]);
 
   return {
@@ -90,6 +104,12 @@ export async function loadSettlementMonth(
       mapDailyValueDocument(document.id, monthId, document.data()),
     ),
     absences,
+    payrollSettings: payrollSettingsSnapshot.docs.map((document) =>
+      mapPayrollSettingDocument(document.id, document.data()),
+    ),
+    adjustments: adjustmentsSnapshot.docs.map((document) =>
+      mapAdjustmentDocument(document.id, monthId, document.data()),
+    ),
   };
 }
 

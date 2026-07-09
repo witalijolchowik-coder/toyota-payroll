@@ -56,6 +56,9 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   NN disqualification.
 - Polish Payroll Settings and Employee Adjustments workspaces.
 - ACTIVE/CANCELLED monthly adjustment lifecycle with non-negative amounts.
+- In-memory payroll-engine foundation for employee-month calculation drafts.
+- Read-only Monthly Settlement draft panel with safe totals, warnings,
+  frequency-bonus status, and adjustment breakdowns.
 
 ### Changed
 

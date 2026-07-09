@@ -215,6 +215,52 @@ export const pl = {
       employees: 'Liczba pracowników w miesiącu: {{count}}',
       calculationVersion: 'Wersja obliczeń: {{version}}',
     },
+    draft: {
+      title: 'Roboczy szkic naliczenia',
+      description:
+        'Podgląd technicznego rozbicia miesiąca. To nie jest finalna lista płac ani raport do zamknięcia.',
+      missingFrequencySetting:
+        'Brakuje aktywnej konfiguracji premii frekwencyjnej dla tego miesiąca. Kwota premii pozostaje nierozstrzygnięta.',
+      warningWithDate: '{{date}}: {{warning}}',
+      moreWarnings: '+{{count}} kolejne uwagi',
+      totals: {
+        nominal: 'Nominał',
+        worked: 'Praca',
+        virtual: 'Wirtualne',
+        frequencyBonus: 'Premia frekw.',
+        increases: 'Zwiększenia',
+        decreases: 'Potrącenia',
+        warnings: 'Uwagi',
+      },
+      table: {
+        teta: 'TETA',
+        employee: 'Pracownik',
+        nominal: 'Nominał',
+        worked: 'Godziny pracy',
+        virtual: 'Wirtualne',
+        frequencyBonus: 'Premia frekwencyjna',
+        adjustments: 'Korekty',
+        warnings: 'Uwagi',
+        noWarnings: 'Brak uwag',
+        unknownEmployee: 'Nieznany pracownik',
+      },
+      warnings: {
+        'employee-not-participating':
+          'Pracownik nie należy do tego miesiąca według okresu zatrudnienia.',
+        'missing-employment-start': 'Brakuje daty rozpoczęcia zatrudnienia.',
+        'attendance-absence-conflict':
+          'Jawne godziny pracy pokrywają się z aktywną nieobecnością.',
+        'explicit-non-working-day': 'Jawne godziny zapisano w dniu wolnym.',
+        'attendance-outside-employment':
+          'Godziny pracy znajdują się poza okresem zatrudnienia.',
+        'absence-outside-employment':
+          'Nieobecność wychodzi poza okres zatrudnienia.',
+        'ambiguous-absence':
+          'Kilka nieobecności ma taki sam priorytet dla tego dnia.',
+        'unresolved-frequency-bonus-setting':
+          'Nie znaleziono aktywnej konfiguracji premii frekwencyjnej.',
+      },
+    },
     settled: {
       title: 'Miesiąc został zamknięty',
       description:

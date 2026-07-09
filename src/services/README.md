@@ -14,9 +14,11 @@ subscribed reads, creates, edits, and deactivation. Future feature services
 should follow the same pattern and accept the restricted client-write types
 from `src/types/firestore/writes.ts`.
 
-The settlement shell composes the month, employee, and daily-value boundaries
-in `settlementService.ts`. Loading is read-only; a separate coordinator action
-transactionally creates only the initial canonical month document.
+The settlement shell composes the month, employee, daily-value, absence,
+payroll-setting, and adjustment boundaries in `settlementService.ts`. Loading
+is read-only; a separate coordinator action transactionally creates only the
+initial canonical month document. Calculation drafts are built in memory by
+pure payroll helpers and are not persisted here.
 
 `dailyValueService.ts` transactionally creates, updates, and clears canonical
 manual daily-value documents. For an imported document it changes only the
