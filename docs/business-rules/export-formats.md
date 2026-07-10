@@ -66,9 +66,15 @@ Worker split rule:
 - PESEL present and no passport / foreign document → Polish SOZ CSV;
 - insufficient identity data → warning, do not silently assign the worker.
 
-The current Employee Firestore model does not yet store PESEL/passport fields.
-Therefore the UI and helpers prepare the split and warnings, but real SOZ rows
-require a future identity-data extension.
+Block 12 adds optional Employee identity fields needed for honest SOZ split:
+
+- `pesel`;
+- `passport_number`;
+- `foreign_document_number`.
+
+They are optional and backward-compatible for older employee documents. If they
+are missing, the SOZ export shows readiness warnings and does not silently
+assign the employee to PL or foreign CSV.
 
 ## SOZ accompanying note
 
@@ -97,6 +103,7 @@ Exports respect the monthly review workflow:
 - unchecked employee-month records produce warnings;
 - unresolved issues produce warnings;
 - missing identity data produces warnings;
+- unsupported template columns/components produce warnings;
 - warnings are visible but do not hard-block export in this block.
 
 The export foundation does not close payroll months and does not create
@@ -123,7 +130,7 @@ immutable snapshots.
 | SOZ field                           | Source                                     |
 | ----------------------------------- | ------------------------------------------ |
 | `Nazwisko`, `Imię`                  | Employee register                          |
-| `Paszport / PESEL`                  | Future employee identity data              |
+| `Paszport / PESEL`                  | Employee PESEL/passport identity data      |
 | `Rok`, `Miesiąc`                    | Selected payroll month                     |
 | `Godziny zwykłe`                    | Monthly draft normal work hours            |
 | `Godziny 50`, `Godziny 100`         | Monthly draft total overtime buckets       |
@@ -134,10 +141,20 @@ immutable snapshots.
 
 ## Known limitations
 
-- PESEL/passport are not yet stored on Employee documents.
 - Toyota `.xlsx` exact styling is not implemented; current output is
   Excel-compatible `.xls` XML.
 - SOZ imports can contain many project-wide columns not yet supported by Toyota
   Payroll; unsupported columns remain blank or `0`.
+- Existing employees may not yet have PESEL/passport values filled in.
 - No ZUS, PIT, tax, net salary, payslip, closing or automatic sending is
   implemented in this block.
+
+## Future import note: NA0
+
+Employee import is not part of Block 12.
+
+For future import work:
+
+- `NA0` is a temporary/code name for new Toyota projects;
+- actual departments are `PU / pianki` and `Headliner / podsufitki`;
+- `NA0` must not be automatically mapped to PU or Headliner.

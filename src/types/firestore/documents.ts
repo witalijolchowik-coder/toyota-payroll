@@ -26,6 +26,9 @@ export interface EmployeeDocument extends ModificationMetadataDocument {
   teta_number: TetaNumber;
   first_name: string;
   last_name: string;
+  pesel?: string | null;
+  passport_number?: string | null;
+  foreign_document_number?: string | null;
   is_active: boolean;
   department_id?: DepartmentId | null;
   shift_assignment?: EmployeeColorShift | null;

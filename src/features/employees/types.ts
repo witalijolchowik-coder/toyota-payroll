@@ -8,6 +8,9 @@ export interface EmployeeFormValues {
   tetaNumber: string;
   firstName: string;
   lastName: string;
+  pesel: string;
+  passportNumber: string;
+  foreignDocumentNumber: string;
   departmentId: DepartmentId | '';
   shiftAssignment: EmployeeColorShift | '';
   employmentStartDate: string;
@@ -15,7 +18,13 @@ export interface EmployeeFormValues {
 }
 
 export type EmployeeFieldName =
-  'tetaNumber' | 'firstName' | 'lastName' | 'employmentEndDate';
+  | 'tetaNumber'
+  | 'firstName'
+  | 'lastName'
+  | 'pesel'
+  | 'passportNumber'
+  | 'foreignDocumentNumber'
+  | 'employmentEndDate';
 
 export type EmployeeValidationCode =
   'required' | 'invalidDateRange' | 'duplicateTeta';

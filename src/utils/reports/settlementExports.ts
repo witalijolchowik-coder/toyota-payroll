@@ -3,7 +3,11 @@ import type { EmployeeMonthlyCalculationDraft } from '../payroll';
 
 export type SozWorkerGroup = 'polish' | 'foreign' | 'missing-identity';
 export type ExportReadinessWarningCode =
-  'not-reviewed' | 'unresolved-issues' | 'missing-identity' | 'empty-export';
+  | 'not-reviewed'
+  | 'unresolved-issues'
+  | 'missing-identity'
+  | 'unsupported-columns'
+  | 'empty-export';
 
 export interface ExportEmployeeIdentity {
   pesel?: string | null;
@@ -256,6 +260,38 @@ export const SOZ_CSV_HEADERS = [
   'Premia od klienta 8 /  Za co / Inne',
 ] as const;
 
+const sozColumn = {
+  lastName: 0,
+  firstName: 1,
+  identity: 2,
+  year: 3,
+  monthName: 4,
+  fullMonthL4: 5,
+  normalHours: 6,
+  nightHours: 7,
+  overtime50: 8,
+  overtime100: 9,
+  employeeNominal: 10,
+  monthNominal: 11,
+  nnHours: 12,
+  nuHours: 13,
+  niHours: 14,
+  vacationHours: 15,
+  unpaidVacationHours: 16,
+  care188Hours: 17,
+  l4Hours: 19,
+  niedoczasHours: 23,
+  transportAmount: 106,
+  transportTax: 107,
+  transportDescription: 108,
+  frequencyBonusAmount: 122,
+  frequencyBonusTax: 123,
+  frequencyBonusDescription: 124,
+  laundryAmount: 130,
+  laundryTax: 131,
+  laundryDescription: 132,
+} as const;
+
 const polishMonthNames = [
   'Styczeń',
   'Luty',
@@ -348,6 +384,11 @@ export function buildExportReadinessWarnings(
   records: readonly SettlementExportRecord[],
 ): ExportReadinessWarning[] {
   const warnings: ExportReadinessWarning[] = [];
+  warnings.push({
+    code: 'unsupported-columns',
+    employeeId: null,
+    tetaNumber: null,
+  });
   if (records.length === 0) {
     warnings.push({
       code: 'empty-export',
@@ -478,82 +519,45 @@ function mapSozExportRow(
   const [year, month] = monthId.split('-').map(Number);
   const draft = record.draft;
   const cells = Array.from({ length: SOZ_CSV_HEADERS.length }, () => '');
-  setCell(cells, 'Nazwisko', record.employee.lastName);
-  setCell(cells, 'Imię', record.employee.firstName);
-  setCell(cells, 'Paszport / PESEL', identityValue(record.identity, group));
-  setCell(cells, 'Rok', String(year));
-  setCell(cells, 'Miesiąc', polishMonthNames[(month ?? 1) - 1] ?? '');
-  setCell(
-    cells,
-    'Zwolnienie L4 przez cały miesiąc',
+  cells[sozColumn.lastName] = record.employee.lastName;
+  cells[sozColumn.firstName] = record.employee.firstName;
+  cells[sozColumn.identity] = identityValue(record.identity, group);
+  cells[sozColumn.year] = String(year);
+  cells[sozColumn.monthName] = polishMonthNames[(month ?? 1) - 1] ?? '';
+  cells[sozColumn.fullMonthL4] =
     draft.totals.nominalHours > 0 &&
-      draft.absences.l4Hours >= draft.totals.nominalHours
+    draft.absences.l4Hours >= draft.totals.nominalHours
       ? 'Tak'
-      : 'Nie',
+      : 'Nie';
+  cells[sozColumn.normalHours] = formatNumber(draft.workTime.normalWorkHours);
+  cells[sozColumn.nightHours] = '0';
+  cells[sozColumn.overtime50] = formatNumber(draft.workTime.overtime50Hours);
+  cells[sozColumn.overtime100] = formatNumber(draft.workTime.overtime100Hours);
+  cells[sozColumn.employeeNominal] = formatNumber(draft.totals.nominalHours);
+  cells[sozColumn.monthNominal] = formatNumber(monthNominalHours);
+  cells[sozColumn.nnHours] = formatNumber(draft.absences.nnHours);
+  cells[sozColumn.nuHours] = '0';
+  cells[sozColumn.niHours] = formatNumber(draft.workTime.coverableNiHours);
+  cells[sozColumn.vacationHours] = formatNumber(draft.absences.vacationHours);
+  cells[sozColumn.unpaidVacationHours] = '0';
+  cells[sozColumn.care188Hours] = '0';
+  cells[sozColumn.l4Hours] = formatNumber(draft.absences.l4Hours);
+  cells[sozColumn.niedoczasHours] = formatNumber(draft.workTime.niedoczasHours);
+  cells[sozColumn.transportAmount] = formatNumber(
+    draft.components.transportAllowanceNetto,
   );
-  setCell(
-    cells,
-    'Godziny zwykłe (suma dzienne plus nocne) ',
-    formatNumber(draft.workTime.normalWorkHours),
+  cells[sozColumn.transportTax] = 'Netto';
+  cells[sozColumn.transportDescription] = 'Dodatek za dojazd do pracy';
+  cells[sozColumn.frequencyBonusAmount] = formatNullableNumber(
+    draft.components.frequencyBonusBrutto,
   );
-  setCell(
-    cells,
-    'Godziny nocne (do wyliczenia dodatku za prace w porze nocnej)',
-    '0',
+  cells[sozColumn.frequencyBonusTax] = 'Brutto';
+  cells[sozColumn.frequencyBonusDescription] = 'Premia frekwencyjna';
+  cells[sozColumn.laundryAmount] = formatNumber(
+    draft.components.laundryAllowanceBrutto,
   );
-  setCell(cells, 'Godziny 50', formatNumber(draft.workTime.overtime50Hours));
-  setCell(cells, 'Godziny 100', formatNumber(draft.workTime.overtime100Hours));
-  setCell(
-    cells,
-    'Harmonogram - nominał pracownika na dany miesiąc',
-    formatNumber(draft.totals.nominalHours),
-  );
-  setCell(cells, 'Czas nominalny', formatNumber(monthNominalHours));
-  setCell(
-    cells,
-    'Godziny nieobecność nieusprawiedliwiona NN',
-    formatNumber(draft.absences.nnHours),
-  );
-  setCell(cells, 'Godziny nieobecność usprawiedliwiona płatna NU', '0');
-  setCell(
-    cells,
-    'Godziny nieobecność usprawiedliwiona bezpłatna (niepłatna) NI',
-    formatNumber(draft.workTime.coverableNiHours),
-  );
-  setCell(
-    cells,
-    'Godziny urlop wypoczynkowy UW',
-    formatNumber(draft.absences.vacationHours),
-  );
-  setCell(cells, 'Godziny urlop bezpłatny UB', '0');
-  setCell(cells, 'Godziny opieka art. 188', '0');
-  setCell(cells, 'Godziny chorobowe L4', formatNumber(draft.absences.l4Hours));
-  setCell(
-    cells,
-    'Godziny niedoczas',
-    formatNumber(draft.workTime.niedoczasHours),
-  );
-  setCell(
-    cells,
-    'Premia spółki 1 / Kwota',
-    formatNumber(draft.components.transportAllowanceNetto),
-  );
-  setCell(cells, 'Premia spółki 1 / Podatek', 'Netto');
-  setCell(cells, 'Premia spółki 1 / Za co', 'Dodatek za dojazd do pracy');
-  setCell(
-    cells,
-    'Premia od klienta 5 / Kwota',
-    formatNullableNumber(draft.components.frequencyBonusBrutto),
-  );
-  setCell(cells, 'Premia od klienta 5 / Podatek', 'Brutto');
-  setCell(cells, 'Premia od klienta 5 /  Za co', 'Premia frekwencyjna');
-  setCell(
-    cells,
-    'Premia od klienta 7 / Kwota',
-    formatNumber(draft.components.laundryAllowanceBrutto),
-  );
-  setCell(cells, 'Premia od klienta 7 / Podatek', 'Brutto');
-  setCell(cells, 'Premia od klienta 7 /  Za co', 'Ekwiwalent za prania');
+  cells[sozColumn.laundryTax] = 'Brutto';
+  cells[sozColumn.laundryDescription] = 'Ekwiwalent za prania';
 
   return { cells, group, tetaNumber: record.employee.tetaNumber };
 }
@@ -585,15 +589,6 @@ function mapSozOvertimeNoteEntry(
     coveringNiedoczas50Hours,
     coveringNiedoczas100Hours,
   };
-}
-
-function setCell(cells: string[], header: string, value: string) {
-  const index = SOZ_CSV_HEADERS.indexOf(
-    header as (typeof SOZ_CSV_HEADERS)[number],
-  );
-  if (index >= 0) {
-    cells[index] = value;
-  }
 }
 
 function identityValue(

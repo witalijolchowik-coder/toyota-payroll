@@ -52,6 +52,7 @@ export function EmployeesTable({
           <TableRow>
             <TableCell>{t.employees.table.teta}</TableCell>
             <TableCell>{t.employees.table.employee}</TableCell>
+            <TableCell>{t.employees.table.identity}</TableCell>
             <TableCell>{t.employees.table.department}</TableCell>
             <TableCell>{t.employees.table.shiftAssignment}</TableCell>
             <TableCell>{t.employees.table.employmentPeriod}</TableCell>
@@ -63,7 +64,7 @@ export function EmployeesTable({
           {isLoading
             ? Array.from({ length: 4 }, (_, index) => (
                 <TableRow key={index}>
-                  {Array.from({ length: 7 }, (__, cellIndex) => (
+                  {Array.from({ length: 8 }, (__, cellIndex) => (
                     <TableCell key={cellIndex}>
                       <Skeleton />
                     </TableCell>
@@ -80,6 +81,11 @@ export function EmployeesTable({
                       </Typography>
                     </TableCell>
                     <TableCell>{employeeName}</TableCell>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {formatIdentity(employee, t)}
+                      </Typography>
+                    </TableCell>
                     <TableCell>
                       {employee.departmentId
                         ? (departmentsById.get(employee.departmentId)?.name ??
@@ -153,6 +159,23 @@ export function EmployeesTable({
       </Table>
     </TableContainer>
   );
+}
+
+function formatIdentity(
+  employee: Employee,
+  t: ReturnType<typeof useTranslations>,
+): string {
+  const values = [
+    employee.pesel ? `${t.employees.table.pesel}: ${employee.pesel}` : null,
+    employee.passportNumber
+      ? `${t.employees.table.passport}: ${employee.passportNumber}`
+      : null,
+    employee.foreignDocumentNumber
+      ? `${t.employees.table.foreignDocument}: ${employee.foreignDocumentNumber}`
+      : null,
+  ].filter(Boolean);
+
+  return values.length > 0 ? values.join(' · ') : t.employees.table.noIdentity;
 }
 
 function formatEmploymentPeriod(

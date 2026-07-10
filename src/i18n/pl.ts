@@ -36,6 +36,11 @@ export const pl = {
     table: {
       teta: 'Numer TETA',
       employee: 'Pracownik',
+      identity: 'Dokumenty',
+      pesel: 'PESEL',
+      passport: 'Paszport',
+      foreignDocument: 'Dokument',
+      noIdentity: 'Brak PESEL / paszportu',
       department: 'Dział',
       shiftAssignment: 'Zmiana',
       employmentPeriod: 'Okres zatrudnienia',
@@ -80,6 +85,12 @@ export const pl = {
       teta: 'Numer TETA',
       firstName: 'Imię',
       lastName: 'Nazwisko',
+      pesel: 'PESEL',
+      passportNumber: 'Paszport',
+      foreignDocumentNumber: 'Inny dokument cudzoziemca',
+      identityOptional: 'Opcjonalnie. Wymagane do poprawnego splitu SOZ.',
+      foreignDocumentHelper:
+        'Uzupełnij tylko wtedy, gdy dokument cudzoziemca nie jest paszportem.',
       department: 'Dział',
       shiftAssignment: 'Zmiana',
       employmentStartDate: 'Data rozpoczęcia zatrudnienia',
@@ -534,6 +545,8 @@ export const pl = {
           'Rekordy z nierozstrzygniętymi uwagami: {{count}}.',
         'missing-identity':
           'Brak danych PESEL/paszport wymaganych do splitu SOZ: {{count}}.',
+        'unsupported-columns':
+          'Część kolumn SOZ/Toyota nie jest jeszcze obsługiwana i pozostanie pusta lub 0: {{count}}.',
         'empty-export': 'Brak pracowników do eksportu: {{count}}.',
       },
     },

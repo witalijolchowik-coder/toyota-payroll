@@ -49,6 +49,9 @@ describe('Firestore converters', () => {
         teta_number: 'TETA-1001',
         first_name: 'Test',
         last_name: 'Employee',
+        pesel: '87010409887',
+        passport_number: null,
+        foreign_document_number: null,
         is_active: true,
         department_id: 'metal',
         shift_assignment: 'RED',
@@ -66,9 +69,38 @@ describe('Firestore converters', () => {
     expect(mapEmployeeDocument('employee-1', document)).toMatchObject({
       id: 'employee-1',
       tetaNumber: 'TETA-1001',
+      pesel: '87010409887',
+      passportNumber: null,
+      foreignDocumentNumber: null,
       departmentId: 'metal',
       shiftAssignment: 'RED',
       employmentStartDate: new Date('2026-07-02T08:00:00.000Z'),
+    });
+  });
+
+  it('maps older employee documents without identity fields as nullable identity', () => {
+    const document = employeeConverter.fromFirestore(
+      snapshot('employees/employee-legacy', {
+        teta_number: 'TETA-1002',
+        first_name: 'Legacy',
+        last_name: 'Employee',
+        is_active: true,
+        department_id: null,
+        shift_assignment: null,
+        employment_start_date: now,
+        employment_end_date: null,
+        created_at: now,
+        created_by: 'test-user',
+        updated_at: now,
+        updated_by: 'test-user',
+      }),
+      {},
+    );
+
+    expect(mapEmployeeDocument('employee-legacy', document)).toMatchObject({
+      pesel: null,
+      passportNumber: null,
+      foreignDocumentNumber: null,
     });
   });
 

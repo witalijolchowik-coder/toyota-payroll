@@ -22,6 +22,9 @@ export function normalizeEmployeeInput(
     tetaNumber: normalizeTetaNumber(input.tetaNumber),
     firstName: input.firstName.trim(),
     lastName: input.lastName.trim(),
+    pesel: input.pesel?.trim() || null,
+    passportNumber: input.passportNumber?.trim() || null,
+    foreignDocumentNumber: input.foreignDocumentNumber?.trim() || null,
     departmentId: input.departmentId?.trim() || null,
     shiftAssignment: input.shiftAssignment ?? null,
   };
@@ -35,6 +38,9 @@ export function employeeInputFromForm(
     tetaNumber: values.tetaNumber,
     firstName: values.firstName,
     lastName: values.lastName,
+    pesel: values.pesel,
+    passportNumber: values.passportNumber,
+    foreignDocumentNumber: values.foreignDocumentNumber,
     isActive,
     departmentId: values.departmentId || null,
     shiftAssignment: isEmployeeColorShift(values.shiftAssignment)

@@ -86,7 +86,11 @@ export function SettlementExportPanel({
           departmentName: employee.departmentId
             ? departmentsById.get(employee.departmentId)?.name
             : null,
-          identity: null,
+          identity: {
+            pesel: employee.pesel,
+            passport: employee.passportNumber,
+            foreignDocument: employee.foreignDocumentNumber,
+          },
           draft,
           reviewStatus: reviewItem?.effectiveStatus,
           unresolvedIssueCount: reviewItem?.unresolvedIssueCount ?? 0,

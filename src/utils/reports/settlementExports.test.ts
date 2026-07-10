@@ -71,6 +71,35 @@ describe('settlement export formats', () => {
     });
   });
 
+  it('does not infer SOZ nationality from name or department', () => {
+    const result = prepareSettlementExportPackage({
+      monthId: '2026-06',
+      monthNominalHours: 168,
+      records: [
+        exportRecord({
+          id: '1',
+          tetaNumber: 'T1',
+          lastName: 'KOWALSKI',
+          identity: null,
+          departmentName: 'PU',
+        }),
+        exportRecord({
+          id: '2',
+          tetaNumber: 'T2',
+          lastName: 'SHEVCHENKO',
+          identity: null,
+          departmentName: 'Headliner',
+        }),
+      ],
+    });
+
+    expect(result.soz.polishRows).toHaveLength(0);
+    expect(result.soz.foreignRows).toHaveLength(0);
+    expect(
+      result.warnings.filter((warning) => warning.code === 'missing-identity'),
+    ).toHaveLength(2);
+  });
+
   it('keeps SOZ overtime 100% combined while the note explains covered niedoczas', () => {
     const result = prepareSettlementExportPackage({
       monthId: '2026-06',
@@ -143,6 +172,32 @@ describe('settlement export formats', () => {
     ]);
     expect(SOZ_CSV_HEADERS.join('|')).not.toMatch(/ZUS|PIT|net salary/i);
   });
+
+  it('renders SOZ CSV with BOM, semicolon delimiter and positional repeated-column mapping', () => {
+    const result = prepareSettlementExportPackage({
+      monthId: '2026-06',
+      monthNominalHours: 168,
+      records: [
+        exportRecord({
+          id: '1',
+          identity: { pesel: '87010409887' },
+        }),
+      ],
+    });
+
+    expect(result.soz.polishCsv.startsWith('\uFEFFNazwisko;Imię;')).toBe(true);
+    const firstDataRow = result.soz.polishCsv.split('\r\n')[1]?.split(';');
+
+    expect(firstDataRow?.[106]).toBe('275');
+    expect(firstDataRow?.[107]).toBe('Netto');
+    expect(firstDataRow?.[108]).toBe('Dodatek za dojazd do pracy');
+    expect(firstDataRow?.[122]).toBe('400');
+    expect(firstDataRow?.[123]).toBe('Brutto');
+    expect(firstDataRow?.[124]).toBe('Premia frekwencyjna');
+    expect(firstDataRow?.[130]).toBe('40');
+    expect(firstDataRow?.[131]).toBe('Brutto');
+    expect(firstDataRow?.[132]).toBe('Ekwiwalent za prania');
+  });
 });
 
 function exportRecord({
@@ -151,6 +206,7 @@ function exportRecord({
   firstName = 'Jan',
   lastName = 'Kowalski',
   identity = { pesel: '87010409887' },
+  departmentName = 'PS',
   draft: draftOverride,
 }: {
   id: string;
@@ -158,6 +214,7 @@ function exportRecord({
   firstName?: string;
   lastName?: string;
   identity?: SettlementExportRecord['identity'];
+  departmentName?: string | null;
   draft?: EmployeeMonthlyCalculationDraft;
 }): SettlementExportRecord {
   return {
@@ -170,7 +227,7 @@ function exportRecord({
       employmentEndDate: null,
     },
     identity,
-    departmentName: 'PS',
+    departmentName,
     draft: draftOverride ?? draft({ tetaNumber }),
     reviewStatus: 'CHECKED',
     unresolvedIssueCount: 0,

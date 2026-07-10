@@ -12,13 +12,20 @@ The monthly settlement must produce practical external files:
 - two SOZ CSV files split into PL and foreign worker groups;
 - a mandatory SOZ note when overtime covers `niedoczas` / private time.
 
-The project does not yet store PESEL/passport identity data and does not yet
-have a final Toyota `.xlsx` workbook template.
+The project did not yet store PESEL/passport identity data and does not yet have
+a final Toyota `.xlsx` workbook template.
 
 ## Decision
 
 Implement export foundation as pure TypeScript mapping helpers plus a
 client-side export panel in the Monthly Settlement area.
+
+Add optional, backward-compatible employee identity fields required for SOZ
+split correctness:
+
+- `pesel`;
+- `passport_number`;
+- `foreign_document_number`.
 
 The helpers:
 
@@ -34,10 +41,11 @@ No export history is persisted in Firestore in this block.
 
 ## Consequences
 
-- No Firestore rules change is needed.
+- Firestore employee rules allow optional identity fields without requiring
+  existing documents to be migrated immediately.
 - Exports can be generated from the current reviewed monthly draft without
   creating production data.
-- SOZ output is structurally ready, but real PL/foreign membership needs a
-  future employee identity-data extension.
+- SOZ output can split employees once PESEL/passport fields are filled; missing
+  identity data remains visible as a readiness warning.
 - The Toyota export can be opened by Excel, but exact `.xlsx` styling remains a
   future template-hardening task.

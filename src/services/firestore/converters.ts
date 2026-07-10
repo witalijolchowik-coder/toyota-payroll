@@ -78,6 +78,11 @@ export const employeeConverter = createConverter<EmployeeDocument>(
     teta_number: readNonEmptyString(data, 'teta_number', path),
     first_name: readNonEmptyString(data, 'first_name', path),
     last_name: readNonEmptyString(data, 'last_name', path),
+    pesel: readOptionalNullableString(data, 'pesel', path) ?? null,
+    passport_number:
+      readOptionalNullableString(data, 'passport_number', path) ?? null,
+    foreign_document_number:
+      readOptionalNullableString(data, 'foreign_document_number', path) ?? null,
     is_active: readBoolean(data, 'is_active', path),
     department_id:
       readOptionalNullableString(data, 'department_id', path) ?? null,

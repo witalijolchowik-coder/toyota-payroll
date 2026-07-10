@@ -27,6 +27,9 @@ function employee(overrides: Partial<Employee> = {}): Employee {
     updatedAt: createdAt,
     updatedBy: 'test',
     ...overrides,
+    pesel: overrides.pesel ?? null,
+    passportNumber: overrides.passportNumber ?? null,
+    foreignDocumentNumber: overrides.foreignDocumentNumber ?? null,
   };
 }
 

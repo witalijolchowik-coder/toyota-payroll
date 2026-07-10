@@ -72,6 +72,16 @@ These fields describe current coordination context. They do not decide
 payroll-month participation and they are not duplicated into operational
 attendance, absence, adjustment, import or settlement documents.
 
+Employee documents may also store optional export identity fields:
+
+- `pesel`;
+- `passport_number`;
+- `foreign_document_number`.
+
+These fields are used for SOZ PL/foreign split. They remain optional so older
+employee records continue to read correctly; missing values produce export
+readiness warnings instead of inferred nationality.
+
 ## Employee entitlements and assignments
 
 `/employeeEntitlements` stores explicit employee-level facts used by Monthly

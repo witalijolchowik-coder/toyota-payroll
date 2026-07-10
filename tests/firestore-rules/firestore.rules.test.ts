@@ -96,6 +96,9 @@ describe('Firestore security rules', () => {
         teta_number: 'TETA-1001',
         first_name: 'Test',
         last_name: 'Employee',
+        pesel: '87010409887',
+        passport_number: null,
+        foreign_document_number: null,
         is_active: true,
         department_id: 'metal',
         shift_assignment: 'RED',
@@ -115,6 +118,9 @@ describe('Firestore security rules', () => {
     await assertSucceeds(
       updateDoc(employee, {
         first_name: 'Anna',
+        pesel: '87010409887',
+        passport_number: 'FU419350',
+        foreign_document_number: null,
         department_id: 'szwalnia',
         shift_assignment: 'WHITE',
         updated_at: serverTimestamp(),

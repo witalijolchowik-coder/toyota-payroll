@@ -50,6 +50,9 @@ function initialValues(employee?: Employee): EmployeeFormValues {
     tetaNumber: employee?.tetaNumber ?? '',
     firstName: employee?.firstName ?? '',
     lastName: employee?.lastName ?? '',
+    pesel: employee?.pesel ?? '',
+    passportNumber: employee?.passportNumber ?? '',
+    foreignDocumentNumber: employee?.foreignDocumentNumber ?? '',
     departmentId: employee?.departmentId ?? '',
     shiftAssignment: employee?.shiftAssignment ?? '',
     employmentStartDate: dateInputValue(employee?.employmentStartDate ?? null),
@@ -171,6 +174,31 @@ export function EmployeeFormDialog({
                 slotProps={{ htmlInput: { autoComplete: 'family-name' } }}
               />
             </Stack>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <TextField
+                fullWidth
+                label={t.employees.form.pesel}
+                value={values.pesel}
+                onChange={handleChange('pesel')}
+                helperText={t.employees.form.identityOptional}
+                slotProps={{ htmlInput: { autoComplete: 'off' } }}
+              />
+              <TextField
+                fullWidth
+                label={t.employees.form.passportNumber}
+                value={values.passportNumber}
+                onChange={handleChange('passportNumber')}
+                helperText={t.employees.form.identityOptional}
+                slotProps={{ htmlInput: { autoComplete: 'off' } }}
+              />
+            </Stack>
+            <TextField
+              label={t.employees.form.foreignDocumentNumber}
+              value={values.foreignDocumentNumber}
+              onChange={handleChange('foreignDocumentNumber')}
+              helperText={t.employees.form.foreignDocumentHelper}
+              slotProps={{ htmlInput: { autoComplete: 'off' } }}
+            />
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <TextField
                 select

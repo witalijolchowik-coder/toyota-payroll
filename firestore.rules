@@ -91,6 +91,9 @@ service cloud.firestore {
           'teta_number',
           'first_name',
           'last_name',
+          'pesel',
+          'passport_number',
+          'foreign_document_number',
           'is_active',
           'department_id',
           'shift_assignment',
@@ -104,6 +107,11 @@ service cloud.firestore {
         && isNonEmptyString(data.teta_number)
         && isNonEmptyString(data.first_name)
         && isNonEmptyString(data.last_name)
+        && (!data.keys().hasAny(['pesel']) || isNullableString(data.pesel))
+        && (!data.keys().hasAny(['passport_number'])
+          || isNullableString(data.passport_number))
+        && (!data.keys().hasAny(['foreign_document_number'])
+          || isNullableString(data.foreign_document_number))
         && data.is_active is bool
         && (!data.keys().hasAny(['department_id'])
           || isNullableString(data.department_id))
@@ -559,6 +567,9 @@ service cloud.firestore {
           'teta_number',
           'first_name',
           'last_name',
+          'pesel',
+          'passport_number',
+          'foreign_document_number',
           'is_active',
           'department_id',
           'shift_assignment',

@@ -37,6 +37,9 @@ export interface Employee extends ModificationMetadata {
   tetaNumber: TetaNumber;
   firstName: string;
   lastName: string;
+  pesel: string | null;
+  passportNumber: string | null;
+  foreignDocumentNumber: string | null;
   isActive: boolean;
   departmentId: DepartmentId | null;
   shiftAssignment: EmployeeColorShift | null;
