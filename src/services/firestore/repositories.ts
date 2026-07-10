@@ -21,6 +21,7 @@ import type {
   MonthDocument,
   PayrollSettingDocument,
   ReportDocument,
+  SettlementReviewDocument,
 } from '../../types/firestore';
 import {
   absenceConverter,
@@ -35,12 +36,15 @@ import {
   monthConverter,
   payrollSettingConverter,
   reportConverter,
+  settlementReviewConverter,
 } from './converters';
 import { firestorePaths } from './paths';
 
 export interface MonthRepositoryBoundary {
   readonly month: DocumentReference<MonthDocument>;
   readonly employeeSettlements: Query<EmployeeSettlementDocument>;
+  readonly reviewStates: CollectionReference<SettlementReviewDocument>;
+  reviewState(employeeId: string): DocumentReference<SettlementReviewDocument>;
   readonly dailyValues: CollectionReference<DailyValueDocument>;
   readonly absences: CollectionReference<AbsenceDocument>;
   readonly adjustments: CollectionReference<AdjustmentDocument>;
@@ -122,6 +126,16 @@ export function createFirestoreRepositoryBoundaries(
           firestore,
           firestorePaths.employeeSettlements(monthId),
         ).withConverter(employeeSettlementConverter),
+        reviewStates: collection(
+          firestore,
+          firestorePaths.reviewStates(monthId),
+        ).withConverter(settlementReviewConverter),
+        reviewState(employeeId) {
+          return doc(
+            firestore,
+            firestorePaths.reviewState(monthId, employeeId),
+          ).withConverter(settlementReviewConverter);
+        },
         dailyValues: collection(
           firestore,
           firestorePaths.dailyValues(monthId),

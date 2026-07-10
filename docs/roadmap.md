@@ -202,3 +202,19 @@ Authentication session.
   surfaced as a resolver warning.
 - No ZUS, PIT, taxes, net salary, payslip, reports, payroll closing or final
   immutable settlement snapshot.
+
+## Business Rules Block 11 implementation
+
+- Adds persisted employee-month review state under
+  `/months/{monthId}/reviewStates/{employeeId}`.
+- Introduces review statuses: Robocze, Wymaga sprawdzenia, Wymaga korekty,
+  Sprawdzone.
+- Monthly Settlement includes a review panel with readiness counters, per
+  employee status, warning counts and component summaries.
+- Employee review details group warnings into practical correction areas and
+  provide shortcuts to existing correction modules.
+- Readiness is informational only and does not export, close, settle or freeze
+  payroll data.
+- Review state does not affect settlement calculations.
+- No ZUS, PIT, taxes, net salary, payslip, reports, import engine, payroll
+  closing or final immutable settlement snapshot.

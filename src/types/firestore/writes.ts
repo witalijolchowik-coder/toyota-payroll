@@ -12,6 +12,7 @@ import type {
   IsoDate,
   MonthId,
   PayrollSettingKey,
+  SettlementReviewStatus,
   TetaNumber,
 } from './documents';
 
@@ -99,6 +100,11 @@ export type EmployeeEntitlementUpdateInput = Pick<
   EmployeeEntitlementCreateInput,
   'validTo' | 'note'
 >;
+
+export interface SettlementReviewUpdateInput extends EmployeeReferenceInput {
+  reviewStatus: SettlementReviewStatus;
+  reviewNote: string;
+}
 
 export interface PayrollSettingCreateInput {
   settingKey: PayrollSettingKey;

@@ -15,6 +15,7 @@ This is the final MVP shape. It supersedes the earlier enterprise collection hie
 
 /months/{monthId}
   /employeeSettlements/{employeeId}
+  /reviewStates/{employeeId}
   /dailyValues/{employeeId_YYYY-MM-DD}
   /absences/{absenceId}
   /adjustments/{adjustmentId}
@@ -181,6 +182,18 @@ Rules Specification exists.
 ## Settlement lock
 
 The month document carries `is_settled`. Client writes beneath a settled month are denied by Firestore rules. Admin SDK operations bypass rules and must independently enforce the same invariant in future Cloud Functions.
+
+## Monthly review state
+
+`/months/{monthId}/reviewStates/{employeeId}` stores coordinator workflow state
+for the employee-month review. It uses the employee ID as the document ID and
+stores `employee_id`, `teta_number`, `month_id`, `review_status`,
+`review_note`, `reviewed_at`, `reviewed_by`, and modification metadata.
+
+Review state does not store calculated payroll results and does not freeze
+source data. It is blocked by the same settled-month read-only rule as other
+month-owned coordinator documents. Review readiness is an informational signal
+for future export/closing work only.
 
 ## Ownership boundaries
 

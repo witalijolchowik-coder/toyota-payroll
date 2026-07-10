@@ -71,6 +71,25 @@ export interface EmployeeSettlementDocument extends EmployeeReferenceDocument {
   calculation_version: string;
 }
 
+export const SETTLEMENT_REVIEW_STATUSES = [
+  'DRAFT',
+  'NEEDS_REVIEW',
+  'NEEDS_CORRECTION',
+  'CHECKED',
+] as const;
+
+export type SettlementReviewStatus =
+  (typeof SETTLEMENT_REVIEW_STATUSES)[number];
+
+export interface SettlementReviewDocument
+  extends EmployeeReferenceDocument, ModificationMetadataDocument {
+  month_id: MonthId;
+  review_status: SettlementReviewStatus;
+  review_note: string;
+  reviewed_at: Timestamp | null;
+  reviewed_by: string | null;
+}
+
 export type DailyValueSource = 'manual' | 'attendance_import';
 
 export interface WorkTimeClassificationOverrideDocument {

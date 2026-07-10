@@ -19,6 +19,7 @@ import type {
   MonthDocument,
   PayrollSettingDocument,
   ReportDocument,
+  SettlementReviewDocument,
   SettlementTotalsDocument,
 } from '../../types/firestore';
 import {
@@ -177,6 +178,22 @@ export const employeeSettlementConverter =
       ),
     };
   });
+
+export const settlementReviewConverter =
+  createConverter<SettlementReviewDocument>((data, path) => ({
+    ...employeeReference(data, path),
+    month_id: readNonEmptyString(data, 'month_id', path),
+    review_status: readEnum(data, 'review_status', path, [
+      'DRAFT',
+      'NEEDS_REVIEW',
+      'NEEDS_CORRECTION',
+      'CHECKED',
+    ] as const),
+    review_note: readString(data, 'review_note', path),
+    reviewed_at: readNullableTimestamp(data, 'reviewed_at', path),
+    reviewed_by: readNullableString(data, 'reviewed_by', path),
+    ...metadata(data, path),
+  }));
 
 export const dailyValueConverter = createConverter<DailyValueDocument>(
   (data, path) => {

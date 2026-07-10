@@ -373,6 +373,52 @@ service cloud.firestore {
         && hasModificationMetadata(data);
     }
 
+    function validSettlementReview(data) {
+      return data.keys().hasAll([
+          'month_id',
+          'employee_id',
+          'teta_number',
+          'review_status',
+          'review_note',
+          'reviewed_at',
+          'reviewed_by',
+          'created_at',
+          'created_by',
+          'updated_at',
+          'updated_by'
+        ])
+        && data.keys().hasOnly([
+          'month_id',
+          'employee_id',
+          'teta_number',
+          'review_status',
+          'review_note',
+          'reviewed_at',
+          'reviewed_by',
+          'created_at',
+          'created_by',
+          'updated_at',
+          'updated_by'
+        ])
+        && isMonthId(data.month_id)
+        && hasEmployeeReference(data)
+        && data.review_status in [
+          'DRAFT',
+          'NEEDS_REVIEW',
+          'NEEDS_CORRECTION',
+          'CHECKED'
+        ]
+        && data.review_note is string
+        && data.reviewed_at is timestamp
+        && data.reviewed_by == request.auth.uid
+        && hasModificationMetadata(data);
+    }
+
+    function hasCanonicalReviewStateIdentity(monthId, reviewStateId, data) {
+      return data.month_id == monthId
+        && reviewStateId == data.employee_id;
+    }
+
     function hasCanonicalAbsenceOwner(monthId, data) {
       return data.start_date[0:7] == monthId;
     }
@@ -632,6 +678,39 @@ service cloud.firestore {
       match /employeeSettlements/{settlementId} {
         allow read: if isAuthenticated();
         allow write: if false;
+      }
+
+      match /reviewStates/{reviewStateId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated()
+          && monthExistsAndIsOpen(monthId)
+          && validSettlementReview(request.resource.data)
+          && hasCanonicalReviewStateIdentity(
+            monthId,
+            reviewStateId,
+            request.resource.data
+          )
+          && request.resource.data.reviewed_at == request.time
+          && hasCreateMetadata(request.resource.data);
+        allow update: if isAuthenticated()
+          && monthExistsAndIsOpen(monthId)
+          && validSettlementReview(request.resource.data)
+          && hasCanonicalReviewStateIdentity(
+            monthId,
+            reviewStateId,
+            request.resource.data
+          )
+          && request.resource.data.reviewed_at == request.time
+          && hasUpdateMetadata(request.resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'review_status',
+            'review_note',
+            'reviewed_at',
+            'reviewed_by',
+            'updated_at',
+            'updated_by'
+          ]);
+        allow delete: if false;
       }
 
       match /dailyValues/{dailyValueId} {

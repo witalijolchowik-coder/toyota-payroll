@@ -427,6 +427,89 @@ export const pl = {
           'Nie znaleziono aktywnej stawki dodatku za własne mieszkanie.',
       },
     },
+    review: {
+      title: 'Przegląd rozliczenia',
+      description:
+        'Kontrola miesięcznego rozliczenia przed przyszłym eksportem lub zamknięciem. To nie zamyka miesiąca i nie tworzy finalnej listy płac.',
+      ready: 'Miesiąc gotowy do przyszłego eksportu',
+      notReady: 'Miesiąc wymaga jeszcze sprawdzenia lub korekt',
+      readOnly:
+        'Miesiąc jest zamknięty. Statusy przeglądu są dostępne tylko do odczytu.',
+      counters: {
+        total: 'Pracownicy',
+        checked: 'Sprawdzone',
+        correction: 'Do korekty',
+        warnings: 'Z uwagami',
+        unresolved: 'Nierozstrzygnięte',
+        notReviewed: 'Nieprzejrzane',
+      },
+      status: {
+        DRAFT: 'Robocze',
+        NEEDS_REVIEW: 'Wymaga sprawdzenia',
+        NEEDS_CORRECTION: 'Wymaga korekty',
+        CHECKED: 'Sprawdzone',
+      },
+      table: {
+        teta: 'TETA',
+        employee: 'Pracownik',
+        department: 'Dział',
+        shift: 'Zmiana',
+        status: 'Status',
+        warnings: 'Uwagi',
+        unresolved: 'Nierozstrzygnięte',
+        components: 'Komponenty',
+        note: 'Notatka',
+        actions: 'Działania',
+        details: 'Przegląd',
+        noNote: '—',
+      },
+      components:
+        'Brutto: {{brutto}} · Netto: {{netto}} · Potrącenia: {{deductions}}',
+      details: {
+        title: 'Przegląd pracownika',
+        employee: '{{employee}} · TETA {{teta}}',
+        workTime: 'Czas pracy',
+        absences: 'Nieobecności',
+        overtime: 'Nadgodziny / czas prywatny',
+        components: 'Dodatki i potrącenia',
+        adjustments: 'Korekty ręczne',
+        warnings: 'Uwagi i nierozstrzygnięte elementy',
+        noWarnings: 'Brak uwag dla tego pracownika.',
+        reviewNote: 'Notatka przeglądu',
+        save: 'Zapisz status',
+        close: 'Zamknij',
+        updatedBy: 'Ostatnia zmiana: {{actor}} · {{date}}',
+        notSaved: 'Status nie był jeszcze zapisany.',
+      },
+      actions: {
+        calendar: 'Otwórz kalendarz pracownika',
+        employees: 'Pracownicy / uprawnienia',
+        absences: 'Nieobecności',
+        adjustments: 'Korekty',
+        settings: 'Ustawienia',
+      },
+      groups: {
+        employment: 'Zatrudnienie',
+        attendance: 'Czas pracy',
+        absences: 'Nieobecności',
+        workTime: 'Nadgodziny / czas prywatny',
+        components: 'Komponenty',
+        configuration: 'Konfiguracja',
+      },
+      issues: {
+        'uncovered-private-time':
+          'Czas prywatny nie został w pełni pokryty w bilansie miesiąca.',
+        'uncovered-coverable-ni':
+          'NI możliwe do pokrycia nie zostało w pełni rozliczone.',
+        niedoczas: 'Występuje niedoczas wymagający decyzji koordynatora.',
+      },
+      notifications: {
+        saved: 'Status przeglądu został zapisany.',
+      },
+      errors: {
+        saveFailed: 'Nie udało się zapisać statusu przeglądu.',
+      },
+    },
     constructor: {
       title: 'Konstruktor kalendarza',
       description:

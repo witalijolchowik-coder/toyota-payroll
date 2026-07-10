@@ -24,6 +24,7 @@ import {
   SettlementServiceError,
   type SettlementServiceErrorCode,
 } from '../../services/settlementService';
+import { saveSettlementReviewState } from '../../services/settlementReviewService';
 import {
   clearManualDailyValue,
   saveManualDailyValue,
@@ -32,6 +33,7 @@ import type {
   Employee,
   EmployeeColorShift,
   MonthId,
+  SettlementReviewUpdateInput,
 } from '../../types/firestore';
 import {
   calculateMonthlyDrafts,
@@ -60,6 +62,7 @@ import {
 import { parseDailyHoursInput } from './dailyValueEntry';
 import { PayrollDraftPanel } from './PayrollDraftPanel';
 import { getPublicHolidaysForYear } from './publicHolidays';
+import { SettlementReviewPanel } from './SettlementReviewPanel';
 import { SettlementGrid } from './SettlementGrid';
 import { SettlementLegend } from './SettlementLegend';
 import { useSettlementMonth } from './useSettlementMonth';
@@ -364,6 +367,23 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
     }
   };
 
+  const saveReviewState = async (input: SettlementReviewUpdateInput) => {
+    try {
+      await saveSettlementReviewState(monthId, input);
+      await reload();
+      notify({
+        message: t.settlement.review.notifications.saved,
+        severity: 'success',
+      });
+    } catch {
+      notify({
+        message: t.settlement.review.errors.saveFailed,
+        severity: 'error',
+      });
+      throw new Error('review-save-failed');
+    }
+  };
+
   return (
     <Stack spacing={2.5}>
       {data.month.isSettled ? (
@@ -540,6 +560,22 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
             onSelectCell={(employee, day) =>
               selectConstructorCell(employee, day)
             }
+          />
+          <SettlementReviewPanel
+            drafts={calculationDrafts}
+            employees={participatingEmployees}
+            departments={data.departments}
+            reviewStates={data.reviewStates}
+            isSettled={data.month.isSettled}
+            onOpenEmployeeCalendar={(employeeId) => {
+              const employee = participatingEmployees.find(
+                (item) => item.id === employeeId,
+              );
+              if (employee) {
+                setFocusedEmployee(employee);
+              }
+            }}
+            onSaveReview={saveReviewState}
           />
           <PayrollDraftPanel
             drafts={filteredDrafts}

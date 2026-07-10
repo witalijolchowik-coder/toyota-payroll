@@ -20,6 +20,7 @@ import type {
   MonthId,
   PayrollSetting,
   PayrollMonth,
+  SettlementReviewState,
 } from '../types/firestore';
 import { loadAbsencesOverlappingMonth } from './absencesService';
 import {
@@ -30,6 +31,7 @@ import {
   mapEmployeeEntitlementDocument,
   mapMonthDocument,
   mapPayrollSettingDocument,
+  mapSettlementReviewDocument,
 } from './firestore/mappers';
 import {
   getFirestoreClient,
@@ -55,6 +57,7 @@ export interface SettlementMonthData {
   absences: Absence[];
   payrollSettings: PayrollSetting[];
   adjustments: Adjustment[];
+  reviewStates: SettlementReviewState[];
 }
 
 async function requireActorUid(): Promise<string> {
@@ -95,6 +98,7 @@ export async function loadSettlementMonth(
     absences,
     payrollSettingsSnapshot,
     adjustmentsSnapshot,
+    reviewStatesSnapshot,
   ] = await Promise.all([
     getDocs(employeesQuery),
     getDocs(repositories.employeeEntitlements),
@@ -103,6 +107,7 @@ export async function loadSettlementMonth(
     loadAbsencesOverlappingMonth(monthId),
     getDocs(repositories.payrollSettings),
     getDocs(monthRepository.adjustments),
+    getDocs(monthRepository.reviewStates),
   ]);
 
   return {
@@ -125,6 +130,9 @@ export async function loadSettlementMonth(
     ),
     adjustments: adjustmentsSnapshot.docs.map((document) =>
       mapAdjustmentDocument(document.id, monthId, document.data()),
+    ),
+    reviewStates: reviewStatesSnapshot.docs.map((document) =>
+      mapSettlementReviewDocument(document.id, monthId, document.data()),
     ),
   };
 }

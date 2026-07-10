@@ -24,6 +24,8 @@ import type {
   PayrollMonth,
   Report,
   ReportDocument,
+  SettlementReviewDocument,
+  SettlementReviewState,
 } from '../../types/firestore';
 
 function modificationMetadata(document: {
@@ -107,6 +109,24 @@ export function mapEmployeeSettlementDocument(
     warnings: [...document.warnings],
     calculatedAt: document.calculated_at.toDate(),
     calculationVersion: document.calculation_version,
+  };
+}
+
+export function mapSettlementReviewDocument(
+  id: string,
+  monthId: MonthId,
+  document: SettlementReviewDocument,
+): SettlementReviewState {
+  return {
+    id,
+    monthId,
+    employeeId: document.employee_id,
+    tetaNumber: document.teta_number,
+    reviewStatus: document.review_status,
+    reviewNote: document.review_note,
+    reviewedAt: document.reviewed_at?.toDate() ?? null,
+    reviewedBy: document.reviewed_by,
+    ...modificationMetadata(document),
   };
 }
 

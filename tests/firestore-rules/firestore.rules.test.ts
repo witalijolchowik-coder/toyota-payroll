@@ -435,6 +435,73 @@ describe('Firestore security rules', () => {
     );
   });
 
+  it('allows monthly review state create and update in an open month', async () => {
+    await seedMonth('2026-07', false);
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const reviewState = doc(
+      firestore,
+      'months/2026-07/reviewStates/employee-1',
+    );
+
+    await assertSucceeds(
+      setDoc(reviewState, {
+        month_id: '2026-07',
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        review_status: 'NEEDS_REVIEW',
+        review_note: '',
+        reviewed_at: serverTimestamp(),
+        reviewed_by: uid,
+        ...modificationMetadata(uid),
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(reviewState, {
+        review_status: 'CHECKED',
+        review_note: 'Sprawdzone',
+        reviewed_at: serverTimestamp(),
+        reviewed_by: uid,
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertFails(deleteDoc(reviewState));
+  });
+
+  it('rejects invalid monthly review state and settled-month review writes', async () => {
+    await seedMonth('2026-07', false);
+    await seedMonth('2026-08', true);
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const payload = {
+      month_id: '2026-07',
+      employee_id: 'employee-1',
+      teta_number: 'TETA-1001',
+      review_status: 'CHECKED',
+      review_note: '',
+      reviewed_at: serverTimestamp(),
+      reviewed_by: uid,
+      ...modificationMetadata(uid),
+    };
+
+    await assertFails(
+      setDoc(doc(firestore, 'months/2026-07/reviewStates/wrong-id'), payload),
+    );
+    await assertFails(
+      setDoc(doc(firestore, 'months/2026-07/reviewStates/employee-1'), {
+        ...payload,
+        review_status: 'DONE',
+      }),
+    );
+    await assertFails(
+      setDoc(doc(firestore, 'months/2026-08/reviewStates/employee-1'), {
+        ...payload,
+        month_id: '2026-08',
+      }),
+    );
+  });
+
   it('allows manual daily value create, update, and delete in an open month', async () => {
     await seedMonth('2026-07', false);
     const uid = 'coordinator-1';

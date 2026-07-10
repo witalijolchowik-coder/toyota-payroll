@@ -20,6 +20,7 @@ import type {
   MonthId,
   PayrollSettingKey,
   ReportStatus,
+  SettlementReviewStatus,
   SettlementTotalsDocument,
   TetaNumber,
 } from './documents';
@@ -75,6 +76,17 @@ export interface EmployeeSettlement {
   warnings: string[];
   calculatedAt: Date;
   calculationVersion: string;
+}
+
+export interface SettlementReviewState extends ModificationMetadata {
+  id: string;
+  monthId: MonthId;
+  employeeId: EmployeeId;
+  tetaNumber: TetaNumber;
+  reviewStatus: SettlementReviewStatus;
+  reviewNote: string;
+  reviewedAt: Date | null;
+  reviewedBy: string | null;
 }
 
 export interface DailyValue extends ModificationMetadata {
