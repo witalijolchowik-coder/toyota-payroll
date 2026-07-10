@@ -602,12 +602,16 @@ service cloud.firestore {
           && hasCreateMetadata(request.resource.data);
         allow update: if isAuthenticated()
           && monthExistsAndIsOpen(monthId)
-          && validDailyValue(request.resource.data)
           && hasUpdateMetadata(request.resource.data)
           && (
             (
               resource.data.source == 'manual'
               && request.resource.data.source == 'manual'
+              && request.resource.data.hours is number
+              && request.resource.data.hours >= 0
+              && request.resource.data.hours <= 24
+              && isNullableString(request.resource.data.note)
+              && validWorkTimeCorrection(request.resource.data)
               && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
                 'hours',
                 'note',
@@ -623,6 +627,8 @@ service cloud.firestore {
                 'manual_override',
                 'work_time_correction'
               ])
+              && validManualOverride(request.resource.data)
+              && validWorkTimeCorrection(request.resource.data)
               && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
                 'manual_override',
                 'work_time_correction',
