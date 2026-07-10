@@ -130,6 +130,10 @@ export const PAYROLL_SETTING_KEYS = [
   'transport_allowance',
   'accommodation_allowance',
   'udt_allowance',
+  'holiday_work_bonus',
+  'laundry_allowance',
+  'own_housing_allowance',
+  'company_housing_media',
 ] as const;
 
 export type KnownPayrollSettingKey = (typeof PAYROLL_SETTING_KEYS)[number];

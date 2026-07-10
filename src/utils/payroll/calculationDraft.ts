@@ -30,7 +30,7 @@ import {
   isDateWithinEmploymentPeriod,
   type EmploymentPeriod,
 } from './employment';
-import { getPayrollMonthDateRange } from './month';
+import { dateToIsoDate, getPayrollMonthDateRange } from './month';
 import { resolveEffectivePayrollSetting } from './settings';
 import { getPayrollVirtualDefaultHours } from './virtualDefaults';
 import {
@@ -63,6 +63,15 @@ export interface PayrollDraftAbsenceGroup {
   nominalHours: number;
 }
 
+export interface PayrollDraftAbsencePeriod {
+  id: string;
+  code: string;
+  startDate: IsoDate;
+  endDate: IsoDate;
+  workingDayCount: number;
+  workingHours: number;
+}
+
 export interface PayrollDraftAdjustmentEntry {
   id: string;
   category: Adjustment['category'];
@@ -78,6 +87,16 @@ export interface PayrollDraftFrequencyBonus {
   l4RecordCount: number;
   hasNnAbsence: boolean;
   reason: ReturnType<typeof calculateFrequencyBonus>['reason'];
+}
+
+export interface EmployeeSettlementEntitlements {
+  udtEligible?: boolean;
+  ownHousingAllowanceEligible?: boolean;
+  companyAccommodation?: {
+    variantKey?: string | null;
+    contractStartDate?: Date | null;
+    contractEndDate?: Date | null;
+  } | null;
 }
 
 export interface EmployeeMonthlyCalculationDraft {
@@ -103,9 +122,16 @@ export interface EmployeeMonthlyCalculationDraft {
   };
   absences: {
     groups: PayrollDraftAbsenceGroup[];
+    periods: PayrollDraftAbsencePeriod[];
     l4Hours: number;
+    vacationHours: number;
+    otherAbsenceHours: number;
     nnHours: number;
     approvedOrJustifiedHours: number;
+  };
+  workDays: {
+    eligibleWorkingDays: number;
+    physicallyWorkedDays: number;
   };
   workTime: {
     normalWorkHours: number;
@@ -131,6 +157,19 @@ export interface EmployeeMonthlyCalculationDraft {
     decreases: number;
     entries: PayrollDraftAdjustmentEntry[];
   };
+  components: {
+    frequencyBonusBrutto: number | null;
+    holidayWorkBonusBrutto: number;
+    transportAllowanceNetto: number;
+    udtAllowanceBrutto: number;
+    laundryAllowanceBrutto: number;
+    ownHousingAllowanceBrutto: number;
+    manualIncreases: number;
+    manualDecreases: number;
+    companyAccommodationDeduction: number;
+    companyAccommodationMediaDeduction: number;
+    companyAccommodationRentDeduction: number;
+  };
   warnings: PayrollDraftWarning[];
   totals: {
     workedHours: number;
@@ -138,6 +177,9 @@ export interface EmployeeMonthlyCalculationDraft {
     frequencyBonusAmount: number | null;
     manualIncreases: number;
     manualDecreases: number;
+    bruttoAdditions: number;
+    nettoAllowances: number;
+    deductions: number;
     preliminaryGrossAdditions: number;
     preliminaryGrossDeductions: number;
   };
@@ -150,17 +192,29 @@ export interface MonthlyCalculationDraftInput {
   absences: readonly Absence[];
   payrollSettings: readonly PayrollSetting[];
   adjustments: readonly Adjustment[];
+  entitlements?: EmployeeSettlementEntitlements | null;
   calendarOptions?: PayrollCalendarOptions;
 }
 
 export interface MonthlyCalculationDraftsInput extends Omit<
   MonthlyCalculationDraftInput,
-  'employee'
+  'employee' | 'entitlements'
 > {
   employees: readonly Employee[];
+  entitlementsByEmployeeId?: ReadonlyMap<
+    string,
+    EmployeeSettlementEntitlements
+  >;
 }
 
 const APPROVED_ABSENCE_CODES = new Set(['UW', 'UZ', 'OPD', 'KRW', 'WZN']);
+const VACATION_ABSENCE_CODES = new Set(['UW', 'UZ']);
+const DEFAULT_TRANSPORT_ALLOWANCE = 275;
+const DEFAULT_HOLIDAY_WORK_BONUS = 300;
+const DEFAULT_UDT_ALLOWANCE = 300;
+const DEFAULT_LAUNDRY_ALLOWANCE = 40;
+const DEFAULT_COMPANY_HOUSING_MEDIA = 500;
+const DEFAULT_COMPANY_HOUSING_RENT = 150;
 
 function employmentPeriod(employee: Employee): EmploymentPeriod {
   return {
@@ -211,6 +265,189 @@ function addAbsenceHours(
   groups.set(code, current);
 }
 
+function configuredAmount(
+  settings: readonly PayrollSetting[],
+  settingKey: string,
+  monthId: MonthId,
+  defaultAmount: number,
+  variantKey: string | null = null,
+): number {
+  return (
+    resolveEffectivePayrollSetting(settings, settingKey, monthId, variantKey)
+      ?.amount ?? defaultAmount
+  );
+}
+
+function roundMoney(value: number): number {
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+function prorateByWorkedDays({
+  monthlyAmount,
+  eligibleWorkingDays,
+  physicallyWorkedDays,
+}: {
+  monthlyAmount: number;
+  eligibleWorkingDays: number;
+  physicallyWorkedDays: number;
+}): number {
+  if (eligibleWorkingDays <= 0 || physicallyWorkedDays <= 0) {
+    return 0;
+  }
+
+  return roundMoney(
+    (monthlyAmount / eligibleWorkingDays) *
+      Math.min(physicallyWorkedDays, eligibleWorkingDays),
+  );
+}
+
+function isoDateToUtcDate(isoDate: IsoDate): Date {
+  return new Date(`${isoDate}T00:00:00.000Z`);
+}
+
+function overlapIsoRange(
+  startDate: IsoDate,
+  endDate: IsoDate,
+  rangeStart: IsoDate,
+  rangeEnd: IsoDate,
+) {
+  const start = startDate > rangeStart ? startDate : rangeStart;
+  const end = endDate < rangeEnd ? endDate : rangeEnd;
+  return start <= end ? { start, end } : null;
+}
+
+function countCalendarDaysInclusive(startDate: IsoDate, endDate: IsoDate) {
+  const start = isoDateToUtcDate(startDate);
+  const end = isoDateToUtcDate(endDate);
+  return Math.floor((end.getTime() - start.getTime()) / 86_400_000) + 1;
+}
+
+function countEligibleWorkingDays({
+  monthId,
+  employment,
+  calendarOptions,
+}: {
+  monthId: MonthId;
+  employment: EmploymentPeriod;
+  calendarOptions: PayrollCalendarOptions;
+}) {
+  return createPayrollMonthCalendar(monthId, calendarOptions).filter(
+    (day) =>
+      day.isWorkingDay && isDateWithinEmploymentPeriod(day.isoDate, employment),
+  ).length;
+}
+
+function calculateAbsencePeriods({
+  monthId,
+  employment,
+  absences,
+  calendarOptions,
+}: {
+  monthId: MonthId;
+  employment: EmploymentPeriod;
+  absences: readonly Absence[];
+  calendarOptions: PayrollCalendarOptions;
+}): PayrollDraftAbsencePeriod[] {
+  const range = getPayrollMonthDateRange(monthId);
+  const monthStart = dateToIsoDate(range.start);
+  const monthEnd = dateToIsoDate(range.end);
+  const calendar = createPayrollMonthCalendar(monthId, calendarOptions);
+
+  return absences
+    .map((absence) => {
+      const overlap = overlapIsoRange(
+        absence.startDate,
+        absence.endDate,
+        monthStart,
+        monthEnd,
+      );
+      if (!overlap) {
+        return null;
+      }
+      const workingDays = calendar.filter(
+        (day) =>
+          day.isoDate >= overlap.start &&
+          day.isoDate <= overlap.end &&
+          day.isWorkingDay &&
+          isDateWithinEmploymentPeriod(day.isoDate, employment),
+      ).length;
+
+      return {
+        id: absence.id,
+        code: normalizeAbsenceCode(absence.absenceCode),
+        startDate: absence.startDate,
+        endDate: absence.endDate,
+        workingDayCount: workingDays,
+        workingHours:
+          workingDays * (absence.hoursPerDay ?? STANDARD_WORKING_DAY_HOURS),
+      };
+    })
+    .filter((period): period is PayrollDraftAbsencePeriod => period !== null)
+    .sort((first, second) =>
+      first.startDate === second.startDate
+        ? first.id.localeCompare(second.id)
+        : first.startDate.localeCompare(second.startDate),
+    );
+}
+
+function calculateCompanyAccommodationDeduction({
+  monthId,
+  employee,
+  settings,
+  entitlements,
+}: {
+  monthId: MonthId;
+  employee: Employee;
+  settings: readonly PayrollSetting[];
+  entitlements: EmployeeSettlementEntitlements | null;
+}) {
+  const assignment = entitlements?.companyAccommodation;
+  if (!assignment) {
+    return { media: 0, rent: 0, total: 0 };
+  }
+
+  const range = getPayrollMonthDateRange(monthId);
+  const monthStart = dateToIsoDate(range.start);
+  const monthEnd = dateToIsoDate(range.end);
+  const contractStart = dateToIsoDate(
+    assignment.contractStartDate ?? employee.employmentStartDate ?? range.start,
+  );
+  const contractEnd = assignment.contractEndDate
+    ? dateToIsoDate(assignment.contractEndDate)
+    : employee.employmentEndDate
+      ? dateToIsoDate(employee.employmentEndDate)
+      : monthEnd;
+  const overlap = overlapIsoRange(
+    contractStart,
+    contractEnd,
+    monthStart,
+    monthEnd,
+  );
+  if (!overlap) {
+    return { media: 0, rent: 0, total: 0 };
+  }
+
+  const chargedDays = countCalendarDaysInclusive(overlap.start, overlap.end);
+  const monthDays = countCalendarDaysInclusive(monthStart, monthEnd);
+  const mediaMonthly = configuredAmount(
+    settings,
+    'company_housing_media',
+    monthId,
+    DEFAULT_COMPANY_HOUSING_MEDIA,
+  );
+  const rentMonthly = configuredAmount(
+    settings,
+    'accommodation_allowance',
+    monthId,
+    DEFAULT_COMPANY_HOUSING_RENT,
+    assignment.variantKey ?? null,
+  );
+  const media = roundMoney((mediaMonthly / monthDays) * chargedDays);
+  const rent = roundMoney((rentMonthly / monthDays) * chargedDays);
+
+  return { media, rent, total: roundMoney(media + rent) };
+}
+
 export function calculateEmployeeMonthlyDraft({
   monthId,
   employee,
@@ -218,6 +455,7 @@ export function calculateEmployeeMonthlyDraft({
   absences,
   payrollSettings,
   adjustments,
+  entitlements = null,
   calendarOptions = {},
 }: MonthlyCalculationDraftInput): EmployeeMonthlyCalculationDraft {
   const range = getPayrollMonthDateRange(monthId);
@@ -271,6 +509,7 @@ export function calculateEmployeeMonthlyDraft({
   const absenceGroups = new Map<string, PayrollDraftAbsenceGroup>();
   const workTimeDeviations: DailyWorkTimeDeviation[] = [];
   const unresolvedClassificationDays: IsoDate[] = [];
+  const physicallyWorkedDates = new Set<IsoDate>();
 
   if (participatesInMonth) {
     createPayrollMonthCalendar(monthId, calendarOptions).forEach((day) => {
@@ -326,6 +565,9 @@ export function calculateEmployeeMonthlyDraft({
             importedHours += effective.hours;
           } else {
             importedOverrideHours += effective.hours;
+          }
+          if (effective.hours > 0 && !hasGoverningAbsence) {
+            physicallyWorkedDates.add(day.isoDate);
           }
           const deviation = dailyWorkTimeDeviationFromValue({
             value: persistedValue,
@@ -395,6 +637,7 @@ export function calculateEmployeeMonthlyDraft({
       });
       virtualHours += virtual ?? 0;
       if (virtual && !hasGoverningAbsence) {
+        physicallyWorkedDates.add(day.isoDate);
         workTimeDeviations.push(
           resolveDailyWorkTimeDeviation({
             planned: plannedIntervalForShift('FIRST'),
@@ -422,6 +665,17 @@ export function calculateEmployeeMonthlyDraft({
     warnings.push(warning('unresolved-frequency-bonus-setting'));
   }
   const frequencyAmount = frequencySetting ? frequencyRule.amount : null;
+  const absencePeriods = calculateAbsencePeriods({
+    monthId,
+    employment,
+    absences: activeAbsences,
+    calendarOptions,
+  });
+  const eligibleWorkingDays = countEligibleWorkingDays({
+    monthId,
+    employment,
+    calendarOptions,
+  });
 
   const activeAdjustments = adjustments.filter((adjustment) =>
     isActiveEmployeeAdjustment(employee, adjustment),
@@ -468,7 +722,76 @@ export function calculateEmployeeMonthlyDraft({
     groups
       .filter((group) => codes.has(group.code))
       .reduce((total, group) => total + group.nominalHours, 0);
-  const preliminaryGrossAdditions = (frequencyAmount ?? 0) + manualIncreases;
+  const otherAbsenceHours = groups
+    .filter(
+      (group) => group.code !== 'L4' && !VACATION_ABSENCE_CODES.has(group.code),
+    )
+    .reduce((total, group) => total + group.nominalHours, 0);
+  const holidayWorkBonusBrutto = workTimeBeforeBalance.holidayWorkBonusEligible
+    ? configuredAmount(
+        payrollSettings,
+        'holiday_work_bonus',
+        monthId,
+        DEFAULT_HOLIDAY_WORK_BONUS,
+      )
+    : 0;
+  const transportAllowanceNetto = prorateByWorkedDays({
+    monthlyAmount: configuredAmount(
+      payrollSettings,
+      'transport_allowance',
+      monthId,
+      DEFAULT_TRANSPORT_ALLOWANCE,
+    ),
+    eligibleWorkingDays,
+    physicallyWorkedDays: physicallyWorkedDates.size,
+  });
+  const laundryAllowanceBrutto = prorateByWorkedDays({
+    monthlyAmount: configuredAmount(
+      payrollSettings,
+      'laundry_allowance',
+      monthId,
+      DEFAULT_LAUNDRY_ALLOWANCE,
+    ),
+    eligibleWorkingDays,
+    physicallyWorkedDays: physicallyWorkedDates.size,
+  });
+  const udtAllowanceBrutto =
+    entitlements?.udtEligible && fullCalendarMonth
+      ? configuredAmount(
+          payrollSettings,
+          'udt_allowance',
+          monthId,
+          DEFAULT_UDT_ALLOWANCE,
+        )
+      : 0;
+  const ownHousingAllowanceBrutto =
+    entitlements?.ownHousingAllowanceEligible && fullCalendarMonth
+      ? configuredAmount(payrollSettings, 'own_housing_allowance', monthId, 0)
+      : 0;
+  const companyAccommodation = calculateCompanyAccommodationDeduction({
+    monthId,
+    employee,
+    settings: payrollSettings,
+    entitlements,
+  });
+  const bruttoAdditions = roundMoney(
+    (frequencyAmount ?? 0) +
+      holidayWorkBonusBrutto +
+      udtAllowanceBrutto +
+      laundryAllowanceBrutto +
+      ownHousingAllowanceBrutto +
+      manualIncreases,
+  );
+  const nettoAllowances = transportAllowanceNetto;
+  const deductions = roundMoney(manualDecreases + companyAccommodation.total);
+  const preliminaryGrossAdditions = roundMoney(
+    (frequencyAmount ?? 0) +
+      holidayWorkBonusBrutto +
+      udtAllowanceBrutto +
+      laundryAllowanceBrutto +
+      ownHousingAllowanceBrutto +
+      manualIncreases,
+  );
 
   return {
     employeeId: employee.id,
@@ -493,9 +816,16 @@ export function calculateEmployeeMonthlyDraft({
     },
     absences: {
       groups,
+      periods: absencePeriods,
       l4Hours: hoursForCodes(new Set(['L4'])),
+      vacationHours: hoursForCodes(VACATION_ABSENCE_CODES),
+      otherAbsenceHours,
       nnHours: hoursForCodes(new Set(['NN'])),
       approvedOrJustifiedHours: hoursForCodes(APPROVED_ABSENCE_CODES),
+    },
+    workDays: {
+      eligibleWorkingDays,
+      physicallyWorkedDays: physicallyWorkedDates.size,
     },
     workTime: {
       normalWorkHours: workTimeBeforeBalance.normalWorkHours,
@@ -528,6 +858,19 @@ export function calculateEmployeeMonthlyDraft({
       decreases: manualDecreases,
       entries: adjustmentEntries,
     },
+    components: {
+      frequencyBonusBrutto: frequencyAmount,
+      holidayWorkBonusBrutto,
+      transportAllowanceNetto,
+      udtAllowanceBrutto,
+      laundryAllowanceBrutto,
+      ownHousingAllowanceBrutto,
+      manualIncreases,
+      manualDecreases,
+      companyAccommodationDeduction: companyAccommodation.total,
+      companyAccommodationMediaDeduction: companyAccommodation.media,
+      companyAccommodationRentDeduction: companyAccommodation.rent,
+    },
     warnings,
     totals: {
       workedHours: explicitHours + virtualHours,
@@ -535,18 +878,26 @@ export function calculateEmployeeMonthlyDraft({
       frequencyBonusAmount: frequencyAmount,
       manualIncreases,
       manualDecreases,
+      bruttoAdditions,
+      nettoAllowances,
+      deductions,
       preliminaryGrossAdditions,
-      preliminaryGrossDeductions: manualDecreases,
+      preliminaryGrossDeductions: deductions,
     },
   };
 }
 
 export function calculateMonthlyDrafts({
   employees,
+  entitlementsByEmployeeId,
   ...input
 }: MonthlyCalculationDraftsInput): EmployeeMonthlyCalculationDraft[] {
   return employees.map((employee) =>
-    calculateEmployeeMonthlyDraft({ ...input, employee }),
+    calculateEmployeeMonthlyDraft({
+      ...input,
+      employee,
+      entitlements: entitlementsByEmployeeId?.get(employee.id) ?? null,
+    }),
   );
 }
 

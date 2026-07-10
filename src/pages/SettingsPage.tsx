@@ -44,6 +44,10 @@ const settingLabels: Record<string, string> = {
   transport_allowance: 'Dodatek transportowy',
   accommodation_allowance: 'Zakwaterowanie',
   udt_allowance: 'Dodatek UDT',
+  holiday_work_bonus: 'Dodatek za pracę w święto',
+  laundry_allowance: 'Dodatek za pranie',
+  own_housing_allowance: 'Dodatek za własne mieszkanie',
+  company_housing_media: 'Media w mieszkaniu firmowym',
 };
 
 type DepartmentFormState =

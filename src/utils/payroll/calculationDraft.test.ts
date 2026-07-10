@@ -9,6 +9,8 @@ import {
   calculateEmployeeMonthlyDraft,
   calculateMonthlyDrafts,
   STANDARD_WORKING_DAY_HOURS,
+  type PayrollCalendarOptions,
+  type EmployeeSettlementEntitlements,
 } from '.';
 
 const createdAt = new Date('2026-01-01T00:00:00.000Z');
@@ -124,12 +126,16 @@ function draft({
   absences = [],
   settings = [payrollSetting()],
   adjustments = [],
+  entitlements = null,
+  calendarOptions = {},
 }: {
   target?: Employee;
   dailyValues?: DailyValue[];
   absences?: Absence[];
   settings?: PayrollSetting[];
   adjustments?: Adjustment[];
+  entitlements?: EmployeeSettlementEntitlements | null;
+  calendarOptions?: PayrollCalendarOptions;
 } = {}) {
   return calculateEmployeeMonthlyDraft({
     monthId: '2026-06',
@@ -138,6 +144,8 @@ function draft({
     absences,
     payrollSettings: settings,
     adjustments,
+    entitlements,
+    calendarOptions,
   });
 }
 
@@ -227,6 +235,30 @@ describe('employee monthly calculation draft', () => {
     );
   });
 
+  it('keeps a Friday-Monday L4 as one reporting period but counts only working days and hours', () => {
+    const result = draft({
+      absences: [
+        absence({
+          id: 'l4-weekend-period',
+          startDate: '2026-06-05',
+          endDate: '2026-06-08',
+        }),
+      ],
+    });
+
+    expect(result.absences.periods).toEqual([
+      {
+        id: 'l4-weekend-period',
+        code: 'L4',
+        startDate: '2026-06-05',
+        endDate: '2026-06-08',
+        workingDayCount: 2,
+        workingHours: 16,
+      },
+    ]);
+    expect(result.absences.l4Hours).toBe(16);
+  });
+
   it('uses active L4 records for the frequency bonus reason and amount', () => {
     const result = draft({
       absences: [
@@ -279,6 +311,126 @@ describe('employee monthly calculation draft', () => {
     expect(result.totals.frequencyBonusAmount).toBe(400);
   });
 
+  it('calculates transport netto and laundry brutto proportionally by physically worked days', () => {
+    const result = draft({
+      absences: [
+        absence({
+          id: 'l4-1',
+          absenceCode: 'L4',
+          startDate: '2026-06-01',
+          endDate: '2026-06-01',
+        }),
+        absence({
+          id: 'uw-1',
+          absenceCode: 'UW',
+          startDate: '2026-06-02',
+          endDate: '2026-06-02',
+        }),
+      ],
+    });
+
+    expect(result.workDays.eligibleWorkingDays).toBe(22);
+    expect(result.workDays.physicallyWorkedDays).toBe(20);
+    expect(result.components.transportAllowanceNetto).toBe(250);
+    expect(result.components.laundryAllowanceBrutto).toBe(36.36);
+    expect(result.absences.vacationHours).toBe(8);
+  });
+
+  it('combines all 100% overtime sources and pays the holiday bonus only once per month', () => {
+    const result = draft({
+      dailyValues: [
+        dailyValue({
+          id: 'employee-1_2026-06-04',
+          date: '2026-06-04',
+          hours: 4,
+        }),
+        dailyValue({
+          id: 'employee-1_2026-06-06',
+          date: '2026-06-06',
+          hours: 4,
+        }),
+      ],
+      calendarOptions: {
+        publicHolidays: new Set(['2026-06-04']),
+      },
+    });
+
+    expect(result.workTime.overtime100Hours).toBe(8);
+    expect(result.workTime.paidOvertime100Hours).toBe(8);
+    expect(result.components.holidayWorkBonusBrutto).toBe(300);
+  });
+
+  it('keeps work-time quantities separate from monetary salary calculation', () => {
+    const result = draft();
+
+    expect(result.workTime.paidOvertime50Hours).toBe(0);
+    expect(result.workTime.paidOvertime100Hours).toBe(0);
+    expect(result.totals.bruttoAdditions).toBe(440);
+    expect(result.totals.nettoAllowances).toBe(275);
+    expect(result.totals).not.toHaveProperty('netSalary');
+  });
+
+  it('pays UDT only for full-month eligible employment and does not reduce it by absences', () => {
+    expect(
+      draft({ entitlements: { udtEligible: true } }).components,
+    ).toMatchObject({ udtAllowanceBrutto: 300 });
+
+    expect(
+      draft({
+        target: employee({ employmentStartDate: utcDate('2026-06-02') }),
+        entitlements: { udtEligible: true },
+      }).components.udtAllowanceBrutto,
+    ).toBe(0);
+
+    expect(
+      draft({
+        absences: [absence({ startDate: '2026-06-01' })],
+        entitlements: { udtEligible: true },
+      }).components.udtAllowanceBrutto,
+    ).toBe(300);
+  });
+
+  it('calculates company accommodation deduction by contract-validity days, not worked days', () => {
+    const result = draft({
+      absences: [absence({ startDate: '2026-06-16', endDate: '2026-06-16' })],
+      entitlements: {
+        companyAccommodation: {
+          contractStartDate: utcDate('2026-06-16'),
+          contractEndDate: utcDate('2026-06-30'),
+        },
+      },
+    });
+
+    expect(result.components.companyAccommodationMediaDeduction).toBe(250);
+    expect(result.components.companyAccommodationRentDeduction).toBe(75);
+    expect(result.components.companyAccommodationDeduction).toBe(325);
+  });
+
+  it('pays own housing allowance only for full-month eligible employment', () => {
+    const settings = [
+      payrollSetting(),
+      payrollSetting({
+        id: 'own-housing',
+        settingKey: 'own_housing_allowance',
+        amount: 200,
+      }),
+    ];
+
+    expect(
+      draft({
+        settings,
+        entitlements: { ownHousingAllowanceEligible: true },
+      }).components.ownHousingAllowanceBrutto,
+    ).toBe(200);
+    expect(
+      draft({
+        target: employee({ employmentStartDate: utcDate('2026-06-02') }),
+        settings,
+        entitlements: { ownHousingAllowanceEligible: true },
+      }).components.ownHousingAllowanceBrutto,
+    ).toBe(0);
+  });
+
   it('includes active adjustments and ignores cancelled adjustments', () => {
     const result = draft({
       adjustments: [
@@ -300,7 +452,7 @@ describe('employee monthly calculation draft', () => {
     expect(result.adjustments.increases).toBe(150);
     expect(result.adjustments.decreases).toBe(40);
     expect(result.adjustments.entries).toHaveLength(2);
-    expect(result.totals.preliminaryGrossAdditions).toBe(550);
+    expect(result.totals.preliminaryGrossAdditions).toBe(590);
     expect(result.totals.preliminaryGrossDeductions).toBe(40);
   });
 

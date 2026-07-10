@@ -33,6 +33,9 @@ The attached design history contains several generations of the architecture. Th
 - [Work time deviations, private time and overtime - Block 8](business-rules/work-time-deviations.md)
   - planned-vs-actual intervals, overtime buckets, and monthly balancing
     foundation
+- [Monthly settlement components - Block 9](business-rules/monthly-settlement-components.md)
+  - coordinator-facing monthly settlement components, separated hours,
+    brutto/netto amounts, deductions, and current limitations
 
 Approved business-rules specifications govern payroll semantics. Architecture
 documents continue to govern system structure and implementation boundaries.
@@ -53,6 +56,7 @@ documents continue to govern system structure and implementation boundaries.
 - [ADR 0012: Calendar Constructor reuses attendance and absence documents](decisions/0012-calendar-constructor.md)
 - [ADR 0013: Departments, color shifts and rotation foundation](decisions/0013-departments-shifts-rotation.md)
 - [ADR 0014: Work-time deviations extend DailyValue](decisions/0014-work-time-deviations.md)
+- [ADR 0015: Monthly settlement components remain a read-only aggregation](decisions/0015-monthly-settlement-components.md)
 
 ## Authority order
 

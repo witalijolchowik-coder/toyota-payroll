@@ -55,10 +55,26 @@ export function PayrollDraftPanel({
         current.paidOvertime50 + draft.workTime.paidOvertime50Hours,
       paidOvertime100:
         current.paidOvertime100 + draft.workTime.paidOvertime100Hours,
+      l4Hours: current.l4Hours + draft.absences.l4Hours,
+      vacationHours: current.vacationHours + draft.absences.vacationHours,
+      otherAbsenceHours:
+        current.otherAbsenceHours + draft.absences.otherAbsenceHours,
       frequencyBonus:
         current.frequencyBonus + (draft.totals.frequencyBonusAmount ?? 0),
+      holidayBonus:
+        current.holidayBonus + draft.components.holidayWorkBonusBrutto,
+      transportNetto:
+        current.transportNetto + draft.components.transportAllowanceNetto,
+      laundry: current.laundry + draft.components.laundryAllowanceBrutto,
+      udt: current.udt + draft.components.udtAllowanceBrutto,
+      housingDeduction:
+        current.housingDeduction +
+        draft.components.companyAccommodationDeduction,
       increases: current.increases + draft.totals.manualIncreases,
       decreases: current.decreases + draft.totals.manualDecreases,
+      bruttoAdditions: current.bruttoAdditions + draft.totals.bruttoAdditions,
+      nettoAllowances: current.nettoAllowances + draft.totals.nettoAllowances,
+      deductions: current.deductions + draft.totals.deductions,
       warnings: current.warnings + draft.warnings.length,
     }),
     {
@@ -69,9 +85,20 @@ export function PayrollDraftPanel({
       niedoczas: 0,
       paidOvertime50: 0,
       paidOvertime100: 0,
+      l4Hours: 0,
+      vacationHours: 0,
+      otherAbsenceHours: 0,
       frequencyBonus: 0,
+      holidayBonus: 0,
+      transportNetto: 0,
+      laundry: 0,
+      udt: 0,
+      housingDeduction: 0,
       increases: 0,
       decreases: 0,
+      bruttoAdditions: 0,
+      nettoAllowances: 0,
+      deductions: 0,
       warnings: 0,
     },
   );
@@ -134,16 +161,36 @@ export function PayrollDraftPanel({
               value={formatHours(totals.paidOvertime100, t)}
             />
             <SummaryChip
+              label={t.settlement.draft.totals.l4}
+              value={formatHours(totals.l4Hours, t)}
+            />
+            <SummaryChip
+              label={t.settlement.draft.totals.vacation}
+              value={formatHours(totals.vacationHours, t)}
+            />
+            <SummaryChip
               label={t.settlement.draft.totals.frequencyBonus}
               value={currencyFormatter.format(totals.frequencyBonus)}
             />
             <SummaryChip
-              label={t.settlement.draft.totals.increases}
-              value={currencyFormatter.format(totals.increases)}
+              label={t.settlement.draft.totals.holidayBonus}
+              value={currencyFormatter.format(totals.holidayBonus)}
             />
             <SummaryChip
-              label={t.settlement.draft.totals.decreases}
-              value={currencyFormatter.format(totals.decreases)}
+              label={t.settlement.draft.totals.transportNetto}
+              value={currencyFormatter.format(totals.transportNetto)}
+            />
+            <SummaryChip
+              label={t.settlement.draft.totals.laundry}
+              value={currencyFormatter.format(totals.laundry)}
+            />
+            <SummaryChip
+              label={t.settlement.draft.totals.bruttoAdditions}
+              value={currencyFormatter.format(totals.bruttoAdditions)}
+            />
+            <SummaryChip
+              label={t.settlement.draft.totals.deductions}
+              value={currencyFormatter.format(totals.deductions)}
             />
             <SummaryChip
               label={t.settlement.draft.totals.warnings}
@@ -181,10 +228,19 @@ export function PayrollDraftPanel({
                     {t.settlement.draft.table.niedoczas}
                   </TableCell>
                   <TableCell align="right">
+                    {t.settlement.draft.table.absences}
+                  </TableCell>
+                  <TableCell align="right">
                     {t.settlement.draft.table.frequencyBonus}
                   </TableCell>
                   <TableCell align="right">
-                    {t.settlement.draft.table.adjustments}
+                    {t.settlement.draft.table.transportNetto}
+                  </TableCell>
+                  <TableCell align="right">
+                    {t.settlement.draft.table.bruttoAdditions}
+                  </TableCell>
+                  <TableCell align="right">
+                    {t.settlement.draft.table.deductions}
                   </TableCell>
                   <TableCell>{t.settlement.draft.table.warnings}</TableCell>
                 </TableRow>
@@ -195,9 +251,6 @@ export function PayrollDraftPanel({
                   const employeeName = employee
                     ? `${employee.lastName} ${employee.firstName}`
                     : t.settlement.draft.table.unknownEmployee;
-                  const adjustmentBalance =
-                    draft.totals.manualIncreases - draft.totals.manualDecreases;
-
                   return (
                     <TableRow key={draft.employeeId} hover>
                       <TableCell>{draft.tetaNumber}</TableCell>
@@ -239,6 +292,17 @@ export function PayrollDraftPanel({
                         {formatHours(draft.workTime.niedoczasHours, t)}
                       </TableCell>
                       <TableCell align="right">
+                        {interpolate(t.settlement.draft.table.absenceSplit, {
+                          l4: formatPlainHours(draft.absences.l4Hours),
+                          vacation: formatPlainHours(
+                            draft.absences.vacationHours,
+                          ),
+                          other: formatPlainHours(
+                            draft.absences.otherAbsenceHours,
+                          ),
+                        })}
+                      </TableCell>
+                      <TableCell align="right">
                         {draft.totals.frequencyBonusAmount === null
                           ? t.settlement.grid.empty
                           : currencyFormatter.format(
@@ -246,7 +310,15 @@ export function PayrollDraftPanel({
                             )}
                       </TableCell>
                       <TableCell align="right">
-                        {currencyFormatter.format(adjustmentBalance)}
+                        {currencyFormatter.format(
+                          draft.components.transportAllowanceNetto,
+                        )}
+                      </TableCell>
+                      <TableCell align="right">
+                        {currencyFormatter.format(draft.totals.bruttoAdditions)}
+                      </TableCell>
+                      <TableCell align="right">
+                        {currencyFormatter.format(draft.totals.deductions)}
                       </TableCell>
                       <TableCell>
                         {draft.warnings.length === 0 ? (

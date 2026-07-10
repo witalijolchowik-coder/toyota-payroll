@@ -167,3 +167,21 @@ Authentication session.
 - Payroll draft displays work-time foundation totals.
 - No final salary calculation, closing, reports, exports, import engine,
   automatic scheduler or full classification-override UI.
+
+## Business Rules Block 9 implementation
+
+- Monthly Settlement now aggregates practical coordinator-facing components per
+  employee.
+- Work-time and absence results remain hour quantities and are not multiplied
+  by hourly rates.
+- Brutto additions, the netto transport allowance, and deductions are separated
+  to avoid presenting a false net salary.
+- Absence periods remain continuous source periods while settlement hours count
+  only working days inside the selected month and employment period.
+- Holiday bonus, transport, laundry, UDT, own-housing and company-housing
+  foundations are calculated from approved rules and payroll settings where
+  model data exists.
+- UDT and housing production eligibility/assignment remain future data-model
+  work; no fake inference from department or shift is used.
+- No ZUS, PIT, taxes, net salary, payslip, reports, payroll closing or final
+  immutable settlement snapshot.

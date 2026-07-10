@@ -27,6 +27,10 @@ const SETTING_OPTIONS: Array<{
   { value: 'transport_allowance', label: 'Dodatek transportowy' },
   { value: 'accommodation_allowance', label: 'Zakwaterowanie' },
   { value: 'udt_allowance', label: 'Dodatek UDT' },
+  { value: 'holiday_work_bonus', label: 'Dodatek za pracę w święto' },
+  { value: 'laundry_allowance', label: 'Dodatek za pranie' },
+  { value: 'own_housing_allowance', label: 'Dodatek za własne mieszkanie' },
+  { value: 'company_housing_media', label: 'Media w mieszkaniu firmowym' },
 ];
 
 interface PayrollSettingFormDialogProps {
