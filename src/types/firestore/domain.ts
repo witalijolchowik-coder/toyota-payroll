@@ -7,7 +7,10 @@ import type {
   AuditAction,
   CalculationStatus,
   DailyValueSource,
+  DepartmentId,
+  DepartmentShiftMode,
   EmployeeId,
+  EmployeeColorShift,
   ImportStatus,
   ImportType,
   IsoDate,
@@ -31,8 +34,17 @@ export interface Employee extends ModificationMetadata {
   firstName: string;
   lastName: string;
   isActive: boolean;
+  departmentId: DepartmentId | null;
+  shiftAssignment: EmployeeColorShift | null;
   employmentStartDate: Date | null;
   employmentEndDate: Date | null;
+}
+
+export interface Department extends ModificationMetadata {
+  id: DepartmentId;
+  name: string;
+  shiftMode: DepartmentShiftMode;
+  active: boolean;
 }
 
 export interface PayrollMonth extends ModificationMetadata {

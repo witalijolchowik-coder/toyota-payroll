@@ -15,6 +15,11 @@
 | 11   | Reports                                                             | Not started |
 | 12   | Month settlement and usability polish                               | Not started |
 
+Business Rules Block 7 introduced departments, Red/White/Blue employee shift
+assignment and a conservative weekly rotation foundation. This is complete as
+coordination/filtering context only; it does not implement payroll consequences
+or a full schedule planner.
+
 The Firestore-foundation sequencing amendment was approved on 2026-07-02. The
 repository must not proceed to Step 4 without explicit approval.
 

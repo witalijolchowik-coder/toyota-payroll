@@ -7,6 +7,8 @@ import type {
   AuditLogEntry,
   DailyValue,
   DailyValueDocument,
+  Department,
+  DepartmentDocument,
   Employee,
   EmployeeDocument,
   EmployeeSettlement,
@@ -46,8 +48,23 @@ export function mapEmployeeDocument(
     firstName: document.first_name,
     lastName: document.last_name,
     isActive: document.is_active,
+    departmentId: document.department_id ?? null,
+    shiftAssignment: document.shift_assignment ?? null,
     employmentStartDate: document.employment_start_date?.toDate() ?? null,
     employmentEndDate: document.employment_end_date?.toDate() ?? null,
+    ...modificationMetadata(document),
+  };
+}
+
+export function mapDepartmentDocument(
+  id: string,
+  document: DepartmentDocument,
+): Department {
+  return {
+    id,
+    name: document.name,
+    shiftMode: document.shift_mode,
+    active: document.active,
     ...modificationMetadata(document),
   };
 }

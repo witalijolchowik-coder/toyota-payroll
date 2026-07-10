@@ -7,6 +7,8 @@ This is the final MVP shape. It supersedes the earlier enterprise collection hie
 ```text
 /payrollSettings/{settingVersionId}
 
+/departments/{departmentId}
+
 /employees/{employeeId}
 
 /months/{monthId}
@@ -56,6 +58,16 @@ Names are resolved from `/employees` in the UI and are not duplicated into opera
 TETA is the only import-matching and external-report identifier. Firestore IDs must never be used for business matching or shown as coordinator-facing identity.
 
 Firestore does not provide unique field constraints. TETA uniqueness therefore requires an application or server-side check when the Employees module is implemented; rules alone cannot guarantee it safely under concurrent writes.
+
+## Departments and employee color shifts
+
+Departments are editable reference documents under `/departments`. Employee
+documents store stable `department_id` and optional `shift_assignment`
+(`RED`, `WHITE`, `BLUE`, or `null`).
+
+These fields describe current coordination context. They do not decide
+payroll-month participation and they are not duplicated into operational
+attendance, absence, adjustment, import or settlement documents.
 
 ## Month documents
 

@@ -2,8 +2,13 @@ import type { Timestamp } from 'firebase/firestore';
 
 export type TetaNumber = string;
 export type EmployeeId = string;
+export type DepartmentId = string;
 export type MonthId = string;
 export type IsoDate = string;
+
+export type EmployeeColorShift = 'RED' | 'WHITE' | 'BLUE';
+export type ActualWorkingShift = 'FIRST' | 'SECOND' | 'NIGHT';
+export type DepartmentShiftMode = 'UNKNOWN' | 'TWO_SHIFT' | 'THREE_SHIFT';
 
 export interface EmployeeReferenceDocument {
   employee_id: EmployeeId;
@@ -22,8 +27,16 @@ export interface EmployeeDocument extends ModificationMetadataDocument {
   first_name: string;
   last_name: string;
   is_active: boolean;
+  department_id?: DepartmentId | null;
+  shift_assignment?: EmployeeColorShift | null;
   employment_start_date: Timestamp | null;
   employment_end_date: Timestamp | null;
+}
+
+export interface DepartmentDocument extends ModificationMetadataDocument {
+  name: string;
+  shift_mode: DepartmentShiftMode;
+  active: boolean;
 }
 
 export type CalculationStatus =

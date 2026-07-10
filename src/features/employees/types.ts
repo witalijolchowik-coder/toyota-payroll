@@ -1,9 +1,15 @@
-import type { EmployeeCreateInput } from '../../types/firestore';
+import type {
+  DepartmentId,
+  EmployeeColorShift,
+  EmployeeCreateInput,
+} from '../../types/firestore';
 
 export interface EmployeeFormValues {
   tetaNumber: string;
   firstName: string;
   lastName: string;
+  departmentId: DepartmentId | '';
+  shiftAssignment: EmployeeColorShift | '';
   employmentStartDate: string;
   employmentEndDate: string;
 }

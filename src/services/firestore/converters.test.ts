@@ -8,6 +8,7 @@ import {
   adjustmentConverter,
   absenceConverter,
   dailyValueConverter,
+  departmentConverter,
   employeeConverter,
   monthConverter,
   payrollSettingConverter,
@@ -16,6 +17,7 @@ import {
   mapAdjustmentDocument,
   mapAbsenceDocument,
   mapDailyValueDocument,
+  mapDepartmentDocument,
   mapEmployeeDocument,
   mapMonthDocument,
   mapPayrollSettingDocument,
@@ -48,6 +50,8 @@ describe('Firestore converters', () => {
         first_name: 'Test',
         last_name: 'Employee',
         is_active: true,
+        department_id: 'metal',
+        shift_assignment: 'RED',
         employment_start_date: now,
         employment_end_date: null,
         created_at: now,
@@ -62,7 +66,31 @@ describe('Firestore converters', () => {
     expect(mapEmployeeDocument('employee-1', document)).toMatchObject({
       id: 'employee-1',
       tetaNumber: 'TETA-1001',
+      departmentId: 'metal',
+      shiftAssignment: 'RED',
       employmentStartDate: new Date('2026-07-02T08:00:00.000Z'),
+    });
+  });
+
+  it('validates and maps an editable department reference document', () => {
+    const document = departmentConverter.fromFirestore(
+      snapshot('departments/metal', {
+        name: 'Metal',
+        shift_mode: 'THREE_SHIFT',
+        active: true,
+        created_at: now,
+        created_by: 'test-user',
+        updated_at: now,
+        updated_by: 'test-user',
+      }),
+      {},
+    );
+
+    expect(mapDepartmentDocument('metal', document)).toMatchObject({
+      id: 'metal',
+      name: 'Metal',
+      shiftMode: 'THREE_SHIFT',
+      active: true,
     });
   });
 
@@ -301,6 +329,8 @@ describe('Firestore converters', () => {
       first_name: 'Test',
       last_name: 'Employee',
       is_active: true,
+      department_id: null,
+      shift_assignment: null,
       employment_start_date: null,
       employment_end_date: null,
       created_at: now,

@@ -62,6 +62,11 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Calendar Constructor toolbar for range-based hours, L4, UW, UZ, NN, and
   manual-attendance clearing in the Monthly Settlement grid.
 - Employee-focused month calendar dialog for daily review and hour editing.
+- Editable departments reference model, employee `department_id` and
+  Red/White/Blue `shift_assignment` foundation.
+- Department and zmiana filters in the Calendar Constructor.
+- Conservative weekly rotation helper types for future first/second/night
+  shift planning.
 
 ### Changed
 

@@ -7,6 +7,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  MenuItem,
   Stack,
   TextField,
   Typography,
@@ -17,7 +18,12 @@ import {
   EmployeeServiceError,
   type EmployeeServiceErrorCode,
 } from '../../services/employeesService';
-import type { Employee, EmployeeCreateInput } from '../../types/firestore';
+import type {
+  Department,
+  Employee,
+  EmployeeColorShift,
+  EmployeeCreateInput,
+} from '../../types/firestore';
 import {
   employeeInputFromForm,
   validateEmployeeInput,
@@ -30,6 +36,7 @@ import type {
 
 interface EmployeeFormDialogProps {
   employee?: Employee;
+  departments: Department[];
   onClose: () => void;
   onSubmit: (input: EmployeeCreateInput) => Promise<unknown>;
 }
@@ -43,6 +50,8 @@ function initialValues(employee?: Employee): EmployeeFormValues {
     tetaNumber: employee?.tetaNumber ?? '',
     firstName: employee?.firstName ?? '',
     lastName: employee?.lastName ?? '',
+    departmentId: employee?.departmentId ?? '',
+    shiftAssignment: employee?.shiftAssignment ?? '',
     employmentStartDate: dateInputValue(employee?.employmentStartDate ?? null),
     employmentEndDate: dateInputValue(employee?.employmentEndDate ?? null),
   };
@@ -50,6 +59,7 @@ function initialValues(employee?: Employee): EmployeeFormValues {
 
 export function EmployeeFormDialog({
   employee,
+  departments,
   onClose,
   onSubmit,
 }: EmployeeFormDialogProps) {
@@ -160,6 +170,48 @@ export function EmployeeFormDialog({
                 helperText={messageForError(errors.lastName)}
                 slotProps={{ htmlInput: { autoComplete: 'family-name' } }}
               />
+            </Stack>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <TextField
+                select
+                fullWidth
+                label={t.employees.form.department}
+                value={values.departmentId}
+                onChange={handleChange('departmentId')}
+              >
+                <MenuItem value="">
+                  {t.organization.departments.unassigned}
+                </MenuItem>
+                {departments
+                  .filter(
+                    (department) =>
+                      department.active ||
+                      department.id === values.departmentId,
+                  )
+                  .map((department) => (
+                    <MenuItem key={department.id} value={department.id}>
+                      {department.name}
+                    </MenuItem>
+                  ))}
+              </TextField>
+              <TextField
+                select
+                fullWidth
+                label={t.employees.form.shiftAssignment}
+                value={values.shiftAssignment}
+                onChange={(event) =>
+                  setValues((current) => ({
+                    ...current,
+                    shiftAssignment: event.target.value as
+                      EmployeeColorShift | '',
+                  }))
+                }
+              >
+                <MenuItem value="">{t.organization.shifts.unassigned}</MenuItem>
+                <MenuItem value="RED">{t.organization.shifts.RED}</MenuItem>
+                <MenuItem value="WHITE">{t.organization.shifts.WHITE}</MenuItem>
+                <MenuItem value="BLUE">{t.organization.shifts.BLUE}</MenuItem>
+              </TextField>
             </Stack>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <TextField

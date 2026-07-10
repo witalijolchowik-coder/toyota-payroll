@@ -1,5 +1,11 @@
 import type { AbsenceCode } from '../../utils/absences';
-import type { EmployeeId, IsoDate } from '../../types/firestore';
+import type {
+  DepartmentId,
+  Employee,
+  EmployeeColorShift,
+  EmployeeId,
+  IsoDate,
+} from '../../types/firestore';
 import type { CalendarDay } from './monthUtils';
 
 export const CALENDAR_CONSTRUCTOR_TOOLS = [
@@ -35,6 +41,11 @@ export interface CalendarConstructorGuardContext {
   isSettled: boolean;
   selectedTool: CalendarConstructorTool;
   containsOutsideEmployment: boolean;
+}
+
+export interface CalendarConstructorOrganizationFilters {
+  departmentId: DepartmentId | 'all' | 'unassigned';
+  shiftAssignment: EmployeeColorShift | 'all' | 'unassigned';
 }
 
 export type CalendarConstructorBlockedReason =
@@ -148,4 +159,29 @@ export function isAbsenceCalendarTool(
   tool: CalendarConstructorTool,
 ): tool is CalendarConstructorAbsenceTool {
   return ABSENCE_TOOL_CODES.has(tool);
+}
+
+export function employeeMatchesCalendarConstructorOrganizationFilters(
+  employee: Employee,
+  filters: CalendarConstructorOrganizationFilters,
+): boolean {
+  if (filters.departmentId === 'unassigned') {
+    if (employee.departmentId) {
+      return false;
+    }
+  } else if (
+    filters.departmentId !== 'all' &&
+    employee.departmentId !== filters.departmentId
+  ) {
+    return false;
+  }
+
+  if (filters.shiftAssignment === 'unassigned') {
+    return !employee.shiftAssignment;
+  }
+
+  return (
+    filters.shiftAssignment === 'all' ||
+    employee.shiftAssignment === filters.shiftAssignment
+  );
 }

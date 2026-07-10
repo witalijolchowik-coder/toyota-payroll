@@ -87,6 +87,8 @@ service cloud.firestore {
           'first_name',
           'last_name',
           'is_active',
+          'department_id',
+          'shift_assignment',
           'employment_start_date',
           'employment_end_date',
           'created_at',
@@ -98,8 +100,38 @@ service cloud.firestore {
         && isNonEmptyString(data.first_name)
         && isNonEmptyString(data.last_name)
         && data.is_active is bool
+        && (!data.keys().hasAny(['department_id'])
+          || isNullableString(data.department_id))
+        && (!data.keys().hasAny(['shift_assignment'])
+          || data.shift_assignment == null
+          || data.shift_assignment in ['RED', 'WHITE', 'BLUE'])
         && isNullableTimestamp(data.employment_start_date)
         && isNullableTimestamp(data.employment_end_date)
+        && hasModificationMetadata(data);
+    }
+
+    function validDepartment(data) {
+      return data.keys().hasAll([
+          'name',
+          'shift_mode',
+          'active',
+          'created_at',
+          'created_by',
+          'updated_at',
+          'updated_by'
+        ])
+        && data.keys().hasOnly([
+          'name',
+          'shift_mode',
+          'active',
+          'created_at',
+          'created_by',
+          'updated_at',
+          'updated_by'
+        ])
+        && isNonEmptyString(data.name)
+        && data.shift_mode in ['UNKNOWN', 'TWO_SHIFT', 'THREE_SHIFT']
+        && data.active is bool
         && hasModificationMetadata(data);
     }
 
@@ -355,6 +387,25 @@ service cloud.firestore {
       allow update, delete: if false;
     }
 
+    match /departments/{departmentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated()
+        && departmentId.matches('^[a-z0-9][a-z0-9-]{0,63}$')
+        && validDepartment(request.resource.data)
+        && hasCreateMetadata(request.resource.data);
+      allow update: if isAuthenticated()
+        && validDepartment(request.resource.data)
+        && hasUpdateMetadata(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'name',
+          'shift_mode',
+          'active',
+          'updated_at',
+          'updated_by'
+        ]);
+      allow delete: if false;
+    }
+
     match /employees/{employeeId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated()
@@ -368,6 +419,8 @@ service cloud.firestore {
           'first_name',
           'last_name',
           'is_active',
+          'department_id',
+          'shift_assignment',
           'employment_start_date',
           'employment_end_date',
           'updated_at',

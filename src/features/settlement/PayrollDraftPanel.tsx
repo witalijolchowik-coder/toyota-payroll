@@ -15,7 +15,7 @@ import {
 
 import { useTranslations } from '../../hooks/useTranslations';
 import { interpolate } from '../../i18n/pl';
-import type { Employee } from '../../types/firestore';
+import type { Department, Employee } from '../../types/firestore';
 import type {
   EmployeeMonthlyCalculationDraft,
   PayrollDraftWarningCode,
@@ -24,6 +24,7 @@ import type {
 interface PayrollDraftPanelProps {
   drafts: EmployeeMonthlyCalculationDraft[];
   employees: Employee[];
+  departments: Department[];
 }
 
 const currencyFormatter = new Intl.NumberFormat('pl-PL', {
@@ -34,10 +35,14 @@ const currencyFormatter = new Intl.NumberFormat('pl-PL', {
 export function PayrollDraftPanel({
   drafts,
   employees,
+  departments,
 }: PayrollDraftPanelProps) {
   const t = useTranslations();
   const employeesById = new Map(
     employees.map((employee) => [employee.id, employee]),
+  );
+  const departmentsById = new Map(
+    departments.map((department) => [department.id, department]),
   );
   const totals = drafts.reduce(
     (current, draft) => ({
@@ -126,6 +131,10 @@ export function PayrollDraftPanel({
                 <TableRow>
                   <TableCell>{t.settlement.draft.table.teta}</TableCell>
                   <TableCell>{t.settlement.draft.table.employee}</TableCell>
+                  <TableCell>{t.settlement.draft.table.department}</TableCell>
+                  <TableCell>
+                    {t.settlement.draft.table.shiftAssignment}
+                  </TableCell>
                   <TableCell align="right">
                     {t.settlement.draft.table.nominal}
                   </TableCell>
@@ -157,6 +166,17 @@ export function PayrollDraftPanel({
                     <TableRow key={draft.employeeId} hover>
                       <TableCell>{draft.tetaNumber}</TableCell>
                       <TableCell>{employeeName}</TableCell>
+                      <TableCell>
+                        {employee?.departmentId
+                          ? (departmentsById.get(employee.departmentId)?.name ??
+                            employee.departmentId)
+                          : t.organization.departments.unassigned}
+                      </TableCell>
+                      <TableCell>
+                        {employee?.shiftAssignment
+                          ? t.organization.shifts[employee.shiftAssignment]
+                          : t.organization.shifts.unassigned}
+                      </TableCell>
                       <TableCell align="right">
                         {formatHours(draft.totals.nominalHours, t)}
                       </TableCell>

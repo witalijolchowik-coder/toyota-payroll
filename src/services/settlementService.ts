@@ -14,6 +14,7 @@ import type {
   Absence,
   Adjustment,
   DailyValue,
+  Department,
   Employee,
   MonthId,
   PayrollSetting,
@@ -23,6 +24,7 @@ import { loadAbsencesOverlappingMonth } from './absencesService';
 import {
   mapAdjustmentDocument,
   mapDailyValueDocument,
+  mapDepartmentDocument,
   mapEmployeeDocument,
   mapMonthDocument,
   mapPayrollSettingDocument,
@@ -45,6 +47,7 @@ export class SettlementServiceError extends Error {
 export interface SettlementMonthData {
   month: PayrollMonth;
   employees: Employee[];
+  departments: Department[];
   dailyValues: DailyValue[];
   absences: Absence[];
   payrollSettings: PayrollSetting[];
@@ -83,12 +86,14 @@ export async function loadSettlementMonth(
   const employeesQuery = query(repositories.employees, orderBy('teta_number'));
   const [
     employeesSnapshot,
+    departmentsSnapshot,
     dailyValuesSnapshot,
     absences,
     payrollSettingsSnapshot,
     adjustmentsSnapshot,
   ] = await Promise.all([
     getDocs(employeesQuery),
+    getDocs(query(repositories.departments, orderBy('name'))),
     getDocs(monthRepository.dailyValues),
     loadAbsencesOverlappingMonth(monthId),
     getDocs(repositories.payrollSettings),
@@ -99,6 +104,9 @@ export async function loadSettlementMonth(
     month: mapMonthDocument(monthId, monthSnapshot.data()),
     employees: employeesSnapshot.docs.map((document) =>
       mapEmployeeDocument(document.id, document.data()),
+    ),
+    departments: departmentsSnapshot.docs.map((document) =>
+      mapDepartmentDocument(document.id, document.data()),
     ),
     dailyValues: dailyValuesSnapshot.docs.map((document) =>
       mapDailyValueDocument(document.id, monthId, document.data()),

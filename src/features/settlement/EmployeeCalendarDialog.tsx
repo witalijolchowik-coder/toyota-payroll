@@ -16,7 +16,12 @@ import {
 
 import { useTranslations } from '../../hooks/useTranslations';
 import { interpolate } from '../../i18n/pl';
-import type { Absence, DailyValue, Employee } from '../../types/firestore';
+import type {
+  Absence,
+  DailyValue,
+  Department,
+  Employee,
+} from '../../types/firestore';
 import { resolveGoverningAbsence } from '../../utils/absences';
 import { resolveAttendanceWarnings } from '../../utils/attendance';
 import {
@@ -32,6 +37,7 @@ interface EmployeeCalendarDialogProps {
   days: CalendarDay[];
   dailyValues: DailyValue[];
   absences: Absence[];
+  departments: Department[];
   isSettled: boolean;
   onClose: () => void;
   onEditDay: (
@@ -55,6 +61,7 @@ export function EmployeeCalendarDialog({
   days,
   dailyValues,
   absences,
+  departments,
   isSettled,
   onClose,
   onEditDay,
@@ -78,6 +85,16 @@ export function EmployeeCalendarDialog({
     ...days.map((day) => ({ kind: 'day' as const, day, id: day.isoDate })),
   ];
   const employeeName = `${employee.lastName} ${employee.firstName}`;
+  const departmentsById = new Map(
+    departments.map((department) => [department.id, department]),
+  );
+  const departmentLabel = employee.departmentId
+    ? (departmentsById.get(employee.departmentId)?.name ??
+      employee.departmentId)
+    : t.organization.departments.unassigned;
+  const shiftLabel = employee.shiftAssignment
+    ? t.organization.shifts[employee.shiftAssignment]
+    : t.organization.shifts.unassigned;
 
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="lg">
@@ -116,7 +133,13 @@ export function EmployeeCalendarDialog({
             />
             <Chip
               variant="outlined"
-              label={t.settlement.employeeCalendar.departmentUnavailable}
+              label={interpolate(
+                t.settlement.employeeCalendar.departmentAndShift,
+                {
+                  department: departmentLabel,
+                  shift: shiftLabel,
+                },
+              )}
             />
           </Stack>
 

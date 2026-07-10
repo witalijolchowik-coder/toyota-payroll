@@ -11,6 +11,7 @@ import type {
   AdjustmentDocument,
   AuditLogDocument,
   DailyValueDocument,
+  DepartmentDocument,
   EmployeeDocument,
   EmployeeSettlementDocument,
   ImportDocument,
@@ -76,6 +77,16 @@ export const employeeConverter = createConverter<EmployeeDocument>(
     first_name: readNonEmptyString(data, 'first_name', path),
     last_name: readNonEmptyString(data, 'last_name', path),
     is_active: readBoolean(data, 'is_active', path),
+    department_id:
+      readOptionalNullableString(data, 'department_id', path) ?? null,
+    shift_assignment:
+      data.shift_assignment === undefined || data.shift_assignment === null
+        ? null
+        : readEnum(data, 'shift_assignment', path, [
+            'RED',
+            'WHITE',
+            'BLUE',
+          ] as const),
     employment_start_date: readNullableTimestamp(
       data,
       'employment_start_date',
@@ -86,6 +97,19 @@ export const employeeConverter = createConverter<EmployeeDocument>(
       'employment_end_date',
       path,
     ),
+    ...metadata(data, path),
+  }),
+);
+
+export const departmentConverter = createConverter<DepartmentDocument>(
+  (data, path) => ({
+    name: readNonEmptyString(data, 'name', path),
+    shift_mode: readEnum(data, 'shift_mode', path, [
+      'UNKNOWN',
+      'TWO_SHIFT',
+      'THREE_SHIFT',
+    ] as const),
+    active: readBoolean(data, 'active', path),
     ...metadata(data, path),
   }),
 );

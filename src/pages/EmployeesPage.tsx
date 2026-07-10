@@ -10,6 +10,7 @@ import { EmployeesTable } from '../features/employees/EmployeesTable';
 import { EmployeesToolbar } from '../features/employees/EmployeesToolbar';
 import type { EmployeeStatusFilter } from '../features/employees/types';
 import { useEmployees } from '../features/employees/useEmployees';
+import { useDepartments } from '../features/settings/useDepartments';
 import { useNotification } from '../hooks/useNotification';
 import { useTranslations } from '../hooks/useTranslations';
 import {
@@ -32,6 +33,11 @@ export function EmployeesPage() {
     editEmployee,
     setEmployeeInactive,
   } = useEmployees();
+  const {
+    departments,
+    isLoading: areDepartmentsLoading,
+    error: departmentsError,
+  } = useDepartments();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<EmployeeStatusFilter>('all');
   const [formState, setFormState] = useState<EmployeeFormState>(null);
@@ -125,6 +131,14 @@ export function EmployeesPage() {
         </Alert>
       ) : null}
 
+      {departmentsError ? (
+        <Alert severity="warning">
+          <strong>{t.organization.departments.loadTitle}</strong>
+          <br />
+          {t.organization.departments.loadDescription}
+        </Alert>
+      ) : null}
+
       <Card>
         <EmployeesToolbar
           search={search}
@@ -136,7 +150,8 @@ export function EmployeesPage() {
         {isLoading || filteredEmployees.length > 0 ? (
           <EmployeesTable
             employees={filteredEmployees}
-            isLoading={isLoading}
+            departments={departments}
+            isLoading={isLoading || areDepartmentsLoading}
             onEdit={(employee) => setFormState({ mode: 'edit', employee })}
             onDeactivate={setDeactivationTarget}
           />
@@ -148,6 +163,7 @@ export function EmployeesPage() {
       {formState ? (
         <EmployeeFormDialog
           employee={formState.mode === 'edit' ? formState.employee : undefined}
+          departments={departments}
           onClose={() => setFormState(null)}
           onSubmit={handleFormSubmit}
         />

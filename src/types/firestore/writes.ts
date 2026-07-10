@@ -2,7 +2,10 @@ import type {
   AdjustmentCategory,
   AdjustmentDirection,
   AuditAction,
+  DepartmentId,
+  DepartmentShiftMode,
   EmployeeId,
+  EmployeeColorShift,
   ImportType,
   IsoDate,
   MonthId,
@@ -15,6 +18,8 @@ export interface EmployeeCreateInput {
   firstName: string;
   lastName: string;
   isActive: boolean;
+  departmentId: DepartmentId | null;
+  shiftAssignment: EmployeeColorShift | null;
   employmentStartDate: Date | null;
   employmentEndDate: Date | null;
 }
@@ -25,6 +30,18 @@ export interface MonthCreateInput {
   year: number;
   month: number;
 }
+
+export interface DepartmentCreateInput {
+  id: DepartmentId;
+  name: string;
+  shiftMode: DepartmentShiftMode;
+  active: boolean;
+}
+
+export type DepartmentUpdateInput = Pick<
+  DepartmentCreateInput,
+  'name' | 'shiftMode' | 'active'
+>;
 
 export interface EmployeeReferenceInput {
   employeeId: EmployeeId;

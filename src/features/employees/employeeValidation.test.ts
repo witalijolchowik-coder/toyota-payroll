@@ -19,6 +19,8 @@ function employee(id: string, tetaNumber: string, isActive: boolean): Employee {
     firstName: 'Jan',
     lastName: 'Kowalski',
     isActive,
+    departmentId: null,
+    shiftAssignment: null,
     employmentStartDate: null,
     employmentEndDate: null,
     ...metadata,
@@ -33,6 +35,8 @@ function validInput(
     firstName: 'Jan',
     lastName: 'Kowalski',
     isActive: true,
+    departmentId: null,
+    shiftAssignment: null,
     employmentStartDate: null,
     employmentEndDate: null,
     ...overrides,
@@ -80,6 +84,22 @@ describe('employee validation', () => {
       tetaNumber: 'TETA-1001',
       firstName: 'Jan',
       lastName: 'Kowalski',
+      departmentId: null,
+      shiftAssignment: null,
+    });
+  });
+
+  it('normalizes department assignment fields before persistence', () => {
+    expect(
+      normalizeEmployeeInput(
+        validInput({
+          departmentId: ' metal ',
+          shiftAssignment: 'RED',
+        }),
+      ),
+    ).toMatchObject({
+      departmentId: 'metal',
+      shiftAssignment: 'RED',
     });
   });
 });

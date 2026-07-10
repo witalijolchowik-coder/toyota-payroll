@@ -36,6 +36,8 @@ export const pl = {
     table: {
       teta: 'Numer TETA',
       employee: 'Pracownik',
+      department: 'Dział',
+      shiftAssignment: 'Zmiana',
       employmentPeriod: 'Okres zatrudnienia',
       status: 'Status',
       actions: 'Działania',
@@ -78,6 +80,8 @@ export const pl = {
       teta: 'Numer TETA',
       firstName: 'Imię',
       lastName: 'Nazwisko',
+      department: 'Dział',
+      shiftAssignment: 'Zmiana',
       employmentStartDate: 'Data rozpoczęcia zatrudnienia',
       employmentEndDate: 'Data zakończenia zatrudnienia',
       cancel: 'Anuluj',
@@ -98,6 +102,68 @@ export const pl = {
       created: 'Pracownik został dodany.',
       updated: 'Dane pracownika zostały zapisane.',
       deactivated: 'Pracownik został dezaktywowany.',
+    },
+  },
+  organization: {
+    departments: {
+      unassigned: 'Brak działu',
+      loadTitle: 'Nie udało się wczytać działów',
+      loadDescription:
+        'Pracownicy pozostają dostępni, ale lista działów wymaga ponownego wczytania.',
+      settingsTitle: 'Działy i zmiany',
+      settingsDescription:
+        'Słownik działów używany w pracownikach i filtrach konstruktora kalendarza.',
+      add: 'Dodaj dział',
+      emptyTitle: 'Brak działów',
+      emptyDescription:
+        'Dodaj pierwszy dział, aby przypisywać pracowników do struktury organizacyjnej.',
+      table: {
+        name: 'Dział',
+        shiftMode: 'Tryb zmianowy',
+        status: 'Status',
+        actions: 'Działania',
+        edit: 'Edytuj dział',
+      },
+      status: {
+        active: 'Aktywny',
+        inactive: 'Nieaktywny',
+      },
+      form: {
+        addTitle: 'Dodaj dział',
+        editTitle: 'Edytuj dział',
+        description:
+          'Identyfikator działu pozostaje stabilny w dokumentach pracowników. Nazwę można później poprawić.',
+        name: 'Nazwa działu',
+        shiftMode: 'Tryb zmianowy',
+        active: 'Dział aktywny',
+        generatedId: 'Identyfikator',
+        stableId: 'Identyfikator pozostaje bez zmian.',
+        required: 'Nazwa działu jest wymagana.',
+        saveFailed: 'Nie udało się zapisać działu. Sprawdź dane i uprawnienia.',
+        cancel: 'Anuluj',
+        create: 'Dodaj',
+        save: 'Zapisz zmiany',
+      },
+      notifications: {
+        created: 'Dział został dodany.',
+        updated: 'Dział został zaktualizowany.',
+      },
+    },
+    shifts: {
+      unassigned: 'Brak zmiany',
+      RED: 'Zmiana Red',
+      WHITE: 'Zmiana White',
+      BLUE: 'Zmiana Blue',
+    },
+    shiftModes: {
+      UNKNOWN: 'Nie skonfigurowano',
+      TWO_SHIFT: 'Dwuzmianowy',
+      THREE_SHIFT: 'Trzyzmianowy',
+    },
+    actualWorkingShifts: {
+      FIRST: 'Pierwsza zmiana',
+      SECOND: 'Druga zmiana',
+      NIGHT: 'Nocna zmiana',
     },
   },
   absences: {
@@ -241,6 +307,8 @@ export const pl = {
         frequencyBonus: 'Premia frekwencyjna',
         adjustments: 'Korekty',
         warnings: 'Uwagi',
+        department: 'Dział',
+        shiftAssignment: 'Zmiana',
         noWarnings: 'Brak uwag',
         unknownEmployee: 'Nieznany pracownik',
       },
@@ -290,6 +358,12 @@ export const pl = {
       },
       filters: {
         employee: 'Szukaj pracownika',
+        department: 'Dział',
+        allDepartments: 'Wszystkie działy',
+        unassignedDepartment: 'Brak działu',
+        shift: 'Zmiana',
+        allShifts: 'Wszystkie zmiany',
+        unassignedShift: 'Brak zmiany',
         type: 'Filtr kalendarza',
         all: 'Wszyscy uczestnicy miesiąca',
         conflicts: 'Konflikty',
@@ -311,6 +385,7 @@ export const pl = {
       employment: 'Zatrudnienie: {{start}} – {{end}}',
       noStartDate: 'brak daty rozpoczęcia',
       noEndDate: 'bez daty końcowej',
+      departmentAndShift: '{{department}} · {{shift}}',
       departmentUnavailable: 'Dział / zmiana: brak w modelu danych',
       helper:
         'Kliknij dzień, aby edytować godziny. Nieobecności dodawaj z konstruktora kalendarza w widoku ogólnym.',

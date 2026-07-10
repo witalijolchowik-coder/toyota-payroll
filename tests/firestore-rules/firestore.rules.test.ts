@@ -52,6 +52,8 @@ async function seedEmployee(employeeId: string) {
       first_name: 'Jan',
       last_name: 'Kowalski',
       is_active: true,
+      department_id: null,
+      shift_assignment: null,
       employment_start_date: null,
       employment_end_date: null,
       created_at: new Date('2026-07-01T00:00:00.000Z'),
@@ -95,6 +97,8 @@ describe('Firestore security rules', () => {
         first_name: 'Test',
         last_name: 'Employee',
         is_active: true,
+        department_id: 'metal',
+        shift_assignment: 'RED',
         employment_start_date: null,
         employment_end_date: null,
         ...modificationMetadata(uid),
@@ -111,6 +115,8 @@ describe('Firestore security rules', () => {
     await assertSucceeds(
       updateDoc(employee, {
         first_name: 'Anna',
+        department_id: 'szwalnia',
+        shift_assignment: 'WHITE',
         updated_at: serverTimestamp(),
         updated_by: uid,
       }),
@@ -135,6 +141,8 @@ describe('Firestore security rules', () => {
         first_name: 'Jan',
         last_name: 'Kowalski',
         is_active: true,
+        department_id: null,
+        shift_assignment: null,
         employment_start_date: null,
         employment_end_date: null,
         ...modificationMetadata(uid),
@@ -147,9 +155,59 @@ describe('Firestore security rules', () => {
         first_name: 'Anna',
         last_name: 'Nowak',
         is_active: true,
+        department_id: null,
+        shift_assignment: null,
         employment_start_date: null,
         employment_end_date: null,
         ...modificationMetadata('another-user'),
+      }),
+    );
+  });
+
+  it('allows authenticated department create and safe edits but denies deletion', async () => {
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const department = doc(firestore, 'departments/metal');
+
+    await assertSucceeds(
+      setDoc(department, {
+        name: 'Metal',
+        shift_mode: 'THREE_SHIFT',
+        active: true,
+        ...modificationMetadata(uid),
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(department, {
+        name: 'Metal produkcja',
+        active: false,
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertFails(deleteDoc(department));
+  });
+
+  it('rejects invalid department shape and unauthenticated access', async () => {
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const anonymous = testEnvironment.unauthenticatedContext().firestore();
+
+    await assertFails(getDoc(doc(anonymous, 'departments/metal')));
+    await assertFails(
+      setDoc(doc(firestore, 'departments/-invalid'), {
+        name: 'Invalid',
+        shift_mode: 'UNKNOWN',
+        active: true,
+        ...modificationMetadata(uid),
+      }),
+    );
+    await assertFails(
+      setDoc(doc(firestore, 'departments/metal'), {
+        name: 'Metal',
+        shift_mode: 'DAY_ONLY',
+        active: true,
+        ...modificationMetadata(uid),
       }),
     );
   });

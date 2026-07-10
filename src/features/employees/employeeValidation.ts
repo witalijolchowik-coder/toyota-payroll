@@ -3,6 +3,7 @@ import type {
   EmployeeCreateInput,
   EmployeeId,
 } from '../../types/firestore';
+import { isEmployeeColorShift } from '../../utils/organization';
 import type { EmployeeFormValues, EmployeeValidationErrors } from './types';
 
 function dateFromInput(value: string): Date | null {
@@ -21,6 +22,8 @@ export function normalizeEmployeeInput(
     tetaNumber: normalizeTetaNumber(input.tetaNumber),
     firstName: input.firstName.trim(),
     lastName: input.lastName.trim(),
+    departmentId: input.departmentId?.trim() || null,
+    shiftAssignment: input.shiftAssignment ?? null,
   };
 }
 
@@ -33,6 +36,10 @@ export function employeeInputFromForm(
     firstName: values.firstName,
     lastName: values.lastName,
     isActive,
+    departmentId: values.departmentId || null,
+    shiftAssignment: isEmployeeColorShift(values.shiftAssignment)
+      ? values.shiftAssignment
+      : null,
     employmentStartDate: dateFromInput(values.employmentStartDate),
     employmentEndDate: dateFromInput(values.employmentEndDate),
   });

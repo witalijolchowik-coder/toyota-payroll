@@ -17,10 +17,11 @@ import {
 
 import { useTranslations } from '../../hooks/useTranslations';
 import { interpolate } from '../../i18n/pl';
-import type { Employee } from '../../types/firestore';
+import type { Department, Employee } from '../../types/firestore';
 
 interface EmployeesTableProps {
   employees: Employee[];
+  departments: Department[];
   isLoading: boolean;
   onEdit: (employee: Employee) => void;
   onDeactivate: (employee: Employee) => void;
@@ -34,11 +35,15 @@ const dateFormatter = new Intl.DateTimeFormat('pl-PL', {
 
 export function EmployeesTable({
   employees,
+  departments,
   isLoading,
   onEdit,
   onDeactivate,
 }: EmployeesTableProps) {
   const t = useTranslations();
+  const departmentsById = new Map(
+    departments.map((department) => [department.id, department]),
+  );
 
   return (
     <TableContainer>
@@ -47,6 +52,8 @@ export function EmployeesTable({
           <TableRow>
             <TableCell>{t.employees.table.teta}</TableCell>
             <TableCell>{t.employees.table.employee}</TableCell>
+            <TableCell>{t.employees.table.department}</TableCell>
+            <TableCell>{t.employees.table.shiftAssignment}</TableCell>
             <TableCell>{t.employees.table.employmentPeriod}</TableCell>
             <TableCell>{t.employees.table.status}</TableCell>
             <TableCell align="right">{t.employees.table.actions}</TableCell>
@@ -56,7 +63,7 @@ export function EmployeesTable({
           {isLoading
             ? Array.from({ length: 4 }, (_, index) => (
                 <TableRow key={index}>
-                  {Array.from({ length: 5 }, (__, cellIndex) => (
+                  {Array.from({ length: 7 }, (__, cellIndex) => (
                     <TableCell key={cellIndex}>
                       <Skeleton />
                     </TableCell>
@@ -73,6 +80,17 @@ export function EmployeesTable({
                       </Typography>
                     </TableCell>
                     <TableCell>{employeeName}</TableCell>
+                    <TableCell>
+                      {employee.departmentId
+                        ? (departmentsById.get(employee.departmentId)?.name ??
+                          employee.departmentId)
+                        : t.organization.departments.unassigned}
+                    </TableCell>
+                    <TableCell>
+                      {employee.shiftAssignment
+                        ? t.organization.shifts[employee.shiftAssignment]
+                        : t.organization.shifts.unassigned}
+                    </TableCell>
                     <TableCell>{formatEmploymentPeriod(employee, t)}</TableCell>
                     <TableCell>
                       <Chip

@@ -24,6 +24,8 @@ function employee(overrides: Partial<Employee> = {}): Employee {
     firstName: 'Jan',
     lastName: 'Kowalski',
     isActive: true,
+    departmentId: null,
+    shiftAssignment: null,
     employmentStartDate: new Date('2026-01-01T00:00:00.000Z'),
     employmentEndDate: null,
     ...metadata,

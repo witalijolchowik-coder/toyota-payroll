@@ -28,13 +28,18 @@ import {
   clearManualDailyValue,
   saveManualDailyValue,
 } from '../../services/dailyValueService';
-import type { Employee, MonthId } from '../../types/firestore';
+import type {
+  Employee,
+  EmployeeColorShift,
+  MonthId,
+} from '../../types/firestore';
 import { calculateMonthlyDrafts } from '../../utils/payroll';
 import { CalendarConstructorToolbar } from './CalendarConstructorToolbar';
 import {
   calendarConstructorBlockedReason,
   calendarToolOperation,
   datesInRangeSelection,
+  employeeMatchesCalendarConstructorOrganizationFilters,
   updateSingleEmployeeRangeSelection,
   type CalendarConstructorTool,
   type CalendarRangeSelection,
@@ -86,6 +91,10 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
   const [constructorNote, setConstructorNote] = useState('');
   const [isApplyingConstructor, setIsApplyingConstructor] = useState(false);
   const [employeeSearch, setEmployeeSearch] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState('all');
+  const [shiftFilter, setShiftFilter] = useState<
+    EmployeeColorShift | 'all' | 'unassigned'
+  >('all');
   const [calendarFilter, setCalendarFilter] = useState('all');
   const [focusedEmployee, setFocusedEmployee] = useState<Employee | null>(null);
 
@@ -206,6 +215,15 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
         'pl-PL',
       );
     if (search && !employeeName.includes(search)) {
+      return false;
+    }
+
+    if (
+      !employeeMatchesCalendarConstructorOrganizationFilters(employee, {
+        departmentId: departmentFilter,
+        shiftAssignment: shiftFilter,
+      })
+    ) {
       return false;
     }
 
@@ -430,6 +448,51 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
                 />
                 <TextField
                   select
+                  label={t.settlement.constructor.filters.department}
+                  value={departmentFilter}
+                  onChange={(event) => setDepartmentFilter(event.target.value)}
+                  size="small"
+                  sx={{ minWidth: { md: 220 } }}
+                >
+                  <MenuItem value="all">
+                    {t.settlement.constructor.filters.allDepartments}
+                  </MenuItem>
+                  <MenuItem value="unassigned">
+                    {t.settlement.constructor.filters.unassignedDepartment}
+                  </MenuItem>
+                  {data.departments.map((department) => (
+                    <MenuItem key={department.id} value={department.id}>
+                      {department.name}
+                    </MenuItem>
+                  ))}
+                </TextField>
+                <TextField
+                  select
+                  label={t.settlement.constructor.filters.shift}
+                  value={shiftFilter}
+                  onChange={(event) =>
+                    setShiftFilter(
+                      event.target.value as
+                        EmployeeColorShift | 'all' | 'unassigned',
+                    )
+                  }
+                  size="small"
+                  sx={{ minWidth: { md: 200 } }}
+                >
+                  <MenuItem value="all">
+                    {t.settlement.constructor.filters.allShifts}
+                  </MenuItem>
+                  <MenuItem value="unassigned">
+                    {t.settlement.constructor.filters.unassignedShift}
+                  </MenuItem>
+                  <MenuItem value="RED">{t.organization.shifts.RED}</MenuItem>
+                  <MenuItem value="WHITE">
+                    {t.organization.shifts.WHITE}
+                  </MenuItem>
+                  <MenuItem value="BLUE">{t.organization.shifts.BLUE}</MenuItem>
+                </TextField>
+                <TextField
+                  select
                   label={t.settlement.constructor.filters.type}
                   value={calendarFilter}
                   onChange={(event) => setCalendarFilter(event.target.value)}
@@ -472,6 +535,7 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
           <PayrollDraftPanel
             drafts={filteredDrafts}
             employees={filteredEmployees}
+            departments={data.departments}
           />
         </>
       ) : (
@@ -531,6 +595,7 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
           days={days}
           dailyValues={participatingDailyValues}
           absences={participatingAbsences}
+          departments={data.departments}
           isSettled={data.month.isSettled}
           onClose={() => setFocusedEmployee(null)}
           onEditDay={(day, value, hasGoverningAbsence) =>

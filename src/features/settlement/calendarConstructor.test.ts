@@ -1,12 +1,15 @@
 import type { CalendarDay } from './monthUtils';
+import type { Employee } from '../../types/firestore';
 import {
   calendarConstructorBlockedReason,
   calendarToolOperation,
   datesInRangeSelection,
+  employeeMatchesCalendarConstructorOrganizationFilters,
   isDateInRangeSelection,
   isSupportedCalendarConstructorTool,
   updateSingleEmployeeRangeSelection,
 } from './calendarConstructor';
+import { employeeParticipatesInMonth } from './monthUtils';
 
 function day(isoDate: string): CalendarDay {
   return {
@@ -17,6 +20,29 @@ function day(isoDate: string): CalendarDay {
     isHoliday: false,
     isWorkingDay: true,
     isFuture: false,
+  };
+}
+
+const metadata = {
+  createdAt: new Date('2026-01-01T00:00:00.000Z'),
+  createdBy: 'test-user',
+  updatedAt: new Date('2026-01-01T00:00:00.000Z'),
+  updatedBy: 'test-user',
+};
+
+function employee(overrides: Partial<Employee> = {}): Employee {
+  return {
+    id: 'employee-1',
+    tetaNumber: 'TETA-1001',
+    firstName: 'Jan',
+    lastName: 'Kowalski',
+    isActive: true,
+    departmentId: null,
+    shiftAssignment: null,
+    employmentStartDate: new Date('2026-07-01T00:00:00.000Z'),
+    employmentEndDate: null,
+    ...metadata,
+    ...overrides,
   };
 }
 
@@ -129,5 +155,73 @@ describe('calendar constructor guards', () => {
         containsOutsideEmployment: true,
       }),
     ).toBe('outside-employment');
+  });
+});
+
+describe('calendar constructor organization filters', () => {
+  it('filters employees by department and color shift assignment', () => {
+    const metalRed = employee({
+      departmentId: 'metal',
+      shiftAssignment: 'RED',
+    });
+
+    expect(
+      employeeMatchesCalendarConstructorOrganizationFilters(metalRed, {
+        departmentId: 'metal',
+        shiftAssignment: 'RED',
+      }),
+    ).toBe(true);
+    expect(
+      employeeMatchesCalendarConstructorOrganizationFilters(metalRed, {
+        departmentId: 'szwalnia',
+        shiftAssignment: 'RED',
+      }),
+    ).toBe(false);
+    expect(
+      employeeMatchesCalendarConstructorOrganizationFilters(metalRed, {
+        departmentId: 'metal',
+        shiftAssignment: 'BLUE',
+      }),
+    ).toBe(false);
+  });
+
+  it('supports unassigned department and shift filters', () => {
+    const unassigned = employee();
+
+    expect(
+      employeeMatchesCalendarConstructorOrganizationFilters(unassigned, {
+        departmentId: 'unassigned',
+        shiftAssignment: 'unassigned',
+      }),
+    ).toBe(true);
+    expect(
+      employeeMatchesCalendarConstructorOrganizationFilters(
+        employee({ departmentId: 'metal' }),
+        {
+          departmentId: 'unassigned',
+          shiftAssignment: 'all',
+        },
+      ),
+    ).toBe(false);
+  });
+
+  it('does not change payroll month participation based on department or shift', () => {
+    const inactiveMetalBlue = employee({
+      isActive: false,
+      departmentId: 'metal',
+      shiftAssignment: 'BLUE',
+      employmentStartDate: new Date('2026-06-15T00:00:00.000Z'),
+      employmentEndDate: new Date('2026-07-10T00:00:00.000Z'),
+    });
+
+    expect(
+      employeeParticipatesInMonth(inactiveMetalBlue, {
+        monthId: '2026-07',
+        year: 2026,
+        month: 7,
+        start: new Date('2026-07-01T00:00:00.000Z'),
+        end: new Date('2026-07-31T23:59:59.999Z'),
+      }),
+    ).toBe(true);
   });
 });

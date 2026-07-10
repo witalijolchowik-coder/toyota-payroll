@@ -13,6 +13,7 @@ import type {
   AdjustmentDocument,
   AuditLogDocument,
   DailyValueDocument,
+  DepartmentDocument,
   EmployeeDocument,
   EmployeeSettlementDocument,
   ImportDocument,
@@ -25,6 +26,7 @@ import {
   adjustmentConverter,
   auditLogConverter,
   dailyValueConverter,
+  departmentConverter,
   employeeConverter,
   employeeSettlementConverter,
   importConverter,
@@ -45,6 +47,7 @@ export interface MonthRepositoryBoundary {
 
 export interface FirestoreRepositoryBoundaries {
   readonly payrollSettings: CollectionReference<PayrollSettingDocument>;
+  readonly departments: CollectionReference<DepartmentDocument>;
   readonly employees: CollectionReference<EmployeeDocument>;
   employee(employeeId: string): DocumentReference<EmployeeDocument>;
   readonly months: CollectionReference<MonthDocument>;
@@ -65,6 +68,10 @@ export function createFirestoreRepositoryBoundaries(
     firestore,
     firestorePaths.employees,
   ).withConverter(employeeConverter);
+  const departments = collection(
+    firestore,
+    firestorePaths.departments,
+  ).withConverter(departmentConverter);
   const months = collection(firestore, firestorePaths.months).withConverter(
     monthConverter,
   );
@@ -80,6 +87,7 @@ export function createFirestoreRepositoryBoundaries(
 
   return {
     payrollSettings,
+    departments,
     employees,
     employee(employeeId) {
       return doc(firestore, firestorePaths.employee(employeeId)).withConverter(
