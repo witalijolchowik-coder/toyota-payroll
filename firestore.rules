@@ -320,6 +320,59 @@ service cloud.firestore {
         && hasModificationMetadata(data);
     }
 
+    function validEmployeeEntitlement(data) {
+      return data.keys().hasAll([
+          'employee_id',
+          'teta_number',
+          'type',
+          'accommodation_variant_key',
+          'valid_from',
+          'valid_to',
+          'status',
+          'note',
+          'created_at',
+          'created_by',
+          'updated_at',
+          'updated_by'
+        ])
+        && data.keys().hasOnly([
+          'employee_id',
+          'teta_number',
+          'type',
+          'accommodation_variant_key',
+          'valid_from',
+          'valid_to',
+          'status',
+          'note',
+          'created_at',
+          'created_by',
+          'updated_at',
+          'updated_by'
+        ])
+        && hasEmployeeReference(data)
+        && data.type in [
+          'UDT',
+          'OWN_HOUSING_ALLOWANCE',
+          'COMPANY_ACCOMMODATION'
+        ]
+        && (
+          (
+            data.type == 'COMPANY_ACCOMMODATION'
+            && isNonEmptyString(data.accommodation_variant_key)
+          )
+          || (
+            data.type != 'COMPANY_ACCOMMODATION'
+            && data.accommodation_variant_key == null
+          )
+        )
+        && isIsoDate(data.valid_from)
+        && (data.valid_to == null || isIsoDate(data.valid_to))
+        && (data.valid_to == null || data.valid_to >= data.valid_from)
+        && data.status in ['ACTIVE', 'CANCELLED']
+        && isNullableString(data.note)
+        && hasModificationMetadata(data);
+    }
+
     function hasCanonicalAbsenceOwner(monthId, data) {
       return data.start_date[0:7] == monthId;
     }
@@ -468,6 +521,38 @@ service cloud.firestore {
           'updated_at',
           'updated_by'
         ]);
+      allow delete: if false;
+    }
+
+    match /employeeEntitlements/{entitlementId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated()
+        && validEmployeeEntitlement(request.resource.data)
+        && request.resource.data.status == 'ACTIVE'
+        && hasCreateMetadata(request.resource.data);
+      allow update: if isAuthenticated()
+        && resource.data.status == 'ACTIVE'
+        && validEmployeeEntitlement(request.resource.data)
+        && hasUpdateMetadata(request.resource.data)
+        && (
+          (
+            request.resource.data.status == 'ACTIVE'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'valid_to',
+              'note',
+              'updated_at',
+              'updated_by'
+            ])
+          )
+          || (
+            request.resource.data.status == 'CANCELLED'
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'status',
+              'updated_at',
+              'updated_by'
+            ])
+          )
+        );
       allow delete: if false;
     }
 

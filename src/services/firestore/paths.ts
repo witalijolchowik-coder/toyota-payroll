@@ -46,6 +46,13 @@ export const firestorePaths = {
   employee(employeeId: string) {
     return `employees/${assertPathSegment(employeeId, 'employeeId')}`;
   },
+  employeeEntitlements: 'employeeEntitlements',
+  employeeEntitlement(entitlementId: string) {
+    return `employeeEntitlements/${assertPathSegment(
+      entitlementId,
+      'entitlementId',
+    )}`;
+  },
   departments: 'departments',
   department(departmentId: string) {
     return `departments/${assertPathSegment(departmentId, 'departmentId')}`;

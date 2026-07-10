@@ -7,6 +7,7 @@ import type {
   DepartmentShiftMode,
   EmployeeId,
   EmployeeColorShift,
+  EmployeeEntitlementType,
   ImportType,
   IsoDate,
   MonthId,
@@ -84,6 +85,19 @@ export interface AbsenceCreateInput extends EmployeeReferenceInput {
 export type AbsenceUpdateInput = Pick<
   AbsenceCreateInput,
   'absenceCode' | 'startDate' | 'endDate' | 'hoursPerDay' | 'note'
+>;
+
+export interface EmployeeEntitlementCreateInput extends EmployeeReferenceInput {
+  type: EmployeeEntitlementType;
+  accommodationVariantKey: string | null;
+  validFrom: IsoDate;
+  validTo: IsoDate | null;
+  note: string | null;
+}
+
+export type EmployeeEntitlementUpdateInput = Pick<
+  EmployeeEntitlementCreateInput,
+  'validTo' | 'note'
 >;
 
 export interface PayrollSettingCreateInput {

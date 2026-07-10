@@ -125,6 +125,26 @@ export interface AbsenceDocument
   note: string | null;
 }
 
+export const EMPLOYEE_ENTITLEMENT_TYPES = [
+  'UDT',
+  'OWN_HOUSING_ALLOWANCE',
+  'COMPANY_ACCOMMODATION',
+] as const;
+
+export type EmployeeEntitlementType =
+  (typeof EMPLOYEE_ENTITLEMENT_TYPES)[number];
+export type EmployeeEntitlementStatus = 'ACTIVE' | 'CANCELLED';
+
+export interface EmployeeEntitlementDocument
+  extends EmployeeReferenceDocument, ModificationMetadataDocument {
+  type: EmployeeEntitlementType;
+  accommodation_variant_key: string | null;
+  valid_from: IsoDate;
+  valid_to: IsoDate | null;
+  status: EmployeeEntitlementStatus;
+  note: string | null;
+}
+
 export const PAYROLL_SETTING_KEYS = [
   'frequency_bonus',
   'transport_allowance',

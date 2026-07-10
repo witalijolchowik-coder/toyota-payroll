@@ -4,23 +4,34 @@ import { Alert, Button, Card, Divider, Stack } from '@mui/material';
 
 import { PageHeader } from '../components/layout/PageHeader';
 import { DeactivateEmployeeDialog } from '../features/employees/DeactivateEmployeeDialog';
+import { EmployeeEntitlementFormDialog } from '../features/employees/EmployeeEntitlementFormDialog';
+import { EmployeeEntitlementsPanel } from '../features/employees/EmployeeEntitlementsPanel';
 import { EmployeeFormDialog } from '../features/employees/EmployeeFormDialog';
 import { EmployeesEmptyState } from '../features/employees/EmployeesEmptyState';
 import { EmployeesTable } from '../features/employees/EmployeesTable';
 import { EmployeesToolbar } from '../features/employees/EmployeesToolbar';
 import type { EmployeeStatusFilter } from '../features/employees/types';
 import { useEmployees } from '../features/employees/useEmployees';
+import { useEmployeeEntitlements } from '../features/employees/useEmployeeEntitlements';
 import { useDepartments } from '../features/settings/useDepartments';
+import { usePayrollSettings } from '../features/settings/usePayrollSettings';
 import { useNotification } from '../hooks/useNotification';
 import { useTranslations } from '../hooks/useTranslations';
 import {
   EmployeeServiceError,
   type EmployeeServiceErrorCode,
 } from '../services/employeesService';
-import type { Employee, EmployeeCreateInput } from '../types/firestore';
+import type {
+  Employee,
+  EmployeeCreateInput,
+  EmployeeEntitlement,
+  EmployeeEntitlementCreateInput,
+} from '../types/firestore';
 
 type EmployeeFormState =
   { mode: 'add' } | { mode: 'edit'; employee: Employee } | null;
+type EntitlementFormState =
+  { mode: 'add' } | { mode: 'edit'; entitlement: EmployeeEntitlement } | null;
 
 export function EmployeesPage() {
   const t = useTranslations();
@@ -38,9 +49,21 @@ export function EmployeesPage() {
     isLoading: areDepartmentsLoading,
     error: departmentsError,
   } = useDepartments();
+  const { settings: payrollSettings, isLoading: arePayrollSettingsLoading } =
+    usePayrollSettings();
+  const {
+    entitlements,
+    isLoading: areEntitlementsLoading,
+    error: entitlementsError,
+    addEntitlement,
+    editEntitlement,
+    cancelEntitlement,
+  } = useEmployeeEntitlements();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<EmployeeStatusFilter>('all');
   const [formState, setFormState] = useState<EmployeeFormState>(null);
+  const [entitlementFormState, setEntitlementFormState] =
+    useState<EntitlementFormState>(null);
   const [deactivationTarget, setDeactivationTarget] = useState<Employee | null>(
     null,
   );
@@ -104,6 +127,54 @@ export function EmployeesPage() {
     }
   };
 
+  const accommodationVariants = useMemo(
+    () =>
+      payrollSettings.filter(
+        (setting) =>
+          setting.active &&
+          setting.settingKey === 'accommodation_allowance' &&
+          setting.variantKey,
+      ),
+    [payrollSettings],
+  );
+
+  const handleEntitlementSubmit = async (
+    input: EmployeeEntitlementCreateInput,
+  ) => {
+    if (entitlementFormState?.mode === 'edit') {
+      await editEntitlement(entitlementFormState.entitlement.id, {
+        validTo: input.validTo,
+        note: input.note,
+      });
+      notify({
+        message: t.employees.entitlements.notifications.updated,
+        severity: 'success',
+      });
+      return;
+    }
+
+    await addEntitlement(input);
+    notify({
+      message: t.employees.entitlements.notifications.created,
+      severity: 'success',
+    });
+  };
+
+  const handleCancelEntitlement = async (entitlement: EmployeeEntitlement) => {
+    try {
+      await cancelEntitlement(entitlement.id);
+      notify({
+        message: t.employees.entitlements.notifications.cancelled,
+        severity: 'success',
+      });
+    } catch {
+      notify({
+        message: t.employees.entitlements.errors.cancelFailed,
+        severity: 'error',
+      });
+    }
+  };
+
   const hasFilters = Boolean(search.trim()) || status !== 'all';
 
   return (
@@ -160,6 +231,19 @@ export function EmployeesPage() {
         )}
       </Card>
 
+      <EmployeeEntitlementsPanel
+        employees={employees}
+        entitlements={entitlements}
+        accommodationVariants={accommodationVariants}
+        isLoading={areEntitlementsLoading || arePayrollSettingsLoading}
+        error={entitlementsError}
+        onAdd={() => setEntitlementFormState({ mode: 'add' })}
+        onEdit={(entitlement) =>
+          setEntitlementFormState({ mode: 'edit', entitlement })
+        }
+        onCancel={(entitlement) => void handleCancelEntitlement(entitlement)}
+      />
+
       {formState ? (
         <EmployeeFormDialog
           employee={formState.mode === 'edit' ? formState.employee : undefined}
@@ -175,6 +259,21 @@ export function EmployeesPage() {
           isSubmitting={isDeactivating}
           onClose={() => setDeactivationTarget(null)}
           onConfirm={handleDeactivate}
+        />
+      ) : null}
+
+      {entitlementFormState ? (
+        <EmployeeEntitlementFormDialog
+          entitlement={
+            entitlementFormState.mode === 'edit'
+              ? entitlementFormState.entitlement
+              : undefined
+          }
+          employees={employees}
+          entitlements={entitlements}
+          accommodationVariants={accommodationVariants}
+          onClose={() => setEntitlementFormState(null)}
+          onSubmit={handleEntitlementSubmit}
         />
       ) : null}
     </Stack>

@@ -164,6 +164,88 @@ describe('Firestore security rules', () => {
     );
   });
 
+  it('allows employee entitlement create, period edit and cancellation but denies deletion', async () => {
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const entitlement = doc(firestore, 'employeeEntitlements/udt-1');
+
+    await assertSucceeds(
+      setDoc(entitlement, {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        type: 'UDT',
+        accommodation_variant_key: null,
+        valid_from: '2026-06-01',
+        valid_to: null,
+        status: 'ACTIVE',
+        note: null,
+        ...modificationMetadata(uid),
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(entitlement, {
+        valid_to: '2026-12-31',
+        note: 'Koniec uprawnienia',
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(entitlement, {
+        status: 'CANCELLED',
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertFails(deleteDoc(entitlement));
+  });
+
+  it('rejects invalid employee entitlement shape and immutable identity updates', async () => {
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const entitlement = doc(
+      firestore,
+      'employeeEntitlements/company-accommodation-1',
+    );
+
+    await assertFails(
+      setDoc(entitlement, {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        type: 'COMPANY_ACCOMMODATION',
+        accommodation_variant_key: null,
+        valid_from: '2026-06-01',
+        valid_to: null,
+        status: 'ACTIVE',
+        note: null,
+        ...modificationMetadata(uid),
+      }),
+    );
+
+    await assertSucceeds(
+      setDoc(entitlement, {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        type: 'COMPANY_ACCOMMODATION',
+        accommodation_variant_key: 'type-a',
+        valid_from: '2026-06-01',
+        valid_to: null,
+        status: 'ACTIVE',
+        note: null,
+        ...modificationMetadata(uid),
+      }),
+    );
+
+    await assertFails(
+      updateDoc(entitlement, {
+        type: 'OWN_HOUSING_ALLOWANCE',
+        accommodation_variant_key: null,
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+  });
+
   it('allows authenticated department create and safe edits but denies deletion', async () => {
     const uid = 'coordinator-1';
     const firestore = testEnvironment.authenticatedContext(uid).firestore();

@@ -16,6 +16,7 @@ import type {
   DailyValue,
   Department,
   Employee,
+  EmployeeEntitlement,
   MonthId,
   PayrollSetting,
   PayrollMonth,
@@ -26,6 +27,7 @@ import {
   mapDailyValueDocument,
   mapDepartmentDocument,
   mapEmployeeDocument,
+  mapEmployeeEntitlementDocument,
   mapMonthDocument,
   mapPayrollSettingDocument,
 } from './firestore/mappers';
@@ -47,6 +49,7 @@ export class SettlementServiceError extends Error {
 export interface SettlementMonthData {
   month: PayrollMonth;
   employees: Employee[];
+  employeeEntitlements: EmployeeEntitlement[];
   departments: Department[];
   dailyValues: DailyValue[];
   absences: Absence[];
@@ -86,6 +89,7 @@ export async function loadSettlementMonth(
   const employeesQuery = query(repositories.employees, orderBy('teta_number'));
   const [
     employeesSnapshot,
+    employeeEntitlementsSnapshot,
     departmentsSnapshot,
     dailyValuesSnapshot,
     absences,
@@ -93,6 +97,7 @@ export async function loadSettlementMonth(
     adjustmentsSnapshot,
   ] = await Promise.all([
     getDocs(employeesQuery),
+    getDocs(repositories.employeeEntitlements),
     getDocs(query(repositories.departments, orderBy('name'))),
     getDocs(monthRepository.dailyValues),
     loadAbsencesOverlappingMonth(monthId),
@@ -104,6 +109,9 @@ export async function loadSettlementMonth(
     month: mapMonthDocument(monthId, monthSnapshot.data()),
     employees: employeesSnapshot.docs.map((document) =>
       mapEmployeeDocument(document.id, document.data()),
+    ),
+    employeeEntitlements: employeeEntitlementsSnapshot.docs.map((document) =>
+      mapEmployeeEntitlementDocument(document.id, document.data()),
     ),
     departments: departmentsSnapshot.docs.map((document) =>
       mapDepartmentDocument(document.id, document.data()),

@@ -24,6 +24,7 @@ import {
   STANDARD_WORKING_DAY_HOURS,
   type PayrollCalendarOptions,
 } from './calendar';
+import type { EmployeeSettlementEntitlements } from './employeeEntitlements';
 import {
   calculateEmployeeNominalHours,
   employeeParticipatesInPayrollMonth,
@@ -49,7 +50,11 @@ export type PayrollDraftWarningCode =
   | 'absence-outside-employment'
   | 'ambiguous-absence'
   | 'unresolved-frequency-bonus-setting'
-  | 'unresolved-work-time-classification';
+  | 'unresolved-work-time-classification'
+  | 'housing-entitlement-conflict'
+  | 'company-accommodation-missing-variant'
+  | 'unresolved-company-accommodation-variant'
+  | 'unresolved-own-housing-setting';
 
 export interface PayrollDraftWarning {
   code: PayrollDraftWarningCode;
@@ -87,16 +92,6 @@ export interface PayrollDraftFrequencyBonus {
   l4RecordCount: number;
   hasNnAbsence: boolean;
   reason: ReturnType<typeof calculateFrequencyBonus>['reason'];
-}
-
-export interface EmployeeSettlementEntitlements {
-  udtEligible?: boolean;
-  ownHousingAllowanceEligible?: boolean;
-  companyAccommodation?: {
-    variantKey?: string | null;
-    contractStartDate?: Date | null;
-    contractEndDate?: Date | null;
-  } | null;
 }
 
 export interface EmployeeMonthlyCalculationDraft {
@@ -214,7 +209,6 @@ const DEFAULT_HOLIDAY_WORK_BONUS = 300;
 const DEFAULT_UDT_ALLOWANCE = 300;
 const DEFAULT_LAUNDRY_ALLOWANCE = 40;
 const DEFAULT_COMPANY_HOUSING_MEDIA = 500;
-const DEFAULT_COMPANY_HOUSING_RENT = 150;
 
 function employmentPeriod(employee: Employee): EmploymentPeriod {
   return {
@@ -403,7 +397,16 @@ function calculateCompanyAccommodationDeduction({
 }) {
   const assignment = entitlements?.companyAccommodation;
   if (!assignment) {
-    return { media: 0, rent: 0, total: 0 };
+    return { media: 0, rent: 0, total: 0, warnings: [] };
+  }
+
+  if (!assignment.variantKey) {
+    return {
+      media: 0,
+      rent: 0,
+      total: 0,
+      warnings: ['company-accommodation-missing-variant'] as const,
+    };
   }
 
   const range = getPayrollMonthDateRange(monthId);
@@ -424,28 +427,38 @@ function calculateCompanyAccommodationDeduction({
     monthEnd,
   );
   if (!overlap) {
-    return { media: 0, rent: 0, total: 0 };
+    return { media: 0, rent: 0, total: 0, warnings: [] };
   }
 
   const chargedDays = countCalendarDaysInclusive(overlap.start, overlap.end);
   const monthDays = countCalendarDaysInclusive(monthStart, monthEnd);
+  const rentSetting = resolveEffectivePayrollSetting(
+    settings,
+    'accommodation_allowance',
+    monthId,
+    assignment.variantKey,
+  );
+
+  if (!rentSetting) {
+    return {
+      media: 0,
+      rent: 0,
+      total: 0,
+      warnings: ['unresolved-company-accommodation-variant'] as const,
+    };
+  }
+
   const mediaMonthly = configuredAmount(
     settings,
     'company_housing_media',
     monthId,
     DEFAULT_COMPANY_HOUSING_MEDIA,
   );
-  const rentMonthly = configuredAmount(
-    settings,
-    'accommodation_allowance',
-    monthId,
-    DEFAULT_COMPANY_HOUSING_RENT,
-    assignment.variantKey ?? null,
-  );
+  const rentMonthly = rentSetting.amount;
   const media = roundMoney((mediaMonthly / monthDays) * chargedDays);
   const rent = roundMoney((rentMonthly / monthDays) * chargedDays);
 
-  return { media, rent, total: roundMoney(media + rent) };
+  return { media, rent, total: roundMoney(media + rent), warnings: [] };
 }
 
 export function calculateEmployeeMonthlyDraft({
@@ -483,6 +496,9 @@ export function calculateEmployeeMonthlyDraft({
   if (!participatesInMonth) {
     warnings.push(warning('employee-not-participating'));
   }
+  entitlements?.reviewWarnings?.forEach((code) => {
+    warnings.push(warning(code));
+  });
 
   const employeeDailyValues = dailyValues.filter((value) =>
     isEmployeeDailyValue(employee, value),
@@ -764,15 +780,26 @@ export function calculateEmployeeMonthlyDraft({
           DEFAULT_UDT_ALLOWANCE,
         )
       : 0;
+  const ownHousingSetting = resolveEffectivePayrollSetting(
+    payrollSettings,
+    'own_housing_allowance',
+    monthId,
+  );
+  if (entitlements?.ownHousingAllowanceEligible && !ownHousingSetting) {
+    warnings.push(warning('unresolved-own-housing-setting'));
+  }
   const ownHousingAllowanceBrutto =
     entitlements?.ownHousingAllowanceEligible && fullCalendarMonth
-      ? configuredAmount(payrollSettings, 'own_housing_allowance', monthId, 0)
+      ? (ownHousingSetting?.amount ?? 0)
       : 0;
   const companyAccommodation = calculateCompanyAccommodationDeduction({
     monthId,
     employee,
     settings: payrollSettings,
     entitlements,
+  });
+  companyAccommodation.warnings.forEach((code) => {
+    warnings.push(warning(code));
   });
   const bruttoAdditions = roundMoney(
     (frequencyAmount ?? 0) +

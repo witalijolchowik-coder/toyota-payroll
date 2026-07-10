@@ -33,7 +33,10 @@ import type {
   EmployeeColorShift,
   MonthId,
 } from '../../types/firestore';
-import { calculateMonthlyDrafts } from '../../utils/payroll';
+import {
+  calculateMonthlyDrafts,
+  resolveMonthlyEmployeeEntitlements,
+} from '../../utils/payroll';
 import { CalendarConstructorToolbar } from './CalendarConstructorToolbar';
 import {
   calendarConstructorBlockedReason,
@@ -196,6 +199,11 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
   const participatingAbsences = data.absences.filter((absence) =>
     participatingEmployeeIds.has(absence.employeeId),
   );
+  const entitlementsByEmployeeId = resolveMonthlyEmployeeEntitlements({
+    monthId,
+    employees: participatingEmployees,
+    entitlements: data.employeeEntitlements,
+  });
   const calculationDrafts = calculateMonthlyDrafts({
     monthId,
     employees: participatingEmployees,
@@ -203,6 +211,7 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
     absences: participatingAbsences,
     payrollSettings: data.payrollSettings,
     adjustments: data.adjustments,
+    entitlementsByEmployeeId,
     calendarOptions: { publicHolidays },
   });
   const draftsByEmployeeId = new Map(

@@ -36,6 +36,8 @@ The attached design history contains several generations of the architecture. Th
 - [Monthly settlement components - Block 9](business-rules/monthly-settlement-components.md)
   - coordinator-facing monthly settlement components, separated hours,
     brutto/netto amounts, deductions, and current limitations
+- [Employee entitlements and assignments - Block 10](business-rules/employee-entitlements-assignments.md)
+  - effective-dated UDT, own-housing and company-accommodation employee facts
 
 Approved business-rules specifications govern payroll semantics. Architecture
 documents continue to govern system structure and implementation boundaries.
@@ -57,6 +59,7 @@ documents continue to govern system structure and implementation boundaries.
 - [ADR 0013: Departments, color shifts and rotation foundation](decisions/0013-departments-shifts-rotation.md)
 - [ADR 0014: Work-time deviations extend DailyValue](decisions/0014-work-time-deviations.md)
 - [ADR 0015: Monthly settlement components remain a read-only aggregation](decisions/0015-monthly-settlement-components.md)
+- [ADR 0016: Employee entitlements and assignments](decisions/0016-employee-entitlements-assignments.md)
 
 ## Authority order
 

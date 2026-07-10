@@ -185,3 +185,20 @@ Authentication session.
   work; no fake inference from department or shift is used.
 - No ZUS, PIT, taxes, net salary, payslip, reports, payroll closing or final
   immutable settlement snapshot.
+
+## Business Rules Block 10 implementation
+
+- Adds effective-dated employee-level entitlements and assignments for UDT,
+  own housing allowance, and company accommodation.
+- Uses a top-level `employeeEntitlements` collection with `employee_id` and
+  `teta_number`; employee names are not duplicated.
+- Employees workspace includes a practical `Uprawnienia i przypisania` panel
+  with add, period edit, cancellation and history view.
+- Monthly Settlement resolves components from real entitlement/assignment
+  data instead of placeholder booleans or department/shift inference.
+- Company accommodation requires an accommodation variant and warns when the
+  variant setting is missing.
+- Own housing and company accommodation overlap is blocked in the browser and
+  surfaced as a resolver warning.
+- No ZUS, PIT, taxes, net salary, payslip, reports, payroll closing or final
+  immutable settlement snapshot.

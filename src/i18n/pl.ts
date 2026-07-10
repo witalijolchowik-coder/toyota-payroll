@@ -103,6 +103,69 @@ export const pl = {
       updated: 'Dane pracownika zostały zapisane.',
       deactivated: 'Pracownik został dezaktywowany.',
     },
+    entitlements: {
+      title: 'Uprawnienia i przypisania',
+      description:
+        'Historyczne fakty pracownika używane w rozliczeniu miesięcznym: UDT, własne mieszkanie i mieszkanie firmowe.',
+      add: 'Dodaj uprawnienie',
+      loadError: 'Nie udało się wczytać uprawnień i przypisań.',
+      empty: 'Brak uprawnień i przypisań.',
+      table: {
+        employee: 'Pracownik',
+        type: 'Rodzaj',
+        variant: 'Wariant',
+        validity: 'Obowiązuje',
+        status: 'Status',
+        note: 'Notatka',
+        actions: 'Działania',
+        noVariant: '—',
+        noNote: '—',
+        noEndDate: 'bezterminowo',
+        edit: 'Zmień okres / notatkę',
+        cancel: 'Anuluj',
+      },
+      types: {
+        UDT: 'UDT',
+        OWN_HOUSING_ALLOWANCE: 'Dodatek za własne mieszkanie',
+        COMPANY_ACCOMMODATION: 'Mieszkanie firmowe',
+      },
+      status: {
+        ACTIVE: 'Aktywne',
+        CANCELLED: 'Anulowane',
+      },
+      form: {
+        addTitle: 'Dodaj uprawnienie lub przypisanie',
+        editTitle: 'Zmień uprawnienie lub przypisanie',
+        employee: 'Pracownik',
+        type: 'Rodzaj',
+        variant: 'Wariant mieszkania',
+        validFrom: 'Od',
+        validTo: 'Do',
+        note: 'Notatka',
+        cancel: 'Anuluj',
+        create: 'Dodaj',
+        save: 'Zapisz zmiany',
+        optionalEnd: 'Opcjonalnie',
+        noVariants: 'Brak aktywnych wariantów zakwaterowania w ustawieniach.',
+        validation: {
+          'employee-required': 'Wybierz pracownika.',
+          'variant-required': 'Wybierz wariant mieszkania firmowego.',
+          'date-required': 'Wprowadź datę początku.',
+          'invalid-date-range': 'Data końca nie może poprzedzać daty początku.',
+          'housing-conflict':
+            'Wybrany okres pokrywa się z drugim typem mieszkaniowym dla tego pracownika.',
+        },
+      },
+      notifications: {
+        created: 'Uprawnienie zostało dodane.',
+        updated: 'Uprawnienie zostało zaktualizowane.',
+        cancelled: 'Uprawnienie zostało anulowane.',
+      },
+      errors: {
+        saveFailed: 'Nie udało się zapisać uprawnienia.',
+        cancelFailed: 'Nie udało się anulować uprawnienia.',
+      },
+    },
   },
   organization: {
     departments: {
@@ -354,6 +417,14 @@ export const pl = {
           'Nie znaleziono aktywnej konfiguracji premii frekwencyjnej.',
         'unresolved-work-time-classification':
           'Brakuje faktycznego startu/końca dla nietypowej liczby godzin.',
+        'housing-entitlement-conflict':
+          'Dodatek za własne mieszkanie pokrywa się z mieszkaniem firmowym.',
+        'company-accommodation-missing-variant':
+          'Przypisanie mieszkania firmowego nie ma wariantu.',
+        'unresolved-company-accommodation-variant':
+          'Nie znaleziono aktywnej stawki dla wariantu mieszkania firmowego.',
+        'unresolved-own-housing-setting':
+          'Nie znaleziono aktywnej stawki dodatku za własne mieszkanie.',
       },
     },
     constructor: {

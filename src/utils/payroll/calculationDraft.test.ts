@@ -3,11 +3,13 @@ import type {
   Adjustment,
   DailyValue,
   Employee,
+  EmployeeEntitlement,
   PayrollSetting,
 } from '../../types/firestore';
 import {
   calculateEmployeeMonthlyDraft,
   calculateMonthlyDrafts,
+  resolveMonthlyEmployeeEntitlements,
   STANDARD_WORKING_DAY_HOURS,
   type PayrollCalendarOptions,
   type EmployeeSettlementEntitlements,
@@ -112,6 +114,27 @@ function adjustment(overrides: Partial<Adjustment>): Adjustment {
     amount: 100,
     note: 'Test',
     status: 'ACTIVE',
+    createdAt,
+    createdBy: 'test',
+    updatedAt: createdAt,
+    updatedBy: 'test',
+    ...overrides,
+  };
+}
+
+function entitlement(
+  overrides: Partial<EmployeeEntitlement> = {},
+): EmployeeEntitlement {
+  return {
+    id: 'entitlement-1',
+    employeeId: 'employee-1',
+    tetaNumber: 'T001',
+    type: 'UDT',
+    accommodationVariantKey: null,
+    validFrom: '2026-01-01',
+    validTo: null,
+    status: 'ACTIVE',
+    note: null,
     createdAt,
     createdBy: 'test',
     updatedAt: createdAt,
@@ -395,15 +418,43 @@ describe('employee monthly calculation draft', () => {
       absences: [absence({ startDate: '2026-06-16', endDate: '2026-06-16' })],
       entitlements: {
         companyAccommodation: {
+          variantKey: 'type-a',
           contractStartDate: utcDate('2026-06-16'),
           contractEndDate: utcDate('2026-06-30'),
         },
       },
+      settings: [
+        payrollSetting(),
+        payrollSetting({
+          id: 'type-a',
+          settingKey: 'accommodation_allowance',
+          variantKey: 'type-a',
+          variantName: 'Typ A',
+          amount: 150,
+        }),
+      ],
     });
 
     expect(result.components.companyAccommodationMediaDeduction).toBe(250);
     expect(result.components.companyAccommodationRentDeduction).toBe(75);
     expect(result.components.companyAccommodationDeduction).toBe(325);
+  });
+
+  it('leaves company accommodation unresolved when the variant setting is missing', () => {
+    const result = draft({
+      entitlements: {
+        companyAccommodation: {
+          variantKey: 'type-a',
+          contractStartDate: utcDate('2026-06-01'),
+          contractEndDate: utcDate('2026-06-30'),
+        },
+      },
+    });
+
+    expect(result.components.companyAccommodationDeduction).toBe(0);
+    expect(result.warnings.map((item) => item.code)).toContain(
+      'unresolved-company-accommodation-variant',
+    );
   });
 
   it('pays own housing allowance only for full-month eligible employment', () => {
@@ -525,5 +576,42 @@ describe('employee monthly calculation draft', () => {
     expect(results).toHaveLength(2);
     expect(results[0]?.employment.participatesInMonth).toBe(true);
     expect(results[1]?.employment.participatesInMonth).toBe(false);
+  });
+
+  it('aggregates settlement components from effective-dated employee entitlements', () => {
+    const employees = [employee()];
+    const entitlementsByEmployeeId = resolveMonthlyEmployeeEntitlements({
+      monthId: '2026-06',
+      employees,
+      entitlements: [
+        entitlement({ type: 'UDT' }),
+        entitlement({
+          id: 'own-housing',
+          type: 'OWN_HOUSING_ALLOWANCE',
+          validFrom: '2026-06-01',
+          validTo: '2026-06-30',
+        }),
+      ],
+    });
+
+    const [result] = calculateMonthlyDrafts({
+      monthId: '2026-06',
+      employees,
+      dailyValues: [],
+      absences: [],
+      payrollSettings: [
+        payrollSetting(),
+        payrollSetting({
+          id: 'own-housing-setting',
+          settingKey: 'own_housing_allowance',
+          amount: 200,
+        }),
+      ],
+      adjustments: [],
+      entitlementsByEmployeeId,
+    });
+
+    expect(result?.components.udtAllowanceBrutto).toBe(300);
+    expect(result?.components.ownHousingAllowanceBrutto).toBe(200);
   });
 });

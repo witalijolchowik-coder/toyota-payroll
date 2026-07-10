@@ -13,6 +13,7 @@ import type {
   DailyValueDocument,
   DepartmentDocument,
   EmployeeDocument,
+  EmployeeEntitlementDocument,
   EmployeeSettlementDocument,
   ImportDocument,
   MonthDocument,
@@ -324,6 +325,26 @@ export const absenceConverter = createConverter<AbsenceDocument>(
     ...metadata(data, path),
   }),
 );
+
+export const employeeEntitlementConverter =
+  createConverter<EmployeeEntitlementDocument>((data, path) => ({
+    ...employeeReference(data, path),
+    type: readEnum(data, 'type', path, [
+      'UDT',
+      'OWN_HOUSING_ALLOWANCE',
+      'COMPANY_ACCOMMODATION',
+    ] as const),
+    accommodation_variant_key: readNullableString(
+      data,
+      'accommodation_variant_key',
+      path,
+    ),
+    valid_from: readNonEmptyString(data, 'valid_from', path),
+    valid_to: readNullableString(data, 'valid_to', path),
+    status: readEnum(data, 'status', path, ['ACTIVE', 'CANCELLED'] as const),
+    note: readNullableString(data, 'note', path),
+    ...metadata(data, path),
+  }));
 
 export const payrollSettingConverter = createConverter<PayrollSettingDocument>(
   (data, path) => ({

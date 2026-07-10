@@ -11,6 +11,8 @@ import type {
   DepartmentShiftMode,
   EmployeeId,
   EmployeeColorShift,
+  EmployeeEntitlementStatus,
+  EmployeeEntitlementType,
   ActualWorkingShift,
   ImportStatus,
   ImportType,
@@ -121,6 +123,18 @@ export interface Absence extends ModificationMetadata {
   source: AbsenceSource;
   importId: string | null;
   status: AbsenceStatus;
+  note: string | null;
+}
+
+export interface EmployeeEntitlement extends ModificationMetadata {
+  id: string;
+  employeeId: EmployeeId;
+  tetaNumber: TetaNumber;
+  type: EmployeeEntitlementType;
+  accommodationVariantKey: string | null;
+  validFrom: IsoDate;
+  validTo: IsoDate | null;
+  status: EmployeeEntitlementStatus;
   note: string | null;
 }
 

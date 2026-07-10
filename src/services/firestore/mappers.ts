@@ -11,6 +11,8 @@ import type {
   DepartmentDocument,
   Employee,
   EmployeeDocument,
+  EmployeeEntitlement,
+  EmployeeEntitlementDocument,
   EmployeeSettlement,
   EmployeeSettlementDocument,
   ImportDocument,
@@ -184,6 +186,24 @@ export function mapAbsenceDocument(
     hoursPerDay: document.hours_per_day,
     source: document.source,
     importId: document.import_id,
+    status: document.status,
+    note: document.note,
+    ...modificationMetadata(document),
+  };
+}
+
+export function mapEmployeeEntitlementDocument(
+  id: string,
+  document: EmployeeEntitlementDocument,
+): EmployeeEntitlement {
+  return {
+    id,
+    employeeId: document.employee_id,
+    tetaNumber: document.teta_number,
+    type: document.type,
+    accommodationVariantKey: document.accommodation_variant_key,
+    validFrom: document.valid_from,
+    validTo: document.valid_to,
     status: document.status,
     note: document.note,
     ...modificationMetadata(document),

@@ -11,6 +11,8 @@ This is the final MVP shape. It supersedes the earlier enterprise collection hie
 
 /employees/{employeeId}
 
+/employeeEntitlements/{entitlementId}
+
 /months/{monthId}
   /employeeSettlements/{employeeId}
   /dailyValues/{employeeId_YYYY-MM-DD}
@@ -68,6 +70,26 @@ documents store stable `department_id` and optional `shift_assignment`
 These fields describe current coordination context. They do not decide
 payroll-month participation and they are not duplicated into operational
 attendance, absence, adjustment, import or settlement documents.
+
+## Employee entitlements and assignments
+
+`/employeeEntitlements` stores explicit employee-level facts used by Monthly
+Settlement. It covers:
+
+- UDT entitlement;
+- own housing allowance entitlement;
+- company accommodation assignment and accommodation variant.
+
+Documents are effective-dated with `valid_from`, optional `valid_to`, and
+`ACTIVE`/`CANCELLED` lifecycle status. They store only `employee_id` and
+`teta_number`; employee names are resolved from `/employees`.
+
+Monthly Settlement resolves these documents for the selected month in memory.
+UDT and own housing require full-month entitlement and full-month employment.
+Company accommodation is calculated by calendar-day overlap with the selected
+month. Hard deletes are denied. Because these documents are global
+effective-dated records, future payroll closing must freeze resolved snapshots
+or block retroactive edits that would affect settled months.
 
 ## Month documents
 
