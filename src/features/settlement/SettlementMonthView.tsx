@@ -63,6 +63,7 @@ import { parseDailyHoursInput } from './dailyValueEntry';
 import { PayrollDraftPanel } from './PayrollDraftPanel';
 import { getPublicHolidaysForYear } from './publicHolidays';
 import { SettlementReviewPanel } from './SettlementReviewPanel';
+import { SettlementExportPanel } from './SettlementExportPanel';
 import { SettlementGrid } from './SettlementGrid';
 import { SettlementLegend } from './SettlementLegend';
 import { useSettlementMonth } from './useSettlementMonth';
@@ -576,6 +577,16 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
               }
             }}
             onSaveReview={saveReviewState}
+          />
+          <SettlementExportPanel
+            monthId={monthId}
+            employees={participatingEmployees}
+            departments={data.departments}
+            days={days}
+            dailyValues={participatingDailyValues}
+            drafts={calculationDrafts}
+            reviewStates={data.reviewStates}
+            publicHolidays={publicHolidays}
           />
           <PayrollDraftPanel
             drafts={filteredDrafts}

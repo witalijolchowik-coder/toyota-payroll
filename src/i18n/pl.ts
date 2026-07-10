@@ -510,6 +510,33 @@ export const pl = {
         saveFailed: 'Nie udało się zapisać statusu przeglądu.',
       },
     },
+    export: {
+      title: 'Eksport',
+      description:
+        'Przygotuj pliki robocze dla Toyota oraz osobne CSV do SOZ dla grup PL i cudzoziemców.',
+      ready: 'Eksport bez ostrzeżeń',
+      warningCount: 'Ostrzeżenia: {{count}}',
+      downloadToyota: 'Pobierz zestawienie dla Toyota',
+      downloadSozPl: 'Pobierz CSV do SOZ — PL',
+      downloadSozForeign: 'Pobierz CSV do SOZ — cudzoziemcy',
+      downloadNote: 'Pobierz notatkę SOZ',
+      identityLimitation:
+        'Split SOZ wymaga danych PESEL/paszport. Obecny model pracownika jeszcze ich nie przechowuje, dlatego brakujące dokumenty są pokazane jako braki danych.',
+      counters: {
+        toyota: 'Toyota: {{count}} prac.',
+        sozPl: 'SOZ PL: {{count}} prac.',
+        sozForeign: 'SOZ cudzoziemcy: {{count}} prac.',
+        note: 'Notatka: {{count}} poz.',
+      },
+      warnings: {
+        'not-reviewed': 'Nieprzejrzane rekordy: {{count}}.',
+        'unresolved-issues':
+          'Rekordy z nierozstrzygniętymi uwagami: {{count}}.',
+        'missing-identity':
+          'Brak danych PESEL/paszport wymaganych do splitu SOZ: {{count}}.',
+        'empty-export': 'Brak pracowników do eksportu: {{count}}.',
+      },
+    },
     constructor: {
       title: 'Konstruktor kalendarza',
       description:

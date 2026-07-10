@@ -41,6 +41,8 @@ The attached design history contains several generations of the architecture. Th
 - [Monthly settlement review - Block 11](business-rules/monthly-settlement-review.md)
   - employee-month review statuses, warning grouping, correction navigation and
     readiness signal
+- [Export formats - Block 12](business-rules/export-formats.md) - Toyota Excel,
+  SOZ CSV PL/foreign split, and mandatory overtime/niedoczas accompanying note
 
 Approved business-rules specifications govern payroll semantics. Architecture
 documents continue to govern system structure and implementation boundaries.
@@ -64,6 +66,7 @@ documents continue to govern system structure and implementation boundaries.
 - [ADR 0015: Monthly settlement components remain a read-only aggregation](decisions/0015-monthly-settlement-components.md)
 - [ADR 0016: Employee entitlements and assignments](decisions/0016-employee-entitlements-assignments.md)
 - [ADR 0017: Monthly settlement review states](decisions/0017-monthly-settlement-review-states.md)
+- [ADR 0018: Export format foundation](decisions/0018-export-format-foundation.md)
 
 ## Authority order
 
