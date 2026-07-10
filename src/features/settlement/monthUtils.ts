@@ -40,7 +40,7 @@ export interface SettlementCellValue {
   hours: number | null;
   fallbackHours: number | null;
   coordinatorNote: string | null;
-  workTimeCorrection: DailyValue['workTimeCorrection'] | null;
+  workTimeCorrection?: DailyValue['workTimeCorrection'] | null;
 }
 
 export const parseMonthId = parsePayrollMonthId;
@@ -140,7 +140,9 @@ export function resolveSettlementCellValue({
               isFuture: day.isFuture,
             }),
       coordinatorNote: effective.kind === 'imported' ? null : effective.note,
-      workTimeCorrection: persistedValue.workTimeCorrection,
+      ...(persistedValue.workTimeCorrection
+        ? { workTimeCorrection: persistedValue.workTimeCorrection }
+        : {}),
     };
   }
 
@@ -157,7 +159,6 @@ export function resolveSettlementCellValue({
       hours: virtualHours,
       fallbackHours: virtualHours,
       coordinatorNote: null,
-      workTimeCorrection: null,
     };
   }
 
@@ -167,7 +168,6 @@ export function resolveSettlementCellValue({
     hours: null,
     fallbackHours: null,
     coordinatorNote: null,
-    workTimeCorrection: null,
   };
 }
 
