@@ -563,41 +563,34 @@ service cloud.firestore {
           && hasCreateMetadata(request.resource.data);
         allow update: if isAuthenticated()
           && monthExistsAndIsOpen(monthId)
+          && resource.data.source == 'manual'
+          && request.resource.data.source == 'manual'
           && hasUpdateMetadata(request.resource.data)
-          && (
-            (
-              resource.data.source == 'manual'
-              && request.resource.data.source == 'manual'
-              && request.resource.data.hours is number
-              && request.resource.data.hours >= 0
-              && request.resource.data.hours <= 24
-              && isNullableString(request.resource.data.note)
-              && validWorkTimeCorrection(request.resource.data)
-              && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-                'hours',
-                'note',
-                'work_time_correction',
-                'updated_at',
-                'updated_by'
-              ])
-            )
-            || (
-              resource.data.source == 'attendance_import'
-              && request.resource.data.source == 'attendance_import'
-              && request.resource.data.diff(resource.data).affectedKeys().hasAny([
-                'manual_override',
-                'work_time_correction'
-              ])
-              && validManualOverride(request.resource.data)
-              && validWorkTimeCorrection(request.resource.data)
-              && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-                'manual_override',
-                'work_time_correction',
-                'updated_at',
-                'updated_by'
-              ])
-            )
-          );
+          && request.resource.data.hours is number
+          && request.resource.data.hours >= 0
+          && request.resource.data.hours <= 24
+          && isNullableString(request.resource.data.note)
+          && validWorkTimeCorrection(request.resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'hours',
+            'note',
+            'work_time_correction',
+            'updated_at',
+            'updated_by'
+          ]);
+        allow update: if isAuthenticated()
+          && monthExistsAndIsOpen(monthId)
+          && resource.data.source == 'attendance_import'
+          && request.resource.data.source == 'attendance_import'
+          && hasUpdateMetadata(request.resource.data)
+          && validManualOverride(request.resource.data)
+          && validWorkTimeCorrection(request.resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'manual_override',
+            'work_time_correction',
+            'updated_at',
+            'updated_by'
+          ]);
         allow delete: if isAuthenticated()
           && monthExistsAndIsOpen(monthId)
           && resource.data.source == 'manual';
