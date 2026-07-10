@@ -148,7 +148,8 @@ the corrected actual start/end time. This field coexists with `hours` and
 `manual_override`; it does not replace imported base facts. Derived private
 time, overtime 50%, overtime 100%, coverable NI, and monthly balancing remain
 calculated in memory until a later payroll-closing stage persists authoritative
-results.
+results. Detailed `classification_override` data is reserved for a later
+server-side/admin workflow; browser writes keep it `null`.
 
 Daily values are worked-hour facts only. They do not define nominal month
 hours, employee-specific nominal hours, bonuses, absence calculations, or

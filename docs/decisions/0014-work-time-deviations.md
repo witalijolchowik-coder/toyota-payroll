@@ -31,6 +31,10 @@ The field is coordinator-owned and may exist on manual or imported daily-value
 documents. Imported `hours`, `source`, `import_id`, identity and base metadata
 remain protected.
 
+For the current browser/client scope, `classification_override` is reserved and
+must remain `null`; coordinators store planned/actual time intervals only.
+Detailed classification overrides require later server-side/admin hardening.
+
 Derived payroll meaning is calculated in pure TypeScript helpers. No
 authoritative payroll result is persisted in this block.
 

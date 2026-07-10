@@ -149,6 +149,11 @@ classification_override
 private time, overtime 50%, overtime 100% or coverable NI hours when automatic
 classification is insufficient.
 
+In the current MVP browser implementation this field is reserved and must stay
+`null`. Coordinators can save the planned shift and actual start/end time now;
+detailed classification overrides will be enabled later with server-side or
+admin-grade hardening.
+
 Existing `hours`, imported base facts and `manual_override` behavior remain
 unchanged.
 
@@ -158,7 +163,7 @@ unchanged.
   private time, overtime 50%, overtime 100%, public-holiday eligibility and
   monthly balancing.
 - DailyValue converters, mappers and Firestore rules accept optional
-  `work_time_correction`.
+  `work_time_correction` with `classification_override` reserved as `null`.
 - Employee day editor can store actual start/end time and planned working
   shift.
 - Payroll draft shows work-time foundation totals.

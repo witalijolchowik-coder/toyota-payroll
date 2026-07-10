@@ -226,46 +226,7 @@ service cloud.firestore {
           && isClockTime(data.work_time_correction.planned_end_time)
           && isClockTime(data.work_time_correction.actual_start_time)
           && isClockTime(data.work_time_correction.actual_end_time)
-          && validWorkTimeClassificationOverride(
-            data.work_time_correction.classification_override
-          )
-        );
-    }
-
-    function validNullableHours(value) {
-      return value == null
-        || (value is number && value >= 0 && value <= 24);
-    }
-
-    function validWorkTimeClassificationOverride(override) {
-      return override == null
-        || (
-          override is map
-          && override.keys().hasAll([
-            'private_time_hours',
-            'overtime_50_hours',
-            'overtime_100_hours',
-            'coverable_ni_hours',
-            'note',
-            'actor_uid',
-            'updated_at'
-          ])
-          && override.keys().hasOnly([
-            'private_time_hours',
-            'overtime_50_hours',
-            'overtime_100_hours',
-            'coverable_ni_hours',
-            'note',
-            'actor_uid',
-            'updated_at'
-          ])
-          && validNullableHours(override.private_time_hours)
-          && validNullableHours(override.overtime_50_hours)
-          && validNullableHours(override.overtime_100_hours)
-          && validNullableHours(override.coverable_ni_hours)
-          && isNullableString(override.note)
-          && override.actor_uid == request.auth.uid
-          && override.updated_at == request.time
+          && data.work_time_correction.classification_override == null
         );
     }
 
