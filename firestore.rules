@@ -583,7 +583,12 @@ service cloud.firestore {
           && resource.data.source == 'attendance_import'
           && request.resource.data.source == 'attendance_import'
           && hasUpdateMetadata(request.resource.data)
-          && validManualOverride(request.resource.data)
+          && (
+            !request.resource.data.diff(resource.data).affectedKeys().hasAny([
+              'manual_override'
+            ])
+            || validManualOverride(request.resource.data)
+          )
           && validWorkTimeCorrection(request.resource.data)
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
             'manual_override',
