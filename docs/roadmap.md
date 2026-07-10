@@ -20,6 +20,11 @@ assignment and a conservative weekly rotation foundation. This is complete as
 coordination/filtering context only; it does not implement payroll consequences
 or a full schedule planner.
 
+Business Rules Block 8 introduced the foundation for planned-vs-actual work
+time, private time, overtime 50%, overtime 100%, public-holiday eligibility and
+monthly balancing. This remains a draft/foundation layer only; it does not
+calculate final salary amounts or close payroll.
+
 The Firestore-foundation sequencing amendment was approved on 2026-07-02. The
 repository must not proceed to Step 4 without explicit approval.
 
@@ -149,3 +154,16 @@ Authentication session.
 - Settled months remain read-only and outside-employment writes are blocked.
 - Department/shift filtering and multi-row painting remain deferred because the
   required data and review workflow are not yet modeled.
+
+## Business Rules Block 8 implementation
+
+- Optional `DailyValue.work_time_correction` stores planned shift and actual
+  start/end time without replacing imported attendance facts.
+- Pure helpers derive normal work, czas prywatny, overtime 50%, overtime 100%,
+  public-holiday bonus eligibility and monthly coverage.
+- Monthly balancing covers private time and explicitly coverable NI before
+  leaving paid overtime.
+- Employee day editor can capture actual start/end correction.
+- Payroll draft displays work-time foundation totals.
+- No final salary calculation, closing, reports, exports, import engine,
+  automatic scheduler or full classification-override UI.

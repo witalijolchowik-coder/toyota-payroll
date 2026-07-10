@@ -283,6 +283,17 @@ export function EmployeeCalendarDialog({
                         >
                           {hoursLabel}
                         </Typography>
+                        {value.workTimeCorrection ? (
+                          <Typography variant="caption" color="primary.main">
+                            {interpolate(
+                              t.settlement.employeeCalendar.actualInterval,
+                              {
+                                start: value.workTimeCorrection.actualStartTime,
+                                end: value.workTimeCorrection.actualEndTime,
+                              },
+                            )}
+                          </Typography>
+                        ) : null}
                         {warnings.length > 0 ? (
                           <Typography variant="caption" color="warning.dark">
                             {t.settlement.employeeCalendar.warning}

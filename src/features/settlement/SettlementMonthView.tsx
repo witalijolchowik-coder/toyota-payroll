@@ -559,13 +559,14 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
           value={editingCell.value}
           hasGoverningAbsence={editingCell.hasGoverningAbsence}
           onClose={() => setEditingCell(null)}
-          onSave={async (hours, note) => {
+          onSave={async (hours, note, workTimeCorrection) => {
             await saveManualDailyValue(monthId, {
               employeeId: editingCell.employee.id,
               tetaNumber: editingCell.employee.tetaNumber,
               date: editingCell.day.isoDate,
               hours,
               note,
+              workTimeCorrection,
             });
             await reload();
             notify({

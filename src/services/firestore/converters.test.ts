@@ -211,6 +211,62 @@ describe('Firestore converters', () => {
     });
   });
 
+  it('maps work-time corrections without changing imported attendance identity', () => {
+    const document = dailyValueConverter.fromFirestore(
+      snapshot('months/2026-07/dailyValues/employee-1_2026-07-02', {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        date: '2026-07-02',
+        hours: 8,
+        source: 'attendance_import',
+        import_id: 'import-1',
+        note: null,
+        manual_override: null,
+        work_time_correction: {
+          planned_shift: 'FIRST',
+          planned_start_time: '06:00',
+          planned_end_time: '14:00',
+          actual_start_time: '09:00',
+          actual_end_time: '17:00',
+          classification_override: {
+            private_time_hours: 3,
+            overtime_50_hours: 3,
+            overtime_100_hours: null,
+            coverable_ni_hours: null,
+            note: 'Przesunięcie do weryfikacji',
+            actor_uid: 'coordinator-1',
+            updated_at: now,
+          },
+        },
+        created_at: now,
+        created_by: 'system',
+        updated_at: now,
+        updated_by: 'coordinator-1',
+      }),
+      {},
+    );
+
+    expect(
+      mapDailyValueDocument('employee-1_2026-07-02', '2026-07', document),
+    ).toMatchObject({
+      hours: 8,
+      source: 'attendance_import',
+      importId: 'import-1',
+      workTimeCorrection: {
+        plannedShift: 'FIRST',
+        actualStartTime: '09:00',
+        actualEndTime: '17:00',
+        classificationOverride: {
+          privateTimeHours: 3,
+          overtime50Hours: 3,
+          overtime100Hours: null,
+          coverableNiHours: null,
+          actorUid: 'coordinator-1',
+        },
+      },
+    });
+  });
+
   it('does not accept a virtual default as a persisted daily value', () => {
     const invalid = {
       employee_id: 'employee-1',

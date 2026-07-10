@@ -73,6 +73,25 @@ export interface EmployeeSettlementDocument extends EmployeeReferenceDocument {
 
 export type DailyValueSource = 'manual' | 'attendance_import';
 
+export interface WorkTimeClassificationOverrideDocument {
+  private_time_hours: number | null;
+  overtime_50_hours: number | null;
+  overtime_100_hours: number | null;
+  coverable_ni_hours: number | null;
+  note: string | null;
+  actor_uid: string;
+  updated_at: Timestamp;
+}
+
+export interface WorkTimeCorrectionDocument {
+  planned_shift: ActualWorkingShift;
+  planned_start_time: string;
+  planned_end_time: string;
+  actual_start_time: string;
+  actual_end_time: string;
+  classification_override?: WorkTimeClassificationOverrideDocument | null;
+}
+
 export interface DailyValueManualOverrideDocument {
   hours: number;
   note: string | null;
@@ -88,6 +107,7 @@ export interface DailyValueDocument
   import_id: string | null;
   note: string | null;
   manual_override?: DailyValueManualOverrideDocument | null;
+  work_time_correction?: WorkTimeCorrectionDocument | null;
 }
 
 export type AbsenceSource = 'manual' | 'absence_import';

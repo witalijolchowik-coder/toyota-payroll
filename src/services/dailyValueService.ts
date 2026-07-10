@@ -12,11 +12,13 @@ import type {
   EmployeeId,
   IsoDate,
   MonthId,
+  WorkTimeCorrectionInput,
 } from '../types/firestore';
 import {
   isValidWorkedHours,
   resolveManualAttendanceClearOperation,
 } from '../utils/attendance';
+import { isValidClockTime } from '../utils/payroll';
 
 export type DailyValueServiceErrorCode =
   'firebase-unavailable' | 'authentication-required' | 'invalid-hours';
@@ -26,6 +28,42 @@ export class DailyValueServiceError extends Error {
     super(code);
     this.name = 'DailyValueServiceError';
   }
+}
+
+function workTimeCorrectionPayload(
+  input: WorkTimeCorrectionInput | null | undefined,
+  actorUid: string,
+) {
+  if (!input) {
+    return null;
+  }
+  if (
+    !isValidClockTime(input.plannedStartTime) ||
+    !isValidClockTime(input.plannedEndTime) ||
+    !isValidClockTime(input.actualStartTime) ||
+    !isValidClockTime(input.actualEndTime)
+  ) {
+    throw new DailyValueServiceError('invalid-hours');
+  }
+
+  return {
+    planned_shift: input.plannedShift,
+    planned_start_time: input.plannedStartTime,
+    planned_end_time: input.plannedEndTime,
+    actual_start_time: input.actualStartTime,
+    actual_end_time: input.actualEndTime,
+    classification_override: input.classificationOverride
+      ? {
+          private_time_hours: input.classificationOverride.privateTimeHours,
+          overtime_50_hours: input.classificationOverride.overtime50Hours,
+          overtime_100_hours: input.classificationOverride.overtime100Hours,
+          coverable_ni_hours: input.classificationOverride.coverableNiHours,
+          note: input.classificationOverride.note,
+          actor_uid: actorUid,
+          updated_at: serverTimestamp(),
+        }
+      : null,
+  };
 }
 
 async function requireActorUid(): Promise<string> {
@@ -59,6 +97,10 @@ export async function saveManualDailyValue(
   }
 
   const actorUid = await requireActorUid();
+  const workTimeCorrection = workTimeCorrectionPayload(
+    input.workTimeCorrection,
+    actorUid,
+  );
   const dailyValues = repositories.forMonth(monthId).dailyValues;
   const reference = doc(
     dailyValues,
@@ -77,6 +119,7 @@ export async function saveManualDailyValue(
             actor_uid: actorUid,
             updated_at: serverTimestamp(),
           },
+          work_time_correction: workTimeCorrection,
           updated_at: serverTimestamp(),
           updated_by: actorUid,
         });
@@ -86,6 +129,7 @@ export async function saveManualDailyValue(
       transaction.update(reference, {
         hours: input.hours,
         note: input.note,
+        work_time_correction: workTimeCorrection,
         updated_at: serverTimestamp(),
         updated_by: actorUid,
       });
@@ -101,6 +145,7 @@ export async function saveManualDailyValue(
       import_id: null,
       note: input.note,
       manual_override: null,
+      work_time_correction: workTimeCorrection,
       created_at: serverTimestamp(),
       created_by: actorUid,
       updated_at: serverTimestamp(),
@@ -137,6 +182,7 @@ export async function clearManualDailyValue(
     if (operation === 'clear-imported-override') {
       transaction.update(reference, {
         manual_override: null,
+        work_time_correction: null,
         updated_at: serverTimestamp(),
         updated_by: actorUid,
       });

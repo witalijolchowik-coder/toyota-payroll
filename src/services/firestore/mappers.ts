@@ -131,6 +131,39 @@ export function mapDailyValueDocument(
           updatedAt: document.manual_override.updated_at.toDate(),
         }
       : null,
+    workTimeCorrection: document.work_time_correction
+      ? {
+          plannedShift: document.work_time_correction.planned_shift,
+          plannedStartTime: document.work_time_correction.planned_start_time,
+          plannedEndTime: document.work_time_correction.planned_end_time,
+          actualStartTime: document.work_time_correction.actual_start_time,
+          actualEndTime: document.work_time_correction.actual_end_time,
+          classificationOverride: document.work_time_correction
+            .classification_override
+            ? {
+                privateTimeHours:
+                  document.work_time_correction.classification_override
+                    .private_time_hours,
+                overtime50Hours:
+                  document.work_time_correction.classification_override
+                    .overtime_50_hours,
+                overtime100Hours:
+                  document.work_time_correction.classification_override
+                    .overtime_100_hours,
+                coverableNiHours:
+                  document.work_time_correction.classification_override
+                    .coverable_ni_hours,
+                note: document.work_time_correction.classification_override
+                  .note,
+                actorUid:
+                  document.work_time_correction.classification_override
+                    .actor_uid,
+                updatedAt:
+                  document.work_time_correction.classification_override.updated_at.toDate(),
+              }
+            : null,
+        }
+      : null,
     ...modificationMetadata(document),
   };
 }

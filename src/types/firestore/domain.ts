@@ -11,6 +11,7 @@ import type {
   DepartmentShiftMode,
   EmployeeId,
   EmployeeColorShift,
+  ActualWorkingShift,
   ImportStatus,
   ImportType,
   IsoDate,
@@ -89,6 +90,22 @@ export interface DailyValue extends ModificationMetadata {
     note: string | null;
     actorUid: string;
     updatedAt: Date;
+  } | null;
+  workTimeCorrection?: {
+    plannedShift: ActualWorkingShift;
+    plannedStartTime: string;
+    plannedEndTime: string;
+    actualStartTime: string;
+    actualEndTime: string;
+    classificationOverride: {
+      privateTimeHours: number | null;
+      overtime50Hours: number | null;
+      overtime100Hours: number | null;
+      coverableNiHours: number | null;
+      note: string | null;
+      actorUid: string;
+      updatedAt: Date;
+    } | null;
   } | null;
 }
 

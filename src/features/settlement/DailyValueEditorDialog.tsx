@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
 import {
   Alert,
   Button,
@@ -7,6 +7,7 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  MenuItem,
   Stack,
   TextField,
   Typography,
@@ -18,7 +19,16 @@ import {
   DailyValueServiceError,
   type DailyValueServiceErrorCode,
 } from '../../services/dailyValueService';
-import type { Employee } from '../../types/firestore';
+import type {
+  ActualWorkingShift,
+  Employee,
+  WorkTimeCorrectionInput,
+} from '../../types/firestore';
+import {
+  DEFAULT_SHIFT_INTERVALS,
+  isValidClockTime,
+  resolveDailyWorkTimeDeviation,
+} from '../../utils/payroll';
 import {
   decideDailyValueMutation,
   parseDailyHoursInput,
@@ -32,7 +42,11 @@ interface DailyValueEditorDialogProps {
   value: SettlementCellValue;
   hasGoverningAbsence: boolean;
   onClose: () => void;
-  onSave: (hours: number, note: string | null) => Promise<void>;
+  onSave: (
+    hours: number,
+    note: string | null,
+    workTimeCorrection: WorkTimeCorrectionInput | null,
+  ) => Promise<void>;
   onClear: () => Promise<void>;
 }
 
@@ -55,11 +69,57 @@ export function DailyValueEditorDialog({
   const t = useTranslations();
   const [input, setInput] = useState(() => value.hours?.toString() ?? '');
   const [note, setNote] = useState(() => value.coordinatorNote ?? '');
+  const [plannedShift, setPlannedShift] = useState<ActualWorkingShift>(
+    () => value.workTimeCorrection?.plannedShift ?? 'FIRST',
+  );
+  const [actualStartTime, setActualStartTime] = useState(
+    () => value.workTimeCorrection?.actualStartTime ?? '',
+  );
+  const [actualEndTime, setActualEndTime] = useState(
+    () => value.workTimeCorrection?.actualEndTime ?? '',
+  );
   const [validationError, setValidationError] =
     useState<DailyHoursValidationError | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const employeeName = `${employee.lastName} ${employee.firstName}`;
+  const plannedInterval = DEFAULT_SHIFT_INTERVALS[plannedShift];
+  const hasTimeCorrection =
+    actualStartTime.trim().length > 0 || actualEndTime.trim().length > 0;
+  const timeValidationError =
+    hasTimeCorrection &&
+    (!isValidClockTime(actualStartTime) || !isValidClockTime(actualEndTime));
+  const workTimePreview = useMemo(() => {
+    if (timeValidationError || !hasTimeCorrection) {
+      return null;
+    }
+    return resolveDailyWorkTimeDeviation({
+      planned: {
+        shift: plannedShift,
+        startTime: plannedInterval.startTime,
+        endTime: plannedInterval.endTime,
+      },
+      actual: {
+        startTime: actualStartTime,
+        endTime: actualEndTime,
+      },
+      isWorkingDay: day.isWorkingDay,
+      isSaturday: day.date.getUTCDay() === 6,
+      isSunday: day.date.getUTCDay() === 0,
+      isPublicHoliday: day.isHoliday,
+    });
+  }, [
+    actualEndTime,
+    actualStartTime,
+    day.date,
+    day.isHoliday,
+    day.isWorkingDay,
+    hasTimeCorrection,
+    plannedInterval.endTime,
+    plannedInterval.startTime,
+    plannedShift,
+    timeValidationError,
+  ]);
 
   const clearValue = async () => {
     setIsSubmitting(true);
@@ -79,6 +139,9 @@ export function DailyValueEditorDialog({
     const parsed = parseDailyHoursInput(input);
     if (parsed.kind === 'error') {
       setValidationError(parsed.code);
+      return;
+    }
+    if (timeValidationError) {
       return;
     }
 
@@ -115,7 +178,20 @@ export function DailyValueEditorDialog({
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      await onSave(parsed.hours, normalizedNote);
+      await onSave(
+        parsed.hours,
+        normalizedNote,
+        hasTimeCorrection
+          ? {
+              plannedShift,
+              plannedStartTime: plannedInterval.startTime,
+              plannedEndTime: plannedInterval.endTime,
+              actualStartTime,
+              actualEndTime,
+              classificationOverride: null,
+            }
+          : null,
+      );
       onClose();
     } catch (error) {
       setSubmitError(serviceErrorMessage(error, 'save', t));
@@ -175,6 +251,67 @@ export function DailyValueEditorDialog({
               minRows={2}
               helperText={t.settlement.editor.noteHelper}
             />
+            <Stack spacing={1.5}>
+              <Typography variant="subtitle2">
+                {t.settlement.editor.workTime.title}
+              </Typography>
+              <TextField
+                select
+                label={t.settlement.editor.workTime.plannedShift}
+                value={plannedShift}
+                onChange={(event) =>
+                  setPlannedShift(event.target.value as ActualWorkingShift)
+                }
+              >
+                <MenuItem value="FIRST">
+                  {t.organization.actualWorkingShifts.FIRST}
+                </MenuItem>
+                <MenuItem value="SECOND">
+                  {t.organization.actualWorkingShifts.SECOND}
+                </MenuItem>
+                <MenuItem value="NIGHT">
+                  {t.organization.actualWorkingShifts.NIGHT}
+                </MenuItem>
+              </TextField>
+              <Typography variant="caption" color="text.secondary">
+                {interpolate(t.settlement.editor.workTime.plannedInterval, {
+                  start: plannedInterval.startTime,
+                  end: plannedInterval.endTime,
+                })}
+              </Typography>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
+                <TextField
+                  label={t.settlement.editor.workTime.actualStart}
+                  value={actualStartTime}
+                  onChange={(event) => setActualStartTime(event.target.value)}
+                  placeholder="06:00"
+                  error={Boolean(timeValidationError)}
+                  helperText={
+                    timeValidationError
+                      ? t.settlement.editor.workTime.invalidTime
+                      : t.settlement.editor.workTime.optional
+                  }
+                />
+                <TextField
+                  label={t.settlement.editor.workTime.actualEnd}
+                  value={actualEndTime}
+                  onChange={(event) => setActualEndTime(event.target.value)}
+                  placeholder="14:00"
+                  error={Boolean(timeValidationError)}
+                  helperText={t.settlement.editor.workTime.optional}
+                />
+              </Stack>
+              {workTimePreview ? (
+                <Alert severity="info">
+                  {interpolate(t.settlement.editor.workTime.preview, {
+                    normal: formatHours(workTimePreview.normalWorkHours),
+                    private: formatHours(workTimePreview.privateTimeHours),
+                    overtime50: formatHours(workTimePreview.overtime50Hours),
+                    overtime100: formatHours(workTimePreview.overtime100Hours),
+                  })}
+                </Alert>
+              ) : null}
+            </Stack>
           </Stack>
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2.5 }}>
@@ -245,4 +382,8 @@ function serviceCodeMessage(
   return operation === 'save'
     ? t.settlement.editor.errors.save
     : t.settlement.editor.errors.clear;
+}
+
+function formatHours(hours: number): string {
+  return hours.toLocaleString('pl-PL');
 }

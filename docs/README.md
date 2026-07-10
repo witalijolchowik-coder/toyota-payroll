@@ -30,6 +30,9 @@ The attached design history contains several generations of the architecture. Th
 - [Departments, shifts and rotation - Block 7](business-rules/departments-shifts-rotation.md)
   - editable departments, Red/White/Blue employee shift assignment, and future
     weekly rotation foundation
+- [Work time deviations, private time and overtime - Block 8](business-rules/work-time-deviations.md)
+  - planned-vs-actual intervals, overtime buckets, and monthly balancing
+    foundation
 
 Approved business-rules specifications govern payroll semantics. Architecture
 documents continue to govern system structure and implementation boundaries.
@@ -49,6 +52,7 @@ documents continue to govern system structure and implementation boundaries.
 - [ADR 0011: In-memory monthly payroll calculation draft](decisions/0011-payroll-engine-draft.md)
 - [ADR 0012: Calendar Constructor reuses attendance and absence documents](decisions/0012-calendar-constructor.md)
 - [ADR 0013: Departments, color shifts and rotation foundation](decisions/0013-departments-shifts-rotation.md)
+- [ADR 0014: Work-time deviations extend DailyValue](decisions/0014-work-time-deviations.md)
 
 ## Authority order
 

@@ -49,6 +49,12 @@ export function PayrollDraftPanel({
       workedHours: current.workedHours + draft.totals.workedHours,
       nominalHours: current.nominalHours + draft.totals.nominalHours,
       virtualHours: current.virtualHours + draft.attendance.virtualHours,
+      privateTime: current.privateTime + draft.workTime.privateTimeHours,
+      niedoczas: current.niedoczas + draft.workTime.niedoczasHours,
+      paidOvertime50:
+        current.paidOvertime50 + draft.workTime.paidOvertime50Hours,
+      paidOvertime100:
+        current.paidOvertime100 + draft.workTime.paidOvertime100Hours,
       frequencyBonus:
         current.frequencyBonus + (draft.totals.frequencyBonusAmount ?? 0),
       increases: current.increases + draft.totals.manualIncreases,
@@ -59,6 +65,10 @@ export function PayrollDraftPanel({
       workedHours: 0,
       nominalHours: 0,
       virtualHours: 0,
+      privateTime: 0,
+      niedoczas: 0,
+      paidOvertime50: 0,
+      paidOvertime100: 0,
       frequencyBonus: 0,
       increases: 0,
       decreases: 0,
@@ -107,6 +117,23 @@ export function PayrollDraftPanel({
               value={formatHours(totals.virtualHours, t)}
             />
             <SummaryChip
+              label={t.settlement.draft.totals.privateTime}
+              value={formatHours(totals.privateTime, t)}
+            />
+            <SummaryChip
+              label={t.settlement.draft.totals.niedoczas}
+              value={formatHours(totals.niedoczas, t)}
+              color={totals.niedoczas > 0 ? 'warning' : 'default'}
+            />
+            <SummaryChip
+              label={t.settlement.draft.totals.overtime50}
+              value={formatHours(totals.paidOvertime50, t)}
+            />
+            <SummaryChip
+              label={t.settlement.draft.totals.overtime100}
+              value={formatHours(totals.paidOvertime100, t)}
+            />
+            <SummaryChip
               label={t.settlement.draft.totals.frequencyBonus}
               value={currencyFormatter.format(totals.frequencyBonus)}
             />
@@ -143,6 +170,15 @@ export function PayrollDraftPanel({
                   </TableCell>
                   <TableCell align="right">
                     {t.settlement.draft.table.virtual}
+                  </TableCell>
+                  <TableCell align="right">
+                    {t.settlement.draft.table.privateTime}
+                  </TableCell>
+                  <TableCell align="right">
+                    {t.settlement.draft.table.overtime}
+                  </TableCell>
+                  <TableCell align="right">
+                    {t.settlement.draft.table.niedoczas}
                   </TableCell>
                   <TableCell align="right">
                     {t.settlement.draft.table.frequencyBonus}
@@ -185,6 +221,22 @@ export function PayrollDraftPanel({
                       </TableCell>
                       <TableCell align="right">
                         {formatHours(draft.attendance.virtualHours, t)}
+                      </TableCell>
+                      <TableCell align="right">
+                        {formatHours(draft.workTime.privateTimeHours, t)}
+                      </TableCell>
+                      <TableCell align="right">
+                        {interpolate(t.settlement.draft.table.overtimeSplit, {
+                          overtime50: formatPlainHours(
+                            draft.workTime.paidOvertime50Hours,
+                          ),
+                          overtime100: formatPlainHours(
+                            draft.workTime.paidOvertime100Hours,
+                          ),
+                        })}
+                      </TableCell>
+                      <TableCell align="right">
+                        {formatHours(draft.workTime.niedoczasHours, t)}
                       </TableCell>
                       <TableCell align="right">
                         {draft.totals.frequencyBonusAmount === null
@@ -283,6 +335,10 @@ function formatHours(hours: number, t: ReturnType<typeof useTranslations>) {
   return interpolate(t.settlement.grid.hours, {
     hours: hours.toLocaleString('pl-PL'),
   });
+}
+
+function formatPlainHours(hours: number) {
+  return hours.toLocaleString('pl-PL');
 }
 
 function warningMessage(

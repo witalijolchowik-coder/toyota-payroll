@@ -31,6 +31,11 @@ service cloud.firestore {
         && value.matches('^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$');
     }
 
+    function isClockTime(value) {
+      return value is string
+        && value.matches('^([01]\\d|2[0-3]):[0-5]\\d$');
+    }
+
     function isMonthId(value) {
       return value is string
         && value.matches('^\\d{4}-(0[1-9]|1[0-2])$');
@@ -158,6 +163,7 @@ service cloud.firestore {
           'import_id',
           'note',
           'manual_override',
+          'work_time_correction',
           'created_at',
           'created_by',
           'updated_at',
@@ -178,14 +184,89 @@ service cloud.firestore {
               !data.keys().hasAny(['manual_override'])
               || data.manual_override == null
             )
+            && validWorkTimeCorrection(data)
           )
           || (
             data.source == 'attendance_import'
             && isNonEmptyString(data.import_id)
             && validManualOverride(data)
+            && validWorkTimeCorrection(data)
           )
         )
         && hasModificationMetadata(data);
+    }
+
+    function validWorkTimeCorrection(data) {
+      return !data.keys().hasAny(['work_time_correction'])
+        || data.work_time_correction == null
+        || (
+          data.work_time_correction is map
+          && data.work_time_correction.keys().hasAll([
+            'planned_shift',
+            'planned_start_time',
+            'planned_end_time',
+            'actual_start_time',
+            'actual_end_time',
+            'classification_override'
+          ])
+          && data.work_time_correction.keys().hasOnly([
+            'planned_shift',
+            'planned_start_time',
+            'planned_end_time',
+            'actual_start_time',
+            'actual_end_time',
+            'classification_override'
+          ])
+          && data.work_time_correction.planned_shift in [
+            'FIRST',
+            'SECOND',
+            'NIGHT'
+          ]
+          && isClockTime(data.work_time_correction.planned_start_time)
+          && isClockTime(data.work_time_correction.planned_end_time)
+          && isClockTime(data.work_time_correction.actual_start_time)
+          && isClockTime(data.work_time_correction.actual_end_time)
+          && validWorkTimeClassificationOverride(
+            data.work_time_correction.classification_override
+          )
+        );
+    }
+
+    function validNullableHours(value) {
+      return value == null
+        || (value is number && value >= 0 && value <= 24);
+    }
+
+    function validWorkTimeClassificationOverride(override) {
+      return override == null
+        || (
+          override is map
+          && override.keys().hasAll([
+            'private_time_hours',
+            'overtime_50_hours',
+            'overtime_100_hours',
+            'coverable_ni_hours',
+            'note',
+            'actor_uid',
+            'updated_at'
+          ])
+          && override.keys().hasOnly([
+            'private_time_hours',
+            'overtime_50_hours',
+            'overtime_100_hours',
+            'coverable_ni_hours',
+            'note',
+            'actor_uid',
+            'updated_at'
+          ])
+          && validNullableHours(override.private_time_hours)
+          && validNullableHours(override.overtime_50_hours)
+          && validNullableHours(override.overtime_100_hours)
+          && validNullableHours(override.coverable_ni_hours)
+          && isNullableString(override.note)
+          && override.actor_uid == request.auth.uid
+          && override.updated_at == request.time
+        );
     }
 
     function validManualOverride(data) {
@@ -530,6 +611,7 @@ service cloud.firestore {
               && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
                 'hours',
                 'note',
+                'work_time_correction',
                 'updated_at',
                 'updated_by'
               ])
@@ -538,10 +620,12 @@ service cloud.firestore {
               resource.data.source == 'attendance_import'
               && request.resource.data.source == 'attendance_import'
               && request.resource.data.diff(resource.data).affectedKeys().hasAny([
-                'manual_override'
+                'manual_override',
+                'work_time_correction'
               ])
               && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
                 'manual_override',
+                'work_time_correction',
                 'updated_at',
                 'updated_by'
               ])

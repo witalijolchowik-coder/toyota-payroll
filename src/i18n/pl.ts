@@ -293,6 +293,10 @@ export const pl = {
         nominal: 'Nominał',
         worked: 'Praca',
         virtual: 'Wirtualne',
+        privateTime: 'Czas prywatny',
+        niedoczas: 'Niedoczas',
+        overtime50: 'Nadgodz. 50%',
+        overtime100: 'Nadgodz. 100%',
         frequencyBonus: 'Premia frekw.',
         increases: 'Zwiększenia',
         decreases: 'Potrącenia',
@@ -304,6 +308,10 @@ export const pl = {
         nominal: 'Nominał',
         worked: 'Godziny pracy',
         virtual: 'Wirtualne',
+        privateTime: 'Czas prywatny',
+        overtime: 'Nadgodziny',
+        overtimeSplit: '50%: {{overtime50}} h / 100%: {{overtime100}} h',
+        niedoczas: 'Niedoczas',
         frequencyBonus: 'Premia frekwencyjna',
         adjustments: 'Korekty',
         warnings: 'Uwagi',
@@ -327,6 +335,8 @@ export const pl = {
           'Kilka nieobecności ma taki sam priorytet dla tego dnia.',
         'unresolved-frequency-bonus-setting':
           'Nie znaleziono aktywnej konfiguracji premii frekwencyjnej.',
+        'unresolved-work-time-classification':
+          'Brakuje faktycznego startu/końca dla nietypowej liczby godzin.',
       },
     },
     constructor: {
@@ -392,6 +402,7 @@ export const pl = {
       settledReadOnly:
         'Ten miesiąc jest zamknięty, dlatego kalendarz pracownika jest tylko do odczytu.',
       warning: 'Wymaga weryfikacji',
+      actualInterval: 'Rzeczywiście: {{start}}–{{end}}',
       close: 'Zamknij',
     },
     settled: {
@@ -467,6 +478,17 @@ export const pl = {
       note: 'Powód lub notatka',
       noteHelper:
         'Opcjonalnie opisz ręczny wpis lub przyczynę korekty wartości z importu.',
+      workTime: {
+        title: 'Korekta czasu pracy',
+        plannedShift: 'Planowana zmiana',
+        plannedInterval: 'Plan: {{start}}–{{end}}',
+        actualStart: 'Rzeczywisty start',
+        actualEnd: 'Rzeczywisty koniec',
+        optional: 'Opcjonalnie, format GG:MM.',
+        invalidTime: 'Wprowadź godzinę w formacie GG:MM.',
+        preview:
+          'Rozbicie: praca normalna {{normal}} h, czas prywatny {{private}} h, nadgodziny 50% {{overtime50}} h, nadgodziny 100% {{overtime100}} h.',
+      },
       cancel: 'Anuluj',
       save: 'Zapisz',
       clear: 'Usuń korektę ręczną',

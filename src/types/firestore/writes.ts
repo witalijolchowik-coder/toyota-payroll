@@ -2,6 +2,7 @@ import type {
   AdjustmentCategory,
   AdjustmentDirection,
   AuditAction,
+  ActualWorkingShift,
   DepartmentId,
   DepartmentShiftMode,
   EmployeeId,
@@ -52,6 +53,24 @@ export interface DailyValueUpsertInput extends EmployeeReferenceInput {
   date: IsoDate;
   hours: number;
   note: string | null;
+  workTimeCorrection?: WorkTimeCorrectionInput | null;
+}
+
+export interface WorkTimeClassificationOverrideInput {
+  privateTimeHours: number | null;
+  overtime50Hours: number | null;
+  overtime100Hours: number | null;
+  coverableNiHours: number | null;
+  note: string | null;
+}
+
+export interface WorkTimeCorrectionInput {
+  plannedShift: ActualWorkingShift;
+  plannedStartTime: string;
+  plannedEndTime: string;
+  actualStartTime: string;
+  actualEndTime: string;
+  classificationOverride?: WorkTimeClassificationOverrideInput | null;
 }
 
 export interface AbsenceCreateInput extends EmployeeReferenceInput {

@@ -33,6 +33,12 @@ import {
 import { getPayrollMonthDateRange } from './month';
 import { resolveEffectivePayrollSetting } from './settings';
 import { getPayrollVirtualDefaultHours } from './virtualDefaults';
+import {
+  balanceMonthlyWorkTimeDeviations,
+  plannedIntervalForShift,
+  resolveDailyWorkTimeDeviation,
+  type DailyWorkTimeDeviation,
+} from './workTimeDeviations';
 
 export type PayrollDraftWarningCode =
   | 'employee-not-participating'
@@ -42,7 +48,8 @@ export type PayrollDraftWarningCode =
   | 'attendance-outside-employment'
   | 'absence-outside-employment'
   | 'ambiguous-absence'
-  | 'unresolved-frequency-bonus-setting';
+  | 'unresolved-frequency-bonus-setting'
+  | 'unresolved-work-time-classification';
 
 export interface PayrollDraftWarning {
   code: PayrollDraftWarningCode;
@@ -99,6 +106,22 @@ export interface EmployeeMonthlyCalculationDraft {
     l4Hours: number;
     nnHours: number;
     approvedOrJustifiedHours: number;
+  };
+  workTime: {
+    normalWorkHours: number;
+    privateTimeHours: number;
+    privateTimeCoveredHours: number;
+    uncoveredPrivateTimeHours: number;
+    coverableNiHours: number;
+    coverableNiCoveredHours: number;
+    uncoveredCoverableNiHours: number;
+    overtime50Hours: number;
+    overtime100Hours: number;
+    paidOvertime50Hours: number;
+    paidOvertime100Hours: number;
+    holidayWorkBonusEligible: boolean;
+    unresolvedClassificationDays: IsoDate[];
+    niedoczasHours: number;
   };
   bonuses: {
     frequency: PayrollDraftFrequencyBonus;
@@ -246,6 +269,8 @@ export function calculateEmployeeMonthlyDraft({
   const conflictDays: IsoDate[] = [];
   const outsideEmploymentValueDays: IsoDate[] = [];
   const absenceGroups = new Map<string, PayrollDraftAbsenceGroup>();
+  const workTimeDeviations: DailyWorkTimeDeviation[] = [];
+  const unresolvedClassificationDays: IsoDate[] = [];
 
   if (participatesInMonth) {
     createPayrollMonthCalendar(monthId, calendarOptions).forEach((day) => {
@@ -302,6 +327,63 @@ export function calculateEmployeeMonthlyDraft({
           } else {
             importedOverrideHours += effective.hours;
           }
+          const deviation = dailyWorkTimeDeviationFromValue({
+            value: persistedValue,
+            day,
+          });
+          if (deviation) {
+            workTimeDeviations.push(deviation);
+          } else if (effective.hours > 0 && !hasGoverningAbsence) {
+            if (!day.isWorkingDay) {
+              workTimeDeviations.push(
+                resolveDailyWorkTimeDeviation({
+                  planned: plannedIntervalForShift('FIRST'),
+                  actual: {
+                    startTime: '06:00',
+                    endTime: addHoursToClockTime('06:00', effective.hours),
+                  },
+                  isWorkingDay: false,
+                  isSaturday: day.date.getUTCDay() === 6,
+                  isSunday: day.date.getUTCDay() === 0,
+                  isPublicHoliday: day.isPublicHoliday,
+                }),
+              );
+            } else if (effective.hours !== STANDARD_WORKING_DAY_HOURS) {
+              unresolvedClassificationDays.push(day.isoDate);
+              warnings.push(
+                warning('unresolved-work-time-classification', day.isoDate),
+              );
+              workTimeDeviations.push({
+                normalWorkHours: Math.min(
+                  effective.hours,
+                  STANDARD_WORKING_DAY_HOURS,
+                ),
+                privateTimeHours: Math.max(
+                  0,
+                  STANDARD_WORKING_DAY_HOURS - effective.hours,
+                ),
+                extraHours: Math.max(
+                  0,
+                  effective.hours - STANDARD_WORKING_DAY_HOURS,
+                ),
+                overtime50Hours: 0,
+                overtime100Hours: 0,
+                overtime100Reasons: [],
+                coverableNiHours: 0,
+                holidayWorkBonusEligible: false,
+                nightOvertimeHours: 0,
+                nightAllowanceHours: 0,
+                unresolved: true,
+              });
+            } else {
+              workTimeDeviations.push(
+                resolveDailyWorkTimeDeviation({
+                  planned: plannedIntervalForShift('FIRST'),
+                  isWorkingDay: true,
+                }),
+              );
+            }
+          }
         }
         return;
       }
@@ -312,6 +394,17 @@ export function calculateEmployeeMonthlyDraft({
         hasGoverningValue: absenceRemovesVirtualDefault(absenceResolution),
       });
       virtualHours += virtual ?? 0;
+      if (virtual && !hasGoverningAbsence) {
+        workTimeDeviations.push(
+          resolveDailyWorkTimeDeviation({
+            planned: plannedIntervalForShift('FIRST'),
+            isWorkingDay: day.isWorkingDay,
+            isSaturday: day.date.getUTCDay() === 6,
+            isSunday: day.date.getUTCDay() === 0,
+            isPublicHoliday: day.isPublicHoliday,
+          }),
+        );
+      }
     });
   }
 
@@ -349,6 +442,28 @@ export function calculateEmployeeMonthlyDraft({
   const groups = [...absenceGroups.values()].sort((first, second) =>
     first.code.localeCompare(second.code, 'pl-PL'),
   );
+  const workTimeBeforeBalance = workTimeDeviations.reduce(
+    (total, deviation) => ({
+      normalWorkHours: total.normalWorkHours + deviation.normalWorkHours,
+      privateTimeHours: total.privateTimeHours + deviation.privateTimeHours,
+      coverableNiHours: total.coverableNiHours + deviation.coverableNiHours,
+      overtime50Hours: total.overtime50Hours + deviation.overtime50Hours,
+      overtime100Hours: total.overtime100Hours + deviation.overtime100Hours,
+      holidayWorkBonusEligible:
+        total.holidayWorkBonusEligible || deviation.holidayWorkBonusEligible,
+    }),
+    {
+      normalWorkHours: 0,
+      privateTimeHours: 0,
+      coverableNiHours: 0,
+      overtime50Hours: 0,
+      overtime100Hours: 0,
+      holidayWorkBonusEligible: false,
+    },
+  );
+  const workTimeBalance = balanceMonthlyWorkTimeDeviations(
+    workTimeBeforeBalance,
+  );
   const hoursForCodes = (codes: ReadonlySet<string>) =>
     groups
       .filter((group) => codes.has(group.code))
@@ -381,6 +496,22 @@ export function calculateEmployeeMonthlyDraft({
       l4Hours: hoursForCodes(new Set(['L4'])),
       nnHours: hoursForCodes(new Set(['NN'])),
       approvedOrJustifiedHours: hoursForCodes(APPROVED_ABSENCE_CODES),
+    },
+    workTime: {
+      normalWorkHours: workTimeBeforeBalance.normalWorkHours,
+      privateTimeHours: workTimeBalance.privateTimeHours,
+      privateTimeCoveredHours: workTimeBalance.privateTimeCoveredHours,
+      uncoveredPrivateTimeHours: workTimeBalance.uncoveredPrivateTimeHours,
+      coverableNiHours: workTimeBalance.coverableNiHours,
+      coverableNiCoveredHours: workTimeBalance.coverableNiCoveredHours,
+      uncoveredCoverableNiHours: workTimeBalance.uncoveredCoverableNiHours,
+      overtime50Hours: workTimeBalance.overtime50Hours,
+      overtime100Hours: workTimeBalance.overtime100Hours,
+      paidOvertime50Hours: workTimeBalance.paidOvertime50Hours,
+      paidOvertime100Hours: workTimeBalance.paidOvertime100Hours,
+      holidayWorkBonusEligible: workTimeBeforeBalance.holidayWorkBonusEligible,
+      unresolvedClassificationDays,
+      niedoczasHours: workTimeBalance.niedoczasHours,
     },
     bonuses: {
       frequency: {
@@ -417,4 +548,50 @@ export function calculateMonthlyDrafts({
   return employees.map((employee) =>
     calculateEmployeeMonthlyDraft({ ...input, employee }),
   );
+}
+
+function dailyWorkTimeDeviationFromValue({
+  value,
+  day,
+}: {
+  value: DailyValue;
+  day: ReturnType<typeof createPayrollMonthCalendar>[number];
+}): DailyWorkTimeDeviation | null {
+  if (!value.workTimeCorrection) {
+    return null;
+  }
+
+  const correction = value.workTimeCorrection;
+  return resolveDailyWorkTimeDeviation({
+    planned: {
+      shift: correction.plannedShift,
+      startTime: correction.plannedStartTime,
+      endTime: correction.plannedEndTime,
+    },
+    actual: {
+      startTime: correction.actualStartTime,
+      endTime: correction.actualEndTime,
+    },
+    isWorkingDay: day.isWorkingDay,
+    isSaturday: day.date.getUTCDay() === 6,
+    isSunday: day.date.getUTCDay() === 0,
+    isPublicHoliday: day.isPublicHoliday,
+    classificationOverride: correction.classificationOverride
+      ? {
+          privateTimeHours: correction.classificationOverride.privateTimeHours,
+          overtime50Hours: correction.classificationOverride.overtime50Hours,
+          overtime100Hours: correction.classificationOverride.overtime100Hours,
+          coverableNiHours: correction.classificationOverride.coverableNiHours,
+        }
+      : null,
+  });
+}
+
+function addHoursToClockTime(startTime: string, hours: number): string {
+  const [hour, minute] = startTime.split(':').map(Number);
+  const totalMinutes = Math.round(hour! * 60 + minute! + hours * 60);
+  const normalized = ((totalMinutes % (24 * 60)) + 24 * 60) % (24 * 60);
+  return `${Math.floor(normalized / 60)
+    .toString()
+    .padStart(2, '0')}:${(normalized % 60).toString().padStart(2, '0')}`;
 }

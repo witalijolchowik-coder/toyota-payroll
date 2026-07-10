@@ -142,6 +142,14 @@ document may contain an optional audited `manual_override` map with `hours`,
 this override in an open month; imported hours, source, import linkage,
 identity, and base creation metadata remain preserved.
 
+Daily values may also contain an optional coordinator-owned
+`work_time_correction` map with the planned actual working shift interval and
+the corrected actual start/end time. This field coexists with `hours` and
+`manual_override`; it does not replace imported base facts. Derived private
+time, overtime 50%, overtime 100%, coverable NI, and monthly balancing remain
+calculated in memory until a later payroll-closing stage persists authoritative
+results.
+
 Daily values are worked-hour facts only. They do not define nominal month
 hours, employee-specific nominal hours, bonuses, absence calculations, or
 payroll results. Those concepts remain deferred until an approved Business

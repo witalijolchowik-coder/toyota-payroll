@@ -67,6 +67,13 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Department and zmiana filters in the Calendar Constructor.
 - Conservative weekly rotation helper types for future first/second/night
   shift planning.
+- Work-time deviation foundation for planned-vs-actual intervals, private
+  time, overtime 50%, combined overtime 100%, public-holiday eligibility, and
+  monthly balancing.
+- Optional `DailyValue.work_time_correction` model and Polish daily editor
+  fields for actual start/end time.
+- Payroll draft work-time totals for private time, niedoczas, and payable
+  overtime buckets.
 
 ### Changed
 
@@ -90,6 +97,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   warnings without introducing payroll consequences.
 - Reused existing DailyValue/manual_override and Absence semantics for visual
   calendar corrections instead of adding a separate calendar status model.
+- Extended existing DailyValue documents for work-time corrections instead of
+  introducing a parallel attendance collection.
 
 ### Security
 
@@ -104,6 +113,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   caller-bound metadata, and calculation version zero.
 - Allowed narrowly scoped `manual_override` updates on imported daily values
   while keeping all imported base fields client-immutable.
+- Allowed narrowly scoped `work_time_correction` updates on daily values while
+  keeping settled months and imported base fields protected.
 - Enforced canonical manual daily-value IDs and kept imported and settled
   values read-only.
 - Denied absence deletion, non-canonical owner months, invalid lifecycle

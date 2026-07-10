@@ -384,6 +384,52 @@ describe('Firestore security rules', () => {
     await assertSucceeds(deleteDoc(dailyValue));
   });
 
+  it('allows audited work-time correction on manual daily values', async () => {
+    await seedMonth('2026-07', false);
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const dailyValue = doc(
+      firestore,
+      'months/2026-07/dailyValues/employee-1_2026-07-14',
+    );
+
+    await assertSucceeds(
+      setDoc(dailyValue, {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        date: '2026-07-14',
+        hours: 8,
+        source: 'manual',
+        import_id: null,
+        note: 'Korekta czasu',
+        work_time_correction: {
+          planned_shift: 'FIRST',
+          planned_start_time: '06:00',
+          planned_end_time: '14:00',
+          actual_start_time: '09:00',
+          actual_end_time: '17:00',
+          classification_override: null,
+        },
+        ...modificationMetadata(uid),
+      }),
+    );
+
+    await assertFails(
+      updateDoc(dailyValue, {
+        work_time_correction: {
+          planned_shift: 'FIRST',
+          planned_start_time: 'bad',
+          planned_end_time: '14:00',
+          actual_start_time: '09:00',
+          actual_end_time: '17:00',
+          classification_override: null,
+        },
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+  });
+
   it('rejects non-canonical daily value document IDs', async () => {
     await seedMonth('2026-07', false);
     const uid = 'coordinator-1';
@@ -473,6 +519,62 @@ describe('Firestore security rules', () => {
         actor_uid: uid,
       },
     });
+
+    await assertSucceeds(
+      updateDoc(dailyValue, {
+        work_time_correction: {
+          planned_shift: 'SECOND',
+          planned_start_time: '14:00',
+          planned_end_time: '22:00',
+          actual_start_time: '14:00',
+          actual_end_time: '00:00',
+          classification_override: {
+            private_time_hours: null,
+            overtime_50_hours: 0,
+            overtime_100_hours: 2,
+            coverable_ni_hours: null,
+            note: 'Nadgodziny nocne',
+            actor_uid: uid,
+            updated_at: serverTimestamp(),
+          },
+        },
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    const withWorkTimeCorrection = await getDoc(dailyValue);
+    expect(withWorkTimeCorrection.data()).toMatchObject({
+      hours: 6,
+      source: 'attendance_import',
+      import_id: 'import-1',
+      work_time_correction: {
+        planned_shift: 'SECOND',
+        actual_end_time: '00:00',
+      },
+    });
+
+    await assertFails(
+      updateDoc(dailyValue, {
+        work_time_correction: {
+          planned_shift: 'SECOND',
+          planned_start_time: '14:00',
+          planned_end_time: '22:00',
+          actual_start_time: '14:00',
+          actual_end_time: '00:00',
+          classification_override: {
+            private_time_hours: null,
+            overtime_50_hours: 0,
+            overtime_100_hours: 2,
+            coverable_ni_hours: null,
+            note: null,
+            actor_uid: 'different-user',
+            updated_at: serverTimestamp(),
+          },
+        },
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
 
     await assertFails(
       updateDoc(dailyValue, {

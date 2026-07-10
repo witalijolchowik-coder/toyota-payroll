@@ -184,6 +184,20 @@ export const dailyValueConverter = createConverter<DailyValueDocument>(
       rawOverride === undefined || rawOverride === null
         ? null
         : readObject(data, 'manual_override', path);
+    const rawWorkTimeCorrection: unknown = data.work_time_correction;
+    const workTimeCorrection =
+      rawWorkTimeCorrection === undefined || rawWorkTimeCorrection === null
+        ? null
+        : readObject(data, 'work_time_correction', path);
+    const classificationOverride =
+      workTimeCorrection?.classification_override === undefined ||
+      workTimeCorrection?.classification_override === null
+        ? null
+        : readObject(
+            workTimeCorrection,
+            'classification_override',
+            `${path}.work_time_correction`,
+          );
 
     return {
       ...employeeReference(data, path),
@@ -217,6 +231,75 @@ export const dailyValueConverter = createConverter<DailyValueDocument>(
               'updated_at',
               `${path}.manual_override`,
             ),
+          }
+        : null,
+      work_time_correction: workTimeCorrection
+        ? {
+            planned_shift: readEnum(
+              workTimeCorrection,
+              'planned_shift',
+              `${path}.work_time_correction`,
+              ['FIRST', 'SECOND', 'NIGHT'] as const,
+            ),
+            planned_start_time: readNonEmptyString(
+              workTimeCorrection,
+              'planned_start_time',
+              `${path}.work_time_correction`,
+            ),
+            planned_end_time: readNonEmptyString(
+              workTimeCorrection,
+              'planned_end_time',
+              `${path}.work_time_correction`,
+            ),
+            actual_start_time: readNonEmptyString(
+              workTimeCorrection,
+              'actual_start_time',
+              `${path}.work_time_correction`,
+            ),
+            actual_end_time: readNonEmptyString(
+              workTimeCorrection,
+              'actual_end_time',
+              `${path}.work_time_correction`,
+            ),
+            classification_override: classificationOverride
+              ? {
+                  private_time_hours: readNullableNumber(
+                    classificationOverride,
+                    'private_time_hours',
+                    `${path}.work_time_correction.classification_override`,
+                  ),
+                  overtime_50_hours: readNullableNumber(
+                    classificationOverride,
+                    'overtime_50_hours',
+                    `${path}.work_time_correction.classification_override`,
+                  ),
+                  overtime_100_hours: readNullableNumber(
+                    classificationOverride,
+                    'overtime_100_hours',
+                    `${path}.work_time_correction.classification_override`,
+                  ),
+                  coverable_ni_hours: readNullableNumber(
+                    classificationOverride,
+                    'coverable_ni_hours',
+                    `${path}.work_time_correction.classification_override`,
+                  ),
+                  note: readNullableString(
+                    classificationOverride,
+                    'note',
+                    `${path}.work_time_correction.classification_override`,
+                  ),
+                  actor_uid: readNonEmptyString(
+                    classificationOverride,
+                    'actor_uid',
+                    `${path}.work_time_correction.classification_override`,
+                  ),
+                  updated_at: readTimestamp(
+                    classificationOverride,
+                    'updated_at',
+                    `${path}.work_time_correction.classification_override`,
+                  ),
+                }
+              : null,
           }
         : null,
       ...metadata(data, path),
