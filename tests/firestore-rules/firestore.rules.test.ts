@@ -45,6 +45,26 @@ async function seedMonth(monthId: string, isSettled: boolean) {
   });
 }
 
+async function seedAppUser(
+  uid: string,
+  {
+    active = true,
+    role = 'coordinator',
+    email = `${uid}@example.com`,
+  }: { active?: boolean; role?: string; email?: string } = {},
+) {
+  await testEnvironment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), 'appUsers', uid), {
+      email,
+      role,
+      active,
+      display_name: uid,
+      created_at: new Date('2026-07-01T00:00:00.000Z'),
+      updated_at: new Date('2026-07-01T00:00:00.000Z'),
+    });
+  });
+}
+
 async function seedEmployee(employeeId: string) {
   await testEnvironment.withSecurityRulesDisabled(async (context) => {
     await setDoc(doc(context.firestore(), 'employees', employeeId), {
@@ -75,6 +95,7 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await testEnvironment.clearFirestore();
+  await seedAppUser('coordinator-1');
 });
 
 afterAll(async () => {
@@ -85,6 +106,87 @@ describe('Firestore security rules', () => {
   it('denies public access', async () => {
     const firestore = testEnvironment.unauthenticatedContext().firestore();
     await assertFails(getDoc(doc(firestore, 'employees', 'employee-1')));
+    await assertFails(
+      setDoc(doc(firestore, 'employees', 'public-write'), {
+        teta_number: 'TETA-0001',
+        first_name: 'Public',
+        last_name: 'User',
+        is_active: true,
+        department_id: null,
+        shift_assignment: null,
+        employment_start_date: null,
+        employment_end_date: null,
+        ...modificationMetadata('anonymous'),
+      }),
+    );
+  });
+
+  it('denies authenticated users without an active app access record', async () => {
+    await seedEmployee('employee-1');
+    const unapproved = testEnvironment
+      .authenticatedContext('unapproved-user')
+      .firestore();
+
+    await assertFails(getDoc(doc(unapproved, 'employees', 'employee-1')));
+    await assertFails(
+      setDoc(doc(unapproved, 'employees', 'employee-unapproved'), {
+        teta_number: 'TETA-0002',
+        first_name: 'No',
+        last_name: 'Access',
+        is_active: true,
+        department_id: null,
+        shift_assignment: null,
+        employment_start_date: null,
+        employment_end_date: null,
+        ...modificationMetadata('unapproved-user'),
+      }),
+    );
+  });
+
+  it('denies inactive app users', async () => {
+    await seedAppUser('inactive-user', { active: false });
+    await seedEmployee('employee-1');
+    const firestore = testEnvironment
+      .authenticatedContext('inactive-user')
+      .firestore();
+
+    await assertFails(getDoc(doc(firestore, 'employees', 'employee-1')));
+  });
+
+  it('allows users to read only their own app access document', async () => {
+    await seedAppUser('viewer-1', { role: 'viewer' });
+    const firestore = testEnvironment
+      .authenticatedContext('viewer-1')
+      .firestore();
+
+    await assertSucceeds(getDoc(doc(firestore, 'appUsers', 'viewer-1')));
+    await assertFails(getDoc(doc(firestore, 'appUsers', 'coordinator-1')));
+  });
+
+  it('prevents users from approving or modifying their own app access', async () => {
+    const unapproved = testEnvironment
+      .authenticatedContext('new-user')
+      .firestore();
+    const approved = testEnvironment
+      .authenticatedContext('coordinator-1')
+      .firestore();
+
+    await assertFails(
+      setDoc(doc(unapproved, 'appUsers', 'new-user'), {
+        email: 'new-user@example.com',
+        role: 'admin',
+        active: true,
+        display_name: 'New User',
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp(),
+      }),
+    );
+    await assertFails(
+      updateDoc(doc(approved, 'appUsers', 'coordinator-1'), {
+        role: 'admin',
+        updated_at: serverTimestamp(),
+      }),
+    );
   });
 
   it('allows a valid authenticated employee create', async () => {

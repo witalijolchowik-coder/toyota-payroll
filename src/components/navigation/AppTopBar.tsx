@@ -5,6 +5,7 @@ import {
   AppBar,
   Avatar,
   Box,
+  Button,
   IconButton,
   Stack,
   Toolbar,
@@ -13,6 +14,7 @@ import {
 } from '@mui/material';
 
 import { useAuth } from '../../hooks/useAuth';
+import { useTranslations } from '../../hooks/useTranslations';
 
 interface AppTopBarProps {
   pageTitle: string;
@@ -27,7 +29,8 @@ export function AppTopBar({
   onOpenMobileDrawer,
   onToggleDesktopDrawer,
 }: AppTopBarProps) {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
+  const t = useTranslations();
   const initials = user?.displayName
     .split(' ')
     .map((part) => part[0])
@@ -48,19 +51,25 @@ export function AppTopBar({
       <Toolbar sx={{ minHeight: { xs: 60, sm: 68 } }}>
         <IconButton
           edge="start"
-          aria-label="Open navigation"
+          aria-label={t.auth.appBar.openNavigation}
           onClick={onOpenMobileDrawer}
           sx={{ display: { md: 'none' }, mr: 1 }}
         >
           <Menu />
         </IconButton>
         <Tooltip
-          title={desktopCollapsed ? 'Expand navigation' : 'Collapse navigation'}
+          title={
+            desktopCollapsed
+              ? t.auth.appBar.expandNavigation
+              : t.auth.appBar.collapseNavigation
+          }
         >
           <IconButton
             edge="start"
             aria-label={
-              desktopCollapsed ? 'Expand navigation' : 'Collapse navigation'
+              desktopCollapsed
+                ? t.auth.appBar.expandNavigation
+                : t.auth.appBar.collapseNavigation
             }
             onClick={onToggleDesktopDrawer}
             sx={{ display: { xs: 'none', md: 'inline-flex' }, mr: 1.5 }}
@@ -106,12 +115,12 @@ export function AppTopBar({
 
         <Box sx={{ flexGrow: 1 }} />
 
-        <Tooltip title="Notifications">
-          <IconButton aria-label="Notifications">
+        <Tooltip title={t.auth.appBar.notifications}>
+          <IconButton aria-label={t.auth.appBar.notifications}>
             <NotificationsNoneOutlined />
           </IconButton>
         </Tooltip>
-        <Tooltip title={user?.displayName ?? 'Current user'}>
+        <Tooltip title={user?.displayName ?? t.auth.appBar.currentUser}>
           <Avatar
             sx={{
               width: 34,
@@ -125,6 +134,14 @@ export function AppTopBar({
             {initials}
           </Avatar>
         </Tooltip>
+        <Button
+          variant="text"
+          color="inherit"
+          onClick={() => void signOut()}
+          sx={{ ml: 1, display: { xs: 'none', sm: 'inline-flex' } }}
+        >
+          {t.auth.signOut}
+        </Button>
       </Toolbar>
     </AppBar>
   );

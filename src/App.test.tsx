@@ -1,16 +1,50 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import type { ReactNode } from 'react';
+import { MemoryRouter } from 'react-router-dom';
 
 import { App } from './App';
+import { NoAccessScreen } from './components/auth/NoAccessScreen';
+import { AuthContext } from './contexts/AuthContext';
 import { pl } from './i18n/pl';
-import { AppProviders } from './providers/AppProviders';
+import { LoginPage } from './pages/LoginPage';
+import { AppThemeProvider } from './providers/AppThemeProvider';
+import { LoadingProvider } from './providers/LoadingProvider';
+import { NotificationProvider } from './providers/NotificationProvider';
+import type { AuthContextValue } from './types/auth';
+
+function renderWithAuth(
+  children: ReactNode,
+  auth: Partial<AuthContextValue> = {},
+) {
+  const value: AuthContextValue = {
+    status: 'authenticated',
+    user: {
+      uid: 'coordinator-1',
+      displayName: 'Payroll Coordinator',
+      email: 'koordynator@example.com',
+      role: 'coordinator',
+    },
+    isAuthenticated: true,
+    signIn: vi.fn(async () => undefined),
+    signOut: vi.fn(async () => undefined),
+    ...auth,
+  };
+
+  return render(
+    <AppThemeProvider>
+      <AuthContext.Provider value={value}>
+        <LoadingProvider>
+          <NotificationProvider>{children}</NotificationProvider>
+        </LoadingProvider>
+      </AuthContext.Provider>
+    </AppThemeProvider>,
+  );
+}
 
 describe('App', () => {
   it('renders the application shell and dashboard', async () => {
-    render(
-      <AppProviders>
-        <App />
-      </AppProviders>,
-    );
+    window.location.hash = '#/dashboard';
+    renderWithAuth(<App />);
 
     expect(
       await screen.findByRole('heading', { name: 'Dashboard', level: 1 }),
@@ -24,5 +58,44 @@ describe('App', () => {
       }).length,
     ).toBeGreaterThan(0);
     expect(screen.getByText('Current Absences')).toBeInTheDocument();
+    expect(screen.getByText(pl.auth.signOut)).toBeInTheDocument();
+  });
+
+  it('shows the login page for unauthenticated users', () => {
+    renderWithAuth(
+      <MemoryRouter>
+        <LoginPage />
+      </MemoryRouter>,
+      {
+        status: 'unauthenticated',
+        user: null,
+        isAuthenticated: false,
+      },
+    );
+
+    expect(
+      screen.getByRole('heading', { name: pl.auth.login.title }),
+    ).toBeInTheDocument();
+    expect(screen.getByLabelText(pl.auth.login.email)).toBeInTheDocument();
+    expect(screen.getByLabelText(pl.auth.login.password)).toBeInTheDocument();
+  });
+
+  it('shows no-access state and allows sign out for unapproved users', async () => {
+    const signOut = vi.fn(async () => undefined);
+
+    renderWithAuth(<NoAccessScreen />, {
+      status: 'no-access',
+      user: null,
+      isAuthenticated: false,
+      signOut,
+    });
+
+    expect(
+      screen.getByRole('heading', { name: pl.auth.noAccess.title }),
+    ).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: pl.auth.signOut }));
+
+    await waitFor(() => expect(signOut).toHaveBeenCalledTimes(1));
   });
 });

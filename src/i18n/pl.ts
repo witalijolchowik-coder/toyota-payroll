@@ -1,4 +1,34 @@
 export const pl = {
+  auth: {
+    loading: 'Sprawdzanie dostępu',
+    signOut: 'Wyloguj',
+    login: {
+      title: 'Logowanie',
+      description:
+        'Zaloguj się kontem utworzonym przez administratora w Firebase.',
+      email: 'E-mail',
+      password: 'Hasło',
+      submit: 'Zaloguj',
+      signingIn: 'Trwa logowanie',
+    },
+    noAccess: {
+      title: 'Brak dostępu',
+      description:
+        'Twoje konto Firebase nie ma aktywnego dostępu do aplikacji Toyota Payroll. Skontaktuj się z administratorem.',
+    },
+    errors: {
+      invalidCredentials: 'Nieprawidłowy e-mail lub hasło.',
+      configuration:
+        'Nie można połączyć się z Firebase. Sprawdź konfigurację aplikacji.',
+    },
+    appBar: {
+      openNavigation: 'Otwórz nawigację',
+      expandNavigation: 'Rozwiń nawigację',
+      collapseNavigation: 'Zwiń nawigację',
+      notifications: 'Powiadomienia',
+      currentUser: 'Zalogowany użytkownik',
+    },
+  },
   navigation: {
     employees: {
       label: 'Pracownicy',

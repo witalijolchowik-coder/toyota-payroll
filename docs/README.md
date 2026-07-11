@@ -7,7 +7,9 @@ The attached design history contains several generations of the architecture. Th
 - [MVP architecture](architecture/mvp-architecture.md) — product shape, boundaries, and final simplifications
 - [Platform](architecture/platform.md) — React, Firebase, GitHub Pages, and logic placement
 - [Data model](architecture/data-model.md) — final MVP Firestore paths and amendments
+- [Authentication and access control](architecture/authentication-access-control.md) — Firebase Auth, `appUsers`, and first-user bootstrap
 - [Roadmap](roadmap.md) — approved implementation sequence and current status
+- [Pre-import security checklist](security/pre-import-checklist.md) — verification gate before real employee data import
 
 ## Business rules specifications
 
@@ -67,6 +69,7 @@ documents continue to govern system structure and implementation boundaries.
 - [ADR 0016: Employee entitlements and assignments](decisions/0016-employee-entitlements-assignments.md)
 - [ADR 0017: Monthly settlement review states](decisions/0017-monthly-settlement-review-states.md)
 - [ADR 0018: Export format foundation](decisions/0018-export-format-foundation.md)
+- [ADR 0019: Firebase Auth with appUsers allowlist](decisions/0019-firebase-auth-app-users.md)
 
 ## Authority order
 

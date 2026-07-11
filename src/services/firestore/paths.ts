@@ -38,6 +38,10 @@ export function dailyValueDocumentId(employeeId: string, date: string): string {
 }
 
 export const firestorePaths = {
+  appUsers: 'appUsers',
+  appUser(uid: string) {
+    return `appUsers/${assertPathSegment(uid, 'uid')}`;
+  },
   payrollSettings: 'payrollSettings',
   payrollSetting(settingId: string) {
     return `payrollSettings/${assertPathSegment(settingId, 'settingId')}`;

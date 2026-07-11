@@ -7,6 +7,7 @@ import { AbsencesPage } from '../pages/AbsencesPage';
 import { AdjustmentsPage } from '../pages/AdjustmentsPage';
 import { DashboardPage } from '../pages/DashboardPage';
 import { EmployeesPage } from '../pages/EmployeesPage';
+import { LoginPage } from '../pages/LoginPage';
 import { MonthlySettlementPage } from '../pages/MonthlySettlementPage';
 import { NotFoundPage } from '../pages/NotFoundPage';
 import { ReportsPage } from '../pages/ReportsPage';
@@ -14,6 +15,11 @@ import { SettingsPage } from '../pages/SettingsPage';
 import { routes } from '../utils/routes';
 
 export const router = createHashRouter([
+  {
+    path: routes.login,
+    element: <LoginPage />,
+    errorElement: <RouteErrorPage />,
+  },
   {
     element: <ProtectedRoute />,
     errorElement: <RouteErrorPage />,

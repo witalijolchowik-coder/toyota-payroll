@@ -2,16 +2,27 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isAuthenticated() {
+    function hasFirebaseAuth() {
       return request.auth != null;
     }
 
-    // Reserved for future role-based policies. Current MVP access remains
-    // authenticated-user based, while server Admin SDK operations bypass rules.
+    function appUserPath(uid) {
+      return /databases/$(database)/documents/appUsers/$(uid);
+    }
+
+    function isAuthenticated() {
+      return hasFirebaseAuth()
+        && exists(appUserPath(request.auth.uid))
+        && get(appUserPath(request.auth.uid)).data.active == true;
+    }
+
+    // Reserved for future role-based policies. Server Admin SDK operations
+    // bypass rules; client access requires an active appUsers document.
     function isAdmin() {
       return isAuthenticated()
         && (request.auth.token.admin == true
-          || request.auth.token.role == 'admin');
+          || request.auth.token.role == 'admin'
+          || get(appUserPath(request.auth.uid)).data.role == 'admin');
     }
 
     function isNonEmptyString(value) {
@@ -525,6 +536,12 @@ service cloud.firestore {
         && data.active is bool
         && data.description is string
         && hasModificationMetadata(data);
+    }
+
+    match /appUsers/{userId} {
+      allow read: if hasFirebaseAuth()
+        && request.auth.uid == userId;
+      allow create, update, delete: if false;
     }
 
     match /payrollSettings/{settingId} {

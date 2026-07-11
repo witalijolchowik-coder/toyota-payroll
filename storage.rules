@@ -2,22 +2,28 @@ rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    function isAuthenticated() {
-      return request.auth != null;
+    function isApprovedActiveUser() {
+      return request.auth != null
+        && firestore.exists(
+          /databases/(default)/documents/appUsers/$(request.auth.uid)
+        )
+        && firestore.get(
+          /databases/(default)/documents/appUsers/$(request.auth.uid)
+        ).data.active == true;
     }
 
     match /imports/{monthId}/{importId}/{filename} {
-      allow read, create: if isAuthenticated();
+      allow read, create: if isApprovedActiveUser();
       allow update, delete: if false;
     }
 
     match /reports/{monthId}/{reportType}/{filename} {
-      allow read: if isAuthenticated();
+      allow read: if isApprovedActiveUser();
       allow write: if false;
     }
 
     match /exports/{monthId}/{exportType}/{filename} {
-      allow read: if isAuthenticated();
+      allow read: if isApprovedActiveUser();
       allow write: if false;
     }
 
