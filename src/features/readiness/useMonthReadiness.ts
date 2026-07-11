@@ -36,7 +36,9 @@ export function useMonthReadiness(monthId: MonthId) {
   }, [hideLoading, monthId, showLoading]);
 
   useEffect(() => {
-    void reload();
+    queueMicrotask(() => {
+      void reload();
+    });
   }, [reload]);
 
   return { ...state, reload };

@@ -226,10 +226,12 @@ export function EmployeesPage() {
     if (!employee) {
       return;
     }
-    setFormState({ mode: 'edit', employee });
-    const next = new URLSearchParams(searchParams);
-    next.delete('editEmployeeId');
-    setSearchParams(next, { replace: true });
+    queueMicrotask(() => {
+      setFormState({ mode: 'edit', employee });
+      const next = new URLSearchParams(searchParams);
+      next.delete('editEmployeeId');
+      setSearchParams(next, { replace: true });
+    });
   }, [employees, formState, searchParams, setSearchParams]);
 
   return (
