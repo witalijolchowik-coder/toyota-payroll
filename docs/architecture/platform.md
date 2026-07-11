@@ -36,7 +36,12 @@ Vite uses `/toyota-payroll/` as its production asset base in GitHub Actions and 
 
 ## Firebase environments
 
-The default Firebase CLI project is `toyota-payroll`. The app configuration uses the existing project identifiers and reads the omitted web API key from `VITE_FIREBASE_API_KEY`.
+The default Firebase CLI project is `toyota-payroll`. The browser app includes
+the public Firebase web configuration for this project, including the web API
+key. These values are not private credentials; security is enforced by Firebase
+Authentication plus Firestore and Storage rules. `VITE_FIREBASE_*` environment
+variables may still override the defaults for local testing or a future
+environment split.
 
 Setting `VITE_USE_FIREBASE_EMULATORS=true` in local development connects Auth, Firestore, and Storage to the configured local emulators.
 

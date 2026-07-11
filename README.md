@@ -21,15 +21,17 @@ unimplemented.
 ## Local setup
 
 1. Copy `.env.example` to `.env.local`.
-2. Replace `VITE_FIREBASE_API_KEY` with the Firebase web API key.
-3. Install and run:
+2. Install and run:
 
    ```shell
    pnpm install
    pnpm dev
    ```
 
-The other Firebase identifiers already point to the existing project.
+The Firebase web configuration points to the existing `toyota-payroll` project.
+Environment variables may override these public client identifiers for local
+testing, but no private Firebase service credentials are required by the
+browser app.
 
 ## Quality checks
 
@@ -57,9 +59,8 @@ The initial Firestore and Storage rules deny anonymous access. Cloud Functions h
 
 Pushes to `main` run the quality checks, build the static application, and deploy `dist/` to GitHub Pages. Before the first deployment:
 
-1. Set the repository Actions variable `VITE_FIREBASE_API_KEY`.
-2. In **Settings → Pages**, select **GitHub Actions** as the source.
-3. Add the deployed Pages origin to Firebase Authentication's authorized domains before Step 2.
+1. In **Settings → Pages**, select **GitHub Actions** as the source.
+2. Add the deployed Pages origin to Firebase Authentication's authorized domains.
 
 The app uses hash-based routing to avoid project-page refresh failures.
 

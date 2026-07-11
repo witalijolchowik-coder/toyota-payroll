@@ -17,6 +17,7 @@ import {
 } from 'firebase/storage';
 
 const defaults = {
+  apiKey: 'AIzaSyDN3XRaAtp6kkiykJc-6PqoLRIsCl4JqKU',
   authDomain: 'toyota-payroll.firebaseapp.com',
   projectId: 'toyota-payroll',
   storageBucket: 'toyota-payroll.firebasestorage.app',
@@ -26,17 +27,17 @@ const defaults = {
 } as const;
 
 export const firebaseConfig: FirebaseOptions = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY ?? '',
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN ?? defaults.authDomain,
-  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID ?? defaults.projectId,
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || defaults.apiKey,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || defaults.authDomain,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID || defaults.projectId,
   storageBucket:
-    import.meta.env.VITE_FIREBASE_STORAGE_BUCKET ?? defaults.storageBucket,
+    import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || defaults.storageBucket,
   messagingSenderId:
-    import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID ??
+    import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID ||
     defaults.messagingSenderId,
-  appId: import.meta.env.VITE_FIREBASE_APP_ID ?? defaults.appId,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID || defaults.appId,
   measurementId:
-    import.meta.env.VITE_FIREBASE_MEASUREMENT_ID ?? defaults.measurementId,
+    import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || defaults.measurementId,
 };
 
 export const firebaseConfigurationComplete = Boolean(firebaseConfig.apiKey);
