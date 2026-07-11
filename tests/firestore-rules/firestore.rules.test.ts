@@ -5,6 +5,7 @@ import {
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import {
+  collection,
   deleteDoc,
   doc,
   collectionGroup,
@@ -962,7 +963,7 @@ describe('Firestore security rules', () => {
     await assertFails(deleteDoc(reference));
   });
 
-  it('allows active app users to read absences through the production collection-group query', async () => {
+  it('allows owner-month absence reads and keeps broad collection-group reads denied', async () => {
     await seedMonth('2026-06', false);
     await testEnvironment.withSecurityRulesDisabled(async (context) => {
       await setDoc(doc(context.firestore(), 'months/2026-06/absences/l4-1'), {
@@ -987,6 +988,9 @@ describe('Firestore security rules', () => {
       .authenticatedContext('coordinator-1')
       .firestore();
     await assertSucceeds(
+      getDocs(collection(active, 'months/2026-06/absences')),
+    );
+    await assertFails(
       getDocs(
         query(
           collectionGroup(active, 'absences'),
