@@ -3,6 +3,11 @@
 This block introduces a safe, preview-first import for the initial employee
 register.
 
+Block 15 supersedes this as the normal coordinator-facing employee import
+workflow. Toyota/SOZ settlement-file import remains a legacy/internal
+troubleshooting path and must not be treated as the long-term onboarding
+interface.
+
 ## Scope
 
 The import may create only selected, valid new employee records in the

@@ -8,11 +8,14 @@ import { DeactivateEmployeeDialog } from '../features/employees/DeactivateEmploy
 import { EmployeeEntitlementFormDialog } from '../features/employees/EmployeeEntitlementFormDialog';
 import { EmployeeEntitlementsPanel } from '../features/employees/EmployeeEntitlementsPanel';
 import { EmployeeFormDialog } from '../features/employees/EmployeeFormDialog';
-import { EmployeeImportDialog } from '../features/employees/EmployeeImportDialog';
+import { EmployeeTemplateImportDialog } from '../features/employees/EmployeeTemplateImportDialog';
 import { EmployeesEmptyState } from '../features/employees/EmployeesEmptyState';
 import { EmployeesTable } from '../features/employees/EmployeesTable';
 import { EmployeesToolbar } from '../features/employees/EmployeesToolbar';
-import type { EmployeeImportPreviewRow } from '../features/employees/employeeImport';
+import type {
+  BulkEmployeeUpdatePreviewRow,
+  NewEmployeeTemplatePreviewRow,
+} from '../features/employees/employeeTemplateImport';
 import type { EmployeeStatusFilter } from '../features/employees/types';
 import { useEmployees } from '../features/employees/useEmployees';
 import { useEmployeeEntitlements } from '../features/employees/useEmployeeEntitlements';
@@ -25,7 +28,10 @@ import {
   EmployeeServiceError,
   type EmployeeServiceErrorCode,
 } from '../services/employeesService';
-import { createEmployeesFromImportPreview } from '../services/employeeImportService';
+import {
+  createEmployeesFromTemplatePreview,
+  updateEmployeesFromTemplatePreview,
+} from '../services/employeeImportService';
 import type {
   Employee,
   EmployeeCreateInput,
@@ -181,11 +187,25 @@ export function EmployeesPage() {
     }
   };
 
-  const handleImportEmployees = async (rows: EmployeeImportPreviewRow[]) => {
-    const result = await createEmployeesFromImportPreview(rows);
+  const handleCreateEmployeesFromTemplate = async (
+    rows: NewEmployeeTemplatePreviewRow[],
+  ) => {
+    const result = await createEmployeesFromTemplatePreview(rows);
     notify({
-      message: interpolate(t.employees.import.notifications.created, {
+      message: interpolate(t.employees.templateImport.notifications.created, {
         count: String(result.createdEmployeeIds.length),
+      }),
+      severity: 'success',
+    });
+  };
+
+  const handleUpdateEmployeesFromTemplate = async (
+    rows: BulkEmployeeUpdatePreviewRow[],
+  ) => {
+    const result = await updateEmployeesFromTemplatePreview(rows);
+    notify({
+      message: interpolate(t.employees.templateImport.notifications.updated, {
+        count: String(result.updatedEmployeeIds.length),
       }),
       severity: 'success',
     });
@@ -206,7 +226,7 @@ export function EmployeesPage() {
               startIcon={<UploadFileOutlined />}
               onClick={() => setIsImportOpen(true)}
             >
-              {t.employees.import.open}
+              {t.employees.templateImport.open}
             </Button>
             <Button
               variant="contained"
@@ -303,12 +323,12 @@ export function EmployeesPage() {
       ) : null}
 
       {isImportOpen ? (
-        <EmployeeImportDialog
+        <EmployeeTemplateImportDialog
           employees={employees}
           departments={departments}
-          accommodationVariants={accommodationVariants}
           onClose={() => setIsImportOpen(false)}
-          onImport={handleImportEmployees}
+          onCreateEmployees={handleCreateEmployeesFromTemplate}
+          onUpdateEmployees={handleUpdateEmployeesFromTemplate}
         />
       ) : null}
     </Stack>

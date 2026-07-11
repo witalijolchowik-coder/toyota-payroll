@@ -47,6 +47,9 @@ The attached design history contains several generations of the architecture. Th
   SOZ CSV PL/foreign split, and mandatory overtime/niedoczas accompanying note
 - [Initial employee base import - Block 14](business-rules/initial-employee-base-import.md)
   - preview-first creation of selected new employees from Toyota/SOZ files
+- [Employee import templates and bulk updates - Block 15](business-rules/employee-import-templates.md)
+  - app-owned CSV templates for new employees and bulk employee master-data
+    updates
 
 Approved business-rules specifications govern payroll semantics. Architecture
 documents continue to govern system structure and implementation boundaries.
@@ -73,6 +76,7 @@ documents continue to govern system structure and implementation boundaries.
 - [ADR 0018: Export format foundation](decisions/0018-export-format-foundation.md)
 - [ADR 0019: Firebase Auth with appUsers allowlist](decisions/0019-firebase-auth-app-users.md)
 - [ADR 0020: Preview-first initial employee base import](decisions/0020-initial-employee-base-import.md)
+- [ADR 0021: Template-based employee import and bulk update](decisions/0021-employee-import-templates.md)
 
 ## Authority order
 

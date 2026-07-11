@@ -223,6 +223,100 @@ export const pl = {
         createFailed: 'Nie udało się utworzyć zaznaczonych pracowników.',
       },
     },
+    templateImport: {
+      open: 'Import i aktualizacja pracowników',
+      title: 'Import i aktualizacja pracowników',
+      description:
+        'Użyj szablonów aplikacji do tworzenia nowych pracowników albo uzupełniania danych istniejących osób. Pliki rozliczeniowe Toyota/SOZ nie są już standardowym importem pracowników.',
+      clearMarkerInfo:
+        'Puste komórki w szablonie aktualizacji oznaczają brak zmiany. Aby świadomie wyczyścić pole, wpisz {{marker}}.',
+      updateTemplateInfo:
+        'Szablon aktualizacji zostanie pobrany dla aktywnych pracowników, którzy nie mają zakończonego zatrudnienia przed dzisiejszą datą. Liczba wierszy: {{count}}.',
+      empty: '—',
+      noWarnings: 'Brak ostrzeżeń',
+      noChanges: 'Bez zmian',
+      fileNotSelected: 'Nie wybrano pliku',
+      employmentRange: '{{start}} – {{end}}',
+      employmentOpenRange: 'od {{start}}',
+      changeDescription: '{{field}}: {{oldValue}} → {{newValue}}',
+      tabs: {
+        newEmployees: 'Nowi pracownicy',
+        updateEmployees: 'Aktualizacja danych',
+      },
+      actions: {
+        downloadNewTemplate: 'Pobierz szablon nowych pracowników',
+        downloadUpdateTemplate: 'Pobierz szablon aktualizacji',
+        chooseFile: 'Wybierz plik CSV',
+        previewImport: 'Podgląd importu',
+        previewUpdate: 'Podgląd zmian',
+        createSelected: 'Utwórz pracowników: {{count}}',
+        applySelected: 'Zastosuj zmiany: {{count}}',
+        cancel: 'Anuluj',
+      },
+      table: {
+        select: 'Wybór',
+        selectRow: 'Zaznacz wiersz: {{employee}}',
+        status: 'Status',
+        teta: 'TETA',
+        employee: 'Pracownik',
+        identity: 'PESEL / paszport',
+        employment: 'Zatrudnienie',
+        department: 'Dział',
+        shift: 'Zmiana',
+        changes: 'Zmiany',
+        warnings: 'Ostrzeżenia',
+      },
+      newStatus: {
+        new: 'Nowy',
+        existing: 'Istnieje',
+        duplicate: 'Duplikat',
+        conflict: 'Konflikt',
+        blocked: 'Zablokowany',
+      },
+      updateStatus: {
+        ready: 'Gotowe',
+        warning: 'Z ostrzeżeniem',
+        blocked: 'Zablokowane',
+        'no-changes': 'Bez zmian',
+      },
+      warnings: {
+        'missing-teta': 'Brakuje numeru TETA.',
+        'missing-first-name': 'Brakuje imienia.',
+        'missing-last-name': 'Brakuje nazwiska.',
+        'missing-employment-start': 'Brakuje daty rozpoczęcia zatrudnienia.',
+        'invalid-employment-start':
+          'Data rozpoczęcia zatrudnienia jest nieprawidłowa.',
+        'invalid-employment-end':
+          'Data zakończenia zatrudnienia jest nieprawidłowa.',
+        'invalid-date-range':
+          'Data zakończenia nie może być wcześniejsza niż data rozpoczęcia.',
+        'duplicate-teta-in-file': 'Ten numer TETA powtarza się w pliku.',
+        'existing-teta':
+          'Pracownik z tym numerem TETA już istnieje — import go nie nadpisze.',
+        'unknown-teta':
+          'Nie znaleziono istniejącego pracownika z tym numerem TETA.',
+        'name-mismatch':
+          'Imię lub nazwisko w pliku różni się od danych w aplikacji.',
+        'identity-conflict':
+          'PESEL, paszport lub dokument pasuje do innego pracownika.',
+        'department-na0':
+          'Dział z pliku: NA0 — wymaga ręcznego przypisania do PU albo Headliner.',
+        'department-unmapped':
+          'Dział nie został bezpiecznie rozpoznany i pozostanie bez zmian lub pusty.',
+        'invalid-shift':
+          'Zmiana musi być pusta albo mieć wartość RED, WHITE lub BLUE.',
+      },
+      notifications: {
+        created: 'Utworzono pracowników: {{count}}.',
+        updated: 'Zaktualizowano pracowników: {{count}}.',
+      },
+      errors: {
+        fileRequired: 'Wybierz plik CSV przygotowany z szablonu.',
+        analyzeFailed: 'Nie udało się przeanalizować pliku CSV.',
+        createFailed: 'Nie udało się utworzyć zaznaczonych pracowników.',
+        updateFailed: 'Nie udało się zastosować zaznaczonych zmian.',
+      },
+    },
     entitlements: {
       title: 'Uprawnienia i przypisania',
       description:
