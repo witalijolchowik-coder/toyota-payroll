@@ -95,6 +95,7 @@ export function normalizeImportText(value: unknown): string {
 export function normalizeImportKey(value: unknown): string {
   return normalizeImportText(value)
     .toLocaleLowerCase('pl-PL')
+    .replaceAll('ł', 'l')
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '')
     .replace(/[^a-z0-9]+/g, '');
