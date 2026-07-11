@@ -677,6 +677,8 @@ export const pl = {
       noFile: 'Nie wybrano pliku',
       analyze: 'Analizuj',
       analyzing: 'Analizowanie',
+      resolveEmployee: 'Dopasuj ręcznie',
+      chooseEmployee: 'Wybierz pracownika',
       apply: 'Zapisz poprawne L4: {{count}}',
       applying: 'Zapisywanie',
       close: 'Zamknij',
@@ -734,6 +736,8 @@ export const pl = {
           'Nie udało się przeanalizować pliku. Sprawdź arkusz i wymagane kolumny.',
         applyFailed:
           'Nie udało się zapisać importu L4. Sprawdź miesiące, uprawnienia i reguły bezpieczeństwa.',
+        resolveFailed:
+          'Nie udało się sprawdzić ręcznego dopasowania pracownika.',
       },
     },
     errors: {

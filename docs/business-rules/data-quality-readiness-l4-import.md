@@ -71,13 +71,20 @@ Workflow:
 1. Select Excel file.
 2. Parse and validate rows.
 3. Show preview.
-4. Apply only rows marked ready.
-5. Leave unresolved rows unimported.
+4. Manually resolve unmatched or ambiguous employee rows when needed.
+5. Recheck the resolved rows against duplicates, overlaps and owner-month
+   availability.
+6. Apply only rows marked ready.
+7. Leave unresolved or review-required rows unimported.
 
 Matching is based on the current employee register. The source name is
 normalized for case and whitespace and interpreted as surname-first. The system
 does not create employees from the L4 file and does not guess partial surname
 matches.
+
+If a row is unmatched or ambiguous, the coordinator may select an existing
+employee manually in the preview. Manual resolution does not bypass safety
+checks: the row is classified again before it can become ready for import.
 
 Preview statuses include ready, duplicate, overlap requiring review,
 continuation requiring review, unmatched, ambiguous, invalid, unsupported type
@@ -99,9 +106,9 @@ write set.
 
 ## Known limitations
 
-- Ambiguous/unmatched L4 rows are shown and blocked from automatic import; a
-  later hardening pass can add explicit per-row manual resolution in the import
-  dialog.
+- Ambiguous/unmatched L4 rows can be resolved manually to an existing employee,
+  but rows that still require duplicate, overlap, continuation or missing-month
+  review remain blocked from import.
 - Toyota-specific calendar override governance remains open.
 - Readiness is an operational guide, not final month closing or payroll
   approval.

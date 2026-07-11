@@ -315,6 +315,7 @@ export function AbsencesPage() {
 
       {isL4ImportOpen ? (
         <L4ImportDialog
+          employees={employees}
           onClose={() => setIsL4ImportOpen(false)}
           onImported={reload}
         />

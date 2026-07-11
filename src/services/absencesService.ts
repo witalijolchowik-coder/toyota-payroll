@@ -15,6 +15,7 @@ import {
   buildL4ImportPreview,
   l4RowsToCreate,
   normalizeAbsenceCode,
+  resolveL4ImportPreviewRow,
   validateAbsenceInput,
   type L4ImportContext,
   type L4ImportPreviewRow,
@@ -260,6 +261,31 @@ export async function loadL4ImportPreview(
     existingMonthIds: months,
   };
   return buildL4ImportPreview(sourceRows, context);
+}
+
+export async function resolveL4ImportRowToEmployee(
+  row: L4ImportPreviewRow,
+  employeeId: string,
+): Promise<L4ImportPreviewRow> {
+  const { repositories } = requireContext();
+  const ownerMonths = row.startDate ? [row.startDate.slice(0, 7)] : [];
+  const rangeMonths =
+    row.startDate && row.endDate
+      ? ownerMonthIdsForRange(row.startDate, row.endDate)
+      : [];
+  const [employeesSnapshot, existingAbsences, months] = await Promise.all([
+    getDocs(query(repositories.employees, orderBy('teta_number'))),
+    loadAbsencesOwnedByMonths(uniqueMonthIds([...ownerMonths, ...rangeMonths])),
+    existingMonthIds(ownerMonths),
+  ]);
+  const context: L4ImportContext = {
+    employees: employeesSnapshot.docs.map((document) =>
+      mapEmployeeDocument(document.id, document.data()),
+    ),
+    existingAbsences,
+    existingMonthIds: months,
+  };
+  return resolveL4ImportPreviewRow(row, employeeId, context);
 }
 
 function assertValidInput(

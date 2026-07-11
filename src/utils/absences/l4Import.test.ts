@@ -4,6 +4,7 @@ import type { Absence, Employee } from '../../types/firestore';
 import {
   buildL4ImportPreview,
   parseL4DateCell,
+  resolveL4ImportPreviewRow,
   type L4ImportSourceRow,
 } from './l4Import';
 
@@ -147,6 +148,49 @@ describe('L4 import helpers', () => {
     expect(preview[0]).toMatchObject({
       status: 'month-missing',
       ownerMonthId: '2026-06',
+    });
+  });
+
+  it('rechecks manually resolved employees before allowing L4 creation', () => {
+    const context = {
+      employees: [employee('employee-1', 'Jan', 'Kowalski', '100')],
+      existingAbsences: [],
+      existingMonthIds: new Set(['2026-07']),
+    };
+    const unmatched = buildL4ImportPreview(
+      [row({ sourceName: 'RAPORTOWE NAZWISKO' })],
+      context,
+    )[0]!;
+
+    expect(unmatched.status).toBe('unmatched');
+    expect(
+      resolveL4ImportPreviewRow(unmatched, 'employee-1', context),
+    ).toMatchObject({
+      status: 'ready',
+      employeeId: 'employee-1',
+      tetaNumber: '100',
+    });
+  });
+
+  it('keeps manual L4 resolution in review when existing active absence overlaps', () => {
+    const context = {
+      employees: [employee('employee-1', 'Jan', 'Kowalski', '100')],
+      existingAbsences: [
+        absence({ startDate: '2026-07-09', endDate: '2026-07-11' }),
+      ],
+      existingMonthIds: new Set(['2026-07']),
+    };
+    const unmatched = buildL4ImportPreview(
+      [row({ sourceName: 'RAPORTOWE NAZWISKO' })],
+      context,
+    )[0]!;
+
+    expect(
+      resolveL4ImportPreviewRow(unmatched, 'employee-1', context),
+    ).toMatchObject({
+      status: 'overlap-review',
+      employeeId: 'employee-1',
+      tetaNumber: '100',
     });
   });
 });

@@ -9,6 +9,7 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
+  MenuItem,
   Stack,
   Table,
   TableBody,
@@ -16,6 +17,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TextField,
   Typography,
 } from '@mui/material';
 
@@ -24,14 +26,17 @@ import { interpolate } from '../../i18n/pl';
 import {
   applyL4ImportRows,
   loadL4ImportPreview,
+  resolveL4ImportRowToEmployee,
 } from '../../services/absencesService';
 import type { L4ImportApplyResult } from '../../services/absencesService';
+import type { Employee } from '../../types/firestore';
 import {
   parseL4ReportWorkbook,
   type L4ImportPreviewRow,
 } from '../../utils/absences';
 
 interface L4ImportDialogProps {
+  employees: readonly Employee[];
   onClose: () => void;
   onImported: () => Promise<void>;
 }
@@ -51,19 +56,25 @@ const statusColor: Record<
   'month-missing': 'warning',
 };
 
-export function L4ImportDialog({ onClose, onImported }: L4ImportDialogProps) {
+export function L4ImportDialog({
+  employees,
+  onClose,
+  onImported,
+}: L4ImportDialogProps) {
   const t = useTranslations();
   const [file, setFile] = useState<File | null>(null);
   const [rows, setRows] = useState<L4ImportPreviewRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [isApplying, setIsApplying] = useState(false);
+  const [resolvingRowId, setResolvingRowId] = useState<string | null>(null);
   const [result, setResult] = useState<L4ImportApplyResult | null>(null);
 
   const createCount = useMemo(
     () => rows.filter((row) => row.status === 'ready').length,
     [rows],
   );
+  const isBusy = isAnalyzing || isApplying || Boolean(resolvingRowId);
 
   const handleAnalyze = async () => {
     if (!file) {
@@ -82,6 +93,26 @@ export function L4ImportDialog({ onClose, onImported }: L4ImportDialogProps) {
       setError(t.absences.l4Import.errors.analyzeFailed);
     } finally {
       setIsAnalyzing(false);
+    }
+  };
+
+  const handleResolveEmployee = async (
+    row: L4ImportPreviewRow,
+    employeeId: string,
+  ) => {
+    setResolvingRowId(row.id);
+    setError(null);
+    try {
+      const resolvedRow = await resolveL4ImportRowToEmployee(row, employeeId);
+      setRows((currentRows) =>
+        currentRows.map((currentRow) =>
+          currentRow.id === row.id ? resolvedRow : currentRow,
+        ),
+      );
+    } catch {
+      setError(t.absences.l4Import.errors.resolveFailed);
+    } finally {
+      setResolvingRowId(null);
     }
   };
 
@@ -141,7 +172,7 @@ export function L4ImportDialog({ onClose, onImported }: L4ImportDialogProps) {
             </Box>
             <Button
               variant="contained"
-              disabled={!file || isAnalyzing}
+              disabled={!file || isBusy}
               onClick={() => void handleAnalyze()}
             >
               {isAnalyzing
@@ -210,7 +241,41 @@ export function L4ImportDialog({ onClose, onImported }: L4ImportDialogProps) {
                           {row.sourceName || t.absences.l4Import.empty}
                         </TableCell>
                         <TableCell>
-                          {row.matchedEmployeeName ?? t.absences.l4Import.empty}
+                          <Stack spacing={1}>
+                            <Typography variant="body2">
+                              {row.matchedEmployeeName ??
+                                t.absences.l4Import.empty}
+                            </Typography>
+                            {canResolveEmployee(row) ? (
+                              <TextField
+                                select
+                                fullWidth
+                                size="small"
+                                label={t.absences.l4Import.resolveEmployee}
+                                value={row.employeeId ?? ''}
+                                disabled={isBusy}
+                                onChange={(event) =>
+                                  void handleResolveEmployee(
+                                    row,
+                                    event.target.value,
+                                  )
+                                }
+                              >
+                                <MenuItem value="">
+                                  {t.absences.l4Import.chooseEmployee}
+                                </MenuItem>
+                                {employees.map((employee) => (
+                                  <MenuItem
+                                    key={employee.id}
+                                    value={employee.id}
+                                  >
+                                    {employee.tetaNumber} — {employee.lastName}{' '}
+                                    {employee.firstName}
+                                  </MenuItem>
+                                ))}
+                              </TextField>
+                            ) : null}
+                          </Stack>
                         </TableCell>
                         <TableCell>
                           {row.tetaNumber ?? t.absences.l4Import.empty}
@@ -258,7 +323,7 @@ export function L4ImportDialog({ onClose, onImported }: L4ImportDialogProps) {
         </Button>
         <Button
           variant="contained"
-          disabled={createCount === 0 || isApplying}
+          disabled={createCount === 0 || isBusy}
           onClick={() => void handleApply()}
         >
           {isApplying
@@ -274,4 +339,8 @@ export function L4ImportDialog({ onClose, onImported }: L4ImportDialogProps) {
 
 function messageLabel(labels: Record<string, string>, message: string): string {
   return labels[message] ?? message;
+}
+
+function canResolveEmployee(row: L4ImportPreviewRow): boolean {
+  return row.status === 'unmatched' || row.status === 'ambiguous';
 }
