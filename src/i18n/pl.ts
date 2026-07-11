@@ -81,8 +81,7 @@ export const pl = {
       month: {
         title: 'Rozliczenie miesięczne',
         value: 'Utwórz miesiąc',
-        helper:
-          'Miesiąc tworzysz ręcznie w module Rozliczenie miesięczne.',
+        helper: 'Miesiąc tworzysz ręcznie w module Rozliczenie miesięczne.',
       },
       absences: {
         title: 'Nieobecności',
@@ -93,8 +92,7 @@ export const pl = {
       exports: {
         title: 'Eksporty',
         value: 'W rozliczeniu',
-        helper:
-          'Eksporty robocze Toyota/SOZ są dostępne po otwarciu miesiąca.',
+        helper: 'Eksporty robocze Toyota/SOZ są dostępne po otwarciu miesiąca.',
       },
     },
     workflow: {
@@ -128,8 +126,7 @@ export const pl = {
     },
     limitations: {
       title: 'Świadome ograniczenia',
-      first:
-        'Eksport nie zamyka miesiąca i nie tworzy finalnej listy płac.',
+      first: 'Eksport nie zamyka miesiąca i nie tworzy finalnej listy płac.',
       second:
         'Przed realnym użyciem trzeba usunąć ostrzeżenia dotyczące danych i zweryfikować miesiąc.',
     },

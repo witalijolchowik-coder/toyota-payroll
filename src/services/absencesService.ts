@@ -97,7 +97,10 @@ function ownerMonthIdsForDisplay(monthId: MonthId): MonthId[] {
   return uniqueMonthIds([addMonths(monthId, -1), monthId]);
 }
 
-function ownerMonthIdsForRange(startDate: IsoDate, endDate: IsoDate): MonthId[] {
+function ownerMonthIdsForRange(
+  startDate: IsoDate,
+  endDate: IsoDate,
+): MonthId[] {
   const startMonth = addMonths(ownerMonthId(startDate), -1);
   const endMonth = ownerMonthId(endDate);
   const result: MonthId[] = [];
@@ -153,11 +156,11 @@ export async function loadAbsencesOverlappingMonth(
   const monthStart = dateToIsoDate(range.start);
   const monthEnd = dateToIsoDate(range.end);
 
-  return (await loadAbsencesOwnedByMonths(ownerMonthIdsForDisplay(monthId)))
-    .filter(
-      (absence) =>
-        absence.startDate <= monthEnd && absence.endDate >= monthStart,
-    );
+  return (
+    await loadAbsencesOwnedByMonths(ownerMonthIdsForDisplay(monthId))
+  ).filter(
+    (absence) => absence.startDate <= monthEnd && absence.endDate >= monthStart,
+  );
 }
 
 async function loadEmployeeAbsencesForRange(

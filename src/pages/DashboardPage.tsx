@@ -27,12 +27,7 @@ interface ReadinessCardProps {
   icon: ReactNode;
 }
 
-function ReadinessCard({
-  title,
-  value,
-  helperText,
-  icon,
-}: ReadinessCardProps) {
+function ReadinessCard({ title, value, helperText, icon }: ReadinessCardProps) {
   return (
     <Card>
       <CardContent sx={{ p: 3 }}>

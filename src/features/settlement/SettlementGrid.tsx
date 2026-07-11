@@ -158,174 +158,175 @@ export function SettlementGrid({
 
               return (
                 <TableRow hover key={employee.id}>
-                <TableCell
-                  sx={leadingCellSx({
-                    left: 0,
-                    width: employeeColumnWidth,
-                    zIndex: 2,
-                  })}
-                >
-                  <Typography variant="body2" noWrap sx={{ fontWeight: 750 }}>
-                    {employee.firstName} {employee.lastName}
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    color="text.secondary"
-                    noWrap
-                    sx={{ display: 'block' }}
+                  <TableCell
+                    sx={leadingCellSx({
+                      left: 0,
+                      width: employeeColumnWidth,
+                      zIndex: 2,
+                    })}
                   >
-                    {departmentLabel} · {shiftLabel}
-                  </Typography>
-                </TableCell>
-                {days.map((day) => {
-                  const persistedValue = dailyValuesByEmployeeAndDate.get(
-                    dailyValueLookupKey(employee.id, day.isoDate),
-                  );
-                  const value = resolveSettlementCellValue({
-                    employee,
-                    day,
-                    persistedValue,
-                  });
-                  const absenceResolution = resolveGoverningAbsence(
-                    absencesByEmployee.get(employee.id) ?? [],
-                    day.isoDate,
-                  );
-                  const absenceLabel =
-                    absenceResolution.kind === 'governed'
-                      ? absenceResolution.code
-                      : absenceResolution.kind === 'ambiguous'
-                        ? absenceResolution.codes.join('/')
-                        : null;
-                  const hoursLabel =
-                    value.hours === null
-                      ? t.settlement.grid.empty
-                      : interpolate(t.settlement.grid.hours, {
-                          hours: value.hours.toLocaleString('pl-PL'),
-                        });
-                  const hasGoverningAbsence = absenceResolution.kind !== 'none';
-                  const warnings = resolveAttendanceWarnings({
-                    hasExplicitValue: Boolean(persistedValue),
-                    hasActiveAbsence: hasGoverningAbsence,
-                    isWorkingDay: day.isWorkingDay,
-                    isWithinEmployment:
-                      value.calendarState !== 'outside-employment',
-                  });
-                  const tooltip = buildTooltip({
-                    value,
-                    absenceResolution,
-                    warnings,
-                    isSettled,
-                    t,
-                  });
-                  const canEdit =
-                    !isSettled &&
-                    value.calendarState !== 'future' &&
-                    value.calendarState !== 'outside-employment' &&
-                    Boolean(onSelectCell ?? onEditCell);
-                  const isSelected = isDateInRangeSelection(
-                    selection,
-                    employee.id,
-                    day.isoDate,
-                  );
-                  const employeeName = `${employee.lastName} ${employee.firstName}`;
-                  const editLabel = interpolate(t.settlement.grid.edit, {
-                    employee: employeeName,
-                    date: day.isoDate,
-                  });
-
-                  return (
-                    <TableCell
-                      key={day.isoDate}
-                      align="center"
-                      sx={{
-                        width: `${100 / Math.max(days.length, 1)}%`,
-                        minWidth: dayColumnMinWidth,
-                        px: 0.5,
-                        py: 0.75,
-                        ...cellBackground(value.calendarState, day),
-                        ...(warnings.length > 0
-                          ? {
-                              boxShadow: (theme) =>
-                                `inset 0 0 0 2px ${theme.palette.warning.main}`,
-                            }
-                          : {}),
-                        ...(isSelected
-                          ? {
-                              outline: (theme) =>
-                                `3px solid ${theme.palette.primary.main}`,
-                              outlineOffset: -3,
-                            }
-                          : {}),
-                      }}
+                    <Typography variant="body2" noWrap sx={{ fontWeight: 750 }}>
+                      {employee.firstName} {employee.lastName}
+                    </Typography>
+                    <Typography
+                      variant="caption"
+                      color="text.secondary"
+                      noWrap
+                      sx={{ display: 'block' }}
                     >
-                      <Tooltip title={tooltip}>
-                        <Box component="span" sx={{ display: 'block' }}>
-                          <ButtonBase
-                            disabled={!canEdit}
-                            aria-label={canEdit ? editLabel : undefined}
-                            onClick={() =>
-                              (onSelectCell ?? onEditCell)?.(
-                                employee,
-                                day,
-                                value,
-                                hasGoverningAbsence,
-                              )
-                            }
-                            sx={{
-                              width: '100%',
-                              minHeight: 28,
-                              borderRadius: 1,
-                              cursor: canEdit ? 'pointer' : 'default',
-                              '&.Mui-disabled': { opacity: 1 },
-                            }}
-                          >
-                            <Box
-                              component="span"
-                              sx={
-                                absenceLabel
-                                  ? {
-                                      color:
-                                        absenceResolution.kind === 'ambiguous'
-                                          ? 'warning.main'
-                                          : 'error.main',
-                                      fontWeight: 800,
-                                    }
-                                  : cellValueSx(value.kind)
+                      {departmentLabel} · {shiftLabel}
+                    </Typography>
+                  </TableCell>
+                  {days.map((day) => {
+                    const persistedValue = dailyValuesByEmployeeAndDate.get(
+                      dailyValueLookupKey(employee.id, day.isoDate),
+                    );
+                    const value = resolveSettlementCellValue({
+                      employee,
+                      day,
+                      persistedValue,
+                    });
+                    const absenceResolution = resolveGoverningAbsence(
+                      absencesByEmployee.get(employee.id) ?? [],
+                      day.isoDate,
+                    );
+                    const absenceLabel =
+                      absenceResolution.kind === 'governed'
+                        ? absenceResolution.code
+                        : absenceResolution.kind === 'ambiguous'
+                          ? absenceResolution.codes.join('/')
+                          : null;
+                    const hoursLabel =
+                      value.hours === null
+                        ? t.settlement.grid.empty
+                        : interpolate(t.settlement.grid.hours, {
+                            hours: value.hours.toLocaleString('pl-PL'),
+                          });
+                    const hasGoverningAbsence =
+                      absenceResolution.kind !== 'none';
+                    const warnings = resolveAttendanceWarnings({
+                      hasExplicitValue: Boolean(persistedValue),
+                      hasActiveAbsence: hasGoverningAbsence,
+                      isWorkingDay: day.isWorkingDay,
+                      isWithinEmployment:
+                        value.calendarState !== 'outside-employment',
+                    });
+                    const tooltip = buildTooltip({
+                      value,
+                      absenceResolution,
+                      warnings,
+                      isSettled,
+                      t,
+                    });
+                    const canEdit =
+                      !isSettled &&
+                      value.calendarState !== 'future' &&
+                      value.calendarState !== 'outside-employment' &&
+                      Boolean(onSelectCell ?? onEditCell);
+                    const isSelected = isDateInRangeSelection(
+                      selection,
+                      employee.id,
+                      day.isoDate,
+                    );
+                    const employeeName = `${employee.lastName} ${employee.firstName}`;
+                    const editLabel = interpolate(t.settlement.grid.edit, {
+                      employee: employeeName,
+                      date: day.isoDate,
+                    });
+
+                    return (
+                      <TableCell
+                        key={day.isoDate}
+                        align="center"
+                        sx={{
+                          width: `${100 / Math.max(days.length, 1)}%`,
+                          minWidth: dayColumnMinWidth,
+                          px: 0.5,
+                          py: 0.75,
+                          ...cellBackground(value.calendarState, day),
+                          ...(warnings.length > 0
+                            ? {
+                                boxShadow: (theme) =>
+                                  `inset 0 0 0 2px ${theme.palette.warning.main}`,
                               }
+                            : {}),
+                          ...(isSelected
+                            ? {
+                                outline: (theme) =>
+                                  `3px solid ${theme.palette.primary.main}`,
+                                outlineOffset: -3,
+                              }
+                            : {}),
+                        }}
+                      >
+                        <Tooltip title={tooltip}>
+                          <Box component="span" sx={{ display: 'block' }}>
+                            <ButtonBase
+                              disabled={!canEdit}
+                              aria-label={canEdit ? editLabel : undefined}
+                              onClick={() =>
+                                (onSelectCell ?? onEditCell)?.(
+                                  employee,
+                                  day,
+                                  value,
+                                  hasGoverningAbsence,
+                                )
+                              }
+                              sx={{
+                                width: '100%',
+                                minHeight: 28,
+                                borderRadius: 1,
+                                cursor: canEdit ? 'pointer' : 'default',
+                                '&.Mui-disabled': { opacity: 1 },
+                              }}
                             >
-                              {absenceLabel ? (
-                                <>
-                                  <Box
-                                    component="span"
-                                    sx={{ display: 'block', lineHeight: 1.1 }}
-                                  >
-                                    {absenceLabel}
-                                  </Box>
-                                  {persistedValue ? (
+                              <Box
+                                component="span"
+                                sx={
+                                  absenceLabel
+                                    ? {
+                                        color:
+                                          absenceResolution.kind === 'ambiguous'
+                                            ? 'warning.main'
+                                            : 'error.main',
+                                        fontWeight: 800,
+                                      }
+                                    : cellValueSx(value.kind)
+                                }
+                              >
+                                {absenceLabel ? (
+                                  <>
                                     <Box
                                       component="span"
-                                      sx={{
-                                        display: 'block',
-                                        color: 'warning.dark',
-                                        fontSize: '0.65rem',
-                                        lineHeight: 1.1,
-                                      }}
+                                      sx={{ display: 'block', lineHeight: 1.1 }}
                                     >
-                                      {hoursLabel}
+                                      {absenceLabel}
                                     </Box>
-                                  ) : null}
-                                </>
-                              ) : (
-                                hoursLabel
-                              )}
-                            </Box>
-                          </ButtonBase>
-                        </Box>
-                      </Tooltip>
-                    </TableCell>
-                  );
-                })}
-              </TableRow>
+                                    {persistedValue ? (
+                                      <Box
+                                        component="span"
+                                        sx={{
+                                          display: 'block',
+                                          color: 'warning.dark',
+                                          fontSize: '0.65rem',
+                                          lineHeight: 1.1,
+                                        }}
+                                      >
+                                        {hoursLabel}
+                                      </Box>
+                                    ) : null}
+                                  </>
+                                ) : (
+                                  hoursLabel
+                                )}
+                              </Box>
+                            </ButtonBase>
+                          </Box>
+                        </Tooltip>
+                      </TableCell>
+                    );
+                  })}
+                </TableRow>
               );
             })}
           </TableBody>
