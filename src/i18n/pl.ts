@@ -30,6 +30,10 @@ export const pl = {
     },
   },
   navigation: {
+    dashboard: {
+      label: 'Pulpit',
+      description: 'Krótki przegląd stanu konfiguracji i najbliższych kroków.',
+    },
     employees: {
       label: 'Pracownicy',
       description:
@@ -44,6 +48,93 @@ export const pl = {
       label: 'Nieobecności',
       description:
         'Rejestr nieobecności, dokumentów L4 i bieżącego statusu pracowników.',
+    },
+    adjustments: {
+      label: 'Korekty',
+      description: 'Miesięczne premie, potrącenia i inne korekty pracowników.',
+    },
+    reports: {
+      label: 'Raporty',
+      description:
+        'Wejście do eksportów przygotowywanych w rozliczeniu miesięcznym.',
+    },
+    settings: {
+      label: 'Ustawienia płacowe',
+      description: 'Historyczne globalne stawki i konfiguracja płacowa.',
+    },
+  },
+  dashboard: {
+    page: {
+      eyebrow: 'Obszar koordynatora',
+      title: 'Pulpit',
+      description:
+        'Najważniejsze kroki przygotowania systemu do kontrolowanej pracy operacyjnej.',
+      status: 'Tryb pilotażowy',
+    },
+    cards: {
+      employees: {
+        title: 'Pracownicy',
+        value: 'Rejestr dostępny',
+        helper:
+          'Uzupełnij daty zatrudnienia, dokumenty do SOZ, działy i zmiany.',
+      },
+      month: {
+        title: 'Rozliczenie miesięczne',
+        value: 'Utwórz miesiąc',
+        helper:
+          'Miesiąc tworzysz ręcznie w module Rozliczenie miesięczne.',
+      },
+      absences: {
+        title: 'Nieobecności',
+        value: 'Gotowe do pracy',
+        helper:
+          'Dokumenty nieobecności są osobnym źródłem prawdy dla kalendarza.',
+      },
+      exports: {
+        title: 'Eksporty',
+        value: 'W rozliczeniu',
+        helper:
+          'Eksporty robocze Toyota/SOZ są dostępne po otwarciu miesiąca.',
+      },
+    },
+    workflow: {
+      title: 'Sugerowana kolejność pracy',
+      description:
+        'Ten pulpit nie jest finalnym dashboardem analitycznym. Ma pomóc szybko przejść do właściwego miejsca.',
+      employees: '1. Sprawdź pracowników i braki danych.',
+      settings: '2. Uzupełnij ustawienia, działy i zmiany.',
+      month: '3. Utwórz lub otwórz miesiąc rozliczeniowy.',
+      absences: '4. Dodaj nieobecności i korekty.',
+      review: '5. Zweryfikuj rozliczenie i robocze eksporty.',
+    },
+    actions: {
+      employees: 'Przejdź do pracowników',
+      settings: 'Przejdź do ustawień',
+      settlement: 'Otwórz rozliczenie',
+      absences: 'Otwórz nieobecności',
+    },
+  },
+  reports: {
+    page: {
+      eyebrow: 'Raporty',
+      title: 'Raporty i eksporty',
+      description:
+        'Na tym etapie eksporty robocze są częścią rozliczenia miesięcznego.',
+    },
+    currentState: {
+      title: 'Aktualny stan modułu',
+      description:
+        'Oddzielne archiwum raportów i historia eksportów nie są jeszcze wdrożone. Aby przygotować pliki Toyota lub SOZ, otwórz właściwy miesiąc w rozliczeniu miesięcznym i użyj sekcji Eksport.',
+    },
+    limitations: {
+      title: 'Świadome ograniczenia',
+      first:
+        'Eksport nie zamyka miesiąca i nie tworzy finalnej listy płac.',
+      second:
+        'Przed realnym użyciem trzeba usunąć ostrzeżenia dotyczące danych i zweryfikować miesiąc.',
+    },
+    actions: {
+      settlement: 'Przejdź do rozliczenia miesięcznego',
     },
   },
   employees: {
@@ -124,6 +215,8 @@ export const pl = {
       department: 'Dział',
       shiftAssignment: 'Zmiana',
       employmentStartDate: 'Data rozpoczęcia zatrudnienia',
+      employmentStartRequired:
+        'Wymagane. Bez tej daty pracownik nie może bezpiecznie wejść do rozliczenia miesiąca.',
       employmentEndDate: 'Data zakończenia zatrudnienia',
       cancel: 'Anuluj',
       create: 'Dodaj',
@@ -541,6 +634,74 @@ export const pl = {
         'Nie można zmienić miesiąca rozpoczęcia. Anuluj dokument i utwórz poprawny.',
       monthUnavailable: 'Miesiąc rozpoczęcia nie został jeszcze utworzony.',
       monthSettled: 'Miesiąc rozpoczęcia jest zamknięty i tylko do odczytu.',
+    },
+    month: {
+      missingTitle: 'Miesiąc {{month}} nie został jeszcze utworzony.',
+      missingDescription:
+        'Nieobecności można przeglądać, ale dodawanie nowych dokumentów wymaga utworzonego miesiąca rozpoczęcia.',
+      createInSettlement: 'Utwórz w rozliczeniu',
+      settled:
+        'Wybrany miesiąc jest zamknięty. Nieobecności są dostępne tylko do odczytu.',
+    },
+  },
+  adjustments: {
+    page: {
+      eyebrow: 'Miesięczne fakty',
+      title: 'Korekty pracowników',
+      description:
+        'Premie, potrącenia i inne korekty wprowadzone ręcznie przez koordynatora.',
+      add: 'Dodaj korektę',
+    },
+    table: {
+      employee: 'Pracownik',
+      category: 'Kategoria',
+      direction: 'Kierunek',
+      amount: 'Kwota',
+      note: 'Notatka',
+      status: 'Status',
+      actions: 'Akcje',
+      noNote: '—',
+      edit: 'Edytuj',
+      cancel: 'Anuluj korektę',
+    },
+    categories: {
+      MANUAL_BONUS: 'Premia ręczna',
+      MANUAL_DEDUCTION: 'Potrącenie ręczne',
+      OTHER: 'Inna korekta',
+    },
+    directions: {
+      INCREASE: 'Zwiększenie',
+      DECREASE: 'Zmniejszenie',
+    },
+    status: {
+      ACTIVE: 'Aktywna',
+      CANCELLED: 'Anulowana',
+    },
+    empty: {
+      title: 'Brak korekt w tym miesiącu',
+      description:
+        'Premie i potrącenia dodane przez koordynatora pojawią się tutaj.',
+    },
+    month: {
+      missing:
+        'Miesiąc {{month}} nie został utworzony. Korekty można dodawać dopiero po utworzeniu miesiąca w Rozliczeniu miesięcznym.',
+      settled: 'Miesiąc jest rozliczony. Korekty są dostępne tylko do odczytu.',
+      createInSettlement: 'Utwórz w rozliczeniu',
+    },
+    cancel: {
+      title: 'Anulować korektę?',
+      description: 'Rekord pozostanie w historii ze statusem Anulowana.',
+      back: 'Wróć',
+      confirm: 'Anuluj korektę',
+    },
+    notifications: {
+      created: 'Korekta została dodana.',
+      updated: 'Korekta została zaktualizowana.',
+      cancelled: 'Korekta została anulowana.',
+    },
+    errors: {
+      load: 'Nie udało się wczytać korekt. Sprawdź Firebase i uprawnienia.',
+      cancelFailed: 'Nie udało się anulować korekty.',
     },
   },
   settlement: {

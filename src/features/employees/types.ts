@@ -24,6 +24,7 @@ export type EmployeeFieldName =
   | 'pesel'
   | 'passportNumber'
   | 'foreignDocumentNumber'
+  | 'employmentStartDate'
   | 'employmentEndDate';
 
 export type EmployeeValidationCode =

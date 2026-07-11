@@ -555,6 +555,7 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
             employees={filteredEmployees}
             days={days}
             dailyValues={filteredDailyValues}
+            departments={data.departments}
             absences={filteredAbsences}
             isSettled={data.month.isSettled}
             selection={selection}

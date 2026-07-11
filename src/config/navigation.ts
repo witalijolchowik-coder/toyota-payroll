@@ -12,10 +12,10 @@ import { routes } from '../utils/routes';
 
 export const primaryNavigation: NavigationItem[] = [
   {
-    label: 'Dashboard',
+    label: pl.navigation.dashboard.label,
     path: routes.dashboard,
     icon: DashboardOutlined,
-    description: 'A concise overview of the current payroll workspace.',
+    description: pl.navigation.dashboard.description,
   },
   {
     label: pl.navigation.employees.label,
@@ -36,25 +36,25 @@ export const primaryNavigation: NavigationItem[] = [
     description: pl.navigation.absences.description,
   },
   {
-    label: 'Korekty',
+    label: pl.navigation.adjustments.label,
     path: routes.adjustments,
     icon: TuneOutlined,
-    description: 'Miesięczne premie, potrącenia i inne korekty pracowników.',
+    description: pl.navigation.adjustments.description,
   },
   {
-    label: 'Reports',
+    label: pl.navigation.reports.label,
     path: routes.reports,
     icon: SummarizeOutlined,
-    description: 'Generate settlement, absence, and SOZ outputs.',
+    description: pl.navigation.reports.description,
   },
 ];
 
 export const secondaryNavigation: NavigationItem[] = [
   {
-    label: 'Ustawienia płacowe',
+    label: pl.navigation.settings.label,
     path: routes.settings,
     icon: SettingsOutlined,
-    description: 'Historyczne globalne stawki i konfiguracja płacowa.',
+    description: pl.navigation.settings.description,
   },
 ];
 

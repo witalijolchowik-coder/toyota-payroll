@@ -78,6 +78,11 @@ documents continue to govern system structure and implementation boundaries.
 - [ADR 0020: Preview-first initial employee base import](decisions/0020-initial-employee-base-import.md)
 - [ADR 0021: Template-based employee import and bulk update](decisions/0021-employee-import-templates.md)
 
+## Audit and readiness reports
+
+- [Core operational readiness remediation](audits/core-operational-readiness-remediation.md)
+  - live workflow remediation after the system readiness audit
+
 ## Authority order
 
 When documents appear to conflict, use this order:

@@ -66,6 +66,9 @@ export function validateEmployeeInput(
   if (!normalized.lastName) {
     errors.lastName = 'required';
   }
+  if (!normalized.employmentStartDate) {
+    errors.employmentStartDate = 'required';
+  }
   if (
     normalized.employmentStartDate &&
     normalized.employmentEndDate &&

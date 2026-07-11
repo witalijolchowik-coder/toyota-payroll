@@ -47,7 +47,10 @@ describe('App', () => {
     renderWithAuth(<App />);
 
     expect(
-      await screen.findByRole('heading', { name: 'Dashboard', level: 1 }),
+      await screen.findByRole('heading', {
+        name: pl.dashboard.page.title,
+        level: 1,
+      }),
     ).toBeInTheDocument();
     expect(
       screen.getByRole('navigation', { name: 'Primary navigation' }),
@@ -57,7 +60,9 @@ describe('App', () => {
         name: pl.navigation.employees.label,
       }).length,
     ).toBeGreaterThan(0);
-    expect(screen.getByText('Current Absences')).toBeInTheDocument();
+    expect(
+      screen.getByText(pl.dashboard.cards.absences.title),
+    ).toBeInTheDocument();
     expect(screen.getByText(pl.auth.signOut)).toBeInTheDocument();
   });
 

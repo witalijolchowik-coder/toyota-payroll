@@ -17,7 +17,12 @@ import {
 
 import { useTranslations } from '../../hooks/useTranslations';
 import { interpolate } from '../../i18n/pl';
-import type { Absence, DailyValue, Employee } from '../../types/firestore';
+import type {
+  Absence,
+  DailyValue,
+  Department,
+  Employee,
+} from '../../types/firestore';
 import { resolveGoverningAbsence } from '../../utils/absences';
 import {
   resolveAttendanceWarnings,
@@ -37,6 +42,7 @@ interface SettlementGridProps {
   employees: Employee[];
   days: CalendarDay[];
   dailyValues: DailyValue[];
+  departments?: Department[];
   absences?: Absence[];
   isSettled?: boolean;
   onEditCell?: (
@@ -59,13 +65,14 @@ const weekdayFormatter = new Intl.DateTimeFormat('pl-PL', {
   timeZone: 'UTC',
 });
 
-const tetaColumnWidth = 116;
-const employeeColumnWidth = 210;
+const employeeColumnWidth = 220;
+const dayColumnMinWidth = 30;
 
 export function SettlementGrid({
   employees,
   days,
   dailyValues,
+  departments = [],
   absences = [],
   isSettled = false,
   onEditCell,
@@ -73,6 +80,9 @@ export function SettlementGrid({
   onSelectCell,
 }: SettlementGridProps) {
   const t = useTranslations();
+  const departmentsById = new Map(
+    departments.map((department) => [department.id, department]),
+  );
   const dailyValuesByEmployeeAndDate = new Map(
     dailyValues.map((value) => [
       dailyValueLookupKey(value.employeeId, value.date),
@@ -92,7 +102,7 @@ export function SettlementGrid({
         <Table
           size="small"
           sx={{
-            minWidth: tetaColumnWidth + employeeColumnWidth + days.length * 56,
+            minWidth: employeeColumnWidth + days.length * dayColumnMinWidth,
             tableLayout: 'fixed',
           }}
         >
@@ -101,15 +111,6 @@ export function SettlementGrid({
               <TableCell
                 sx={leadingCellSx({
                   left: 0,
-                  width: tetaColumnWidth,
-                  zIndex: 4,
-                })}
-              >
-                {t.settlement.grid.teta}
-              </TableCell>
-              <TableCell
-                sx={leadingCellSx({
-                  left: tetaColumnWidth,
                   width: employeeColumnWidth,
                   zIndex: 4,
                 })}
@@ -121,9 +122,9 @@ export function SettlementGrid({
                   key={day.isoDate}
                   align="center"
                   sx={{
-                    width: 56,
-                    minWidth: 56,
-                    p: 0.75,
+                    width: `${100 / Math.max(days.length, 1)}%`,
+                    minWidth: dayColumnMinWidth,
+                    p: 0.35,
                     ...calendarBackground(day),
                   }}
                 >
@@ -145,28 +146,35 @@ export function SettlementGrid({
             </TableRow>
           </TableHead>
           <TableBody>
-            {employees.map((employee) => (
-              <TableRow hover key={employee.id}>
+            {employees.map((employee) => {
+              const department = employee.departmentId
+                ? departmentsById.get(employee.departmentId)
+                : null;
+              const departmentLabel =
+                department?.name ?? t.organization.departments.unassigned;
+              const shiftLabel = employee.shiftAssignment
+                ? t.organization.shifts[employee.shiftAssignment]
+                : t.organization.shifts.unassigned;
+
+              return (
+                <TableRow hover key={employee.id}>
                 <TableCell
                   sx={leadingCellSx({
                     left: 0,
-                    width: tetaColumnWidth,
-                    zIndex: 2,
-                  })}
-                >
-                  <Typography variant="body2" sx={{ fontWeight: 750 }}>
-                    {employee.tetaNumber}
-                  </Typography>
-                </TableCell>
-                <TableCell
-                  sx={leadingCellSx({
-                    left: tetaColumnWidth,
                     width: employeeColumnWidth,
                     zIndex: 2,
                   })}
                 >
-                  <Typography variant="body2" noWrap>
+                  <Typography variant="body2" noWrap sx={{ fontWeight: 750 }}>
                     {employee.firstName} {employee.lastName}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    noWrap
+                    sx={{ display: 'block' }}
+                  >
+                    {departmentLabel} · {shiftLabel}
                   </Typography>
                 </TableCell>
                 {days.map((day) => {
@@ -230,10 +238,10 @@ export function SettlementGrid({
                       key={day.isoDate}
                       align="center"
                       sx={{
-                        width: 56,
-                        minWidth: 56,
+                        width: `${100 / Math.max(days.length, 1)}%`,
+                        minWidth: dayColumnMinWidth,
                         px: 0.5,
-                        py: 1,
+                        py: 0.75,
                         ...cellBackground(value.calendarState, day),
                         ...(warnings.length > 0
                           ? {
@@ -265,7 +273,7 @@ export function SettlementGrid({
                             }
                             sx={{
                               width: '100%',
-                              minHeight: 30,
+                              minHeight: 28,
                               borderRadius: 1,
                               cursor: canEdit ? 'pointer' : 'default',
                               '&.Mui-disabled': { opacity: 1 },
@@ -318,7 +326,8 @@ export function SettlementGrid({
                   );
                 })}
               </TableRow>
-            ))}
+              );
+            })}
           </TableBody>
         </Table>
       </TableContainer>

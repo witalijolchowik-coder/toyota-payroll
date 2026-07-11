@@ -3,11 +3,10 @@ import {
   doc,
   getDoc,
   getDocs,
-  orderBy,
   query,
   serverTimestamp,
   updateDoc,
-  where,
+  orderBy,
 } from 'firebase/firestore';
 
 import { auth } from '../config/firebase';
@@ -28,8 +27,13 @@ import type {
   Employee,
   IsoDate,
   MonthId,
+  PayrollMonth,
 } from '../types/firestore';
-import { mapAbsenceDocument, mapEmployeeDocument } from './firestore/mappers';
+import {
+  mapAbsenceDocument,
+  mapEmployeeDocument,
+  mapMonthDocument,
+} from './firestore/mappers';
 import {
   getFirestoreClient,
   getFirestoreRepositories,
@@ -56,6 +60,7 @@ export interface AbsenceWorkspaceData {
   absences: Absence[];
   currentAbsences: Absence[];
   employees: Employee[];
+  month: PayrollMonth | null;
 }
 
 function requireContext() {
@@ -75,12 +80,59 @@ function ownerMonthId(startDate: IsoDate): MonthId {
   return startDate.slice(0, 7);
 }
 
-function ownerMonthFromPath(path: string): MonthId {
-  const match = /^months\/([^/]+)\/absences\//.exec(path);
-  if (!match) {
-    throw new AbsenceServiceError('invalid-input');
+function addMonths(monthId: MonthId, offset: number): MonthId {
+  const [year, month] = monthId.split('-').map(Number);
+  const date = new Date(Date.UTC(year!, month! - 1 + offset, 1));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(
+    2,
+    '0',
+  )}`;
+}
+
+function uniqueMonthIds(monthIds: MonthId[]): MonthId[] {
+  return [...new Set(monthIds)];
+}
+
+function ownerMonthIdsForDisplay(monthId: MonthId): MonthId[] {
+  return uniqueMonthIds([addMonths(monthId, -1), monthId]);
+}
+
+function ownerMonthIdsForRange(startDate: IsoDate, endDate: IsoDate): MonthId[] {
+  const startMonth = addMonths(ownerMonthId(startDate), -1);
+  const endMonth = ownerMonthId(endDate);
+  const result: MonthId[] = [];
+  let current = startMonth;
+
+  while (current <= endMonth) {
+    result.push(current);
+    current = addMonths(current, 1);
   }
-  return match[1]!;
+
+  return uniqueMonthIds(result);
+}
+
+async function loadAbsencesOwnedByMonths(
+  monthIds: MonthId[],
+): Promise<Absence[]> {
+  const { repositories } = requireContext();
+  const snapshots = await Promise.all(
+    uniqueMonthIds(monthIds).map(async (monthId) => ({
+      monthId,
+      snapshot: await getDocs(repositories.forMonth(monthId).absences),
+    })),
+  );
+
+  return snapshots
+    .flatMap(({ monthId, snapshot }) =>
+      snapshot.docs.map((document) =>
+        mapAbsenceDocument(document.id, monthId, document.data()),
+      ),
+    )
+    .sort((first, second) =>
+      first.startDate === second.startDate
+        ? first.tetaNumber.localeCompare(second.tetaNumber, 'pl-PL')
+        : first.startDate.localeCompare(second.startDate),
+    );
 }
 
 async function assertWritableMonth(monthId: MonthId) {
@@ -97,40 +149,29 @@ async function assertWritableMonth(monthId: MonthId) {
 export async function loadAbsencesOverlappingMonth(
   monthId: MonthId,
 ): Promise<Absence[]> {
-  const { repositories } = requireContext();
   const range = getPayrollMonthDateRange(monthId);
   const monthStart = dateToIsoDate(range.start);
   const monthEnd = dateToIsoDate(range.end);
-  const snapshot = await getDocs(
-    query(
-      repositories.allAbsences,
-      where('start_date', '<=', monthEnd),
-      orderBy('start_date'),
-    ),
-  );
 
-  return snapshot.docs
-    .map((document) =>
-      mapAbsenceDocument(
-        document.id,
-        ownerMonthFromPath(document.ref.path),
-        document.data(),
-      ),
-    )
-    .filter((absence) => absence.endDate >= monthStart);
+  return (await loadAbsencesOwnedByMonths(ownerMonthIdsForDisplay(monthId)))
+    .filter(
+      (absence) =>
+        absence.startDate <= monthEnd && absence.endDate >= monthStart,
+    );
 }
 
-async function loadEmployeeAbsences(employeeId: string): Promise<Absence[]> {
-  const { repositories } = requireContext();
-  const snapshot = await getDocs(
-    query(repositories.allAbsences, where('employee_id', '==', employeeId)),
-  );
-  return snapshot.docs.map((document) =>
-    mapAbsenceDocument(
-      document.id,
-      ownerMonthFromPath(document.ref.path),
-      document.data(),
-    ),
+async function loadEmployeeAbsencesForRange(
+  employeeId: string,
+  startDate: IsoDate,
+  endDate: IsoDate,
+): Promise<Absence[]> {
+  return (
+    await loadAbsencesOwnedByMonths(ownerMonthIdsForRange(startDate, endDate))
+  ).filter(
+    (absence) =>
+      absence.employeeId === employeeId &&
+      absence.startDate <= endDate &&
+      absence.endDate >= startDate,
   );
 }
 
@@ -139,15 +180,21 @@ export async function loadAbsenceWorkspace(
 ): Promise<AbsenceWorkspaceData> {
   const { repositories } = requireContext();
   const currentMonthId = currentPayrollMonthId(new Date());
-  const [employeesSnapshot, absences, currentAbsences] = await Promise.all([
-    getDocs(query(repositories.employees, orderBy('teta_number'))),
-    loadAbsencesOverlappingMonth(selectedMonthId),
-    selectedMonthId === currentMonthId
-      ? Promise.resolve(null)
-      : loadAbsencesOverlappingMonth(currentMonthId),
-  ]);
+  const monthRepository = repositories.forMonth(selectedMonthId);
+  const [monthSnapshot, employeesSnapshot, absences, currentAbsences] =
+    await Promise.all([
+      getDoc(monthRepository.month),
+      getDocs(query(repositories.employees, orderBy('teta_number'))),
+      loadAbsencesOverlappingMonth(selectedMonthId),
+      selectedMonthId === currentMonthId
+        ? Promise.resolve(null)
+        : loadAbsencesOverlappingMonth(currentMonthId),
+    ]);
 
   return {
+    month: monthSnapshot.exists()
+      ? mapMonthDocument(selectedMonthId, monthSnapshot.data())
+      : null,
     employees: employeesSnapshot.docs.map((document) =>
       mapEmployeeDocument(document.id, document.data()),
     ),
@@ -181,7 +228,11 @@ async function assertNoBlockingL4(
   input: AbsenceCreateInput,
   ignoredAbsenceId?: string,
 ) {
-  const existing = await loadEmployeeAbsences(input.employeeId);
+  const existing = await loadEmployeeAbsencesForRange(
+    input.employeeId,
+    input.startDate,
+    input.endDate,
+  );
   if (
     findBlockingL4(
       existing,

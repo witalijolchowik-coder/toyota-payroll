@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { Link as RouterLink } from 'react-router-dom';
 import AddOutlined from '@mui/icons-material/AddOutlined';
 import CancelOutlined from '@mui/icons-material/CancelOutlined';
 import EditOutlined from '@mui/icons-material/EditOutlined';
@@ -51,6 +52,7 @@ import {
   normalizeAbsenceCode,
 } from '../utils/absences';
 import { currentPayrollMonthId } from '../utils/payroll';
+import { routes } from '../utils/routes';
 
 type FormState = { mode: 'add' } | { mode: 'edit'; absence: Absence } | null;
 
@@ -72,6 +74,7 @@ export function AbsencesPage() {
     absences,
     currentAbsences,
     employees,
+    month,
     isLoading,
     error,
     createAbsence,
@@ -88,6 +91,7 @@ export function AbsencesPage() {
     () => new Map(employees.map((employee) => [employee.id, employee])),
     [employees],
   );
+  const isWritable = Boolean(month && !month.isSettled);
 
   const filteredAbsences = useMemo(
     () =>
@@ -159,6 +163,7 @@ export function AbsencesPage() {
           <Button
             variant="contained"
             startIcon={<AddOutlined />}
+            disabled={!isWritable || employees.length === 0}
             onClick={() => setFormState({ mode: 'add' })}
           >
             {t.absences.page.add}
@@ -172,6 +177,32 @@ export function AbsencesPage() {
           <br />
           {loadErrorMessage(error, t)}
         </Alert>
+      ) : null}
+
+      {!isLoading && !month ? (
+        <Alert
+          severity="warning"
+          action={
+            <Button
+              component={RouterLink}
+              to={routes.settlement}
+              color="inherit"
+              size="small"
+            >
+              {t.absences.month.createInSettlement}
+            </Button>
+          }
+        >
+          <strong>
+            {interpolate(t.absences.month.missingTitle, { month: monthId })}
+          </strong>
+          <br />
+          {interpolate(t.absences.month.missingDescription, { month: monthId })}
+        </Alert>
+      ) : null}
+
+      {month?.isSettled ? (
+        <Alert severity="info">{t.absences.month.settled}</Alert>
       ) : null}
 
       <Box

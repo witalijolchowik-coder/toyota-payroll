@@ -243,11 +243,17 @@ export function EmployeeFormDialog({
             </Stack>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <TextField
+                required
                 fullWidth
                 type="date"
                 label={t.employees.form.employmentStartDate}
                 value={values.employmentStartDate}
                 onChange={handleChange('employmentStartDate')}
+                error={Boolean(errors.employmentStartDate)}
+                helperText={
+                  messageForError(errors.employmentStartDate) ??
+                  t.employees.form.employmentStartRequired
+                }
                 slotProps={{ inputLabel: { shrink: true } }}
               />
               <TextField

@@ -1,57 +1,42 @@
 import type { ReactNode } from 'react';
-import CloudUploadOutlined from '@mui/icons-material/CloudUploadOutlined';
+import { Link as RouterLink } from 'react-router-dom';
+import AssessmentOutlined from '@mui/icons-material/AssessmentOutlined';
 import EventBusyOutlined from '@mui/icons-material/EventBusyOutlined';
 import GroupsOutlined from '@mui/icons-material/GroupsOutlined';
-import PendingActionsOutlined from '@mui/icons-material/PendingActionsOutlined';
+import SettingsOutlined from '@mui/icons-material/SettingsOutlined';
+import SummarizeOutlined from '@mui/icons-material/SummarizeOutlined';
 import TaskAltOutlined from '@mui/icons-material/TaskAltOutlined';
 import {
   Box,
+  Button,
   Card,
   CardContent,
   Chip,
-  Divider,
-  Skeleton,
   Stack,
   Typography,
 } from '@mui/material';
 
 import { PageHeader } from '../components/layout/PageHeader';
+import { useTranslations } from '../hooks/useTranslations';
+import { routes } from '../utils/routes';
 
-interface DashboardCardProps {
+interface ReadinessCardProps {
   title: string;
   value: string;
   helperText: string;
   icon: ReactNode;
-  gridColumn?: string;
 }
 
-function DashboardCard({
+function ReadinessCard({
   title,
   value,
   helperText,
   icon,
-  gridColumn,
-}: DashboardCardProps) {
+}: ReadinessCardProps) {
   return (
-    <Card sx={{ gridColumn }}>
+    <Card>
       <CardContent sx={{ p: 3 }}>
-        <Stack
-          direction="row"
-          spacing={2}
-          sx={{ justifyContent: 'space-between' }}
-        >
-          <Box>
-            <Typography
-              color="text.secondary"
-              variant="body2"
-              sx={{ fontWeight: 650 }}
-            >
-              {title}
-            </Typography>
-            <Typography variant="h4" sx={{ mt: 1.5 }}>
-              {value}
-            </Typography>
-          </Box>
+        <Stack direction="row" spacing={2} sx={{ alignItems: 'flex-start' }}>
           <Box
             sx={{
               width: 44,
@@ -66,49 +51,21 @@ function DashboardCard({
           >
             {icon}
           </Box>
-        </Stack>
-        <Typography color="text.secondary" variant="caption">
-          {helperText}
-        </Typography>
-      </CardContent>
-    </Card>
-  );
-}
-
-function LatestImportsCard() {
-  return (
-    <Card sx={{ gridColumn: { xs: 'auto', lg: 'span 2' } }}>
-      <CardContent sx={{ p: 3 }}>
-        <Stack
-          direction="row"
-          spacing={2}
-          sx={{ justifyContent: 'space-between', alignItems: 'center' }}
-        >
-          <div>
-            <Typography variant="h6">Latest Imports</Typography>
-            <Typography color="text.secondary" variant="body2">
-              Recent attendance and absence files will appear here.
-            </Typography>
-          </div>
-          <CloudUploadOutlined color="primary" />
-        </Stack>
-        <Divider sx={{ my: 2.5 }} />
-        <Stack spacing={2}>
-          {[68, 54, 61].map((width) => (
-            <Stack
-              direction="row"
-              spacing={2}
-              sx={{ alignItems: 'center' }}
-              key={width}
+          <Box>
+            <Typography
+              color="text.secondary"
+              variant="body2"
+              sx={{ fontWeight: 650 }}
             >
-              <Skeleton variant="rounded" width={36} height={36} />
-              <Box sx={{ flexGrow: 1 }}>
-                <Skeleton width={`${width}%`} />
-                <Skeleton width="34%" height={16} />
-              </Box>
-              <Skeleton variant="rounded" width={72} height={24} />
-            </Stack>
-          ))}
+              {title}
+            </Typography>
+            <Typography variant="h6" sx={{ mt: 0.75 }}>
+              {value}
+            </Typography>
+            <Typography color="text.secondary" variant="body2" sx={{ mt: 1 }}>
+              {helperText}
+            </Typography>
+          </Box>
         </Stack>
       </CardContent>
     </Card>
@@ -116,17 +73,19 @@ function LatestImportsCard() {
 }
 
 export function DashboardPage() {
+  const t = useTranslations();
+
   return (
     <Stack spacing={4}>
       <PageHeader
-        eyebrow="Coordinator workspace"
-        title="Dashboard"
-        description="Your monthly payroll overview will live here. The shell is ready; live data and business workflows will be connected in later steps."
+        eyebrow={t.dashboard.page.eyebrow}
+        title={t.dashboard.page.title}
+        description={t.dashboard.page.description}
         action={
           <Chip
             icon={<TaskAltOutlined />}
-            label="Application shell ready"
-            color="success"
+            label={t.dashboard.page.status}
+            color="warning"
             variant="outlined"
           />
         }
@@ -143,56 +102,73 @@ export function DashboardPage() {
           gap: 2.5,
         }}
       >
-        <DashboardCard
-          title="Current Absences"
-          value="—"
-          helperText="No absence data connected"
-          icon={<EventBusyOutlined />}
-        />
-        <DashboardCard
-          title="Active Employees"
-          value="—"
-          helperText="Employee module not started"
+        <ReadinessCard
+          title={t.dashboard.cards.employees.title}
+          value={t.dashboard.cards.employees.value}
+          helperText={t.dashboard.cards.employees.helper}
           icon={<GroupsOutlined />}
         />
-        <DashboardCard
-          title="Pending Reviews"
-          value="—"
-          helperText="Review workflow not connected"
-          icon={<PendingActionsOutlined />}
+        <ReadinessCard
+          title={t.dashboard.cards.month.title}
+          value={t.dashboard.cards.month.value}
+          helperText={t.dashboard.cards.month.helper}
+          icon={<AssessmentOutlined />}
         />
-        <DashboardCard
-          title="Payroll Status"
-          value="Not started"
-          helperText="Monthly settlement will appear here"
-          icon={<TaskAltOutlined />}
+        <ReadinessCard
+          title={t.dashboard.cards.absences.title}
+          value={t.dashboard.cards.absences.value}
+          helperText={t.dashboard.cards.absences.helper}
+          icon={<EventBusyOutlined />}
         />
-        <LatestImportsCard />
-        <Card sx={{ gridColumn: { xs: 'auto', lg: 'span 2' } }}>
-          <CardContent sx={{ p: 3 }}>
-            <Typography variant="h6">Payroll Status</Typography>
-            <Typography color="text.secondary" variant="body2" sx={{ mt: 0.5 }}>
-              Period progress and validation status will appear here.
-            </Typography>
-            <Box
-              sx={{
-                mt: 3,
-                minHeight: 124,
-                display: 'grid',
-                placeItems: 'center',
-                border: 1,
-                borderStyle: 'dashed',
-                borderColor: 'divider',
-                borderRadius: 2.5,
-              }}
-            >
-              <Typography color="text.secondary" variant="body2">
-                No payroll period selected
-              </Typography>
-            </Box>
-          </CardContent>
-        </Card>
+        <ReadinessCard
+          title={t.dashboard.cards.exports.title}
+          value={t.dashboard.cards.exports.value}
+          helperText={t.dashboard.cards.exports.helper}
+          icon={<SummarizeOutlined />}
+        />
       </Box>
+
+      <Card>
+        <CardContent sx={{ p: 3 }}>
+          <Typography variant="h6">{t.dashboard.workflow.title}</Typography>
+          <Typography color="text.secondary" sx={{ mt: 0.75 }}>
+            {t.dashboard.workflow.description}
+          </Typography>
+          <Stack spacing={1.25} sx={{ mt: 2.5 }}>
+            <Typography>{t.dashboard.workflow.employees}</Typography>
+            <Typography>{t.dashboard.workflow.settings}</Typography>
+            <Typography>{t.dashboard.workflow.month}</Typography>
+            <Typography>{t.dashboard.workflow.absences}</Typography>
+            <Typography>{t.dashboard.workflow.review}</Typography>
+          </Stack>
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={1.5}
+            sx={{ mt: 3, flexWrap: 'wrap' }}
+          >
+            <Button component={RouterLink} to={routes.employees}>
+              {t.dashboard.actions.employees}
+            </Button>
+            <Button
+              component={RouterLink}
+              to={routes.settings}
+              startIcon={<SettingsOutlined />}
+            >
+              {t.dashboard.actions.settings}
+            </Button>
+            <Button
+              component={RouterLink}
+              to={routes.settlement}
+              variant="contained"
+            >
+              {t.dashboard.actions.settlement}
+            </Button>
+            <Button component={RouterLink} to={routes.absences}>
+              {t.dashboard.actions.absences}
+            </Button>
+          </Stack>
+        </CardContent>
+      </Card>
     </Stack>
   );
 }

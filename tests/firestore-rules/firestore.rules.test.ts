@@ -7,10 +7,15 @@ import {
 import {
   deleteDoc,
   doc,
+  collectionGroup,
   getDoc,
+  getDocs,
+  orderBy,
+  query,
   serverTimestamp,
   setDoc,
   updateDoc,
+  where,
 } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
 
@@ -955,6 +960,55 @@ describe('Firestore security rules', () => {
       }),
     );
     await assertFails(deleteDoc(reference));
+  });
+
+  it('allows active app users to read absences through the production collection-group query', async () => {
+    await seedMonth('2026-06', false);
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'months/2026-06/absences/l4-1'), {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        absence_code: 'L4',
+        start_date: '2026-06-28',
+        end_date: '2026-07-05',
+        hours_per_day: null,
+        source: 'manual',
+        import_id: null,
+        status: 'ACTIVE',
+        note: null,
+        created_at: new Date('2026-06-28T00:00:00.000Z'),
+        created_by: 'coordinator-1',
+        updated_at: new Date('2026-06-28T00:00:00.000Z'),
+        updated_by: 'coordinator-1',
+      });
+    });
+
+    const active = testEnvironment
+      .authenticatedContext('coordinator-1')
+      .firestore();
+    await assertSucceeds(
+      getDocs(
+        query(
+          collectionGroup(active, 'absences'),
+          where('start_date', '<=', '2026-07-31'),
+          orderBy('start_date'),
+        ),
+      ),
+    );
+
+    await seedAppUser('inactive-absence-reader', { active: false });
+    const inactive = testEnvironment
+      .authenticatedContext('inactive-absence-reader')
+      .firestore();
+    await assertFails(
+      getDocs(
+        query(
+          collectionGroup(inactive, 'absences'),
+          where('start_date', '<=', '2026-07-31'),
+          orderBy('start_date'),
+        ),
+      ),
+    );
   });
 
   it('requires ACTIVE creation and ownership by the start month', async () => {

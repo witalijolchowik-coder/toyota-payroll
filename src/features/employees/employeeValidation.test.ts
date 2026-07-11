@@ -24,7 +24,7 @@ function employee(id: string, tetaNumber: string, isActive: boolean): Employee {
     isActive,
     departmentId: null,
     shiftAssignment: null,
-    employmentStartDate: null,
+    employmentStartDate: new Date('2026-07-01T00:00:00.000Z'),
     employmentEndDate: null,
     ...metadata,
   };
@@ -43,26 +43,28 @@ function validInput(
     isActive: true,
     departmentId: null,
     shiftAssignment: null,
-    employmentStartDate: null,
+    employmentStartDate: new Date('2026-07-01T00:00:00.000Z'),
     employmentEndDate: null,
     ...overrides,
   };
 }
 
 describe('employee validation', () => {
-  it('requires TETA number, first name, and last name after trimming', () => {
+  it('requires TETA number, first name, last name, and employment start', () => {
     expect(
       validateEmployeeInput(
         validInput({
           tetaNumber: ' ',
           firstName: '',
           lastName: '  ',
+          employmentStartDate: null,
         }),
       ),
     ).toEqual({
       tetaNumber: 'required',
       firstName: 'required',
       lastName: 'required',
+      employmentStartDate: 'required',
     });
   });
 

@@ -13,12 +13,14 @@ import type {
   AbsenceUpdateInput,
   Employee,
   MonthId,
+  PayrollMonth,
 } from '../../types/firestore';
 
 interface AbsenceState {
   absences: Absence[];
   currentAbsences: Absence[];
   employees: Employee[];
+  month: PayrollMonth | null;
   isLoading: boolean;
   error: Error | null;
 }
@@ -27,6 +29,7 @@ const initialState: AbsenceState = {
   absences: [],
   currentAbsences: [],
   employees: [],
+  month: null,
   isLoading: true,
   error: null,
 };
