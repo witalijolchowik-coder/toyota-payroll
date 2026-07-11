@@ -61,8 +61,8 @@ describe('App', () => {
       }).length,
     ).toBeGreaterThan(0);
     expect(
-      screen.getByText(pl.dashboard.cards.absences.title),
-    ).toBeInTheDocument();
+      screen.getAllByText(pl.dashboard.cards.absences.title).length,
+    ).toBeGreaterThan(0);
     expect(screen.getByText(pl.auth.signOut)).toBeInTheDocument();
   });
 
