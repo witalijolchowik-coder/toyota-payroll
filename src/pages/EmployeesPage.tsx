@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import AddOutlined from '@mui/icons-material/AddOutlined';
 import UploadFileOutlined from '@mui/icons-material/UploadFileOutlined';
 import { Alert, Button, Card, Divider, Stack } from '@mui/material';
@@ -47,6 +48,7 @@ type EntitlementFormState =
 export function EmployeesPage() {
   const t = useTranslations();
   const { notify } = useNotification();
+  const [searchParams, setSearchParams] = useSearchParams();
   const {
     employees,
     isLoading,
@@ -212,6 +214,23 @@ export function EmployeesPage() {
   };
 
   const hasFilters = Boolean(search.trim()) || status !== 'all';
+
+  useEffect(() => {
+    const editEmployeeId = searchParams.get('editEmployeeId');
+    if (!editEmployeeId || employees.length === 0 || formState) {
+      return;
+    }
+    const employee = employees.find(
+      (candidate) => candidate.id === editEmployeeId,
+    );
+    if (!employee) {
+      return;
+    }
+    setFormState({ mode: 'edit', employee });
+    const next = new URLSearchParams(searchParams);
+    next.delete('editEmployeeId');
+    setSearchParams(next, { replace: true });
+  }, [employees, formState, searchParams, setSearchParams]);
 
   return (
     <Stack spacing={3}>

@@ -11,7 +11,7 @@
 | 7    | Absences                                                            | Complete    |
 | 8    | Recalculation function                                              | Not started |
 | 9    | Adjustments                                                         | Complete    |
-| 10   | L4 and attendance import                                            | Not started |
+| 10   | L4 and attendance import                                            | Partial     |
 | 11   | Reports                                                             | Not started |
 | 12   | Month settlement and usability polish                               | Not started |
 
@@ -218,3 +218,23 @@ Authentication session.
 - Review state does not affect settlement calculations.
 - No ZUS, PIT, taxes, net salary, payslip, reports, import engine, payroll
   closing or final immutable settlement snapshot.
+
+## Business Rules Block 17 implementation
+
+- Pulpit includes a Firestore-backed readiness view for a selected payroll
+  month.
+- Readiness distinguishes blocking, warning, optional and informational issues.
+- Employee readiness covers missing employment start, identity data,
+  department, shift, unresolved `NA0`, inactive/missing departments and
+  entitlement conflicts.
+- Payroll settings readiness flags missing active settings and overlapping
+  effective periods for existing payroll-setting keys.
+- Calendar readiness explicitly warns that Toyota-specific calendar overrides
+  are not yet production-governed.
+- Nieobecności includes preview-first L4 Excel import for the operational
+  `RAPORT TBPL` worksheet and required columns.
+- Imported L4 documents are stored once under the owner month of `start_date`
+  with `source: absence_import`; exact duplicates are skipped and overlaps or
+  possible continuations require review.
+- Attendance import, final month close, server-authoritative payroll, taxes,
+  payslips and multi-user approvals remain out of scope.

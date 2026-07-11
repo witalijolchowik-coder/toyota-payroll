@@ -332,8 +332,11 @@ service cloud.firestore {
           || (data.hours_per_day is number
             && data.hours_per_day >= 0
             && data.hours_per_day <= 24))
-        && data.source == 'manual'
-        && data.import_id == null
+        && data.source in ['manual', 'absence_import']
+        && (
+          (data.source == 'manual' && data.import_id == null)
+          || (data.source == 'absence_import' && isNonEmptyString(data.import_id))
+        )
         && data.status in ['ACTIVE', 'CANCELLED']
         && isNullableString(data.note)
         && hasModificationMetadata(data);

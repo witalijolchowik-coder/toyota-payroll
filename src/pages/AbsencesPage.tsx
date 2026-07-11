@@ -3,6 +3,7 @@ import { Link as RouterLink } from 'react-router-dom';
 import AddOutlined from '@mui/icons-material/AddOutlined';
 import CancelOutlined from '@mui/icons-material/CancelOutlined';
 import EditOutlined from '@mui/icons-material/EditOutlined';
+import UploadFileOutlined from '@mui/icons-material/UploadFileOutlined';
 import {
   Alert,
   Box,
@@ -32,6 +33,7 @@ import {
 
 import { PageHeader } from '../components/layout/PageHeader';
 import { AbsenceFormDialog } from '../features/absences/AbsenceFormDialog';
+import { L4ImportDialog } from '../features/absences/L4ImportDialog';
 import { useAbsences } from '../features/absences/useAbsences';
 import { useNotification } from '../hooks/useNotification';
 import { useTranslations } from '../hooks/useTranslations';
@@ -80,11 +82,13 @@ export function AbsencesPage() {
     createAbsence,
     updateAbsence,
     cancelAbsence,
+    reload,
   } = useAbsences(monthId);
   const [employeeFilter, setEmployeeFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('ACTIVE');
   const [formState, setFormState] = useState<FormState>(null);
+  const [isL4ImportOpen, setIsL4ImportOpen] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<Absence | null>(null);
   const [isCancelling, setIsCancelling] = useState(false);
   const employeesById = useMemo(
@@ -160,14 +164,23 @@ export function AbsencesPage() {
         title={t.absences.page.title}
         description={t.absences.page.description}
         action={
-          <Button
-            variant="contained"
-            startIcon={<AddOutlined />}
-            disabled={!isWritable || employees.length === 0}
-            onClick={() => setFormState({ mode: 'add' })}
-          >
-            {t.absences.page.add}
-          </Button>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+            <Button
+              variant="outlined"
+              startIcon={<UploadFileOutlined />}
+              onClick={() => setIsL4ImportOpen(true)}
+            >
+              {t.absences.page.importL4}
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<AddOutlined />}
+              disabled={!isWritable || employees.length === 0}
+              onClick={() => setFormState({ mode: 'add' })}
+            >
+              {t.absences.page.add}
+            </Button>
+          </Stack>
         }
       />
 
@@ -297,6 +310,13 @@ export function AbsencesPage() {
           }
           onClose={() => setFormState(null)}
           onSubmit={handleSubmit}
+        />
+      ) : null}
+
+      {isL4ImportOpen ? (
+        <L4ImportDialog
+          onClose={() => setIsL4ImportOpen(false)}
+          onImported={reload}
         />
       ) : null}
 

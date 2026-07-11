@@ -963,6 +963,52 @@ describe('Firestore security rules', () => {
     await assertFails(deleteDoc(reference));
   });
 
+  it('allows imported L4 creation but keeps imported absences read-only for client edits', async () => {
+    await seedMonth('2026-07', false);
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const reference = doc(firestore, 'months/2026-07/absences/imported-l4-1');
+
+    await assertSucceeds(
+      setDoc(reference, {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        absence_code: 'L4',
+        start_date: '2026-07-08',
+        end_date: '2026-07-10',
+        hours_per_day: null,
+        source: 'absence_import',
+        import_id: 'l4-test-batch',
+        status: 'ACTIVE',
+        note: 'L4 import: sanitized.xlsx, wiersz 2',
+        ...modificationMetadata(uid),
+      }),
+    );
+
+    await assertFails(
+      updateDoc(reference, {
+        note: 'manual change',
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertFails(
+      setDoc(doc(firestore, 'months/2026-07/absences/imported-without-id'), {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        absence_code: 'L4',
+        start_date: '2026-07-11',
+        end_date: '2026-07-12',
+        hours_per_day: null,
+        source: 'absence_import',
+        import_id: null,
+        status: 'ACTIVE',
+        note: null,
+        ...modificationMetadata(uid),
+      }),
+    );
+  });
+
   it('allows owner-month absence reads and keeps broad collection-group reads denied', async () => {
     await seedMonth('2026-06', false);
     await testEnvironment.withSecurityRulesDisabled(async (context) => {

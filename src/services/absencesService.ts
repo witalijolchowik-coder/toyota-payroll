@@ -12,8 +12,13 @@ import {
 import { auth } from '../config/firebase';
 import {
   findBlockingL4,
+  buildL4ImportPreview,
+  l4RowsToCreate,
   normalizeAbsenceCode,
   validateAbsenceInput,
+  type L4ImportContext,
+  type L4ImportPreviewRow,
+  type L4ImportSourceRow,
 } from '../utils/absences';
 import {
   currentPayrollMonthId,
@@ -61,6 +66,12 @@ export interface AbsenceWorkspaceData {
   currentAbsences: Absence[];
   employees: Employee[];
   month: PayrollMonth | null;
+}
+
+export interface L4ImportApplyResult {
+  created: number;
+  skipped: number;
+  failed: number;
 }
 
 function requireContext() {
@@ -149,6 +160,19 @@ async function assertWritableMonth(monthId: MonthId) {
   }
 }
 
+async function existingMonthIds(monthIds: MonthId[]): Promise<Set<MonthId>> {
+  const { repositories } = requireContext();
+  const entries = await Promise.all(
+    uniqueMonthIds(monthIds).map(async (monthId) => {
+      const snapshot = await getDoc(repositories.forMonth(monthId).month);
+      return [monthId, snapshot.exists()] as const;
+    }),
+  );
+  return new Set(
+    entries.filter(([, exists]) => exists).map(([monthId]) => monthId),
+  );
+}
+
 export async function loadAbsencesOverlappingMonth(
   monthId: MonthId,
 ): Promise<Absence[]> {
@@ -204,6 +228,38 @@ export async function loadAbsenceWorkspace(
     absences,
     currentAbsences: currentAbsences ?? absences,
   };
+}
+
+export async function loadL4ImportPreview(
+  sourceRows: readonly L4ImportSourceRow[],
+): Promise<L4ImportPreviewRow[]> {
+  const { repositories } = requireContext();
+  const ownerMonths = sourceRows
+    .map((row) => row.startDate?.slice(0, 7) ?? null)
+    .filter((monthId): monthId is MonthId => Boolean(monthId));
+  const sourceDates = sourceRows
+    .flatMap((row) => [row.startDate, row.endDate])
+    .filter((date): date is IsoDate => Boolean(date));
+  const rangeMonths =
+    sourceDates.length > 0
+      ? ownerMonthIdsForRange(
+          sourceDates.reduce((first, date) => (date < first ? date : first)),
+          sourceDates.reduce((last, date) => (date > last ? date : last)),
+        )
+      : [];
+  const [employeesSnapshot, existingAbsences, months] = await Promise.all([
+    getDocs(query(repositories.employees, orderBy('teta_number'))),
+    loadAbsencesOwnedByMonths(uniqueMonthIds([...ownerMonths, ...rangeMonths])),
+    existingMonthIds(ownerMonths),
+  ]);
+  const context: L4ImportContext = {
+    employees: employeesSnapshot.docs.map((document) =>
+      mapEmployeeDocument(document.id, document.data()),
+    ),
+    existingAbsences,
+    existingMonthIds: months,
+  };
+  return buildL4ImportPreview(sourceRows, context);
 }
 
 function assertValidInput(
@@ -282,6 +338,75 @@ export async function createAbsence(
     updated_by: uid,
   });
   return reference.id;
+}
+
+export async function applyL4ImportRows({
+  rows,
+  fileName,
+}: {
+  rows: readonly L4ImportPreviewRow[];
+  fileName: string;
+}): Promise<L4ImportApplyResult> {
+  const { repositories, uid } = requireContext();
+  const rowsToCreate = l4RowsToCreate(rows);
+  const importId = `l4-${Date.now()}`;
+  const result: L4ImportApplyResult = { created: 0, skipped: 0, failed: 0 };
+
+  for (const row of rowsToCreate) {
+    const employeeId = row.employeeId!;
+    const tetaNumber = row.tetaNumber!;
+    const startDate = row.startDate!;
+    const endDate = row.endDate!;
+    const monthId = row.ownerMonthId!;
+    try {
+      assertValidInput({
+        employeeId,
+        tetaNumber,
+        absenceCode: 'L4',
+        startDate,
+        endDate,
+        hoursPerDay: null,
+        note: null,
+      });
+      await assertWritableMonth(monthId);
+      const existing = await loadEmployeeAbsencesForRange(
+        employeeId,
+        startDate,
+        endDate,
+      );
+      const hasActiveOverlap = existing.some(
+        (absence) =>
+          absence.status === 'ACTIVE' &&
+          absence.startDate <= endDate &&
+          absence.endDate >= startDate,
+      );
+      if (hasActiveOverlap) {
+        result.skipped += 1;
+        continue;
+      }
+      await addDoc(repositories.forMonth(monthId).absences, {
+        employee_id: employeeId,
+        teta_number: tetaNumber,
+        absence_code: 'L4',
+        start_date: startDate,
+        end_date: endDate,
+        hours_per_day: null,
+        source: 'absence_import',
+        import_id: importId,
+        status: 'ACTIVE',
+        note: `L4 import: ${fileName}, wiersz ${row.rowNumber}`,
+        created_at: serverTimestamp(),
+        created_by: uid,
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      });
+      result.created += 1;
+    } catch {
+      result.failed += 1;
+    }
+  }
+
+  return result;
 }
 
 export async function updateAbsence(

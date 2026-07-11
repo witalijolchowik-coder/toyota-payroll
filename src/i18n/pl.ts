@@ -111,6 +111,56 @@ export const pl = {
       settlement: 'Otwórz rozliczenie',
       absences: 'Otwórz nieobecności',
     },
+    readiness: {
+      title: 'Gotowość miesiąca',
+      description:
+        'Szybka kontrola danych pracowników, konfiguracji i kalendarza przed dalszą pracą operacyjną.',
+      month: 'Miesiąc rozliczeniowy',
+      loadError:
+        'Nie udało się wczytać gotowości miesiąca. Sprawdź połączenie i uprawnienia.',
+      monthExists: 'Utworzony',
+      monthMissing: 'Brak miesiąca',
+      noIssues: 'Nie wykryto problemów gotowości dla wybranego miesiąca.',
+      moreIssues: 'Pozostałe problemy: {{count}}.',
+      correct: 'Popraw',
+      metrics: {
+        participants: 'Uczestnicy miesiąca',
+        blocking: 'Blokujące',
+        warning: 'Ostrzeżenia',
+        optional: 'Opcjonalne',
+        month: 'Dokument miesiąca',
+      },
+      severity: {
+        blocking: 'Blokuje',
+        warning: 'Ostrzeżenie',
+        optional: 'Opcjonalne',
+        info: 'Informacja',
+      },
+      issues: {
+        'month-missing': 'Miesiąc nie został jeszcze utworzony.',
+        'calendar-overrides-unresolved':
+          'Toyota-specyficzne wyjątki kalendarza nie są jeszcze potwierdzone.',
+        'employee-missing-employment-start':
+          'Brakuje daty rozpoczęcia zatrudnienia.',
+        'employee-missing-identity': 'Brakuje danych identyfikacyjnych do SOZ.',
+        'employee-missing-department': 'Pracownik nie ma przypisanego działu.',
+        'employee-missing-shift': 'Pracownik nie ma przypisanej zmiany.',
+        'department-unresolved-na0':
+          'Kod NA0 nie jest działem i wymaga ręcznego przypisania.',
+        'department-missing-or-inactive':
+          'Przypisany dział nie istnieje albo jest nieaktywny.',
+        'payroll-setting-missing':
+          'Brakuje aktywnej stawki dla wybranego miesiąca.',
+        'payroll-setting-conflict':
+          'Konfiguracja płacowa ma nakładające się okresy.',
+        'entitlement-overlap':
+          'Uprawnienia pracownika mają nakładające się okresy.',
+        'housing-conflict':
+          'Mieszkanie firmowe pokrywa się z dodatkiem za własne mieszkanie.',
+        'company-accommodation-missing-variant':
+          'Mieszkanie firmowe nie ma wybranego wariantu.',
+      },
+    },
   },
   reports: {
     page: {
@@ -540,6 +590,7 @@ export const pl = {
       description:
         'Zarządzaj dokumentami nieobecności bez zmieniania danych bezpośrednio w kalendarzu rozliczenia.',
       add: 'Dodaj nieobecność',
+      importL4: 'Importuj L4',
     },
     summary: {
       l4: 'Na L4 dzisiaj',
@@ -615,6 +666,75 @@ export const pl = {
       created: 'Nieobecność została dodana.',
       updated: 'Nieobecność została zaktualizowana.',
       cancelled: 'Nieobecność została anulowana.',
+    },
+    l4Import: {
+      title: 'Import L4 z Excela',
+      description:
+        'Wczytaj raport L4, sprawdź podgląd i dopiero potem zapisz poprawne rekordy nieobecności.',
+      expectedFormat:
+        'Oczekiwany arkusz: RAPORT TBPL. Kolumny: l.p., nazwisko i imię pracownika, rodzaj nieobecności, data od, data do.',
+      chooseFile: 'Wybierz plik Excel',
+      noFile: 'Nie wybrano pliku',
+      analyze: 'Analizuj',
+      analyzing: 'Analizowanie',
+      apply: 'Zapisz poprawne L4: {{count}}',
+      applying: 'Zapisywanie',
+      close: 'Zamknij',
+      empty: '—',
+      summary:
+        'Przeanalizowano {{total}} wierszy. Do zapisu gotowe: {{create}}.',
+      toCreate: 'Do utworzenia: {{count}}',
+      result:
+        'Utworzono: {{created}}, pominięto: {{skipped}}, błędy: {{failed}}.',
+      table: {
+        row: 'Wiersz',
+        sourceName: 'Nazwa z raportu',
+        employee: 'Dopasowany pracownik',
+        teta: 'TETA',
+        type: 'Typ',
+        period: 'Okres',
+        ownerMonth: 'Miesiąc źródłowy',
+        status: 'Wynik',
+      },
+      status: {
+        ready: 'Gotowe',
+        duplicate: 'Duplikat',
+        'overlap-review': 'Wymaga weryfikacji',
+        'continuation-review': 'Możliwa kontynuacja',
+        unmatched: 'Nie znaleziono',
+        ambiguous: 'Niejednoznaczne',
+        invalid: 'Nieprawidłowe',
+        'unsupported-type': 'Nieobsługiwane',
+        'month-missing': 'Brak miesiąca',
+      },
+      messages: {
+        ready: 'Rekord zostanie zapisany po potwierdzeniu.',
+        duplicate:
+          'Taki aktywny dokument L4 już istnieje i zostanie pominięty.',
+        'overlap-review':
+          'Okres nachodzi na istniejącą nieobecność i wymaga ręcznej decyzji.',
+        'continuation-review':
+          'Okres sąsiaduje z istniejącym L4 i wymaga ręcznej decyzji.',
+        unmatched: 'Nie znaleziono jednoznacznego pracownika w rejestrze.',
+        ambiguous:
+          'Kilku pracowników może pasować do tej nazwy. Rekord nie zostanie zapisany automatycznie.',
+        'invalid-row': 'Wiersz ma brakujące lub nieprawidłowe dane.',
+        'missing-name': 'Brakuje nazwy pracownika.',
+        'missing-type': 'Brakuje rodzaju nieobecności.',
+        'invalid-start-date': 'Data od jest nieprawidłowa.',
+        'invalid-end-date': 'Data do jest nieprawidłowa.',
+        'invalid-date-range': 'Data do jest wcześniejsza niż data od.',
+        'unsupported-type': 'Importer obsługuje w tym kroku tylko L4.',
+        'month-missing':
+          'Miesiąc źródłowy nie istnieje. Utwórz miesiąc przed importem.',
+      },
+      errors: {
+        fileRequired: 'Wybierz plik Excel z raportem L4.',
+        analyzeFailed:
+          'Nie udało się przeanalizować pliku. Sprawdź arkusz i wymagane kolumny.',
+        applyFailed:
+          'Nie udało się zapisać importu L4. Sprawdź miesiące, uprawnienia i reguły bezpieczeństwa.',
+      },
     },
     errors: {
       loadTitle: 'Nie udało się pobrać nieobecności',

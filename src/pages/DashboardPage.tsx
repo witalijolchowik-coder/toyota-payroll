@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import AssessmentOutlined from '@mui/icons-material/AssessmentOutlined';
 import EventBusyOutlined from '@mui/icons-material/EventBusyOutlined';
@@ -17,7 +18,9 @@ import {
 } from '@mui/material';
 
 import { PageHeader } from '../components/layout/PageHeader';
+import { MonthReadinessPanel } from '../features/readiness/MonthReadinessPanel';
 import { useTranslations } from '../hooks/useTranslations';
+import { previousPayrollMonthId } from '../utils/payroll';
 import { routes } from '../utils/routes';
 
 interface ReadinessCardProps {
@@ -69,6 +72,9 @@ function ReadinessCard({ title, value, helperText, icon }: ReadinessCardProps) {
 
 export function DashboardPage() {
   const t = useTranslations();
+  const [monthId, setMonthId] = useState(() =>
+    previousPayrollMonthId(new Date()),
+  );
 
   return (
     <Stack spacing={4}>
@@ -164,6 +170,8 @@ export function DashboardPage() {
           </Stack>
         </CardContent>
       </Card>
+
+      <MonthReadinessPanel monthId={monthId} onMonthChange={setMonthId} />
     </Stack>
   );
 }

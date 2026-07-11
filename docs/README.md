@@ -50,6 +50,9 @@ The attached design history contains several generations of the architecture. Th
 - [Employee import templates and bulk updates - Block 15](business-rules/employee-import-templates.md)
   - app-owned CSV templates for new employees and bulk employee master-data
     updates
+- [Data quality readiness and L4 import - Block 17](business-rules/data-quality-readiness-l4-import.md)
+  - employee/month readiness, payroll-setting checks and preview-first L4
+    import
 
 Approved business-rules specifications govern payroll semantics. Architecture
 documents continue to govern system structure and implementation boundaries.
