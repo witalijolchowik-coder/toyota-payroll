@@ -144,6 +144,85 @@ export const pl = {
       updated: 'Dane pracownika zostały zapisane.',
       deactivated: 'Pracownik został dezaktywowany.',
     },
+    import: {
+      open: 'Import pracowników',
+      title: 'Import początkowej bazy pracowników',
+      description:
+        'Wczytaj zestawienie Toyota jako źródło podstawowych danych pracownika. Pliki SOZ służą tylko do bezpiecznego uzupełnienia dokumentu i ostrzeżeń — nie importują godzin, nieobecności ani wartości rozliczenia.',
+      empty: '—',
+      noWarnings: 'Brak ostrzeżeń',
+      summary:
+        'Przeanalizowano {{total}} wierszy. Do utworzenia można zaznaczyć {{selectable}}.',
+      employmentRange: '{{start}} – {{end}}',
+      employmentOpenRange: 'od {{start}}',
+      files: {
+        toyota: 'Plik Toyota Excel',
+        sozPl: 'SOZ PL CSV',
+        sozUa: 'SOZ UA CSV',
+        notSelected: 'Nie wybrano pliku',
+      },
+      actions: {
+        analyze: 'Analizuj pliki',
+        analyzing: 'Analizowanie',
+        cancel: 'Anuluj',
+        createSelected: 'Utwórz zaznaczonych: {{count}}',
+        creating: 'Tworzenie pracowników',
+      },
+      table: {
+        select: 'Wybór',
+        selectRow: 'Zaznacz pracownika: {{employee}}',
+        status: 'Status',
+        teta: 'TETA',
+        employee: 'Pracownik',
+        identity: 'PESEL / paszport',
+        employment: 'Zatrudnienie',
+        department: 'Dział',
+        housing: 'Mieszkanie',
+        warnings: 'Uwagi',
+      },
+      status: {
+        new: 'Nowy',
+        existing: 'Istnieje',
+        duplicate: 'Duplikat',
+        conflict: 'Konflikt',
+        blocked: 'Zablokowany',
+      },
+      housing: {
+        media: 'Media {{amount}}',
+        accommodation: 'Mieszkanie {{amount}}',
+        ownAllowance: 'Dodatek własny {{amount}}',
+      },
+      warnings: {
+        'missing-name': 'Brakuje imienia lub nazwiska.',
+        'missing-teta': 'Brakuje numeru TETA.',
+        'missing-employment-start': 'Brakuje daty rozpoczęcia zatrudnienia.',
+        'duplicate-teta-in-import': 'Ten numer TETA powtarza się w imporcie.',
+        'existing-employee':
+          'Pracownik z tym numerem TETA już istnieje — import go nie nadpisze.',
+        'identity-conflict':
+          'PESEL lub paszport pasuje do innego istniejącego pracownika.',
+        'soz-unmatched':
+          'Wiersz SOZ nie ma jednoznacznego odpowiednika w pliku Toyota.',
+        'soz-ambiguous-match':
+          'Wiersz SOZ pasuje do kilku osób o tym samym imieniu i nazwisku.',
+        'department-na0':
+          'Dział NA0 nie jest mapowany automatycznie i wymaga decyzji.',
+        'department-unmapped':
+          'Dział nie został bezpiecznie rozpoznany i pozostanie pusty.',
+        'company-housing-variant-required':
+          'Wykryto mieszkanie firmowe, ale wariant mieszkania trzeba przypisać ręcznie.',
+        'own-housing-detected':
+          'Wykryto dodatek mieszkaniowy w SOZ PL; nie jest tworzony automatycznie.',
+      },
+      notifications: {
+        created: 'Utworzono pracowników: {{count}}.',
+      },
+      errors: {
+        toyotaRequired: 'Wybierz plik Toyota Excel.',
+        analyzeFailed: 'Nie udało się przeanalizować plików importu.',
+        createFailed: 'Nie udało się utworzyć zaznaczonych pracowników.',
+      },
+    },
     entitlements: {
       title: 'Uprawnienia i przypisania',
       description:

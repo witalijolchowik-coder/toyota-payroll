@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import AddOutlined from '@mui/icons-material/AddOutlined';
+import UploadFileOutlined from '@mui/icons-material/UploadFileOutlined';
 import { Alert, Button, Card, Divider, Stack } from '@mui/material';
 
 import { PageHeader } from '../components/layout/PageHeader';
@@ -7,9 +8,11 @@ import { DeactivateEmployeeDialog } from '../features/employees/DeactivateEmploy
 import { EmployeeEntitlementFormDialog } from '../features/employees/EmployeeEntitlementFormDialog';
 import { EmployeeEntitlementsPanel } from '../features/employees/EmployeeEntitlementsPanel';
 import { EmployeeFormDialog } from '../features/employees/EmployeeFormDialog';
+import { EmployeeImportDialog } from '../features/employees/EmployeeImportDialog';
 import { EmployeesEmptyState } from '../features/employees/EmployeesEmptyState';
 import { EmployeesTable } from '../features/employees/EmployeesTable';
 import { EmployeesToolbar } from '../features/employees/EmployeesToolbar';
+import type { EmployeeImportPreviewRow } from '../features/employees/employeeImport';
 import type { EmployeeStatusFilter } from '../features/employees/types';
 import { useEmployees } from '../features/employees/useEmployees';
 import { useEmployeeEntitlements } from '../features/employees/useEmployeeEntitlements';
@@ -17,10 +20,12 @@ import { useDepartments } from '../features/settings/useDepartments';
 import { usePayrollSettings } from '../features/settings/usePayrollSettings';
 import { useNotification } from '../hooks/useNotification';
 import { useTranslations } from '../hooks/useTranslations';
+import { interpolate } from '../i18n/pl';
 import {
   EmployeeServiceError,
   type EmployeeServiceErrorCode,
 } from '../services/employeesService';
+import { createEmployeesFromImportPreview } from '../services/employeeImportService';
 import type {
   Employee,
   EmployeeCreateInput,
@@ -64,6 +69,7 @@ export function EmployeesPage() {
   const [formState, setFormState] = useState<EmployeeFormState>(null);
   const [entitlementFormState, setEntitlementFormState] =
     useState<EntitlementFormState>(null);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const [deactivationTarget, setDeactivationTarget] = useState<Employee | null>(
     null,
   );
@@ -175,6 +181,16 @@ export function EmployeesPage() {
     }
   };
 
+  const handleImportEmployees = async (rows: EmployeeImportPreviewRow[]) => {
+    const result = await createEmployeesFromImportPreview(rows);
+    notify({
+      message: interpolate(t.employees.import.notifications.created, {
+        count: String(result.createdEmployeeIds.length),
+      }),
+      severity: 'success',
+    });
+  };
+
   const hasFilters = Boolean(search.trim()) || status !== 'all';
 
   return (
@@ -184,13 +200,22 @@ export function EmployeesPage() {
         title={t.employees.page.title}
         description={t.employees.page.description}
         action={
-          <Button
-            variant="contained"
-            startIcon={<AddOutlined />}
-            onClick={() => setFormState({ mode: 'add' })}
-          >
-            {t.employees.page.add}
-          </Button>
+          <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+            <Button
+              variant="outlined"
+              startIcon={<UploadFileOutlined />}
+              onClick={() => setIsImportOpen(true)}
+            >
+              {t.employees.import.open}
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<AddOutlined />}
+              onClick={() => setFormState({ mode: 'add' })}
+            >
+              {t.employees.page.add}
+            </Button>
+          </Stack>
         }
       />
 
@@ -274,6 +299,16 @@ export function EmployeesPage() {
           accommodationVariants={accommodationVariants}
           onClose={() => setEntitlementFormState(null)}
           onSubmit={handleEntitlementSubmit}
+        />
+      ) : null}
+
+      {isImportOpen ? (
+        <EmployeeImportDialog
+          employees={employees}
+          departments={departments}
+          accommodationVariants={accommodationVariants}
+          onClose={() => setIsImportOpen(false)}
+          onImport={handleImportEmployees}
         />
       ) : null}
     </Stack>

@@ -45,6 +45,8 @@ The attached design history contains several generations of the architecture. Th
     readiness signal
 - [Export formats - Block 12](business-rules/export-formats.md) - Toyota Excel,
   SOZ CSV PL/foreign split, and mandatory overtime/niedoczas accompanying note
+- [Initial employee base import - Block 14](business-rules/initial-employee-base-import.md)
+  - preview-first creation of selected new employees from Toyota/SOZ files
 
 Approved business-rules specifications govern payroll semantics. Architecture
 documents continue to govern system structure and implementation boundaries.
@@ -70,6 +72,7 @@ documents continue to govern system structure and implementation boundaries.
 - [ADR 0017: Monthly settlement review states](decisions/0017-monthly-settlement-review-states.md)
 - [ADR 0018: Export format foundation](decisions/0018-export-format-foundation.md)
 - [ADR 0019: Firebase Auth with appUsers allowlist](decisions/0019-firebase-auth-app-users.md)
+- [ADR 0020: Preview-first initial employee base import](decisions/0020-initial-employee-base-import.md)
 
 ## Authority order
 
