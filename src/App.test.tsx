@@ -76,8 +76,8 @@ describe('App', () => {
     expect(
       screen.getByRole('heading', { name: pl.auth.login.title }),
     ).toBeInTheDocument();
-    expect(screen.getByLabelText(pl.auth.login.email)).toBeInTheDocument();
-    expect(screen.getByLabelText(pl.auth.login.password)).toBeInTheDocument();
+    expect(screen.getByLabelText(/E-mail/)).toBeInTheDocument();
+    expect(screen.getByLabelText(/Hasło/)).toBeInTheDocument();
   });
 
   it('shows no-access state and allows sign out for unapproved users', async () => {
