@@ -96,7 +96,8 @@ export async function loadDepartments(): Promise<Department[]> {
       .map((document) => mapDepartmentDocument(document.id, document.data()))
       .filter((department) => getCanonicalDepartmentDefinition(department.id));
   } catch {
-    departments = [];
+    // Use the canonical in-memory fallback below when the Firestore reference
+    // collection cannot be read or contains legacy data that cannot be mapped.
   }
 
   const byId = new Map(
