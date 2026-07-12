@@ -34,6 +34,22 @@ export class DepartmentsServiceError extends Error {
   }
 }
 
+export function canonicalDepartmentsFallback(): Department[] {
+  const now = new Date(0);
+  return CANONICAL_DEPARTMENTS.map((department) => ({
+    id: department.id,
+    name: department.name,
+    shiftMode: department.shiftMode,
+    active: true,
+    rotationAnchorWeekStart: department.rotationAnchor.weekStartIsoDate,
+    rotationBaseAssignment: department.rotationAnchor.baseAssignment,
+    createdAt: now,
+    createdBy: 'system',
+    updatedAt: now,
+    updatedBy: 'system',
+  }));
+}
+
 function requireContext() {
   const repositories = getFirestoreRepositories();
   if (!repositories) {
@@ -71,15 +87,24 @@ export function validateDepartmentInput(
 
 export async function loadDepartments(): Promise<Department[]> {
   const context = requireContext();
-  await ensureCanonicalDepartments(context);
-  const snapshot = await getDocs(context.repositories.departments);
-  const departments = snapshot.docs
-    .map((document) => mapDepartmentDocument(document.id, document.data()))
-    .filter((department) => getCanonicalDepartmentDefinition(department.id));
+  await ensureCanonicalDepartments(context).catch(() => undefined);
 
-  return CANONICAL_DEPARTMENTS.map((definition) =>
-    departments.find((department) => department.id === definition.id),
-  ).filter((department): department is Department => Boolean(department));
+  let departments: Department[] = [];
+  try {
+    const snapshot = await getDocs(context.repositories.departments);
+    departments = snapshot.docs
+      .map((document) => mapDepartmentDocument(document.id, document.data()))
+      .filter((department) => getCanonicalDepartmentDefinition(department.id));
+  } catch {
+    departments = [];
+  }
+
+  const byId = new Map(
+    departments.map((department) => [department.id, department]),
+  );
+  return canonicalDepartmentsFallback().map(
+    (fallback) => byId.get(fallback.id) ?? fallback,
+  );
 }
 
 export async function createDepartment(
