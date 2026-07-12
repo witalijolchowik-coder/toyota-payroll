@@ -105,10 +105,6 @@ function uniqueMonthIds(monthIds: MonthId[]): MonthId[] {
   return [...new Set(monthIds)];
 }
 
-function ownerMonthIdsForDisplay(monthId: MonthId): MonthId[] {
-  return uniqueMonthIds([addMonths(monthId, -1), monthId]);
-}
-
 function ownerMonthIdsForRange(
   startDate: IsoDate,
   endDate: IsoDate,
@@ -150,6 +146,29 @@ async function loadAbsencesOwnedByMonths(
     );
 }
 
+export function monthIdFromAbsencePath(path: string): MonthId | null {
+  const match = /^months\/([^/]+)\/absences\/[^/]+$/.exec(path);
+  return match?.[1] ?? null;
+}
+
+async function loadAllAbsences(): Promise<Absence[]> {
+  const { repositories } = requireContext();
+  const snapshot = await getDocs(repositories.allAbsences);
+  return snapshot.docs
+    .map((document) => {
+      const monthId = monthIdFromAbsencePath(document.ref.path);
+      return monthId
+        ? mapAbsenceDocument(document.id, monthId, document.data())
+        : null;
+    })
+    .filter((absence): absence is Absence => Boolean(absence))
+    .sort((first, second) =>
+      first.startDate === second.startDate
+        ? first.tetaNumber.localeCompare(second.tetaNumber, 'pl-PL')
+        : first.startDate.localeCompare(second.startDate),
+    );
+}
+
 async function assertWritableMonth(monthId: MonthId) {
   const { repositories } = requireContext();
   const snapshot = await getDoc(repositories.forMonth(monthId).month);
@@ -181,9 +200,7 @@ export async function loadAbsencesOverlappingMonth(
   const monthStart = dateToIsoDate(range.start);
   const monthEnd = dateToIsoDate(range.end);
 
-  return (
-    await loadAbsencesOwnedByMonths(ownerMonthIdsForDisplay(monthId))
-  ).filter(
+  return (await loadAllAbsences()).filter(
     (absence) => absence.startDate <= monthEnd && absence.endDate >= monthStart,
   );
 }
