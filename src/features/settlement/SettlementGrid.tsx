@@ -22,6 +22,9 @@ import type {
   DailyValue,
   Department,
   Employee,
+  EmployeeAssignment,
+  ScheduleCorrection,
+  IsoDate,
 } from '../../types/firestore';
 import { resolveGoverningAbsence } from '../../utils/absences';
 import {
@@ -37,14 +40,23 @@ import {
   resolveSettlementCellValue,
   type CalendarDay,
 } from './monthUtils';
+import {
+  generateEmployeeMonthlySchedule,
+  type PlannedScheduleDay,
+} from '../../utils/schedule';
 
 interface SettlementGridProps {
   employees: Employee[];
   days: CalendarDay[];
   dailyValues: DailyValue[];
   departments?: Department[];
+  employeeAssignments?: EmployeeAssignment[];
+  scheduleCorrections?: ScheduleCorrection[];
+  publicHolidays?: ReadonlySet<IsoDate>;
+  publicHolidayNames?: ReadonlyMap<IsoDate, string>;
   absences?: Absence[];
   isSettled?: boolean;
+  displayMode?: 'hours' | 'shifts';
   onEditCell?: (
     employee: Employee,
     day: CalendarDay,
@@ -73,8 +85,13 @@ export function SettlementGrid({
   days,
   dailyValues,
   departments = [],
+  employeeAssignments = [],
+  scheduleCorrections = [],
+  publicHolidays,
+  publicHolidayNames,
   absences = [],
   isSettled = false,
+  displayMode = 'hours',
   onEditCell,
   selection = null,
   onSelectCell,
@@ -147,6 +164,19 @@ export function SettlementGrid({
           </TableHead>
           <TableBody>
             {employees.map((employee) => {
+              const plannedScheduleByDate = new Map(
+                generateEmployeeMonthlySchedule({
+                  employee,
+                  days,
+                  departments,
+                  options: {
+                    assignments: employeeAssignments,
+                    corrections: scheduleCorrections,
+                    publicHolidays,
+                    publicHolidayNames,
+                  },
+                }).map((plannedDay) => [plannedDay.date, plannedDay]),
+              );
               const department = employee.departmentId
                 ? departmentsById.get(employee.departmentId)
                 : null;
@@ -181,6 +211,7 @@ export function SettlementGrid({
                     const persistedValue = dailyValuesByEmployeeAndDate.get(
                       dailyValueLookupKey(employee.id, day.isoDate),
                     );
+                    const plannedDay = plannedScheduleByDate.get(day.isoDate);
                     const value = resolveSettlementCellValue({
                       employee,
                       day,
@@ -202,6 +233,13 @@ export function SettlementGrid({
                         : interpolate(t.settlement.grid.hours, {
                             hours: value.hours.toLocaleString('pl-PL'),
                           });
+                    const displayLabel = cellDisplayLabel({
+                      value,
+                      plannedDay,
+                      hoursLabel,
+                      emptyLabel: t.settlement.grid.empty,
+                      displayMode,
+                    });
                     const hasGoverningAbsence =
                       absenceResolution.kind !== 'none';
                     const warnings = resolveAttendanceWarnings({
@@ -213,6 +251,7 @@ export function SettlementGrid({
                     });
                     const tooltip = buildTooltip({
                       value,
+                      plannedDay,
                       absenceResolution,
                       warnings,
                       isSettled,
@@ -317,7 +356,7 @@ export function SettlementGrid({
                                     ) : null}
                                   </>
                                 ) : (
-                                  hoursLabel
+                                  displayLabel
                                 )}
                               </Box>
                             </ButtonBase>
@@ -416,14 +455,36 @@ function cellValueSx(
   return { color: 'text.disabled' };
 }
 
+function cellDisplayLabel({
+  value,
+  plannedDay,
+  hoursLabel,
+  emptyLabel,
+  displayMode,
+}: {
+  value: ReturnType<typeof resolveSettlementCellValue>;
+  plannedDay?: PlannedScheduleDay;
+  hoursLabel: string;
+  emptyLabel: string;
+  displayMode: 'hours' | 'shifts';
+}): string {
+  if (displayMode === 'hours') {
+    return hoursLabel;
+  }
+
+  return plannedDay?.label ?? (value.hours === null ? emptyLabel : hoursLabel);
+}
+
 function buildTooltip({
   value,
+  plannedDay,
   absenceResolution,
   warnings,
   isSettled,
   t,
 }: {
   value: ReturnType<typeof resolveSettlementCellValue>;
+  plannedDay?: PlannedScheduleDay;
   absenceResolution: ReturnType<typeof resolveGoverningAbsence>;
   warnings: AttendanceWarning[];
   isSettled: boolean;
@@ -455,6 +516,26 @@ function buildTooltip({
     parts.push(t.settlement.grid.importedValue);
   } else if (value.kind === 'manual') {
     parts.push(t.settlement.grid.manualValue);
+  }
+
+  if (plannedDay) {
+    if (plannedDay.status === 'UNRESOLVED') {
+      parts.push(t.settlement.grid.scheduleUnresolved);
+    } else if (plannedDay.source === 'manual-correction') {
+      parts.push(t.settlement.grid.scheduleManualCorrection);
+    } else if (plannedDay.status === 'BHP') {
+      parts.push(t.settlement.grid.scheduleBhp);
+    } else if (plannedDay.status === 'PUBLIC_HOLIDAY') {
+      parts.push(
+        plannedDay.holidayName
+          ? interpolate(t.settlement.grid.publicHolidayName, {
+              holiday: plannedDay.holidayName,
+            })
+          : t.settlement.grid.publicHoliday,
+      );
+    } else if (plannedDay.status === 'WORKING') {
+      parts.push(t.settlement.grid.scheduleAutomatic);
+    }
   }
 
   if (isSettled) {

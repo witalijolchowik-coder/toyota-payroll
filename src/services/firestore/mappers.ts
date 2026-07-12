@@ -10,6 +10,8 @@ import type {
   Department,
   DepartmentDocument,
   Employee,
+  EmployeeAssignment,
+  EmployeeAssignmentDocument,
   EmployeeDocument,
   EmployeeEntitlement,
   EmployeeEntitlementDocument,
@@ -24,6 +26,8 @@ import type {
   PayrollMonth,
   Report,
   ReportDocument,
+  ScheduleCorrection,
+  ScheduleCorrectionDocument,
   SettlementReviewDocument,
   SettlementReviewState,
 } from '../../types/firestore';
@@ -72,6 +76,46 @@ export function mapDepartmentDocument(
     name: document.name,
     shiftMode: document.shift_mode,
     active: document.active,
+    rotationAnchorWeekStart: document.rotation_anchor_week_start ?? null,
+    rotationBaseAssignment: document.rotation_base_assignment ?? null,
+    ...modificationMetadata(document),
+  };
+}
+
+export function mapEmployeeAssignmentDocument(
+  id: string,
+  document: EmployeeAssignmentDocument,
+): EmployeeAssignment {
+  return {
+    id,
+    employeeId: document.employee_id,
+    tetaNumber: document.teta_number,
+    departmentId: document.department_id,
+    shiftAssignment: document.shift_assignment,
+    validFrom: document.valid_from,
+    validTo: document.valid_to,
+    status: document.status,
+    note: document.note,
+    ...modificationMetadata(document),
+  };
+}
+
+export function mapScheduleCorrectionDocument(
+  id: string,
+  monthId: MonthId,
+  document: ScheduleCorrectionDocument,
+): ScheduleCorrection {
+  return {
+    id,
+    monthId,
+    employeeId: document.employee_id,
+    tetaNumber: document.teta_number,
+    date: document.date,
+    kind: document.kind,
+    plannedShift: document.planned_shift,
+    plannedHours: document.planned_hours,
+    note: document.note,
+    status: document.status,
     ...modificationMetadata(document),
   };
 }

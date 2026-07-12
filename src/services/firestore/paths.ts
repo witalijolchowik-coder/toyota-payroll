@@ -57,6 +57,13 @@ export const firestorePaths = {
       'entitlementId',
     )}`;
   },
+  employeeAssignments: 'employeeAssignments',
+  employeeAssignment(assignmentId: string) {
+    return `employeeAssignments/${assertPathSegment(
+      assignmentId,
+      'assignmentId',
+    )}`;
+  },
   departments: 'departments',
   department(departmentId: string) {
     return `departments/${assertPathSegment(departmentId, 'departmentId')}`;
@@ -80,6 +87,9 @@ export const firestorePaths = {
   },
   dailyValues(monthId: string) {
     return `${this.month(monthId)}/dailyValues`;
+  },
+  scheduleCorrections(monthId: string) {
+    return `${this.month(monthId)}/scheduleCorrections`;
   },
   absences(monthId: string) {
     return `${this.month(monthId)}/absences`;

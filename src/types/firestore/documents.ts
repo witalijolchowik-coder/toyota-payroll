@@ -9,6 +9,15 @@ export type IsoDate = string;
 export type EmployeeColorShift = 'RED' | 'WHITE' | 'BLUE';
 export type ActualWorkingShift = 'FIRST' | 'SECOND' | 'NIGHT';
 export type DepartmentShiftMode = 'UNKNOWN' | 'TWO_SHIFT' | 'THREE_SHIFT';
+export type EmployeeAssignmentStatus = 'ACTIVE' | 'CANCELLED';
+export type ScheduleCorrectionStatus = 'ACTIVE' | 'CANCELLED';
+export type ScheduleCorrectionKind =
+  | 'FIRST_SHIFT'
+  | 'SECOND_SHIFT'
+  | 'NIGHT_SHIFT'
+  | 'DAY_OFF'
+  | 'PUBLIC_HOLIDAY_WORK'
+  | 'BHP';
 
 export interface EmployeeReferenceDocument {
   employee_id: EmployeeId;
@@ -40,6 +49,30 @@ export interface DepartmentDocument extends ModificationMetadataDocument {
   name: string;
   shift_mode: DepartmentShiftMode;
   active: boolean;
+  rotation_anchor_week_start?: IsoDate | null;
+  rotation_base_assignment?: Partial<
+    Record<EmployeeColorShift, ActualWorkingShift>
+  > | null;
+}
+
+export interface EmployeeAssignmentDocument
+  extends EmployeeReferenceDocument, ModificationMetadataDocument {
+  department_id: DepartmentId | null;
+  shift_assignment: EmployeeColorShift | null;
+  valid_from: IsoDate;
+  valid_to: IsoDate | null;
+  status: EmployeeAssignmentStatus;
+  note: string | null;
+}
+
+export interface ScheduleCorrectionDocument
+  extends EmployeeReferenceDocument, ModificationMetadataDocument {
+  date: IsoDate;
+  kind: ScheduleCorrectionKind;
+  planned_shift: ActualWorkingShift | null;
+  planned_hours: number | null;
+  note: string | null;
+  status: ScheduleCorrectionStatus;
 }
 
 export type CalculationStatus =

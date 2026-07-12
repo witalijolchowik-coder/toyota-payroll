@@ -20,6 +20,13 @@ assignment and a conservative weekly rotation foundation. This is complete as
 coordination/filtering context only; it does not implement payroll consequences
 or a full schedule planner.
 
+Business Rules Block 18 extends that foundation into monthly planned schedule
+generation. It adds canonical department enforcement, effective-dated
+department/color assignments, local shift rotations, BHP planned days, Polish
+public holidays and a Monthly Settlement display toggle between hours and
+planned shifts. It still does not implement payroll closing, salary amounts,
+taxes, payslips or multi-user approvals.
+
 Business Rules Block 8 introduced the foundation for planned-vs-actual work
 time, private time, overtime 50%, overtime 100%, public-holiday eligibility and
 monthly balancing. This remains a draft/foundation layer only; it does not
@@ -238,3 +245,21 @@ Authentication session.
   possible continuations require review.
 - Attendance import, final month close, server-authoritative payroll, taxes,
   payslips and multi-user approvals remain out of scope.
+
+## Business Rules Block 18 implementation
+
+- Department selection and imports use the canonical MVP department set:
+  Metal, Szwalnia, Montaż, PU, Headliner and Magazyn.
+- `NA0` and unknown department names remain unresolved warnings and are not
+  automatically mapped.
+- Department documents include local rotation anchor metadata.
+- Employee department/color changes create effective-dated assignment history
+  while preserving the employee's current coordination snapshot.
+- Monthly schedule utilities generate planned day labels without writing
+  default documents or overwriting actual attendance.
+- BHP is planned working time: first two working days, 8h, first shift.
+- Polish public holidays are generated, including Boże Ciało on 2026-06-04.
+- Monthly Settlement keeps a default hours view and adds a planned-shifts view.
+- Readiness surfaces unresolved schedule days.
+- No payroll amounts, final closing, attendance import, reports, taxes,
+  payslips or multi-user approval workflow are implemented.

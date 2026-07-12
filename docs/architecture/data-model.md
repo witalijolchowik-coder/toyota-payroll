@@ -11,12 +11,15 @@ This is the final MVP shape. It supersedes the earlier enterprise collection hie
 
 /employees/{employeeId}
 
+/employeeAssignments/{assignmentId}
+
 /employeeEntitlements/{entitlementId}
 
 /months/{monthId}
   /employeeSettlements/{employeeId}
   /reviewStates/{employeeId}
   /dailyValues/{employeeId_YYYY-MM-DD}
+  /scheduleCorrections/{correctionId}
   /absences/{absenceId}
   /adjustments/{adjustmentId}
   /imports/{importId}
@@ -71,6 +74,54 @@ documents store stable `department_id` and optional `shift_assignment`
 These fields describe current coordination context. They do not decide
 payroll-month participation and they are not duplicated into operational
 attendance, absence, adjustment, import or settlement documents.
+
+The MVP canonical department set is limited to Metal, Szwalnia, Montaż, PU,
+Headliner and Magazyn. `NA0` is not a department and remains an unresolved
+manual-assignment issue.
+
+Department documents may store a local rotation anchor:
+
+```text
+rotation_anchor_week_start
+rotation_base_assignment
+```
+
+These fields define the department-local Red/White/Blue alignment. They do not
+store employee attendance.
+
+## Employee assignment history
+
+`/employeeAssignments` stores effective-dated employee department and color
+group facts:
+
+```text
+employee_id
+teta_number
+department_id
+shift_assignment
+valid_from
+valid_to
+status
+note
+created_at / created_by
+updated_at / updated_by
+```
+
+The current fields on `/employees` remain a latest coordination snapshot.
+Monthly schedule evaluation uses the effective assignment valid on each date.
+Changing an employee's department or color group creates a new assignment from
+the coordinator-selected effective date and closes overlapping active history
+where needed.
+
+## Planned schedule corrections
+
+`/months/{monthId}/scheduleCorrections` is reserved for explicit planned
+schedule overrides. It stores employee reference, date, correction kind,
+planned shift, planned hours, note, lifecycle status and modification metadata.
+
+Schedule corrections affect the planned schedule view only. They must not
+overwrite actual attendance, imported daily values, manual daily values or
+absence documents.
 
 Employee documents may also store optional export identity fields:
 

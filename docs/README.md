@@ -53,6 +53,9 @@ The attached design history contains several generations of the architecture. Th
 - [Data quality readiness and L4 import - Block 17](business-rules/data-quality-readiness-l4-import.md)
   - employee/month readiness, payroll-setting checks and preview-first L4
     import
+- [Department schedule planning - Block 18](business-rules/department-schedule-planning.md)
+  - canonical departments, effective-dated employee assignments, BHP schedule
+    days, local shift rotations and monthly planned schedule display
 
 Approved business-rules specifications govern payroll semantics. Architecture
 documents continue to govern system structure and implementation boundaries.
@@ -80,6 +83,7 @@ documents continue to govern system structure and implementation boundaries.
 - [ADR 0019: Firebase Auth with appUsers allowlist](decisions/0019-firebase-auth-app-users.md)
 - [ADR 0020: Preview-first initial employee base import](decisions/0020-initial-employee-base-import.md)
 - [ADR 0021: Template-based employee import and bulk update](decisions/0021-employee-import-templates.md)
+- [ADR 0022: Department schedule planning foundation](decisions/0022-department-schedule-planning.md)
 
 ## Audit and readiness reports
 

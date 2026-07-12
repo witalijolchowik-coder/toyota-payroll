@@ -10,6 +10,11 @@ function dateFromInput(value: string): Date | null {
   return value ? new Date(`${value}T00:00:00.000Z`) : null;
 }
 
+function isValidDateInput(value: string): boolean {
+  const parsed = dateFromInput(value);
+  return Boolean(parsed && !Number.isNaN(parsed.getTime()));
+}
+
 export function normalizeTetaNumber(value: string): string {
   return value.trim().toLocaleUpperCase('pl-PL');
 }
@@ -48,6 +53,7 @@ export function employeeInputFromForm(
       : null,
     employmentStartDate: dateFromInput(values.employmentStartDate),
     employmentEndDate: dateFromInput(values.employmentEndDate),
+    assignmentEffectiveDate: values.assignmentEffectiveDate || null,
   });
 }
 
@@ -68,6 +74,12 @@ export function validateEmployeeInput(
   }
   if (!normalized.employmentStartDate) {
     errors.employmentStartDate = 'required';
+  }
+  if (
+    normalized.assignmentEffectiveDate &&
+    !isValidDateInput(normalized.assignmentEffectiveDate)
+  ) {
+    errors.assignmentEffectiveDate = 'invalidDateRange';
   }
   if (
     normalized.employmentStartDate &&

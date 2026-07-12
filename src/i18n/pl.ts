@@ -149,6 +149,8 @@ export const pl = {
           'Kod NA0 nie jest działem i wymaga ręcznego przypisania.',
         'department-missing-or-inactive':
           'Przypisany dział nie istnieje albo jest nieaktywny.',
+        'schedule-unresolved-day':
+          'Nie udało się wyznaczyć planu pracy dla co najmniej jednego dnia.',
         'payroll-setting-missing':
           'Brakuje aktywnej stawki dla wybranego miesiąca.',
         'payroll-setting-conflict':
@@ -261,6 +263,11 @@ export const pl = {
         'Uzupełnij tylko wtedy, gdy dokument cudzoziemca nie jest paszportem.',
       department: 'Dział',
       shiftAssignment: 'Zmiana',
+      assignmentEffectivePrompt:
+        'Zmieniasz dział lub grupę. Wskaż, od jakiej daty ta zmiana ma obowiązywać.',
+      assignmentEffectiveDate: 'Data obowiązywania zmiany',
+      assignmentEffectiveHelper:
+        'Poprzednie dni zachowają dotychczasowe przypisanie w historii.',
       employmentStartDate: 'Data rozpoczęcia zatrudnienia',
       employmentStartRequired:
         'Wymagane. Bez tej daty pracownik nie może bezpiecznie wejść do rozliczenia miesiąca.',
@@ -1123,6 +1130,16 @@ export const pl = {
         'Oryginalna wartość z importu. Możesz dodać korektę bez nadpisywania importu.',
       importedOverride:
         'Ręczna korekta wartości z importu. Oryginalna wartość: {{original}} h.',
+      scheduleAutomatic:
+        'Plan miesięczny wyznaczony automatycznie na podstawie działu, grupy i rotacji.',
+      scheduleBhp:
+        'Dzień BHP — pierwsza zmiana, 8 godzin, liczony tylko w dni robocze.',
+      scheduleManualCorrection:
+        'Ręczna korekta planu miesięcznego. Nie zmienia rzeczywistych godzin pracy.',
+      scheduleUnresolved:
+        'Nie udało się wyznaczyć planu dla tego dnia. Wymagana jest korekta danych.',
+      publicHoliday: 'Święto ustawowe.',
+      publicHolidayName: 'Święto ustawowe: {{holiday}}.',
       nonWorkingDay: 'Dzień wolny — domyślna wartość 0 h jest wirtualna.',
       futureDay: 'Nie można edytować przyszłego dnia.',
       outsideEmployment: 'Data poza okresem zatrudnienia pracownika.',
@@ -1139,6 +1156,11 @@ export const pl = {
           'Uwaga: jawne godziny pracy zapisano w dniu wolnym.',
         'outside-employment':
           'Uwaga: jawne godziny znajdują się poza okresem zatrudnienia.',
+      },
+      displayMode: {
+        label: 'Tryb wyświetlania kalendarza',
+        hours: 'Godziny',
+        shifts: 'Zmiany',
       },
     },
     legend: {

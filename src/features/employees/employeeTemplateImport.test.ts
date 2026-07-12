@@ -151,6 +151,39 @@ describe('employee template import', () => {
     expect(preview[0].warnings).toContain('department-na0');
   });
 
+  it.each([
+    ['MONTAZ', 'montaz'],
+    ['PU', 'pu'],
+    ['Headliner', 'headliner'],
+    ['magazyn', 'magazyn'],
+  ])('matches canonical department %s safely', (rawDepartment, expectedId) => {
+    const preview = buildNewEmployeeTemplatePreview(
+      csv([
+        [
+          'WT-001',
+          'Anna',
+          'Kowalska',
+          '',
+          '',
+          '',
+          '2026-06-03',
+          '',
+          rawDepartment,
+        ],
+      ]),
+      [],
+      [
+        department('montaz', 'Montaż'),
+        department('pu', 'PU'),
+        department('headliner', 'Headliner'),
+        department('magazyn', 'Magazyn'),
+      ],
+    );
+
+    expect(preview[0].departmentId).toBe(expectedId);
+    expect(preview[0].warnings).not.toContain('department-unmapped');
+  });
+
   it('generates an update template for active employees not ended before today', () => {
     const csvText = buildEmployeeUpdateTemplateCsv(
       [

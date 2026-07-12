@@ -1,10 +1,12 @@
 import {
   allowedColorShiftsForMode,
+  CANONICAL_DEPARTMENT_IDS,
   colorShiftLabelKey,
   departmentKeyFromName,
   isDepartmentShiftMode,
   isEmployeeColorShift,
   normalizeDepartmentName,
+  resolveCanonicalDepartment,
   resolveWeeklyRotationAssignment,
 } from './organizationRules';
 
@@ -13,6 +15,44 @@ describe('department and shift organization rules', () => {
     expect(normalizeDepartmentName('  Montaż   PU  ')).toBe('Montaż PU');
     expect(departmentKeyFromName('Montaż PU')).toBe('montaz-pu');
     expect(departmentKeyFromName(' Szwalnia ')).toBe('szwalnia');
+  });
+
+  it('contains only canonical MVP departments', () => {
+    expect(CANONICAL_DEPARTMENT_IDS).toEqual([
+      'metal',
+      'szwalnia',
+      'montaz',
+      'pu',
+      'headliner',
+      'magazyn',
+    ]);
+    expect(CANONICAL_DEPARTMENT_IDS).not.toContain('lakiernia');
+    expect(CANONICAL_DEPARTMENT_IDS).not.toContain('pen');
+    expect(CANONICAL_DEPARTMENT_IDS).not.toContain('podsufitki');
+  });
+
+  it.each([
+    [' Metal ', 'metal'],
+    ['szwalnia', 'szwalnia'],
+    ['MONTAZ', 'montaz'],
+    ['Montaż', 'montaz'],
+    ['PU', 'pu'],
+    ['Headliner', 'headliner'],
+    ['magazyn', 'magazyn'],
+  ])('safely resolves canonical department %s', (raw, expectedId) => {
+    expect(resolveCanonicalDepartment(raw)).toMatchObject({
+      status: 'matched',
+      department: { id: expectedId },
+    });
+  });
+
+  it('does not map NA0 or unknown departments automatically', () => {
+    expect(resolveCanonicalDepartment('NA0')).toEqual({
+      status: 'unresolved-na0',
+    });
+    expect(resolveCanonicalDepartment('Lakiernia')).toEqual({
+      status: 'unknown',
+    });
   });
 
   it('recognizes only supported employee color shifts', () => {
@@ -30,7 +70,7 @@ describe('department and shift organization rules', () => {
     expect(isDepartmentShiftMode('DAY_ONLY')).toBe(false);
   });
 
-  it('keeps Blue optional in two-shift departments', () => {
+  it('limits Blue to three-shift departments', () => {
     expect(allowedColorShiftsForMode('TWO_SHIFT')).toEqual(['RED', 'WHITE']);
     expect(allowedColorShiftsForMode('THREE_SHIFT')).toEqual([
       'RED',

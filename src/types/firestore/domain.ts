@@ -10,6 +10,7 @@ import type {
   DepartmentId,
   DepartmentShiftMode,
   EmployeeId,
+  EmployeeAssignmentStatus,
   EmployeeColorShift,
   EmployeeEntitlementStatus,
   EmployeeEntitlementType,
@@ -20,6 +21,8 @@ import type {
   MonthId,
   PayrollSettingKey,
   ReportStatus,
+  ScheduleCorrectionKind,
+  ScheduleCorrectionStatus,
   SettlementReviewStatus,
   SettlementTotalsDocument,
   TetaNumber,
@@ -52,6 +55,35 @@ export interface Department extends ModificationMetadata {
   name: string;
   shiftMode: DepartmentShiftMode;
   active: boolean;
+  rotationAnchorWeekStart?: IsoDate | null;
+  rotationBaseAssignment?: Partial<
+    Record<EmployeeColorShift, ActualWorkingShift>
+  > | null;
+}
+
+export interface EmployeeAssignment extends ModificationMetadata {
+  id: string;
+  employeeId: EmployeeId;
+  tetaNumber: TetaNumber;
+  departmentId: DepartmentId | null;
+  shiftAssignment: EmployeeColorShift | null;
+  validFrom: IsoDate;
+  validTo: IsoDate | null;
+  status: EmployeeAssignmentStatus;
+  note: string | null;
+}
+
+export interface ScheduleCorrection extends ModificationMetadata {
+  id: string;
+  monthId: MonthId;
+  employeeId: EmployeeId;
+  tetaNumber: TetaNumber;
+  date: IsoDate;
+  kind: ScheduleCorrectionKind;
+  plannedShift: ActualWorkingShift | null;
+  plannedHours: number | null;
+  note: string | null;
+  status: ScheduleCorrectionStatus;
 }
 
 export interface PayrollMonth extends ModificationMetadata {

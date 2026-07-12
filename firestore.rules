@@ -148,6 +148,8 @@ service cloud.firestore {
           'name',
           'shift_mode',
           'active',
+          'rotation_anchor_week_start',
+          'rotation_base_assignment',
           'created_at',
           'created_by',
           'updated_at',
@@ -156,6 +158,103 @@ service cloud.firestore {
         && isNonEmptyString(data.name)
         && data.shift_mode in ['UNKNOWN', 'TWO_SHIFT', 'THREE_SHIFT']
         && data.active is bool
+        && (!data.keys().hasAny(['rotation_anchor_week_start'])
+          || data.rotation_anchor_week_start == null
+          || isIsoDate(data.rotation_anchor_week_start))
+        && (!data.keys().hasAny(['rotation_base_assignment'])
+          || data.rotation_base_assignment == null
+          || data.rotation_base_assignment is map)
+        && hasModificationMetadata(data);
+    }
+
+    function validEmployeeAssignment(data) {
+      return data.keys().hasAll([
+          'employee_id',
+          'teta_number',
+          'department_id',
+          'shift_assignment',
+          'valid_from',
+          'valid_to',
+          'status',
+          'note',
+          'created_at',
+          'created_by',
+          'updated_at',
+          'updated_by'
+        ])
+        && data.keys().hasOnly([
+          'employee_id',
+          'teta_number',
+          'department_id',
+          'shift_assignment',
+          'valid_from',
+          'valid_to',
+          'status',
+          'note',
+          'created_at',
+          'created_by',
+          'updated_at',
+          'updated_by'
+        ])
+        && hasEmployeeReference(data)
+        && isNullableString(data.department_id)
+        && (data.shift_assignment == null
+          || data.shift_assignment in ['RED', 'WHITE', 'BLUE'])
+        && isIsoDate(data.valid_from)
+        && (data.valid_to == null || isIsoDate(data.valid_to))
+        && (data.valid_to == null || data.valid_to >= data.valid_from)
+        && data.status in ['ACTIVE', 'CANCELLED']
+        && isNullableString(data.note)
+        && hasModificationMetadata(data);
+    }
+
+    function validScheduleCorrection(data) {
+      return data.keys().hasAll([
+          'employee_id',
+          'teta_number',
+          'date',
+          'kind',
+          'planned_shift',
+          'planned_hours',
+          'note',
+          'status',
+          'created_at',
+          'created_by',
+          'updated_at',
+          'updated_by'
+        ])
+        && data.keys().hasOnly([
+          'employee_id',
+          'teta_number',
+          'date',
+          'kind',
+          'planned_shift',
+          'planned_hours',
+          'note',
+          'status',
+          'created_at',
+          'created_by',
+          'updated_at',
+          'updated_by'
+        ])
+        && hasEmployeeReference(data)
+        && isIsoDate(data.date)
+        && data.kind in [
+          'FIRST_SHIFT',
+          'SECOND_SHIFT',
+          'NIGHT_SHIFT',
+          'DAY_OFF',
+          'PUBLIC_HOLIDAY_WORK',
+          'BHP'
+        ]
+        && (data.planned_shift == null
+          || data.planned_shift in ['FIRST', 'SECOND', 'NIGHT'])
+        && (data.planned_hours == null
+          || (data.planned_hours is number
+            && data.planned_hours >= 0
+            && data.planned_hours <= 24))
+        && isNullableString(data.note)
+        && data.status in ['ACTIVE', 'CANCELLED']
         && hasModificationMetadata(data);
     }
 
@@ -569,6 +668,8 @@ service cloud.firestore {
           'name',
           'shift_mode',
           'active',
+          'rotation_anchor_week_start',
+          'rotation_base_assignment',
           'updated_at',
           'updated_by'
         ]);
@@ -595,6 +696,25 @@ service cloud.firestore {
           'shift_assignment',
           'employment_start_date',
           'employment_end_date',
+          'updated_at',
+          'updated_by'
+        ]);
+      allow delete: if false;
+    }
+
+    match /employeeAssignments/{assignmentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated()
+        && validEmployeeAssignment(request.resource.data)
+        && request.resource.data.status == 'ACTIVE'
+        && hasCreateMetadata(request.resource.data);
+      allow update: if isAuthenticated()
+        && validEmployeeAssignment(request.resource.data)
+        && hasUpdateMetadata(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'valid_to',
+          'status',
+          'note',
           'updated_at',
           'updated_by'
         ]);
@@ -794,6 +914,44 @@ service cloud.firestore {
         allow delete: if isAuthenticated()
           && monthExistsAndIsOpen(monthId)
           && resource.data.source == 'manual';
+      }
+
+      match /scheduleCorrections/{correctionId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated()
+          && monthExistsAndIsOpen(monthId)
+          && validScheduleCorrection(request.resource.data)
+          && request.resource.data.date[0:7] == monthId
+          && request.resource.data.status == 'ACTIVE'
+          && hasCreateMetadata(request.resource.data);
+        allow update: if isAuthenticated()
+          && monthExistsAndIsOpen(monthId)
+          && resource.data.status == 'ACTIVE'
+          && validScheduleCorrection(request.resource.data)
+          && request.resource.data.date[0:7] == monthId
+          && hasUpdateMetadata(request.resource.data)
+          && (
+            (
+              request.resource.data.status == 'ACTIVE'
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'kind',
+                'planned_shift',
+                'planned_hours',
+                'note',
+                'updated_at',
+                'updated_by'
+              ])
+            )
+            || (
+              request.resource.data.status == 'CANCELLED'
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'status',
+                'updated_at',
+                'updated_by'
+              ])
+            )
+          );
+        allow delete: if false;
       }
 
       match /absences/{absenceId} {

@@ -13,6 +13,8 @@ import {
   Skeleton,
   Stack,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from '@mui/material';
 
@@ -61,7 +63,10 @@ import {
 } from './monthUtils';
 import { parseDailyHoursInput } from './dailyValueEntry';
 import { PayrollDraftPanel } from './PayrollDraftPanel';
-import { getPublicHolidaysForYear } from './publicHolidays';
+import {
+  getPublicHolidayNamesForYear,
+  getPublicHolidaysForYear,
+} from './publicHolidays';
 import { SettlementReviewPanel } from './SettlementReviewPanel';
 import { SettlementExportPanel } from './SettlementExportPanel';
 import { SettlementGrid } from './SettlementGrid';
@@ -103,6 +108,9 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
     EmployeeColorShift | 'all' | 'unassigned'
   >('all');
   const [calendarFilter, setCalendarFilter] = useState('all');
+  const [calendarDisplayMode, setCalendarDisplayMode] = useState<
+    'hours' | 'shifts'
+  >('hours');
   const [focusedEmployee, setFocusedEmployee] = useState<Employee | null>(null);
 
   if (isLoading) {
@@ -130,6 +138,7 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
 
   const range = getMonthDateRange(monthId);
   const publicHolidays = getPublicHolidaysForYear(range.year);
+  const publicHolidayNames = getPublicHolidayNamesForYear(range.year);
   const days = createCalendarDays(monthId, {
     publicHolidays,
   });
@@ -548,6 +557,25 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
                     count: filteredEmployees.length.toString(),
                   })}
                 </Typography>
+                <ToggleButtonGroup
+                  exclusive
+                  size="small"
+                  value={calendarDisplayMode}
+                  onChange={(_, value: 'hours' | 'shifts' | null) => {
+                    if (value) {
+                      setCalendarDisplayMode(value);
+                    }
+                  }}
+                  aria-label={t.settlement.grid.displayMode.label}
+                  sx={{ ml: { md: 'auto' } }}
+                >
+                  <ToggleButton value="hours">
+                    {t.settlement.grid.displayMode.hours}
+                  </ToggleButton>
+                  <ToggleButton value="shifts">
+                    {t.settlement.grid.displayMode.shifts}
+                  </ToggleButton>
+                </ToggleButtonGroup>
               </Stack>
             </CardContent>
           </Card>
@@ -556,8 +584,13 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
             days={days}
             dailyValues={filteredDailyValues}
             departments={data.departments}
+            employeeAssignments={data.employeeAssignments}
+            scheduleCorrections={data.scheduleCorrections}
+            publicHolidays={publicHolidays}
+            publicHolidayNames={publicHolidayNames}
             absences={filteredAbsences}
             isSettled={data.month.isSettled}
+            displayMode={calendarDisplayMode}
             selection={selection}
             onSelectCell={(employee, day) =>
               selectConstructorCell(employee, day)

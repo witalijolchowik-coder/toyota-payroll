@@ -13,6 +13,7 @@ export interface EmployeeFormValues {
   foreignDocumentNumber: string;
   departmentId: DepartmentId | '';
   shiftAssignment: EmployeeColorShift | '';
+  assignmentEffectiveDate: string;
   employmentStartDate: string;
   employmentEndDate: string;
 }
@@ -24,6 +25,7 @@ export type EmployeeFieldName =
   | 'pesel'
   | 'passportNumber'
   | 'foreignDocumentNumber'
+  | 'assignmentEffectiveDate'
   | 'employmentStartDate'
   | 'employmentEndDate';
 

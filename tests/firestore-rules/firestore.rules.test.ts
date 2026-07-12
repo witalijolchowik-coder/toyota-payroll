@@ -370,6 +370,12 @@ describe('Firestore security rules', () => {
         name: 'Metal',
         shift_mode: 'THREE_SHIFT',
         active: true,
+        rotation_anchor_week_start: '2026-01-05',
+        rotation_base_assignment: {
+          RED: 'FIRST',
+          WHITE: 'SECOND',
+          BLUE: 'NIGHT',
+        },
         ...modificationMetadata(uid),
       }),
     );
@@ -404,6 +410,83 @@ describe('Firestore security rules', () => {
         shift_mode: 'DAY_ONLY',
         active: true,
         ...modificationMetadata(uid),
+      }),
+    );
+  });
+
+  it('allows employee assignment history create and safe closure', async () => {
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const assignment = doc(firestore, 'employeeAssignments/assignment-1');
+
+    await assertSucceeds(
+      setDoc(assignment, {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        department_id: 'metal',
+        shift_assignment: 'RED',
+        valid_from: '2026-06-01',
+        valid_to: null,
+        status: 'ACTIVE',
+        note: null,
+        ...modificationMetadata(uid),
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(assignment, {
+        valid_to: '2026-06-14',
+        note: 'Transfer od 2026-06-15',
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(assignment, {
+        status: 'CANCELLED',
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertFails(deleteDoc(assignment));
+  });
+
+  it('rejects invalid employee assignment edits', async () => {
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const assignment = doc(firestore, 'employeeAssignments/assignment-invalid');
+
+    await assertFails(
+      setDoc(assignment, {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        department_id: 'metal',
+        shift_assignment: 'GREEN',
+        valid_from: '2026-06-01',
+        valid_to: null,
+        status: 'ACTIVE',
+        note: null,
+        ...modificationMetadata(uid),
+      }),
+    );
+
+    await assertSucceeds(
+      setDoc(assignment, {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        department_id: 'metal',
+        shift_assignment: 'RED',
+        valid_from: '2026-06-01',
+        valid_to: null,
+        status: 'ACTIVE',
+        note: null,
+        ...modificationMetadata(uid),
+      }),
+    );
+    await assertFails(
+      updateDoc(assignment, {
+        department_id: 'montaz',
+        updated_at: serverTimestamp(),
+        updated_by: uid,
       }),
     );
   });
@@ -645,6 +728,83 @@ describe('Firestore security rules', () => {
       }),
     );
     await assertSucceeds(deleteDoc(dailyValue));
+  });
+
+  it('allows schedule correction create, edit and cancellation in an open month', async () => {
+    await seedMonth('2026-07', false);
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const correction = doc(
+      firestore,
+      'months/2026-07/scheduleCorrections/employee-1_2026-07-14',
+    );
+
+    await assertSucceeds(
+      setDoc(correction, {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        date: '2026-07-14',
+        kind: 'NIGHT_SHIFT',
+        planned_shift: 'NIGHT',
+        planned_hours: 8,
+        note: 'Zmiana planu',
+        status: 'ACTIVE',
+        ...modificationMetadata(uid),
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(correction, {
+        planned_hours: 10,
+        note: 'Praca dodatkowa',
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(correction, {
+        status: 'CANCELLED',
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertFails(deleteDoc(correction));
+  });
+
+  it('rejects invalid schedule corrections and settled-month writes', async () => {
+    await seedMonth('2026-07', false);
+    await seedMonth('2026-08', true);
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+
+    await assertFails(
+      setDoc(
+        doc(firestore, 'months/2026-07/scheduleCorrections/invalid-hours'),
+        {
+          employee_id: 'employee-1',
+          teta_number: 'TETA-1001',
+          date: '2026-07-14',
+          kind: 'NIGHT_SHIFT',
+          planned_shift: 'NIGHT',
+          planned_hours: 25,
+          note: null,
+          status: 'ACTIVE',
+          ...modificationMetadata(uid),
+        },
+      ),
+    );
+    await assertFails(
+      setDoc(doc(firestore, 'months/2026-08/scheduleCorrections/settled'), {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        date: '2026-08-14',
+        kind: 'FIRST_SHIFT',
+        planned_shift: 'FIRST',
+        planned_hours: 8,
+        note: null,
+        status: 'ACTIVE',
+        ...modificationMetadata(uid),
+      }),
+    );
   });
 
   it('allows audited work-time correction on manual daily values', async () => {

@@ -1,18 +1,22 @@
 import type {
   Department,
   Employee,
+  EmployeeAssignment,
   EmployeeEntitlement,
   MonthId,
   PayrollMonth,
   PayrollSetting,
+  ScheduleCorrection,
 } from '../../types/firestore';
 import { PAYROLL_SETTING_KEYS } from '../../types/firestore';
 import {
   employeeEntitlementsOverlap,
   employeeParticipatesInPayrollMonth,
+  createPayrollMonthCalendar,
   getPayrollMonthDateRange,
   resolveEffectivePayrollSetting,
 } from '../payroll';
+import { generateEmployeeMonthlySchedule } from '../schedule';
 
 export type ReadinessSeverity = 'blocking' | 'warning' | 'optional' | 'info';
 
@@ -25,6 +29,7 @@ export type ReadinessIssueCode =
   | 'employee-missing-shift'
   | 'department-unresolved-na0'
   | 'department-missing-or-inactive'
+  | 'schedule-unresolved-day'
   | 'payroll-setting-missing'
   | 'payroll-setting-conflict'
   | 'entitlement-overlap'
@@ -65,6 +70,8 @@ export interface MonthReadinessInput {
   month: PayrollMonth | null;
   employees: readonly Employee[];
   departments: readonly Department[];
+  employeeAssignments?: readonly EmployeeAssignment[];
+  scheduleCorrections?: readonly ScheduleCorrection[];
   entitlements: readonly EmployeeEntitlement[];
   payrollSettings: readonly PayrollSetting[];
 }
@@ -132,6 +139,8 @@ export function assessMonthReadiness({
   month,
   employees,
   departments,
+  employeeAssignments = [],
+  scheduleCorrections = [],
   entitlements,
   payrollSettings,
 }: MonthReadinessInput): MonthReadinessSummary {
@@ -145,6 +154,7 @@ export function assessMonthReadiness({
   const departmentsById = new Map(
     departments.map((department) => [department.id, department]),
   );
+  const payrollCalendarDays = createPayrollMonthCalendar(monthId);
 
   if (!month) {
     addIssue(summary, {
@@ -226,6 +236,26 @@ export function assessMonthReadiness({
         code: 'employee-missing-shift',
         severity: 'optional',
         target: 'employees',
+      });
+    }
+
+    const schedule = generateEmployeeMonthlySchedule({
+      employee,
+      days: payrollCalendarDays,
+      departments,
+      options: {
+        assignments: employeeAssignments,
+        corrections: scheduleCorrections,
+      },
+    });
+    const unresolvedDay = schedule.find((day) => day.status === 'UNRESOLVED');
+    if (unresolvedDay) {
+      addIssue(summary, {
+        ...baseIssue,
+        code: 'schedule-unresolved-day',
+        severity: 'warning',
+        target: 'settlement',
+        context: unresolvedDay.date,
       });
     }
 

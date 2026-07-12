@@ -16,10 +16,12 @@ import type {
   DailyValue,
   Department,
   Employee,
+  EmployeeAssignment,
   EmployeeEntitlement,
   MonthId,
   PayrollSetting,
   PayrollMonth,
+  ScheduleCorrection,
   SettlementReviewState,
 } from '../types/firestore';
 import { loadAbsencesOverlappingMonth } from './absencesService';
@@ -27,10 +29,12 @@ import {
   mapAdjustmentDocument,
   mapDailyValueDocument,
   mapDepartmentDocument,
+  mapEmployeeAssignmentDocument,
   mapEmployeeDocument,
   mapEmployeeEntitlementDocument,
   mapMonthDocument,
   mapPayrollSettingDocument,
+  mapScheduleCorrectionDocument,
   mapSettlementReviewDocument,
 } from './firestore/mappers';
 import {
@@ -52,8 +56,10 @@ export interface SettlementMonthData {
   month: PayrollMonth;
   employees: Employee[];
   employeeEntitlements: EmployeeEntitlement[];
+  employeeAssignments: EmployeeAssignment[];
   departments: Department[];
   dailyValues: DailyValue[];
+  scheduleCorrections: ScheduleCorrection[];
   absences: Absence[];
   payrollSettings: PayrollSetting[];
   adjustments: Adjustment[];
@@ -93,8 +99,10 @@ export async function loadSettlementMonth(
   const [
     employeesSnapshot,
     employeeEntitlementsSnapshot,
+    employeeAssignmentsSnapshot,
     departmentsSnapshot,
     dailyValuesSnapshot,
+    scheduleCorrectionsSnapshot,
     absences,
     payrollSettingsSnapshot,
     adjustmentsSnapshot,
@@ -102,8 +110,10 @@ export async function loadSettlementMonth(
   ] = await Promise.all([
     getDocs(employeesQuery),
     getDocs(repositories.employeeEntitlements),
+    getDocs(repositories.employeeAssignments),
     getDocs(query(repositories.departments, orderBy('name'))),
     getDocs(monthRepository.dailyValues),
+    getDocs(monthRepository.scheduleCorrections),
     loadAbsencesOverlappingMonth(monthId),
     getDocs(repositories.payrollSettings),
     getDocs(monthRepository.adjustments),
@@ -118,11 +128,17 @@ export async function loadSettlementMonth(
     employeeEntitlements: employeeEntitlementsSnapshot.docs.map((document) =>
       mapEmployeeEntitlementDocument(document.id, document.data()),
     ),
+    employeeAssignments: employeeAssignmentsSnapshot.docs.map((document) =>
+      mapEmployeeAssignmentDocument(document.id, document.data()),
+    ),
     departments: departmentsSnapshot.docs.map((document) =>
       mapDepartmentDocument(document.id, document.data()),
     ),
     dailyValues: dailyValuesSnapshot.docs.map((document) =>
       mapDailyValueDocument(document.id, monthId, document.data()),
+    ),
+    scheduleCorrections: scheduleCorrectionsSnapshot.docs.map((document) =>
+      mapScheduleCorrectionDocument(document.id, monthId, document.data()),
     ),
     absences,
     payrollSettings: payrollSettingsSnapshot.docs.map((document) =>

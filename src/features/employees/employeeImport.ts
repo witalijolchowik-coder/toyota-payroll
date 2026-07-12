@@ -4,6 +4,7 @@ import type {
   EmployeeCreateInput,
   PayrollSetting,
 } from '../../types/firestore';
+import { resolveCanonicalDepartment } from '../../utils/organization';
 import { normalizeTetaNumber } from './employeeValidation';
 
 export type EmployeeImportSource = 'toyota' | 'soz-pl' | 'soz-ua';
@@ -83,8 +84,6 @@ interface CsvRow {
   headers: string[];
   values: string[];
 }
-
-const SAFE_DEPARTMENT_TOKENS = ['metal', 'szwalnia', 'montaz'] as const;
 
 export function normalizeImportText(value: unknown): string {
   return String(value ?? '')
@@ -573,27 +572,18 @@ function resolveDepartment(
     'department-na0' | 'department-unmapped'
   > | null;
 } {
-  const sourceKey = normalizeImportKey(sourceDepartmentName);
-  if (!sourceKey) {
+  const resolution = resolveCanonicalDepartment(sourceDepartmentName);
+  if (resolution.status === 'unknown') {
     return { id: null, name: null, warning: 'department-unmapped' };
   }
-  if (sourceKey.includes('na0')) {
+  if (resolution.status === 'unresolved-na0') {
     return { id: null, name: null, warning: 'department-na0' };
   }
 
-  const token = SAFE_DEPARTMENT_TOKENS.find((candidate) =>
-    sourceKey.includes(candidate),
+  const department = departments.find(
+    (candidate) =>
+      candidate.active && candidate.id === resolution.department.id,
   );
-  if (!token) {
-    return { id: null, name: null, warning: 'department-unmapped' };
-  }
-
-  const department = departments.find((candidate) => {
-    const departmentKey = normalizeImportKey(
-      `${candidate.id} ${candidate.name}`,
-    );
-    return candidate.active && departmentKey.includes(token);
-  });
 
   return department
     ? { id: department.id, name: department.name, warning: null }

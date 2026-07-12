@@ -5,6 +5,7 @@ import { assessMonthReadiness } from '../utils/readiness';
 import type { MonthReadinessSummary } from '../utils/readiness';
 import {
   mapDepartmentDocument,
+  mapEmployeeAssignmentDocument,
   mapEmployeeDocument,
   mapEmployeeEntitlementDocument,
   mapMonthDocument,
@@ -25,12 +26,14 @@ export async function loadMonthReadiness(
     departmentsSnapshot,
     entitlementsSnapshot,
     settingsSnapshot,
+    assignmentsSnapshot,
   ] = await Promise.all([
     getDoc(repositories.forMonth(monthId).month),
     getDocs(query(repositories.employees, orderBy('teta_number'))),
     getDocs(repositories.departments),
     getDocs(repositories.employeeEntitlements),
     getDocs(repositories.payrollSettings),
+    getDocs(repositories.employeeAssignments),
   ]);
 
   return assessMonthReadiness({
@@ -43,6 +46,9 @@ export async function loadMonthReadiness(
     ),
     departments: departmentsSnapshot.docs.map((document) =>
       mapDepartmentDocument(document.id, document.data()),
+    ),
+    employeeAssignments: assignmentsSnapshot.docs.map((document) =>
+      mapEmployeeAssignmentDocument(document.id, document.data()),
     ),
     entitlements: entitlementsSnapshot.docs.map((document) =>
       mapEmployeeEntitlementDocument(document.id, document.data()),

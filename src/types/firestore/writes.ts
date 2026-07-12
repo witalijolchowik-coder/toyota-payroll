@@ -7,6 +7,7 @@ import type {
   DepartmentShiftMode,
   EmployeeId,
   EmployeeColorShift,
+  ScheduleCorrectionKind,
   EmployeeEntitlementType,
   ImportType,
   IsoDate,
@@ -28,6 +29,7 @@ export interface EmployeeCreateInput {
   shiftAssignment: EmployeeColorShift | null;
   employmentStartDate: Date | null;
   employmentEndDate: Date | null;
+  assignmentEffectiveDate?: IsoDate | null;
 }
 
 export type EmployeeUpdateInput = Partial<EmployeeCreateInput>;
@@ -52,6 +54,22 @@ export type DepartmentUpdateInput = Pick<
 export interface EmployeeReferenceInput {
   employeeId: EmployeeId;
   tetaNumber: TetaNumber;
+}
+
+export interface EmployeeAssignmentCreateInput extends EmployeeReferenceInput {
+  departmentId: DepartmentId | null;
+  shiftAssignment: EmployeeColorShift | null;
+  validFrom: IsoDate;
+  validTo: IsoDate | null;
+  note: string | null;
+}
+
+export interface ScheduleCorrectionCreateInput extends EmployeeReferenceInput {
+  date: IsoDate;
+  kind: ScheduleCorrectionKind;
+  plannedShift: ActualWorkingShift | null;
+  plannedHours: number | null;
+  note: string | null;
 }
 
 export interface DailyValueUpsertInput extends EmployeeReferenceInput {

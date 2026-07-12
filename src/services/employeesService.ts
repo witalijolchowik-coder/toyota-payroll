@@ -1,12 +1,14 @@
 import {
   Timestamp,
   addDoc,
+  getDoc,
   getDocs,
   onSnapshot,
   orderBy,
   query,
   serverTimestamp,
   updateDoc,
+  where,
   type Unsubscribe,
 } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -20,8 +22,14 @@ import type {
   Employee,
   EmployeeCreateInput,
   EmployeeId,
+  EmployeeAssignment,
+  EmployeeAssignmentCreateInput,
+  IsoDate,
 } from '../types/firestore';
-import { mapEmployeeDocument } from './firestore/mappers';
+import {
+  mapEmployeeAssignmentDocument,
+  mapEmployeeDocument,
+} from './firestore/mappers';
 import { getFirestoreRepositories } from './firestoreService';
 
 export type EmployeeServiceErrorCode =
@@ -52,6 +60,26 @@ function requireActorUid(): string {
 
 function timestampOrNull(value: Date | null) {
   return value ? Timestamp.fromDate(value) : null;
+}
+
+function dateToIsoDate(value: Date): IsoDate {
+  return value.toISOString().slice(0, 10);
+}
+
+function previousIsoDate(value: IsoDate): IsoDate {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() - 1);
+  return dateToIsoDate(date);
+}
+
+function assignmentEffectiveDate(input: EmployeeCreateInput): IsoDate {
+  if (input.assignmentEffectiveDate) {
+    return input.assignmentEffectiveDate;
+  }
+  if (input.employmentStartDate) {
+    return dateToIsoDate(input.employmentStartDate);
+  }
+  return dateToIsoDate(new Date());
 }
 
 async function getEmployeesForUniquenessCheck(): Promise<Employee[]> {
@@ -159,6 +187,16 @@ export async function createEmployee(
     updated_by: actorUid,
   });
 
+  await createEmployeeAssignment({
+    employeeId: employee.id,
+    tetaNumber: normalized.tetaNumber,
+    departmentId: normalized.departmentId,
+    shiftAssignment: normalized.shiftAssignment,
+    validFrom: assignmentEffectiveDate(normalized),
+    validTo: null,
+    note: null,
+  });
+
   return employee.id;
 }
 
@@ -171,6 +209,12 @@ export async function updateEmployee(
   const normalized = normalizeEmployeeInput(input);
 
   await assertUniqueActiveTeta(normalized, employeeId);
+  const previousEmployeeSnapshot = await getDoc(
+    repositories.employee(employeeId),
+  );
+  const previousEmployee = previousEmployeeSnapshot.exists()
+    ? mapEmployeeDocument(employeeId, previousEmployeeSnapshot.data())
+    : null;
 
   await updateDoc(repositories.employee(employeeId), {
     teta_number: normalized.tetaNumber,
@@ -186,6 +230,22 @@ export async function updateEmployee(
     updated_at: serverTimestamp(),
     updated_by: actorUid,
   });
+
+  if (
+    previousEmployee &&
+    (previousEmployee.departmentId !== normalized.departmentId ||
+      previousEmployee.shiftAssignment !== normalized.shiftAssignment)
+  ) {
+    await replaceCurrentEmployeeAssignment({
+      employeeId,
+      tetaNumber: normalized.tetaNumber,
+      departmentId: normalized.departmentId,
+      shiftAssignment: normalized.shiftAssignment,
+      validFrom: assignmentEffectiveDate(normalized),
+      validTo: null,
+      note: null,
+    });
+  }
 }
 
 export async function deactivateEmployee(
@@ -199,4 +259,73 @@ export async function deactivateEmployee(
     updated_at: serverTimestamp(),
     updated_by: actorUid,
   });
+}
+
+async function createEmployeeAssignment(
+  input: EmployeeAssignmentCreateInput,
+): Promise<void> {
+  const actorUid = requireActorUid();
+  const repositories = requireRepositories();
+
+  await addDoc(repositories.employeeAssignments, {
+    employee_id: input.employeeId,
+    teta_number: input.tetaNumber,
+    department_id: input.departmentId,
+    shift_assignment: input.shiftAssignment,
+    valid_from: input.validFrom,
+    valid_to: input.validTo,
+    status: 'ACTIVE',
+    note: input.note,
+    created_at: serverTimestamp(),
+    created_by: actorUid,
+    updated_at: serverTimestamp(),
+    updated_by: actorUid,
+  });
+}
+
+async function replaceCurrentEmployeeAssignment(
+  input: EmployeeAssignmentCreateInput,
+): Promise<void> {
+  const actorUid = requireActorUid();
+  const repositories = requireRepositories();
+  const snapshot = await getDocs(
+    query(
+      repositories.employeeAssignments,
+      where('employee_id', '==', input.employeeId),
+      where('status', '==', 'ACTIVE'),
+    ),
+  );
+  const assignments = snapshot.docs.map((document) =>
+    mapEmployeeAssignmentDocument(document.id, document.data()),
+  );
+  const previousDay = previousIsoDate(input.validFrom);
+  const overlappingAssignments = assignments.filter((assignment) =>
+    overlapsAssignment(assignment, input.validFrom),
+  );
+
+  await Promise.all(
+    overlappingAssignments.map((assignment) =>
+      updateDoc(repositories.employeeAssignment(assignment.id), {
+        valid_to:
+          assignment.validFrom < input.validFrom
+            ? previousDay
+            : assignment.validTo,
+        status: assignment.validFrom < input.validFrom ? 'ACTIVE' : 'CANCELLED',
+        updated_at: serverTimestamp(),
+        updated_by: actorUid,
+      }),
+    ),
+  );
+
+  await createEmployeeAssignment(input);
+}
+
+function overlapsAssignment(
+  assignment: EmployeeAssignment,
+  validFrom: IsoDate,
+): boolean {
+  return (
+    assignment.validFrom <= validFrom &&
+    (!assignment.validTo || assignment.validTo >= validFrom)
+  );
 }

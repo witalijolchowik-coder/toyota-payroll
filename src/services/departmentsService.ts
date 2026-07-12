@@ -1,8 +1,6 @@
 import {
   doc,
   getDocs,
-  orderBy,
-  query,
   serverTimestamp,
   setDoc,
   updateDoc,
@@ -15,10 +13,13 @@ import type {
   DepartmentUpdateInput,
 } from '../types/firestore';
 import {
+  CANONICAL_DEPARTMENTS,
   departmentKeyFromName,
+  getCanonicalDepartmentDefinition,
   isDepartmentShiftMode,
   isValidDepartmentName,
   normalizeDepartmentName,
+  resolveCanonicalDepartment,
 } from '../utils/organization';
 import { mapDepartmentDocument } from './firestore/mappers';
 import { getFirestoreRepositories } from './firestoreService';
@@ -49,10 +50,14 @@ export function normalizeDepartmentInput(
   input: DepartmentCreateInput,
 ): DepartmentCreateInput {
   const name = normalizeDepartmentName(input.name);
+  const canonical = resolveCanonicalDepartment(name);
   return {
     ...input,
-    id: input.id.trim() || departmentKeyFromName(name),
-    name,
+    id:
+      canonical.status === 'matched'
+        ? canonical.department.id
+        : input.id.trim() || departmentKeyFromName(name),
+    name: canonical.status === 'matched' ? canonical.department.name : name,
   };
 }
 
@@ -65,13 +70,16 @@ export function validateDepartmentInput(
 }
 
 export async function loadDepartments(): Promise<Department[]> {
-  const { repositories } = requireContext();
-  const snapshot = await getDocs(
-    query(repositories.departments, orderBy('name')),
-  );
-  return snapshot.docs.map((document) =>
-    mapDepartmentDocument(document.id, document.data()),
-  );
+  const context = requireContext();
+  await ensureCanonicalDepartments(context);
+  const snapshot = await getDocs(context.repositories.departments);
+  const departments = snapshot.docs
+    .map((document) => mapDepartmentDocument(document.id, document.data()))
+    .filter((department) => getCanonicalDepartmentDefinition(department.id));
+
+  return CANONICAL_DEPARTMENTS.map((definition) =>
+    departments.find((department) => department.id === definition.id),
+  ).filter((department): department is Department => Boolean(department));
 }
 
 export async function createDepartment(
@@ -79,14 +87,17 @@ export async function createDepartment(
 ): Promise<string> {
   const { repositories, uid } = requireContext();
   const normalized = normalizeDepartmentInput(input);
-  if (!validateDepartmentInput(normalized) || !normalized.id) {
+  const canonical = getCanonicalDepartmentDefinition(normalized.id);
+  if (!validateDepartmentInput(normalized) || !normalized.id || !canonical) {
     throw new DepartmentsServiceError('invalid-input');
   }
 
   await setDoc(doc(repositories.departments, normalized.id), {
-    name: normalized.name,
-    shift_mode: normalized.shiftMode,
+    name: canonical.name,
+    shift_mode: canonical.shiftMode,
     active: normalized.active,
+    rotation_anchor_week_start: canonical.rotationAnchor.weekStartIsoDate,
+    rotation_base_assignment: canonical.rotationAnchor.baseAssignment,
     created_at: serverTimestamp(),
     created_by: uid,
     updated_at: serverTimestamp(),
@@ -100,19 +111,54 @@ export async function updateDepartment(
   input: DepartmentUpdateInput,
 ): Promise<void> {
   const { repositories, uid } = requireContext();
+  const canonical = getCanonicalDepartmentDefinition(departmentId);
   const normalized = {
     ...input,
-    name: normalizeDepartmentName(input.name),
+    name: canonical?.name ?? normalizeDepartmentName(input.name),
   };
-  if (!validateDepartmentInput(normalized)) {
+  if (!validateDepartmentInput(normalized) || !canonical) {
     throw new DepartmentsServiceError('invalid-input');
   }
 
   await updateDoc(doc(repositories.departments, departmentId), {
-    name: normalized.name,
+    name: canonical.name,
     shift_mode: normalized.shiftMode,
     active: normalized.active,
+    rotation_anchor_week_start: canonical.rotationAnchor.weekStartIsoDate,
+    rotation_base_assignment: canonical.rotationAnchor.baseAssignment,
     updated_at: serverTimestamp(),
     updated_by: uid,
   });
+}
+
+async function ensureCanonicalDepartments({
+  repositories,
+  uid,
+}: ReturnType<typeof requireContext>): Promise<void> {
+  const snapshot = await getDocs(repositories.departments);
+  const existingIds = new Set(snapshot.docs.map((document) => document.id));
+
+  await Promise.all(
+    CANONICAL_DEPARTMENTS.map((department) => {
+      const data = {
+        name: department.name,
+        shift_mode: department.shiftMode,
+        active: true,
+        rotation_anchor_week_start: department.rotationAnchor.weekStartIsoDate,
+        rotation_base_assignment: department.rotationAnchor.baseAssignment,
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+        ...(existingIds.has(department.id)
+          ? {}
+          : {
+              created_at: serverTimestamp(),
+              created_by: uid,
+            }),
+      };
+
+      return setDoc(doc(repositories.departments, department.id), data, {
+        merge: true,
+      });
+    }),
+  );
 }

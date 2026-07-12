@@ -4,7 +4,10 @@ import type {
   EmployeeColorShift,
   EmployeeCreateInput,
 } from '../../types/firestore';
-import { isEmployeeColorShift } from '../../utils/organization';
+import {
+  isEmployeeColorShift,
+  resolveCanonicalDepartment,
+} from '../../utils/organization';
 import {
   normalizeEmployeeInput,
   normalizeTetaNumber,
@@ -453,8 +456,8 @@ function resolveTemplateDepartment(
     return { departmentId: null, departmentName: null, warning: null };
   }
 
-  const key = normalizeImportKey(raw);
-  if (key.includes('na0')) {
+  const resolution = resolveCanonicalDepartment(raw);
+  if (resolution.status === 'unresolved-na0') {
     return {
       departmentId: null,
       departmentName: null,
@@ -462,17 +465,21 @@ function resolveTemplateDepartment(
     };
   }
 
-  const matches = departments.filter((department) => {
-    const departmentKey = normalizeImportKey(
-      `${department.id} ${department.name}`,
+  if (resolution.status === 'matched') {
+    const department = departments.find(
+      (candidate) =>
+        candidate.active && candidate.id === resolution.department.id,
     );
-    return department.active && departmentKey.includes(key);
-  });
-
-  if (matches.length === 1) {
+    if (!department) {
+      return {
+        departmentId: null,
+        departmentName: null,
+        warning: 'department-unmapped',
+      };
+    }
     return {
-      departmentId: matches[0].id,
-      departmentName: matches[0].name,
+      departmentId: department.id,
+      departmentName: department.name,
       warning: null,
     };
   }

@@ -13,12 +13,14 @@ import type {
   DailyValueDocument,
   DepartmentDocument,
   EmployeeDocument,
+  EmployeeAssignmentDocument,
   EmployeeEntitlementDocument,
   EmployeeSettlementDocument,
   ImportDocument,
   MonthDocument,
   PayrollSettingDocument,
   ReportDocument,
+  ScheduleCorrectionDocument,
   SettlementReviewDocument,
   SettlementTotalsDocument,
 } from '../../types/firestore';
@@ -73,6 +75,28 @@ function employeeReference(data: DocumentData, path: string) {
   };
 }
 
+function readRotationBaseAssignment(
+  data: DocumentData,
+  path: string,
+): Partial<Record<'RED' | 'WHITE' | 'BLUE', 'FIRST' | 'SECOND' | 'NIGHT'>> {
+  const result: Partial<
+    Record<'RED' | 'WHITE' | 'BLUE', 'FIRST' | 'SECOND' | 'NIGHT'>
+  > = {};
+
+  (['RED', 'WHITE', 'BLUE'] as const).forEach((color) => {
+    if (data[color] === undefined || data[color] === null) {
+      return;
+    }
+    result[color] = readEnum(data, color, path, [
+      'FIRST',
+      'SECOND',
+      'NIGHT',
+    ] as const);
+  });
+
+  return result;
+}
+
 export const employeeConverter = createConverter<EmployeeDocument>(
   (data, path) => ({
     teta_number: readNonEmptyString(data, 'teta_number', path),
@@ -117,9 +141,66 @@ export const departmentConverter = createConverter<DepartmentDocument>(
       'THREE_SHIFT',
     ] as const),
     active: readBoolean(data, 'active', path),
+    rotation_anchor_week_start:
+      readOptionalNullableString(data, 'rotation_anchor_week_start', path) ??
+      null,
+    rotation_base_assignment:
+      data.rotation_base_assignment === undefined ||
+      data.rotation_base_assignment === null
+        ? null
+        : readRotationBaseAssignment(
+            readObject(data, 'rotation_base_assignment', path),
+            path,
+          ),
     ...metadata(data, path),
   }),
 );
+
+export const employeeAssignmentConverter =
+  createConverter<EmployeeAssignmentDocument>((data, path) => ({
+    ...employeeReference(data, path),
+    department_id:
+      readOptionalNullableString(data, 'department_id', path) ?? null,
+    shift_assignment:
+      data.shift_assignment === undefined || data.shift_assignment === null
+        ? null
+        : readEnum(data, 'shift_assignment', path, [
+            'RED',
+            'WHITE',
+            'BLUE',
+          ] as const),
+    valid_from: readNonEmptyString(data, 'valid_from', path),
+    valid_to: readNullableString(data, 'valid_to', path),
+    status: readEnum(data, 'status', path, ['ACTIVE', 'CANCELLED'] as const),
+    note: readNullableString(data, 'note', path),
+    ...metadata(data, path),
+  }));
+
+export const scheduleCorrectionConverter =
+  createConverter<ScheduleCorrectionDocument>((data, path) => ({
+    ...employeeReference(data, path),
+    date: readNonEmptyString(data, 'date', path),
+    kind: readEnum(data, 'kind', path, [
+      'FIRST_SHIFT',
+      'SECOND_SHIFT',
+      'NIGHT_SHIFT',
+      'DAY_OFF',
+      'PUBLIC_HOLIDAY_WORK',
+      'BHP',
+    ] as const),
+    planned_shift:
+      data.planned_shift === undefined || data.planned_shift === null
+        ? null
+        : readEnum(data, 'planned_shift', path, [
+            'FIRST',
+            'SECOND',
+            'NIGHT',
+          ] as const),
+    planned_hours: readNullableNumber(data, 'planned_hours', path),
+    note: readNullableString(data, 'note', path),
+    status: readEnum(data, 'status', path, ['ACTIVE', 'CANCELLED'] as const),
+    ...metadata(data, path),
+  }));
 
 export const monthConverter = createConverter<MonthDocument>((data, path) => ({
   year: readNumber(data, 'year', path),

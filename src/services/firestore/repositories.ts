@@ -14,6 +14,7 @@ import type {
   AuditLogDocument,
   DailyValueDocument,
   DepartmentDocument,
+  EmployeeAssignmentDocument,
   EmployeeDocument,
   EmployeeEntitlementDocument,
   EmployeeSettlementDocument,
@@ -21,6 +22,7 @@ import type {
   MonthDocument,
   PayrollSettingDocument,
   ReportDocument,
+  ScheduleCorrectionDocument,
   SettlementReviewDocument,
 } from '../../types/firestore';
 import {
@@ -30,12 +32,14 @@ import {
   dailyValueConverter,
   departmentConverter,
   employeeConverter,
+  employeeAssignmentConverter,
   employeeEntitlementConverter,
   employeeSettlementConverter,
   importConverter,
   monthConverter,
   payrollSettingConverter,
   reportConverter,
+  scheduleCorrectionConverter,
   settlementReviewConverter,
 } from './converters';
 import { firestorePaths } from './paths';
@@ -46,6 +50,7 @@ export interface MonthRepositoryBoundary {
   readonly reviewStates: CollectionReference<SettlementReviewDocument>;
   reviewState(employeeId: string): DocumentReference<SettlementReviewDocument>;
   readonly dailyValues: CollectionReference<DailyValueDocument>;
+  readonly scheduleCorrections: CollectionReference<ScheduleCorrectionDocument>;
   readonly absences: CollectionReference<AbsenceDocument>;
   readonly adjustments: CollectionReference<AdjustmentDocument>;
   readonly imports: CollectionReference<ImportDocument>;
@@ -56,6 +61,10 @@ export interface FirestoreRepositoryBoundaries {
   readonly departments: CollectionReference<DepartmentDocument>;
   readonly employees: CollectionReference<EmployeeDocument>;
   employee(employeeId: string): DocumentReference<EmployeeDocument>;
+  readonly employeeAssignments: CollectionReference<EmployeeAssignmentDocument>;
+  employeeAssignment(
+    assignmentId: string,
+  ): DocumentReference<EmployeeAssignmentDocument>;
   readonly employeeEntitlements: CollectionReference<EmployeeEntitlementDocument>;
   employeeEntitlement(
     entitlementId: string,
@@ -86,6 +95,10 @@ export function createFirestoreRepositoryBoundaries(
     firestore,
     firestorePaths.employeeEntitlements,
   ).withConverter(employeeEntitlementConverter);
+  const employeeAssignments = collection(
+    firestore,
+    firestorePaths.employeeAssignments,
+  ).withConverter(employeeAssignmentConverter);
   const months = collection(firestore, firestorePaths.months).withConverter(
     monthConverter,
   );
@@ -107,6 +120,13 @@ export function createFirestoreRepositoryBoundaries(
       return doc(firestore, firestorePaths.employee(employeeId)).withConverter(
         employeeConverter,
       );
+    },
+    employeeAssignments,
+    employeeAssignment(assignmentId) {
+      return doc(
+        firestore,
+        firestorePaths.employeeAssignment(assignmentId),
+      ).withConverter(employeeAssignmentConverter);
     },
     employeeEntitlements,
     employeeEntitlement(entitlementId) {
@@ -140,6 +160,10 @@ export function createFirestoreRepositoryBoundaries(
           firestore,
           firestorePaths.dailyValues(monthId),
         ).withConverter(dailyValueConverter),
+        scheduleCorrections: collection(
+          firestore,
+          firestorePaths.scheduleCorrections(monthId),
+        ).withConverter(scheduleCorrectionConverter),
         absences: collection(
           firestore,
           firestorePaths.absences(monthId),

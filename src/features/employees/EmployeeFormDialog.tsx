@@ -55,6 +55,9 @@ function initialValues(employee?: Employee): EmployeeFormValues {
     foreignDocumentNumber: employee?.foreignDocumentNumber ?? '',
     departmentId: employee?.departmentId ?? '',
     shiftAssignment: employee?.shiftAssignment ?? '',
+    assignmentEffectiveDate: dateInputValue(
+      employee?.employmentStartDate ?? new Date(),
+    ),
     employmentStartDate: dateInputValue(employee?.employmentStartDate ?? null),
     employmentEndDate: dateInputValue(employee?.employmentEndDate ?? null),
   };
@@ -71,6 +74,11 @@ export function EmployeeFormDialog({
   const [errors, setErrors] = useState<EmployeeValidationErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const assignmentChanged = Boolean(
+    employee &&
+    (employee.departmentId !== (values.departmentId || null) ||
+      employee.shiftAssignment !== (values.shiftAssignment || null)),
+  );
 
   const messageForError = (
     code: EmployeeValidationCode | undefined,
@@ -98,6 +106,9 @@ export function EmployeeFormDialog({
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     const input = employeeInputFromForm(values, employee?.isActive ?? true);
+    if (!assignmentChanged) {
+      input.assignmentEffectiveDate = null;
+    }
     const validationErrors = validateEmployeeInput(input);
 
     if (Object.keys(validationErrors).length > 0) {
@@ -241,6 +252,29 @@ export function EmployeeFormDialog({
                 <MenuItem value="BLUE">{t.organization.shifts.BLUE}</MenuItem>
               </TextField>
             </Stack>
+            {assignmentChanged ? (
+              <Alert severity="info">
+                <Stack spacing={1.5}>
+                  <Typography>
+                    {t.employees.form.assignmentEffectivePrompt}
+                  </Typography>
+                  <TextField
+                    required
+                    fullWidth
+                    type="date"
+                    label={t.employees.form.assignmentEffectiveDate}
+                    value={values.assignmentEffectiveDate}
+                    onChange={handleChange('assignmentEffectiveDate')}
+                    error={Boolean(errors.assignmentEffectiveDate)}
+                    helperText={
+                      messageForError(errors.assignmentEffectiveDate) ??
+                      t.employees.form.assignmentEffectiveHelper
+                    }
+                    slotProps={{ inputLabel: { shrink: true } }}
+                  />
+                </Stack>
+              </Alert>
+            ) : null}
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <TextField
                 required
