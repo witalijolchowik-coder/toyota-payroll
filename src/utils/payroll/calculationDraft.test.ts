@@ -64,17 +64,21 @@ function dailyValue(overrides: Partial<DailyValue>): DailyValue {
 }
 
 function absence(overrides: Partial<Absence>): Absence {
+  const absenceCode = overrides.absenceCode ?? 'L4';
+  const source =
+    overrides.source ?? (absenceCode === 'L4' ? 'absence_import' : 'manual');
   return {
     id: 'absence-1',
     monthId: '2026-06',
     employeeId: 'employee-1',
     tetaNumber: 'T001',
-    absenceCode: 'L4',
+    absenceCode,
     startDate: '2026-06-01',
     endDate: '2026-06-01',
     hoursPerDay: null,
-    source: 'manual',
-    importId: null,
+    source,
+    importId:
+      overrides.importId ?? (source === 'absence_import' ? 'import-1' : null),
     status: 'ACTIVE',
     note: null,
     createdAt,
@@ -283,6 +287,29 @@ describe('employee monthly calculation draft', () => {
       },
     ]);
     expect(result.absences.l4Hours).toBe(16);
+  });
+
+  it('warns about manual L4 without treating it as confirmed payroll sickness', () => {
+    const result = draft({
+      absences: [
+        absence({
+          id: 'manual-l4',
+          source: 'manual',
+          importId: null,
+          startDate: '2026-06-01',
+          endDate: '2026-06-01',
+        }),
+      ],
+    });
+
+    expect(result.absences.groups).toEqual([]);
+    expect(result.absences.l4Hours).toBe(0);
+    expect(result.attendance.virtualHours).toBe(
+      22 * STANDARD_WORKING_DAY_HOURS,
+    );
+    expect(result.warnings.map((item) => item.code)).toContain(
+      'unconfirmed-l4',
+    );
   });
 
   it('uses active L4 records for the frequency bonus reason and amount', () => {
