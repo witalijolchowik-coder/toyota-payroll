@@ -720,8 +720,16 @@ export const pl = {
         'unsupported-type': 'Nieobsługiwane',
         'month-missing': 'Brak miesiąca',
       },
+      applyStatus: {
+        created: 'Utworzono',
+        duplicate: 'Pominięto duplikat',
+        unresolved: 'Nie zapisano',
+        blocked: 'Zablokowane',
+        failed: 'Błąd zapisu',
+      },
       messages: {
         ready: 'Rekord zostanie zapisany po potwierdzeniu.',
+        created: 'Dokument L4 został zapisany w miesiącu źródłowym.',
         duplicate:
           'Taki aktywny dokument L4 już istnieje i zostanie pominięty.',
         'overlap-review':
@@ -740,6 +748,25 @@ export const pl = {
         'unsupported-type': 'Importer obsługuje w tym kroku tylko L4.',
         'month-missing':
           'Miesiąc źródłowy nie istnieje. Utwórz miesiąc przed importem.',
+        'firebase-unavailable':
+          'Nie można połączyć się z Firebase. Sprawdź konfigurację aplikacji.',
+        'authentication-required':
+          'Sesja Firebase wygasła albo użytkownik nie jest zalogowany.',
+        'invalid-input': 'Dane wiersza nie spełniają walidacji aplikacji.',
+        'month-unavailable':
+          'Miesiąc źródłowy nie został jeszcze utworzony.',
+        'month-settled':
+          'Miesiąc źródłowy jest zamknięty i nie pozwala na zapis.',
+        'l4-overlap':
+          'Okres nachodzi na aktywne L4 i wymaga ręcznej decyzji.',
+        'ownership-month-change':
+          'Miesiąc źródłowy nie zgadza się z datą rozpoczęcia.',
+        'permission-denied':
+          'Firebase odrzucił zapis z powodu reguł bezpieczeństwa.',
+        unavailable:
+          'Firebase był chwilowo niedostępny podczas zapisu tego wiersza.',
+        'unknown-error':
+          'Nie udało się zapisać wiersza. Szczegóły są dostępne w konsoli deweloperskiej.',
       },
       errors: {
         fileRequired: 'Wybierz plik Excel z raportem L4.',

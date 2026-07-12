@@ -9,6 +9,7 @@ import {
   DialogContent,
   DialogTitle,
   Divider,
+  LinearProgress,
   MenuItem,
   Stack,
   Table,
@@ -29,6 +30,7 @@ import {
   resolveL4ImportRowToEmployee,
 } from '../../services/absencesService';
 import type { L4ImportApplyResult } from '../../services/absencesService';
+import type { L4ImportApplyRowStatus } from '../../services/absencesService';
 import type { Employee } from '../../types/firestore';
 import {
   parseL4ReportWorkbook,
@@ -56,6 +58,17 @@ const statusColor: Record<
   'month-missing': 'warning',
 };
 
+const applyStatusColor: Record<
+  L4ImportApplyRowStatus,
+  'success' | 'warning' | 'error' | 'info' | 'default'
+> = {
+  created: 'success',
+  duplicate: 'default',
+  unresolved: 'warning',
+  blocked: 'warning',
+  failed: 'error',
+};
+
 export function L4ImportDialog({
   employees,
   onClose,
@@ -74,6 +87,23 @@ export function L4ImportDialog({
     () => rows.filter((row) => row.status === 'ready').length,
     [rows],
   );
+  const rowResultById = useMemo(
+    () =>
+      new Map(
+        result?.rowResults.map((rowResult) => [
+          rowResult.rowId,
+          rowResult,
+        ]) ?? [],
+      ),
+    [result],
+  );
+  const resultSeverity = !result
+    ? 'success'
+    : result.failed > 0
+      ? result.created > 0 || result.skipped > 0
+        ? 'warning'
+        : 'error'
+      : 'success';
   const isBusy = isAnalyzing || isApplying || Boolean(resolvingRowId);
 
   const handleAnalyze = async () => {
@@ -182,8 +212,9 @@ export function L4ImportDialog({
           </Stack>
 
           {error ? <Alert severity="error">{error}</Alert> : null}
+          {isApplying ? <LinearProgress /> : null}
           {result ? (
-            <Alert severity="success">
+            <Alert severity={resultSeverity}>
               {interpolate(t.absences.l4Import.result, {
                 created: String(result.created),
                 skipped: String(result.skipped),
@@ -234,8 +265,10 @@ export function L4ImportDialog({
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {rows.map((row) => (
-                      <TableRow key={row.id} hover>
+                    {rows.map((row) => {
+                      const applyResult = rowResultById.get(row.id);
+                      return (
+                        <TableRow key={row.id} hover>
                         <TableCell>{row.rowNumber}</TableCell>
                         <TableCell>
                           {row.sourceName || t.absences.l4Import.empty}
@@ -292,24 +325,37 @@ export function L4ImportDialog({
                         </TableCell>
                         <TableCell>
                           <Stack spacing={0.5}>
-                            <Chip
-                              size="small"
-                              color={statusColor[row.status]}
-                              label={t.absences.l4Import.status[row.status]}
-                            />
+                            {applyResult ? (
+                              <Chip
+                                size="small"
+                                color={applyStatusColor[applyResult.status]}
+                                label={
+                                  t.absences.l4Import.applyStatus[
+                                    applyResult.status
+                                  ]
+                                }
+                              />
+                            ) : (
+                              <Chip
+                                size="small"
+                                color={statusColor[row.status]}
+                                label={t.absences.l4Import.status[row.status]}
+                              />
+                            )}
                             <Typography
                               color="text.secondary"
                               variant="caption"
                             >
                               {messageLabel(
                                 t.absences.l4Import.messages,
-                                row.message,
+                                applyResult?.message ?? row.message,
                               )}
                             </Typography>
                           </Stack>
                         </TableCell>
-                      </TableRow>
-                    ))}
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </TableContainer>

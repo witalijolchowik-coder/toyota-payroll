@@ -73,6 +73,23 @@ export interface L4ImportApplyResult {
   created: number;
   skipped: number;
   failed: number;
+  rowResults: L4ImportApplyRowResult[];
+}
+
+export type L4ImportApplyRowStatus =
+  | 'created'
+  | 'duplicate'
+  | 'unresolved'
+  | 'blocked'
+  | 'failed';
+
+export interface L4ImportApplyRowResult {
+  rowId: string;
+  rowNumber: number;
+  status: L4ImportApplyRowStatus;
+  message: string;
+  ownerMonthId: MonthId | null;
+  path: string | null;
 }
 
 function requireContext() {
@@ -151,24 +168,6 @@ export function monthIdFromAbsencePath(path: string): MonthId | null {
   return match?.[1] ?? null;
 }
 
-async function loadAllAbsences(): Promise<Absence[]> {
-  const { repositories } = requireContext();
-  const snapshot = await getDocs(repositories.allAbsences);
-  return snapshot.docs
-    .map((document) => {
-      const monthId = monthIdFromAbsencePath(document.ref.path);
-      return monthId
-        ? mapAbsenceDocument(document.id, monthId, document.data())
-        : null;
-    })
-    .filter((absence): absence is Absence => Boolean(absence))
-    .sort((first, second) =>
-      first.startDate === second.startDate
-        ? first.tetaNumber.localeCompare(second.tetaNumber, 'pl-PL')
-        : first.startDate.localeCompare(second.startDate),
-    );
-}
-
 async function assertWritableMonth(monthId: MonthId) {
   const { repositories } = requireContext();
   const snapshot = await getDoc(repositories.forMonth(monthId).month);
@@ -193,14 +192,33 @@ async function existingMonthIds(monthIds: MonthId[]): Promise<Set<MonthId>> {
   );
 }
 
+export function ownerMonthIdsForOverlappingDisplay(
+  existingMonthIds: readonly MonthId[],
+  selectedMonthId: MonthId,
+): MonthId[] {
+  return uniqueMonthIds(
+    existingMonthIds.filter((monthId) => monthId <= selectedMonthId),
+  ).sort();
+}
+
+async function loadExistingPayrollMonthIds(): Promise<MonthId[]> {
+  const { repositories } = requireContext();
+  const snapshot = await getDocs(repositories.months);
+  return snapshot.docs.map((document) => document.id as MonthId).sort();
+}
+
 export async function loadAbsencesOverlappingMonth(
   monthId: MonthId,
 ): Promise<Absence[]> {
   const range = getPayrollMonthDateRange(monthId);
   const monthStart = dateToIsoDate(range.start);
   const monthEnd = dateToIsoDate(range.end);
+  const ownerMonthIds = ownerMonthIdsForOverlappingDisplay(
+    await loadExistingPayrollMonthIds(),
+    monthId,
+  );
 
-  return (await loadAllAbsences()).filter(
+  return (await loadAbsencesOwnedByMonths(ownerMonthIds)).filter(
     (absence) => absence.startDate <= monthEnd && absence.endDate >= monthStart,
   );
 }
@@ -391,11 +409,32 @@ export async function applyL4ImportRows({
   fileName: string;
 }): Promise<L4ImportApplyResult> {
   const { repositories, uid } = requireContext();
-  const rowsToCreate = l4RowsToCreate(rows);
   const importId = `l4-${Date.now()}`;
-  const result: L4ImportApplyResult = { created: 0, skipped: 0, failed: 0 };
+  const result: L4ImportApplyResult = {
+    created: 0,
+    skipped: 0,
+    failed: 0,
+    rowResults: [],
+  };
 
-  for (const row of rowsToCreate) {
+  for (const row of rows) {
+    if (!isCreatableL4ImportRow(row)) {
+      result.skipped += 1;
+      result.rowResults.push({
+        rowId: row.id,
+        rowNumber: row.rowNumber,
+        status:
+          row.status === 'duplicate'
+            ? 'duplicate'
+            : row.status === 'month-missing'
+              ? 'blocked'
+              : 'unresolved',
+        message: row.message,
+        ownerMonthId: row.ownerMonthId,
+        path: null,
+      });
+      continue;
+    }
     const employeeId = row.employeeId!;
     const tetaNumber = row.tetaNumber!;
     const startDate = row.startDate!;
@@ -417,6 +456,25 @@ export async function applyL4ImportRows({
         startDate,
         endDate,
       );
+      const exactDuplicate = existing.find(
+        (absence) =>
+          absence.status === 'ACTIVE' &&
+          normalizeAbsenceCode(absence.absenceCode) === 'L4' &&
+          absence.startDate === startDate &&
+          absence.endDate === endDate,
+      );
+      if (exactDuplicate) {
+        result.skipped += 1;
+        result.rowResults.push({
+          rowId: row.id,
+          rowNumber: row.rowNumber,
+          status: 'duplicate',
+          message: 'duplicate',
+          ownerMonthId: monthId,
+          path: `months/${exactDuplicate.monthId}/absences/${exactDuplicate.id}`,
+        });
+        continue;
+      }
       const hasActiveOverlap = existing.some(
         (absence) =>
           absence.status === 'ACTIVE' &&
@@ -424,10 +482,18 @@ export async function applyL4ImportRows({
           absence.endDate >= startDate,
       );
       if (hasActiveOverlap) {
-        result.skipped += 1;
+        result.failed += 1;
+        result.rowResults.push({
+          rowId: row.id,
+          rowNumber: row.rowNumber,
+          status: 'blocked',
+          message: 'overlap-review',
+          ownerMonthId: monthId,
+          path: null,
+        });
         continue;
       }
-      await addDoc(repositories.forMonth(monthId).absences, {
+      const reference = await addDoc(repositories.forMonth(monthId).absences, {
         employee_id: employeeId,
         teta_number: tetaNumber,
         absence_code: 'L4',
@@ -444,12 +510,53 @@ export async function applyL4ImportRows({
         updated_by: uid,
       });
       result.created += 1;
-    } catch {
+      result.rowResults.push({
+        rowId: row.id,
+        rowNumber: row.rowNumber,
+        status: 'created',
+        message: 'created',
+        ownerMonthId: monthId,
+        path: `months/${monthId}/absences/${reference.id}`,
+      });
+    } catch (error) {
       result.failed += 1;
+      result.rowResults.push({
+        rowId: row.id,
+        rowNumber: row.rowNumber,
+        status: 'failed',
+        message: describeL4ApplyFailure(error),
+        ownerMonthId: row.ownerMonthId,
+        path: null,
+      });
     }
   }
 
   return result;
+}
+
+function isCreatableL4ImportRow(
+  row: L4ImportPreviewRow,
+): row is L4ImportPreviewRow & {
+  employeeId: string;
+  tetaNumber: string;
+  startDate: IsoDate;
+  endDate: IsoDate;
+  ownerMonthId: MonthId;
+} {
+  return l4RowsToCreate([row]).length === 1;
+}
+
+function describeL4ApplyFailure(error: unknown): string {
+  if (error instanceof AbsenceServiceError) {
+    return error.code;
+  }
+  if (typeof error === 'object' && error && 'code' in error) {
+    return String((error as { code: unknown }).code);
+  }
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+  return 'unknown-error';
 }
 
 export async function updateAbsence(
