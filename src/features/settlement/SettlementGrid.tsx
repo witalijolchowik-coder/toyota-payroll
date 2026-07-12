@@ -223,7 +223,10 @@ export function SettlementGrid({
                     );
                     const absenceLabel =
                       absenceResolution.kind === 'governed'
-                        ? absenceResolution.code
+                        ? absenceResolution.code === 'L4' &&
+                          absenceResolution.confirmation === 'reported'
+                          ? t.settlement.grid.reportedL4Label
+                          : absenceResolution.code
                         : absenceResolution.kind === 'ambiguous'
                           ? absenceResolution.codes.join('/')
                           : null;
@@ -327,7 +330,12 @@ export function SettlementGrid({
                                         color:
                                           absenceResolution.kind === 'ambiguous'
                                             ? 'warning.main'
-                                            : 'error.main',
+                                            : absenceResolution.kind ===
+                                                  'governed' &&
+                                                absenceResolution.confirmation ===
+                                                  'reported'
+                                              ? 'warning.dark'
+                                              : 'error.main',
                                         fontWeight: 800,
                                       }
                                     : cellValueSx(value.kind)
@@ -496,9 +504,12 @@ function buildTooltip({
     parts.push(t.settlement.grid.absenceAmbiguous);
   } else if (absenceResolution.kind === 'governed') {
     parts.push(
-      interpolate(t.settlement.grid.absence, {
-        code: absenceResolution.code,
-      }),
+      absenceResolution.code === 'L4' &&
+        absenceResolution.confirmation === 'reported'
+        ? t.settlement.grid.reportedL4Tooltip
+        : interpolate(t.settlement.grid.absence, {
+            code: absenceResolution.code,
+          }),
     );
   }
 

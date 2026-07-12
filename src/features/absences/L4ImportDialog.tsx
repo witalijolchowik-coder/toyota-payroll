@@ -48,12 +48,14 @@ const statusColor: Record<
   'success' | 'warning' | 'error' | 'info' | 'default'
 > = {
   ready: 'success',
+  'confirm-manual': 'info',
   duplicate: 'default',
   'overlap-review': 'warning',
   'continuation-review': 'warning',
   unmatched: 'error',
   ambiguous: 'warning',
   invalid: 'error',
+  'future-start': 'error',
   'unsupported-type': 'error',
   'month-missing': 'warning',
 };
@@ -63,6 +65,7 @@ const applyStatusColor: Record<
   'success' | 'warning' | 'error' | 'info' | 'default'
 > = {
   created: 'success',
+  'confirmed-manual': 'success',
   duplicate: 'default',
   unresolved: 'warning',
   blocked: 'warning',
@@ -84,7 +87,10 @@ export function L4ImportDialog({
   const [result, setResult] = useState<L4ImportApplyResult | null>(null);
 
   const createCount = useMemo(
-    () => rows.filter((row) => row.status === 'ready').length,
+    () =>
+      rows.filter(
+        (row) => row.status === 'ready' || row.status === 'confirm-manual',
+      ).length,
     [rows],
   );
   const rowResultById = useMemo(

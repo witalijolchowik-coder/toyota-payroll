@@ -983,6 +983,23 @@ service cloud.firestore {
               ])
             )
             || (
+              resource.data.absence_code == 'L4'
+              && resource.data.source == 'manual'
+              && request.resource.data.absence_code == 'L4'
+              && request.resource.data.status == 'ACTIVE'
+              && request.resource.data.source == 'absence_import'
+              && isNonEmptyString(request.resource.data.import_id)
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'start_date',
+                'end_date',
+                'source',
+                'import_id',
+                'note',
+                'updated_at',
+                'updated_by'
+              ])
+            )
+            || (
               request.resource.data.status == 'CANCELLED'
               && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
                 'status',

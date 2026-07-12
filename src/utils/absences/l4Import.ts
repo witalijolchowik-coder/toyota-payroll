@@ -16,12 +16,14 @@ export const L4_REPORT_SHEET_NAME = 'RAPORT TBPL';
 
 export type L4ImportPreviewStatus =
   | 'ready'
+  | 'confirm-manual'
   | 'duplicate'
   | 'overlap-review'
   | 'continuation-review'
   | 'unmatched'
   | 'ambiguous'
   | 'invalid'
+  | 'future-start'
   | 'unsupported-type'
   | 'month-missing';
 
@@ -49,6 +51,7 @@ export interface L4ImportContext {
   employees: readonly Employee[];
   existingAbsences: readonly Absence[];
   existingMonthIds: ReadonlySet<MonthId>;
+  today?: IsoDate;
 }
 
 const REQUIRED_HEADERS = {
@@ -195,6 +198,10 @@ function classifyMatchedL4Row(
   if (!row.startDate || !row.endDate) {
     return { status: 'invalid', message: 'invalid-row' };
   }
+  const today = context.today ?? new Date().toISOString().slice(0, 10);
+  if (row.startDate > today) {
+    return { status: 'future-start', message: 'future-start' };
+  }
   const ownerMonthId = row.startDate.slice(0, 7);
   const existingForEmployee = context.existingAbsences.filter(
     (absence) => absence.employeeId === employee.id,
@@ -202,25 +209,59 @@ function classifyMatchedL4Row(
   const activeExisting = existingForEmployee.filter(
     (absence) => absence.status === 'ACTIVE',
   );
-  const exact = activeExisting.find(
+  const importedExisting = activeExisting.filter(
+    (absence) => absence.source === 'absence_import',
+  );
+  const manualL4Existing = activeExisting.filter(
+    (absence) =>
+      absence.source === 'manual' &&
+      normalizeAbsenceCode(absence.absenceCode) === 'L4',
+  );
+  const exactImported = importedExisting.find(
     (absence) =>
       normalizeAbsenceCode(absence.absenceCode) === 'L4' &&
       absence.startDate === row.startDate &&
       absence.endDate === row.endDate,
   );
-  if (exact) {
+  if (exactImported) {
     return { status: 'duplicate', message: 'duplicate' };
   }
-  const overlapping = activeExisting.find((absence) =>
+  const importedOverlap = importedExisting.find((absence) =>
     absenceRangesOverlap(absence, {
       startDate: row.startDate!,
       endDate: row.endDate!,
     }),
   );
-  if (overlapping) {
+  if (importedOverlap) {
     return { status: 'overlap-review', message: 'overlap-review' };
   }
-  const consecutive = activeExisting.find(
+  const manualMatch = manualL4Existing.find(
+    (absence) =>
+      absence.monthId === ownerMonthId &&
+      (absenceRangesOverlap(absence, {
+        startDate: row.startDate!,
+        endDate: row.endDate!,
+      }) ||
+        isConsecutive(absence, {
+          startDate: row.startDate!,
+          endDate: row.endDate!,
+        })),
+  );
+  if (manualMatch) {
+    return { status: 'confirm-manual', message: 'confirm-manual' };
+  }
+  const activeNonL4Overlap = activeExisting.find(
+    (absence) =>
+      normalizeAbsenceCode(absence.absenceCode) !== 'L4' &&
+      absenceRangesOverlap(absence, {
+        startDate: row.startDate!,
+        endDate: row.endDate!,
+      }),
+  );
+  if (activeNonL4Overlap) {
+    return { status: 'overlap-review', message: 'overlap-review' };
+  }
+  const consecutive = importedExisting.find(
     (absence) =>
       normalizeAbsenceCode(absence.absenceCode) === 'L4' &&
       isConsecutive(absence, {
@@ -351,7 +392,7 @@ export function resolveL4ImportPreviewRow(
 export function l4RowsToCreate(rows: readonly L4ImportPreviewRow[]) {
   return rows.filter(
     (row) =>
-      row.status === 'ready' &&
+      (row.status === 'ready' || row.status === 'confirm-manual') &&
       row.employeeId &&
       row.tetaNumber &&
       row.startDate &&

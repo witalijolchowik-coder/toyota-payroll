@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Absence, Employee } from '../../types/firestore';
 import {
   buildL4ImportPreview,
+  l4RowsToCreate,
   parseL4DateCell,
   resolveL4ImportPreviewRow,
   type L4ImportSourceRow,
@@ -81,6 +82,7 @@ describe('L4 import helpers', () => {
       employees: [employee('employee-1', 'Anna', 'Żółć', '100')],
       existingAbsences: [],
       existingMonthIds: new Set(['2026-07']),
+      today: '2026-07-12',
     });
 
     expect(preview[0]).toMatchObject({
@@ -101,6 +103,7 @@ describe('L4 import helpers', () => {
         employees,
         existingAbsences: [],
         existingMonthIds: new Set(['2026-07']),
+        today: '2026-07-12',
       })[0]?.status,
     ).toBe('ambiguous');
     expect(
@@ -108,16 +111,20 @@ describe('L4 import helpers', () => {
         employees,
         existingAbsences: [],
         existingMonthIds: new Set(['2026-07']),
+        today: '2026-07-12',
       })[0]?.status,
     ).toBe('unmatched');
   });
 
-  it('skips exact duplicates and sends overlaps or continuations to review', () => {
+  it('skips exact imported duplicates and sends imported overlaps or continuations to review', () => {
     const employees = [employee('employee-1', 'Jan', 'Kowalski', '100')];
     const context = {
       employees,
-      existingAbsences: [absence()],
+      existingAbsences: [
+        absence({ source: 'absence_import', importId: 'import-1' }),
+      ],
       existingMonthIds: new Set(['2026-07']),
+      today: '2026-07-12' as const,
     };
 
     expect(buildL4ImportPreview([row()], context)[0]?.status).toBe('duplicate');
@@ -135,6 +142,43 @@ describe('L4 import helpers', () => {
     ).toBe('continuation-review');
   });
 
+  it('confirms a matching manual L4 instead of creating a parallel duplicate', () => {
+    const context = {
+      employees: [employee('employee-1', 'Jan', 'Kowalski', '100')],
+      existingAbsences: [absence()],
+      existingMonthIds: new Set(['2026-07']),
+      today: '2026-07-12' as const,
+    };
+
+    const exact = buildL4ImportPreview([row()], context)[0]!;
+    expect(exact).toMatchObject({
+      status: 'confirm-manual',
+      message: 'confirm-manual',
+    });
+    expect(l4RowsToCreate([exact])).toHaveLength(1);
+    expect(
+      buildL4ImportPreview(
+        [row({ startDate: '2026-07-09', endDate: '2026-07-12' })],
+        context,
+      )[0]?.status,
+    ).toBe('confirm-manual');
+  });
+
+  it('marks imported future-start L4 as anomalous and not creatable', () => {
+    const preview = buildL4ImportPreview([row()], {
+      employees: [employee('employee-1', 'Jan', 'Kowalski', '100')],
+      existingAbsences: [],
+      existingMonthIds: new Set(['2026-07']),
+      today: '2026-07-01',
+    });
+
+    expect(preview[0]).toMatchObject({
+      status: 'future-start',
+      message: 'future-start',
+    });
+    expect(l4RowsToCreate(preview)).toHaveLength(0);
+  });
+
   it('requires the owner month to exist before creating a cross-month L4', () => {
     const preview = buildL4ImportPreview(
       [row({ startDate: '2026-06-28', endDate: '2026-07-05' })],
@@ -142,6 +186,7 @@ describe('L4 import helpers', () => {
         employees: [employee('employee-1', 'Jan', 'Kowalski', '100')],
         existingAbsences: [],
         existingMonthIds: new Set(['2026-07']),
+        today: '2026-07-12',
       },
     );
 
@@ -156,6 +201,7 @@ describe('L4 import helpers', () => {
       employees: [employee('employee-1', 'Jan', 'Kowalski', '100')],
       existingAbsences: [],
       existingMonthIds: new Set(['2026-07']),
+      today: '2026-07-12' as const,
     };
     const unmatched = buildL4ImportPreview(
       [row({ sourceName: 'RAPORTOWE NAZWISKO' })],
@@ -172,13 +218,19 @@ describe('L4 import helpers', () => {
     });
   });
 
-  it('keeps manual L4 resolution in review when existing active absence overlaps', () => {
+  it('keeps imported L4 resolution in review when existing confirmed absence overlaps', () => {
     const context = {
       employees: [employee('employee-1', 'Jan', 'Kowalski', '100')],
       existingAbsences: [
-        absence({ startDate: '2026-07-09', endDate: '2026-07-11' }),
+        absence({
+          source: 'absence_import',
+          importId: 'import-1',
+          startDate: '2026-07-09',
+          endDate: '2026-07-11',
+        }),
       ],
       existingMonthIds: new Set(['2026-07']),
+      today: '2026-07-12' as const,
     };
     const unmatched = buildL4ImportPreview(
       [row({ sourceName: 'RAPORTOWE NAZWISKO' })],

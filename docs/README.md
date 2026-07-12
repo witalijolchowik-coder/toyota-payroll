@@ -56,6 +56,9 @@ The attached design history contains several generations of the architecture. Th
 - [Department schedule planning - Block 18](business-rules/department-schedule-planning.md)
   - canonical departments, effective-dated employee assignments, BHP schedule
     days, local shift rotations and monthly planned schedule display
+- [L4 source of truth, status model and import reconciliation](business-rules/l4-source-of-truth.md)
+  - ZUS import priority, manual L4 as preliminary, three L4 business statuses,
+    reconciliation, counters, filters and calendar meaning
 
 Approved business-rules specifications govern payroll semantics. Architecture
 documents continue to govern system structure and implementation boundaries.

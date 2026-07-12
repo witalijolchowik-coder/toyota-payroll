@@ -186,7 +186,10 @@ export function EmployeeCalendarDialog({
               );
               const absenceLabel =
                 absenceResolution.kind === 'governed'
-                  ? absenceResolution.code
+                  ? absenceResolution.code === 'L4' &&
+                    absenceResolution.confirmation === 'reported'
+                    ? t.settlement.grid.reportedL4Label
+                    : absenceResolution.code
                   : absenceResolution.kind === 'ambiguous'
                     ? absenceResolution.codes.join('/')
                     : null;
@@ -259,7 +262,12 @@ export function EmployeeCalendarDialog({
                         {absenceLabel ? (
                           <Typography
                             variant="body2"
-                            color="error.main"
+                            color={
+                              absenceResolution.kind === 'governed' &&
+                              absenceResolution.confirmation === 'reported'
+                                ? 'warning.dark'
+                                : 'error.main'
+                            }
                             sx={{ fontWeight: 800 }}
                           >
                             {absenceLabel}

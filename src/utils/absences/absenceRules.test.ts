@@ -3,6 +3,8 @@ import {
   absenceEmploymentIssue,
   absenceRangesOverlap,
   absenceRemovesVirtualDefault,
+  countUniqueEmployeesOnConfirmedL4Today,
+  deriveL4BusinessStatus,
   findBlockingL4,
   resolveGoverningAbsence,
   validateAbsenceInput,
@@ -64,6 +66,81 @@ describe('absence validation and record boundaries', () => {
   });
 });
 
+describe('L4 business status model', () => {
+  it('classifies manual L4 as reported and imported L4 by date', () => {
+    expect(
+      deriveL4BusinessStatus(
+        absence({ absenceCode: 'L4', source: 'manual', importId: null }),
+        '2026-06-11',
+      ),
+    ).toBe('REPORTED');
+    expect(
+      deriveL4BusinessStatus(
+        absence({
+          absenceCode: 'L4',
+          source: 'absence_import',
+          importId: 'import-1',
+        }),
+        '2026-06-11',
+      ),
+    ).toBe('ACTIVE');
+    expect(
+      deriveL4BusinessStatus(
+        absence({
+          absenceCode: 'L4',
+          source: 'absence_import',
+          importId: 'import-1',
+          endDate: '2026-06-10',
+        }),
+        '2026-06-11',
+      ),
+    ).toBe('INACTIVE');
+    expect(
+      deriveL4BusinessStatus(
+        absence({
+          absenceCode: 'L4',
+          source: 'absence_import',
+          importId: 'import-1',
+          startDate: '2026-06-12',
+          endDate: '2026-06-15',
+        }),
+        '2026-06-11',
+      ),
+    ).toBe('FUTURE_ANOMALY');
+  });
+
+  it('counts unique employees on confirmed L4 today only', () => {
+    expect(
+      countUniqueEmployeesOnConfirmedL4Today(
+        [
+          absence({
+            id: 'manual',
+            employeeId: 'employee-1',
+            absenceCode: 'L4',
+            source: 'manual',
+            importId: null,
+          }),
+          absence({
+            id: 'confirmed-1',
+            employeeId: 'employee-2',
+            absenceCode: 'L4',
+            source: 'absence_import',
+            importId: 'import-1',
+          }),
+          absence({
+            id: 'confirmed-2',
+            employeeId: 'employee-2',
+            absenceCode: 'L4',
+            source: 'absence_import',
+            importId: 'import-2',
+          }),
+        ],
+        '2026-06-11',
+      ),
+    ).toBe(1);
+  });
+});
+
 describe('absence overlap and L4 priority', () => {
   it('detects inclusive date-range overlap', () => {
     expect(
@@ -102,8 +179,32 @@ describe('absence overlap and L4 priority', () => {
       code: 'L4',
       records: [l4],
       overriddenRecords: [leave],
+      confirmation: 'reported',
     });
     expect(records.every((record) => record.status === 'ACTIVE')).toBe(true);
+  });
+
+  it('lets confirmed imported L4 override manual L4 for the same day', () => {
+    const manual = absence({
+      id: 'manual-l4',
+      absenceCode: 'L4',
+      source: 'manual',
+      importId: null,
+    });
+    const imported = absence({
+      id: 'imported-l4',
+      absenceCode: 'L4',
+      source: 'absence_import',
+      importId: 'import-1',
+    });
+
+    expect(resolveGoverningAbsence([manual, imported], '2026-06-11')).toEqual({
+      kind: 'governed',
+      code: 'L4',
+      records: [imported],
+      overriddenRecords: [manual],
+      confirmation: 'confirmed',
+    });
   });
 
   it('reports different overlapping non-L4 categories as ambiguous', () => {

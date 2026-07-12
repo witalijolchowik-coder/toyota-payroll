@@ -51,6 +51,8 @@ import {
   UNEXPLAINED_ABSENCE_CODES,
   absenceCoversDate,
   absenceEmploymentIssue,
+  countUniqueEmployeesOnConfirmedL4Today,
+  deriveL4BusinessStatus,
   normalizeAbsenceCode,
 } from '../utils/absences';
 import { currentPayrollMonthId } from '../utils/payroll';
@@ -86,7 +88,7 @@ export function AbsencesPage() {
   } = useAbsences(monthId);
   const [employeeFilter, setEmployeeFilter] = useState('all');
   const [typeFilter, setTypeFilter] = useState('all');
-  const [statusFilter, setStatusFilter] = useState('ACTIVE');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [formState, setFormState] = useState<FormState>(null);
   const [isL4ImportOpen, setIsL4ImportOpen] = useState(false);
   const [cancelTarget, setCancelTarget] = useState<Absence | null>(null);
@@ -97,25 +99,28 @@ export function AbsencesPage() {
   );
   const isWritable = Boolean(month && !month.isSettled);
 
+  const today = localIsoDate();
   const filteredAbsences = useMemo(
     () =>
-      absences.filter(
-        (absence) =>
-          (employeeFilter === 'all' || absence.employeeId === employeeFilter) &&
-          (typeFilter === 'all' ||
-            normalizeAbsenceCode(absence.absenceCode) === typeFilter) &&
-          (statusFilter === 'all' || absence.status === statusFilter),
-      ),
-    [absences, employeeFilter, statusFilter, typeFilter],
+      absences.filter((absence) => {
+        if (employeeFilter !== 'all' && absence.employeeId !== employeeFilter) {
+          return false;
+        }
+        const normalizedCode = normalizeAbsenceCode(absence.absenceCode);
+        if (typeFilter !== 'all' && normalizedCode !== typeFilter) {
+          return false;
+        }
+        return matchesAbsenceStatusFilter(absence, statusFilter, today);
+      }),
+    [absences, employeeFilter, statusFilter, today, typeFilter],
   );
 
-  const today = localIsoDate();
   const currentActive = currentAbsences.filter(
     (absence) =>
       absence.status === 'ACTIVE' && absenceCoversDate(absence, today),
   );
   const summary = {
-    l4: countEmployees(currentActive, (code) => code === 'L4'),
+    l4: countUniqueEmployeesOnConfirmedL4Today(currentAbsences, today),
     excused: countEmployees(currentActive, (code) =>
       EXCUSED_ABSENCE_CODES.has(code),
     ),
@@ -267,7 +272,10 @@ export function AbsencesPage() {
             select
             label={t.absences.filters.type}
             value={typeFilter}
-            onChange={(event) => setTypeFilter(event.target.value)}
+            onChange={(event) => {
+              setTypeFilter(event.target.value);
+              setStatusFilter('all');
+            }}
             sx={{ minWidth: 140 }}
           >
             <MenuItem value="all">{t.absences.filters.allTypes}</MenuItem>
@@ -285,14 +293,33 @@ export function AbsencesPage() {
             sx={{ minWidth: 150 }}
           >
             <MenuItem value="all">{t.absences.filters.allStatuses}</MenuItem>
-            <MenuItem value="ACTIVE">{t.absences.status.ACTIVE}</MenuItem>
-            <MenuItem value="CANCELLED">{t.absences.status.CANCELLED}</MenuItem>
+            {typeFilter === 'L4'
+              ? [
+                  <MenuItem key="L4_REPORTED" value="L4_REPORTED">
+                    {t.absences.status.L4_REPORTED}
+                  </MenuItem>,
+                  <MenuItem key="L4_ACTIVE" value="L4_ACTIVE">
+                    {t.absences.status.L4_ACTIVE}
+                  </MenuItem>,
+                  <MenuItem key="L4_INACTIVE" value="L4_INACTIVE">
+                    {t.absences.status.L4_INACTIVE}
+                  </MenuItem>,
+                ]
+              : [
+                  <MenuItem key="ACTIVE" value="ACTIVE">
+                    {t.absences.status.ACTIVE}
+                  </MenuItem>,
+                  <MenuItem key="CANCELLED" value="CANCELLED">
+                    {t.absences.status.CANCELLED}
+                  </MenuItem>,
+                ]}
           </TextField>
         </Stack>
         <Divider />
         <AbsenceTable
           absences={filteredAbsences}
           employeesById={employeesById}
+          today={today}
           isLoading={isLoading}
           onEdit={(absence) => setFormState({ mode: 'edit', absence })}
           onCancel={setCancelTarget}
@@ -380,15 +407,33 @@ function countEmployees(
   ).size;
 }
 
+function matchesAbsenceStatusFilter(
+  absence: Absence,
+  statusFilter: string,
+  today: string,
+): boolean {
+  if (statusFilter === 'all') return true;
+  if (statusFilter.startsWith('L4_')) {
+    const businessStatus = deriveL4BusinessStatus(absence, today);
+    if (statusFilter === 'L4_REPORTED') return businessStatus === 'REPORTED';
+    if (statusFilter === 'L4_ACTIVE') return businessStatus === 'ACTIVE';
+    if (statusFilter === 'L4_INACTIVE') return businessStatus === 'INACTIVE';
+    return false;
+  }
+  return absence.status === statusFilter;
+}
+
 function AbsenceTable({
   absences,
   employeesById,
+  today,
   isLoading,
   onEdit,
   onCancel,
 }: {
   absences: Absence[];
   employeesById: Map<string, Employee>;
+  today: string;
   isLoading: boolean;
   onEdit: (absence: Absence) => void;
   onCancel: (absence: Absence) => void;
@@ -439,6 +484,11 @@ function AbsenceTable({
               : 'missing-employment-start';
             const editable =
               absence.source === 'manual' && absence.status === 'ACTIVE';
+            const statusPresentation = absenceStatusPresentation(
+              absence,
+              today,
+              t,
+            );
             return (
               <TableRow hover key={`${absence.monthId}:${absence.id}`}>
                 <TableCell>{absence.tetaNumber}</TableCell>
@@ -458,12 +508,18 @@ function AbsenceTable({
                 <TableCell>
                   <Chip
                     size="small"
-                    label={t.absences.status[absence.status]}
-                    color={absence.status === 'ACTIVE' ? 'success' : 'default'}
+                    label={statusPresentation.label}
+                    color={statusPresentation.color}
                   />
                 </TableCell>
                 <TableCell>
-                  {issue ? (
+                  {statusPresentation.reviewMessage ? (
+                    <Chip
+                      size="small"
+                      color="warning"
+                      label={statusPresentation.reviewMessage}
+                    />
+                  ) : issue ? (
                     <Chip
                       size="small"
                       color="warning"
@@ -505,6 +561,51 @@ function AbsenceTable({
       </Table>
     </TableContainer>
   );
+}
+
+function absenceStatusPresentation(
+  absence: Absence,
+  today: string,
+  t: ReturnType<typeof useTranslations>,
+): {
+  label: string;
+  color: 'success' | 'warning' | 'default' | 'error';
+  reviewMessage: string | null;
+} {
+  const l4Status = deriveL4BusinessStatus(absence, today);
+  if (l4Status === 'REPORTED') {
+    return {
+      label: t.absences.status.L4_REPORTED,
+      color: 'warning',
+      reviewMessage: t.absences.table.unconfirmedL4,
+    };
+  }
+  if (l4Status === 'ACTIVE') {
+    return {
+      label: t.absences.status.L4_ACTIVE,
+      color: 'success',
+      reviewMessage: null,
+    };
+  }
+  if (l4Status === 'INACTIVE') {
+    return {
+      label: t.absences.status.L4_INACTIVE,
+      color: 'default',
+      reviewMessage: null,
+    };
+  }
+  if (l4Status === 'FUTURE_ANOMALY') {
+    return {
+      label: t.absences.table.emptyStatus,
+      color: 'warning',
+      reviewMessage: t.absences.table.futureL4Anomaly,
+    };
+  }
+  return {
+    label: t.absences.status[absence.status],
+    color: absence.status === 'ACTIVE' ? 'success' : 'default',
+    reviewMessage: null,
+  };
 }
 
 function loadErrorMessage(error: Error, t: ReturnType<typeof useTranslations>) {

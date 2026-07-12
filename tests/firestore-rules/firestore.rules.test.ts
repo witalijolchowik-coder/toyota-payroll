@@ -1169,6 +1169,67 @@ describe('Firestore security rules', () => {
     );
   });
 
+  it('allows manual L4 to be confirmed by imported ZUS data without weakening other absence updates', async () => {
+    await seedMonth('2026-07', false);
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const manualL4 = doc(firestore, 'months/2026-07/absences/manual-l4');
+    const manualVacation = doc(
+      firestore,
+      'months/2026-07/absences/manual-vacation',
+    );
+
+    await assertSucceeds(
+      setDoc(manualL4, {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        absence_code: 'L4',
+        start_date: '2026-07-08',
+        end_date: '2026-07-10',
+        hours_per_day: null,
+        source: 'manual',
+        import_id: null,
+        status: 'ACTIVE',
+        note: 'zgłoszone przez koordynatora',
+        ...modificationMetadata(uid),
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(manualL4, {
+        end_date: '2026-07-14',
+        source: 'absence_import',
+        import_id: 'l4-1780000000000',
+        note: 'L4 import: Raport L4_PS_12-07-2026.xlsx, wiersz 2',
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+
+    await assertSucceeds(
+      setDoc(manualVacation, {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        absence_code: 'UW',
+        start_date: '2026-07-15',
+        end_date: '2026-07-16',
+        hours_per_day: null,
+        source: 'manual',
+        import_id: null,
+        status: 'ACTIVE',
+        note: null,
+        ...modificationMetadata(uid),
+      }),
+    );
+    await assertFails(
+      updateDoc(manualVacation, {
+        source: 'absence_import',
+        import_id: 'l4-1780000000001',
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+  });
+
   it('allows the real L4 import payload shape in an open owner month', async () => {
     await seedMonth('2026-07', false);
     await seedMonth('2026-08', false);

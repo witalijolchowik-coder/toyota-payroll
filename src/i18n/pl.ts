@@ -623,6 +623,9 @@ export const pl = {
     status: {
       ACTIVE: 'Aktywna',
       CANCELLED: 'Anulowana',
+      L4_REPORTED: 'Zgłoszone',
+      L4_ACTIVE: 'Aktywne',
+      L4_INACTIVE: 'Nieaktywne',
     },
     table: {
       teta: 'TETA',
@@ -638,6 +641,9 @@ export const pl = {
       edit: 'Edytuj nieobecność',
       cancel: 'Anuluj nieobecność',
       readOnly: 'Tylko odczyt',
+      unconfirmedL4: 'L4 zgłoszone ręcznie — oczekuje na potwierdzenie ZUS',
+      futureL4Anomaly: 'L4 z przyszłą datą rozpoczęcia wymaga weryfikacji',
+      emptyStatus: '—',
     },
     empty: {
       title: 'Brak nieobecności',
@@ -711,17 +717,20 @@ export const pl = {
       },
       status: {
         ready: 'Gotowe',
+        'confirm-manual': 'Potwierdzi zgłoszenie',
         duplicate: 'Duplikat',
         'overlap-review': 'Wymaga weryfikacji',
         'continuation-review': 'Możliwa kontynuacja',
         unmatched: 'Nie znaleziono',
         ambiguous: 'Niejednoznaczne',
         invalid: 'Nieprawidłowe',
+        'future-start': 'Przyszły początek',
         'unsupported-type': 'Nieobsługiwane',
         'month-missing': 'Brak miesiąca',
       },
       applyStatus: {
         created: 'Utworzono',
+        'confirmed-manual': 'Potwierdzono zgłoszenie',
         duplicate: 'Pominięto duplikat',
         unresolved: 'Nie zapisano',
         blocked: 'Zablokowane',
@@ -729,7 +738,11 @@ export const pl = {
       },
       messages: {
         ready: 'Rekord zostanie zapisany po potwierdzeniu.',
+        'confirm-manual':
+          'Import ZUS potwierdzi istniejące ręczne zgłoszenie L4 bez tworzenia drugiej skutecznej nieobecności.',
         created: 'Dokument L4 został zapisany w miesiącu źródłowym.',
+        'confirmed-manual':
+          'Ręczne zgłoszenie L4 zostało potwierdzone danymi z importu ZUS.',
         duplicate:
           'Taki aktywny dokument L4 już istnieje i zostanie pominięty.',
         'overlap-review':
@@ -745,6 +758,8 @@ export const pl = {
         'invalid-start-date': 'Data od jest nieprawidłowa.',
         'invalid-end-date': 'Data do jest nieprawidłowa.',
         'invalid-date-range': 'Data do jest wcześniejsza niż data od.',
+        'future-start':
+          'L4 z raportu zaczyna się w przyszłości. Wiersz wymaga weryfikacji i nie zostanie zapisany automatycznie.',
         'unsupported-type': 'Importer obsługuje w tym kroku tylko L4.',
         'month-missing':
           'Miesiąc źródłowy nie istnieje. Utwórz miesiąc przed importem.',
@@ -945,6 +960,8 @@ export const pl = {
           'Nieobecność wychodzi poza okres zatrudnienia.',
         'ambiguous-absence':
           'Kilka nieobecności ma taki sam priorytet dla tego dnia.',
+        'unconfirmed-l4':
+          'Ręcznie zgłoszone L4 nie jest jeszcze potwierdzone przez import ZUS i nie jest traktowane jak finalne źródło rozliczenia.',
         'unresolved-frequency-bonus-setting':
           'Nie znaleziono aktywnej konfiguracji premii frekwencyjnej.',
         'unresolved-work-time-classification':
@@ -1176,6 +1193,9 @@ export const pl = {
       edit: 'Edytuj godziny: {{employee}}, {{date}}',
       absence:
         'Nieobecność {{code}} — edycja jest dostępna w module Nieobecności.',
+      reportedL4Label: 'L4 zgł.',
+      reportedL4Tooltip:
+        'Ręcznie zgłoszone L4 — widoczne operacyjnie, ale niepotwierdzone przez import ZUS.',
       absenceAmbiguous:
         'Kilka różnych nieobecności obejmuje ten dzień. Wymagana jest weryfikacja.',
       warnings: {

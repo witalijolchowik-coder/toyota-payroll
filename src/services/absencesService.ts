@@ -12,6 +12,7 @@ import {
 import { auth } from '../config/firebase';
 import {
   findBlockingL4,
+  absenceRangesOverlap,
   buildL4ImportPreview,
   l4RowsToCreate,
   normalizeAbsenceCode,
@@ -77,7 +78,12 @@ export interface L4ImportApplyResult {
 }
 
 export type L4ImportApplyRowStatus =
-  'created' | 'duplicate' | 'unresolved' | 'blocked' | 'failed';
+  | 'created'
+  | 'confirmed-manual'
+  | 'duplicate'
+  | 'unresolved'
+  | 'blocked'
+  | 'failed';
 
 export interface L4ImportApplyRowResult {
   rowId: string;
@@ -133,6 +139,20 @@ function ownerMonthIdsForRange(
   }
 
   return uniqueMonthIds(result);
+}
+
+function areConsecutiveAbsenceRanges(
+  first: { startDate: IsoDate; endDate: IsoDate },
+  second: { startDate: IsoDate; endDate: IsoDate },
+): boolean {
+  const dayAfterFirst = new Date(`${first.endDate}T00:00:00.000Z`);
+  dayAfterFirst.setUTCDate(dayAfterFirst.getUTCDate() + 1);
+  const dayAfterSecond = new Date(`${second.endDate}T00:00:00.000Z`);
+  dayAfterSecond.setUTCDate(dayAfterSecond.getUTCDate() + 1);
+  return (
+    dayAfterFirst.toISOString().slice(0, 10) === second.startDate ||
+    dayAfterSecond.toISOString().slice(0, 10) === first.startDate
+  );
 }
 
 async function loadAbsencesOwnedByMonths(
@@ -455,6 +475,7 @@ export async function applyL4ImportRows({
       const exactDuplicate = existing.find(
         (absence) =>
           absence.status === 'ACTIVE' &&
+          absence.source === 'absence_import' &&
           normalizeAbsenceCode(absence.absenceCode) === 'L4' &&
           absence.startDate === startDate &&
           absence.endDate === endDate,
@@ -471,13 +492,14 @@ export async function applyL4ImportRows({
         });
         continue;
       }
-      const hasActiveOverlap = existing.some(
+      const importedOverlap = existing.some(
         (absence) =>
           absence.status === 'ACTIVE' &&
+          absence.source === 'absence_import' &&
           absence.startDate <= endDate &&
           absence.endDate >= startDate,
       );
-      if (hasActiveOverlap) {
+      if (importedOverlap) {
         result.failed += 1;
         result.rowResults.push({
           rowId: row.id,
@@ -486,6 +508,58 @@ export async function applyL4ImportRows({
           message: 'overlap-review',
           ownerMonthId: monthId,
           path: null,
+        });
+        continue;
+      }
+      const activeNonL4Overlap = existing.some(
+        (absence) =>
+          absence.status === 'ACTIVE' &&
+          normalizeAbsenceCode(absence.absenceCode) !== 'L4' &&
+          absence.startDate <= endDate &&
+          absence.endDate >= startDate,
+      );
+      if (activeNonL4Overlap) {
+        result.failed += 1;
+        result.rowResults.push({
+          rowId: row.id,
+          rowNumber: row.rowNumber,
+          status: 'blocked',
+          message: 'overlap-review',
+          ownerMonthId: monthId,
+          path: null,
+        });
+        continue;
+      }
+      const manualToConfirm = existing.find(
+        (absence) =>
+          absence.status === 'ACTIVE' &&
+          absence.source === 'manual' &&
+          absence.monthId === monthId &&
+          normalizeAbsenceCode(absence.absenceCode) === 'L4' &&
+          (absenceRangesOverlap(absence, { startDate, endDate }) ||
+            areConsecutiveAbsenceRanges(absence, { startDate, endDate })),
+      );
+      if (manualToConfirm) {
+        await updateDoc(
+          doc(repositories.forMonth(monthId).absences, manualToConfirm.id),
+          {
+            start_date: startDate,
+            end_date: endDate,
+            source: 'absence_import',
+            import_id: importId,
+            note: `L4 import: ${fileName}, wiersz ${row.rowNumber}`,
+            updated_at: serverTimestamp(),
+            updated_by: uid,
+          },
+        );
+        result.created += 1;
+        result.rowResults.push({
+          rowId: row.id,
+          rowNumber: row.rowNumber,
+          status: 'confirmed-manual',
+          message: 'confirmed-manual',
+          ownerMonthId: monthId,
+          path: `months/${monthId}/absences/${manualToConfirm.id}`,
         });
         continue;
       }

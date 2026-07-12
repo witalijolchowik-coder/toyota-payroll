@@ -33,7 +33,12 @@ export interface AbsenceRuleRecord {
   startDate: IsoDate;
   endDate: IsoDate;
   status: 'ACTIVE' | 'CANCELLED';
+  source?: 'manual' | 'absence_import';
+  importId?: string | null;
 }
+
+export type L4BusinessStatus =
+  'REPORTED' | 'ACTIVE' | 'INACTIVE' | 'FUTURE_ANOMALY' | 'CANCELLED';
 
 export type AbsenceValidationCode =
   | 'required'
@@ -63,6 +68,7 @@ export type GoverningAbsenceResolution =
       code: string;
       records: AbsenceRuleRecord[];
       overriddenRecords: AbsenceRuleRecord[];
+      confirmation: 'confirmed' | 'reported' | 'mixed';
     }
   | {
       kind: 'ambiguous';
@@ -144,6 +150,64 @@ export function absenceCoversDate(
   return absence.startDate <= date && absence.endDate >= date;
 }
 
+export function isL4Absence(
+  absence: Pick<AbsenceRuleRecord, 'absenceCode'>,
+): boolean {
+  return normalizeAbsenceCode(absence.absenceCode) === 'L4';
+}
+
+export function isImportedAbsence(
+  absence: Pick<AbsenceRuleRecord, 'source' | 'importId'>,
+): boolean {
+  return absence.source === 'absence_import' && Boolean(absence.importId);
+}
+
+export function deriveL4BusinessStatus(
+  absence: Pick<
+    AbsenceRuleRecord,
+    'absenceCode' | 'startDate' | 'endDate' | 'status' | 'source' | 'importId'
+  >,
+  today: IsoDate,
+): L4BusinessStatus | null {
+  if (!isL4Absence(absence)) {
+    return null;
+  }
+  if (absence.status === 'CANCELLED') {
+    return 'CANCELLED';
+  }
+  if (!isImportedAbsence(absence)) {
+    return 'REPORTED';
+  }
+  if (absence.startDate > today) {
+    return 'FUTURE_ANOMALY';
+  }
+  if (absence.endDate < today) {
+    return 'INACTIVE';
+  }
+  return 'ACTIVE';
+}
+
+export function isConfirmedL4ActiveToday(
+  absence: Pick<
+    AbsenceRuleRecord,
+    'absenceCode' | 'startDate' | 'endDate' | 'status' | 'source' | 'importId'
+  >,
+  today: IsoDate,
+): boolean {
+  return deriveL4BusinessStatus(absence, today) === 'ACTIVE';
+}
+
+export function countUniqueEmployeesOnConfirmedL4Today(
+  absences: readonly AbsenceRuleRecord[],
+  today: IsoDate,
+): number {
+  return new Set(
+    absences
+      .filter((absence) => isConfirmedL4ActiveToday(absence, today))
+      .map((absence) => absence.employeeId),
+  ).size;
+}
+
 export function findBlockingL4(
   existing: readonly AbsenceRuleRecord[],
   candidate: Pick<
@@ -180,15 +244,18 @@ export function resolveGoverningAbsence(
     return { kind: 'none', code: null, records: [] };
   }
 
-  const l4 = active.filter(
-    (absence) => normalizeAbsenceCode(absence.absenceCode) === 'L4',
-  );
+  const l4 = active.filter((absence) => isL4Absence(absence));
   if (l4.length > 0) {
+    const confirmedL4 = l4.filter(isImportedAbsence);
+    const governingL4 = confirmedL4.length > 0 ? confirmedL4 : l4;
     return {
       kind: 'governed',
       code: 'L4',
-      records: l4,
-      overriddenRecords: active.filter((absence) => !l4.includes(absence)),
+      records: governingL4,
+      overriddenRecords: active.filter(
+        (absence) => !governingL4.includes(absence),
+      ),
+      confirmation: confirmedL4.length > 0 ? 'confirmed' : 'reported',
     };
   }
 
@@ -203,6 +270,7 @@ export function resolveGoverningAbsence(
       code: codes[0]!,
       records: active,
       overriddenRecords: [],
+      confirmation: 'confirmed',
     };
   }
 

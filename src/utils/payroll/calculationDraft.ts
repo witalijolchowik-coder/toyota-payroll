@@ -9,7 +9,8 @@ import type {
 } from '../../types/firestore';
 import {
   absenceEmploymentIssue,
-  absenceRemovesVirtualDefault,
+  isImportedAbsence,
+  isL4Absence,
   normalizeAbsenceCode,
   resolveGoverningAbsence,
   type AbsenceRuleRecord,
@@ -49,6 +50,7 @@ export type PayrollDraftWarningCode =
   | 'attendance-outside-employment'
   | 'absence-outside-employment'
   | 'ambiguous-absence'
+  | 'unconfirmed-l4'
   | 'unresolved-frequency-bonus-setting'
   | 'unresolved-work-time-classification'
   | 'housing-entitlement-conflict'
@@ -222,6 +224,10 @@ function isActiveEmployeeAbsence(
   absence: Absence,
 ): boolean {
   return absence.employeeId === employee.id && absence.status === 'ACTIVE';
+}
+
+function isPayrollEffectiveAbsence(absence: Absence): boolean {
+  return !isL4Absence(absence) || isImportedAbsence(absence);
 }
 
 function isEmployeeDailyValue(employee: Employee, value: DailyValue): boolean {
@@ -509,6 +515,9 @@ export function calculateEmployeeMonthlyDraft({
   const activeAbsences = absences.filter((absence) =>
     isActiveEmployeeAbsence(employee, absence),
   );
+  const payrollEffectiveAbsences = activeAbsences.filter(
+    isPayrollEffectiveAbsence,
+  );
   activeAbsences.forEach((absence) => {
     if (absenceEmploymentIssue(absence, employment) === 'outside-employment') {
       warnings.push(warning('absence-outside-employment', absence.startDate));
@@ -539,9 +548,16 @@ export function calculateEmployeeMonthlyDraft({
         day.isoDate,
       );
       const hasGoverningAbsence = absenceResolution.kind !== 'none';
+      const hasReportedL4 =
+        absenceResolution.kind === 'governed' &&
+        absenceResolution.code === 'L4' &&
+        absenceResolution.confirmation === 'reported';
+      const hasPayrollGoverningAbsence = hasGoverningAbsence && !hasReportedL4;
 
       if (absenceResolution.kind === 'ambiguous') {
         warnings.push(warning('ambiguous-absence', day.isoDate));
+      } else if (hasReportedL4 && isWithinEmployment) {
+        warnings.push(warning('unconfirmed-l4', day.isoDate));
       } else if (absenceResolution.kind === 'governed' && isWithinEmployment) {
         addAbsenceHours(
           absenceGroups,
@@ -554,7 +570,7 @@ export function calculateEmployeeMonthlyDraft({
         const effective = resolveEffectiveAttendanceValue(persistedValue);
         const attendanceWarnings = resolveAttendanceWarnings({
           hasExplicitValue: true,
-          hasActiveAbsence: hasGoverningAbsence,
+          hasActiveAbsence: hasPayrollGoverningAbsence,
           isWorkingDay: day.isWorkingDay,
           isWithinEmployment,
         });
@@ -582,7 +598,7 @@ export function calculateEmployeeMonthlyDraft({
           } else {
             importedOverrideHours += effective.hours;
           }
-          if (effective.hours > 0 && !hasGoverningAbsence) {
+          if (effective.hours > 0 && !hasPayrollGoverningAbsence) {
             physicallyWorkedDates.add(day.isoDate);
           }
           const deviation = dailyWorkTimeDeviationFromValue({
@@ -591,7 +607,7 @@ export function calculateEmployeeMonthlyDraft({
           });
           if (deviation) {
             workTimeDeviations.push(deviation);
-          } else if (effective.hours > 0 && !hasGoverningAbsence) {
+          } else if (effective.hours > 0 && !hasPayrollGoverningAbsence) {
             if (!day.isWorkingDay) {
               workTimeDeviations.push(
                 resolveDailyWorkTimeDeviation({
@@ -649,10 +665,10 @@ export function calculateEmployeeMonthlyDraft({
       const virtual = getPayrollVirtualDefaultHours({
         isWorkingDay: day.isWorkingDay,
         isWithinEmployment,
-        hasGoverningValue: absenceRemovesVirtualDefault(absenceResolution),
+        hasGoverningValue: hasPayrollGoverningAbsence,
       });
       virtualHours += virtual ?? 0;
-      if (virtual && !hasGoverningAbsence) {
+      if (virtual && !hasPayrollGoverningAbsence) {
         physicallyWorkedDates.add(day.isoDate);
         workTimeDeviations.push(
           resolveDailyWorkTimeDeviation({
@@ -675,7 +691,7 @@ export function calculateEmployeeMonthlyDraft({
   const frequencyRule = calculateFrequencyBonus({
     monthId,
     employment,
-    absences: activeAbsences as AbsenceRuleRecord[],
+    absences: payrollEffectiveAbsences as AbsenceRuleRecord[],
   });
   if (!frequencySetting) {
     warnings.push(warning('unresolved-frequency-bonus-setting'));
@@ -684,7 +700,7 @@ export function calculateEmployeeMonthlyDraft({
   const absencePeriods = calculateAbsencePeriods({
     monthId,
     employment,
-    absences: activeAbsences,
+    absences: payrollEffectiveAbsences,
     calendarOptions,
   });
   const eligibleWorkingDays = countEligibleWorkingDays({
