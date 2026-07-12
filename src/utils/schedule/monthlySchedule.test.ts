@@ -110,6 +110,7 @@ describe('monthly schedule planning', () => {
       days,
       departments: [department('metal', 'Metal', 'THREE_SHIFT')],
       options: {
+        publicHolidays: getPublicHolidaysForYear(2026),
         publicHolidayNames: getPublicHolidayNamesForYear(2026),
       },
     });
