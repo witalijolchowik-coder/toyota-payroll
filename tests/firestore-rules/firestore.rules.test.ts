@@ -1169,6 +1169,92 @@ describe('Firestore security rules', () => {
     );
   });
 
+  it('allows the real L4 import payload shape in an open owner month', async () => {
+    await seedMonth('2026-07', false);
+    await seedMonth('2026-08', false);
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const importedPayload = {
+      employee_id: 'k56CSm05E1SM4S1oGIYq1VlpyoE3',
+      teta_number: 'WT-07832534',
+      absence_code: 'L4',
+      start_date: '2026-07-08',
+      end_date: '2026-08-14',
+      hours_per_day: null,
+      source: 'absence_import',
+      import_id: 'l4-1780000000000',
+      status: 'ACTIVE',
+      note: 'L4 import: Raport L4_PS_12-07-2026.xlsx, wiersz 2',
+      ...modificationMetadata(uid),
+    };
+
+    await assertSucceeds(
+      setDoc(
+        doc(firestore, 'months/2026-07/absences/imported-l4-live-shape'),
+        importedPayload,
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(firestore, 'months/2026-08/absences/imported-l4-wrong-owner'),
+        importedPayload,
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(firestore, 'months/2026-07/absences/imported-l4-extra-field'),
+        {
+          ...importedPayload,
+          employee_name: 'SMENTEK KAMIL',
+        },
+      ),
+    );
+  });
+
+  it('denies imported L4 creation for inactive app users and settled months', async () => {
+    await seedMonth('2026-07', true);
+    await seedAppUser('inactive-coordinator', { active: false });
+    const payload = {
+      employee_id: 'employee-1',
+      teta_number: 'WT-07832534',
+      absence_code: 'L4',
+      start_date: '2026-07-08',
+      end_date: '2026-08-14',
+      hours_per_day: null,
+      source: 'absence_import',
+      import_id: 'l4-1780000000000',
+      status: 'ACTIVE',
+      note: 'L4 import: Raport L4_PS_12-07-2026.xlsx, wiersz 2',
+    };
+
+    await assertFails(
+      setDoc(
+        doc(
+          testEnvironment.authenticatedContext('coordinator-1').firestore(),
+          'months/2026-07/absences/imported-l4-settled',
+        ),
+        {
+          ...payload,
+          ...modificationMetadata('coordinator-1'),
+        },
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(
+          testEnvironment
+            .authenticatedContext('inactive-coordinator')
+            .firestore(),
+          'months/2026-07/absences/imported-l4-inactive-user',
+        ),
+        {
+          ...payload,
+          ...modificationMetadata('inactive-coordinator'),
+        },
+      ),
+    );
+  });
+
   it('allows owner-month absence reads and keeps broad collection-group reads denied', async () => {
     await seedMonth('2026-06', false);
     await testEnvironment.withSecurityRulesDisabled(async (context) => {
