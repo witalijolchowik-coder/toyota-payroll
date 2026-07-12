@@ -77,11 +77,7 @@ export interface L4ImportApplyResult {
 }
 
 export type L4ImportApplyRowStatus =
-  | 'created'
-  | 'duplicate'
-  | 'unresolved'
-  | 'blocked'
-  | 'failed';
+  'created' | 'duplicate' | 'unresolved' | 'blocked' | 'failed';
 
 export interface L4ImportApplyRowResult {
   rowId: string;

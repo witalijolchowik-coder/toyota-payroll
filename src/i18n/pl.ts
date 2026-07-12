@@ -753,12 +753,10 @@ export const pl = {
         'authentication-required':
           'Sesja Firebase wygasła albo użytkownik nie jest zalogowany.',
         'invalid-input': 'Dane wiersza nie spełniają walidacji aplikacji.',
-        'month-unavailable':
-          'Miesiąc źródłowy nie został jeszcze utworzony.',
+        'month-unavailable': 'Miesiąc źródłowy nie został jeszcze utworzony.',
         'month-settled':
           'Miesiąc źródłowy jest zamknięty i nie pozwala na zapis.',
-        'l4-overlap':
-          'Okres nachodzi na aktywne L4 i wymaga ręcznej decyzji.',
+        'l4-overlap': 'Okres nachodzi na aktywne L4 i wymaga ręcznej decyzji.',
         'ownership-month-change':
           'Miesiąc źródłowy nie zgadza się z datą rozpoczęcia.',
         'permission-denied':

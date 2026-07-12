@@ -90,10 +90,8 @@ export function L4ImportDialog({
   const rowResultById = useMemo(
     () =>
       new Map(
-        result?.rowResults.map((rowResult) => [
-          rowResult.rowId,
-          rowResult,
-        ]) ?? [],
+        result?.rowResults.map((rowResult) => [rowResult.rowId, rowResult]) ??
+          [],
       ),
     [result],
   );
@@ -269,90 +267,90 @@ export function L4ImportDialog({
                       const applyResult = rowResultById.get(row.id);
                       return (
                         <TableRow key={row.id} hover>
-                        <TableCell>{row.rowNumber}</TableCell>
-                        <TableCell>
-                          {row.sourceName || t.absences.l4Import.empty}
-                        </TableCell>
-                        <TableCell>
-                          <Stack spacing={1}>
-                            <Typography variant="body2">
-                              {row.matchedEmployeeName ??
-                                t.absences.l4Import.empty}
-                            </Typography>
-                            {canResolveEmployee(row) ? (
-                              <TextField
-                                select
-                                fullWidth
-                                size="small"
-                                label={t.absences.l4Import.resolveEmployee}
-                                value={row.employeeId ?? ''}
-                                disabled={isBusy}
-                                onChange={(event) =>
-                                  void handleResolveEmployee(
-                                    row,
-                                    event.target.value,
-                                  )
-                                }
-                              >
-                                <MenuItem value="">
-                                  {t.absences.l4Import.chooseEmployee}
-                                </MenuItem>
-                                {employees.map((employee) => (
-                                  <MenuItem
-                                    key={employee.id}
-                                    value={employee.id}
-                                  >
-                                    {employee.tetaNumber} — {employee.lastName}{' '}
-                                    {employee.firstName}
+                          <TableCell>{row.rowNumber}</TableCell>
+                          <TableCell>
+                            {row.sourceName || t.absences.l4Import.empty}
+                          </TableCell>
+                          <TableCell>
+                            <Stack spacing={1}>
+                              <Typography variant="body2">
+                                {row.matchedEmployeeName ??
+                                  t.absences.l4Import.empty}
+                              </Typography>
+                              {canResolveEmployee(row) ? (
+                                <TextField
+                                  select
+                                  fullWidth
+                                  size="small"
+                                  label={t.absences.l4Import.resolveEmployee}
+                                  value={row.employeeId ?? ''}
+                                  disabled={isBusy}
+                                  onChange={(event) =>
+                                    void handleResolveEmployee(
+                                      row,
+                                      event.target.value,
+                                    )
+                                  }
+                                >
+                                  <MenuItem value="">
+                                    {t.absences.l4Import.chooseEmployee}
                                   </MenuItem>
-                                ))}
-                              </TextField>
-                            ) : null}
-                          </Stack>
-                        </TableCell>
-                        <TableCell>
-                          {row.tetaNumber ?? t.absences.l4Import.empty}
-                        </TableCell>
-                        <TableCell>
-                          {row.absenceType || t.absences.l4Import.empty}
-                        </TableCell>
-                        <TableCell>
-                          {row.startDate ?? t.absences.l4Import.empty} –{' '}
-                          {row.endDate ?? t.absences.l4Import.empty}
-                        </TableCell>
-                        <TableCell>
-                          {row.ownerMonthId ?? t.absences.l4Import.empty}
-                        </TableCell>
-                        <TableCell>
-                          <Stack spacing={0.5}>
-                            {applyResult ? (
-                              <Chip
-                                size="small"
-                                color={applyStatusColor[applyResult.status]}
-                                label={
-                                  t.absences.l4Import.applyStatus[
-                                    applyResult.status
-                                  ]
-                                }
-                              />
-                            ) : (
-                              <Chip
-                                size="small"
-                                color={statusColor[row.status]}
-                                label={t.absences.l4Import.status[row.status]}
-                              />
-                            )}
-                            <Typography
-                              color="text.secondary"
-                              variant="caption"
-                            >
-                              {messageLabel(
-                                t.absences.l4Import.messages,
-                                applyResult?.message ?? row.message,
+                                  {employees.map((employee) => (
+                                    <MenuItem
+                                      key={employee.id}
+                                      value={employee.id}
+                                    >
+                                      {employee.tetaNumber} —{' '}
+                                      {employee.lastName} {employee.firstName}
+                                    </MenuItem>
+                                  ))}
+                                </TextField>
+                              ) : null}
+                            </Stack>
+                          </TableCell>
+                          <TableCell>
+                            {row.tetaNumber ?? t.absences.l4Import.empty}
+                          </TableCell>
+                          <TableCell>
+                            {row.absenceType || t.absences.l4Import.empty}
+                          </TableCell>
+                          <TableCell>
+                            {row.startDate ?? t.absences.l4Import.empty} –{' '}
+                            {row.endDate ?? t.absences.l4Import.empty}
+                          </TableCell>
+                          <TableCell>
+                            {row.ownerMonthId ?? t.absences.l4Import.empty}
+                          </TableCell>
+                          <TableCell>
+                            <Stack spacing={0.5}>
+                              {applyResult ? (
+                                <Chip
+                                  size="small"
+                                  color={applyStatusColor[applyResult.status]}
+                                  label={
+                                    t.absences.l4Import.applyStatus[
+                                      applyResult.status
+                                    ]
+                                  }
+                                />
+                              ) : (
+                                <Chip
+                                  size="small"
+                                  color={statusColor[row.status]}
+                                  label={t.absences.l4Import.status[row.status]}
+                                />
                               )}
-                            </Typography>
-                          </Stack>
-                        </TableCell>
+                              <Typography
+                                color="text.secondary"
+                                variant="caption"
+                              >
+                                {messageLabel(
+                                  t.absences.l4Import.messages,
+                                  applyResult?.message ?? row.message,
+                                )}
+                              </Typography>
+                            </Stack>
+                          </TableCell>
                         </TableRow>
                       );
                     })}
