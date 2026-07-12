@@ -46,7 +46,9 @@ export async function loadMonthReadiness(
       optionalReadinessLayer(async () => {
         const snapshot = await getDocs(repositories.departments);
         const mapped = snapshot.docs
-          .map((document) => mapDepartmentDocument(document.id, document.data()))
+          .map((document) =>
+            mapDepartmentDocument(document.id, document.data()),
+          )
           .filter((department) =>
             canonicalDepartmentsFallback().some(
               (canonical) => canonical.id === department.id,

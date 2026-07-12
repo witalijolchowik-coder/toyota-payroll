@@ -124,94 +124,70 @@ export async function loadSettlementMonth(
     adjustments,
     reviewStates,
   ] = await Promise.all([
-    optionalSettlementLayer(
-      async () => {
-        const snapshot = await getDocs(repositories.employeeEntitlements);
-        return snapshot.docs.map((document) =>
-          mapEmployeeEntitlementDocument(document.id, document.data()),
+    optionalSettlementLayer(async () => {
+      const snapshot = await getDocs(repositories.employeeEntitlements);
+      return snapshot.docs.map((document) =>
+        mapEmployeeEntitlementDocument(document.id, document.data()),
+      );
+    }, [] as EmployeeEntitlement[]),
+    optionalSettlementLayer(async () => {
+      const snapshot = await getDocs(repositories.employeeAssignments);
+      return snapshot.docs.map((document) =>
+        mapEmployeeAssignmentDocument(document.id, document.data()),
+      );
+    }, [] as EmployeeAssignment[]),
+    optionalSettlementLayer(async () => {
+      const snapshot = await getDocs(
+        query(repositories.departments, orderBy('name')),
+      );
+      const mapped = snapshot.docs
+        .map((document) => mapDepartmentDocument(document.id, document.data()))
+        .filter((department) =>
+          canonicalDepartmentsFallback().some(
+            (canonical) => canonical.id === department.id,
+          ),
         );
-      },
-      [] as EmployeeEntitlement[],
-    ),
-    optionalSettlementLayer(
-      async () => {
-        const snapshot = await getDocs(repositories.employeeAssignments);
-        return snapshot.docs.map((document) =>
-          mapEmployeeAssignmentDocument(document.id, document.data()),
-        );
-      },
-      [] as EmployeeAssignment[],
-    ),
-    optionalSettlementLayer(
-      async () => {
-        const snapshot = await getDocs(
-          query(repositories.departments, orderBy('name')),
-        );
-        const mapped = snapshot.docs
-          .map((document) => mapDepartmentDocument(document.id, document.data()))
-          .filter((department) =>
-            canonicalDepartmentsFallback().some(
-              (canonical) => canonical.id === department.id,
-            ),
-          );
-        const byId = new Map(
-          mapped.map((department) => [department.id, department]),
-        );
-        return canonicalDepartmentsFallback().map(
-          (fallback) => byId.get(fallback.id) ?? fallback,
-        );
-      },
-      canonicalDepartmentsFallback(),
-    ),
-    optionalSettlementLayer(
-      async () => {
-        const snapshot = await getDocs(monthRepository.dailyValues);
-        return snapshot.docs.map((document) =>
-          mapDailyValueDocument(document.id, monthId, document.data()),
-        );
-      },
-      [] as DailyValue[],
-    ),
-    optionalSettlementLayer(
-      async () => {
-        const snapshot = await getDocs(monthRepository.scheduleCorrections);
-        return snapshot.docs.map((document) =>
-          mapScheduleCorrectionDocument(document.id, monthId, document.data()),
-        );
-      },
-      [] as ScheduleCorrection[],
-    ),
+      const byId = new Map(
+        mapped.map((department) => [department.id, department]),
+      );
+      return canonicalDepartmentsFallback().map(
+        (fallback) => byId.get(fallback.id) ?? fallback,
+      );
+    }, canonicalDepartmentsFallback()),
+    optionalSettlementLayer(async () => {
+      const snapshot = await getDocs(monthRepository.dailyValues);
+      return snapshot.docs.map((document) =>
+        mapDailyValueDocument(document.id, monthId, document.data()),
+      );
+    }, [] as DailyValue[]),
+    optionalSettlementLayer(async () => {
+      const snapshot = await getDocs(monthRepository.scheduleCorrections);
+      return snapshot.docs.map((document) =>
+        mapScheduleCorrectionDocument(document.id, monthId, document.data()),
+      );
+    }, [] as ScheduleCorrection[]),
     optionalSettlementLayer(
       () => loadAbsencesOverlappingMonth(monthId),
       [] as Absence[],
     ),
-    optionalSettlementLayer(
-      async () => {
-        const snapshot = await getDocs(repositories.payrollSettings);
-        return snapshot.docs.map((document) =>
-          mapPayrollSettingDocument(document.id, document.data()),
-        );
-      },
-      [] as PayrollSetting[],
-    ),
-    optionalSettlementLayer(
-      async () => {
-        const snapshot = await getDocs(monthRepository.adjustments);
-        return snapshot.docs.map((document) =>
-          mapAdjustmentDocument(document.id, monthId, document.data()),
-        );
-      },
-      [] as Adjustment[],
-    ),
-    optionalSettlementLayer(
-      async () => {
-        const snapshot = await getDocs(monthRepository.reviewStates);
-        return snapshot.docs.map((document) =>
-          mapSettlementReviewDocument(document.id, monthId, document.data()),
-        );
-      },
-      [] as SettlementReviewState[],
-    ),
+    optionalSettlementLayer(async () => {
+      const snapshot = await getDocs(repositories.payrollSettings);
+      return snapshot.docs.map((document) =>
+        mapPayrollSettingDocument(document.id, document.data()),
+      );
+    }, [] as PayrollSetting[]),
+    optionalSettlementLayer(async () => {
+      const snapshot = await getDocs(monthRepository.adjustments);
+      return snapshot.docs.map((document) =>
+        mapAdjustmentDocument(document.id, monthId, document.data()),
+      );
+    }, [] as Adjustment[]),
+    optionalSettlementLayer(async () => {
+      const snapshot = await getDocs(monthRepository.reviewStates);
+      return snapshot.docs.map((document) =>
+        mapSettlementReviewDocument(document.id, monthId, document.data()),
+      );
+    }, [] as SettlementReviewState[]),
   ]);
 
   return {
