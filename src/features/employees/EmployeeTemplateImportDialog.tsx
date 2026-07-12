@@ -5,11 +5,13 @@ import {
   Button,
   Checkbox,
   Chip,
+  CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
   Divider,
+  LinearProgress,
   Stack,
   Tab,
   Tabs,
@@ -24,6 +26,7 @@ import {
 
 import { useTranslations } from '../../hooks/useTranslations';
 import { interpolate } from '../../i18n/pl';
+import type { EmployeeImportProgress } from '../../services/employeeImportService';
 import type { Department, Employee } from '../../types/firestore';
 import {
   buildBulkEmployeeUpdatePreview,
@@ -45,10 +48,14 @@ interface EmployeeTemplateImportDialogProps {
   departments: Department[];
   onClose: () => void;
   onCreateEmployees: (rows: NewEmployeeTemplatePreviewRow[]) => Promise<void>;
-  onUpdateEmployees: (rows: BulkEmployeeUpdatePreviewRow[]) => Promise<void>;
+  onUpdateEmployees: (
+    rows: BulkEmployeeUpdatePreviewRow[],
+    onProgress?: (progress: EmployeeImportProgress) => void,
+  ) => Promise<void>;
 }
 
 type TemplateTab = 'new' | 'update';
+type BusyMode = 'analyzing' | 'creating' | 'updating';
 
 const newStatusColors: Record<
   NewEmployeeTemplateStatus,
@@ -91,7 +98,10 @@ export function EmployeeTemplateImportDialog({
     new Set(),
   );
   const [error, setError] = useState<string | null>(null);
-  const [isBusy, setIsBusy] = useState(false);
+  const [busyMode, setBusyMode] = useState<BusyMode | null>(null);
+  const [updateProgress, setUpdateProgress] =
+    useState<EmployeeImportProgress | null>(null);
+  const isBusy = busyMode !== null;
 
   const selectedNewRows = useMemo(
     () => newRows.filter((row) => selectedNewIds.has(row.id)),
@@ -107,7 +117,7 @@ export function EmployeeTemplateImportDialog({
       setError(t.employees.templateImport.errors.fileRequired);
       return;
     }
-    setIsBusy(true);
+    setBusyMode('analyzing');
     setError(null);
     try {
       const rows = buildNewEmployeeTemplatePreview(
@@ -125,7 +135,7 @@ export function EmployeeTemplateImportDialog({
       console.error(caughtError);
       setError(t.employees.templateImport.errors.analyzeFailed);
     } finally {
-      setIsBusy(false);
+      setBusyMode(null);
     }
   };
 
@@ -134,7 +144,7 @@ export function EmployeeTemplateImportDialog({
       setError(t.employees.templateImport.errors.fileRequired);
       return;
     }
-    setIsBusy(true);
+    setBusyMode('analyzing');
     setError(null);
     try {
       const rows = buildBulkEmployeeUpdatePreview(
@@ -154,12 +164,12 @@ export function EmployeeTemplateImportDialog({
       console.error(caughtError);
       setError(t.employees.templateImport.errors.analyzeFailed);
     } finally {
-      setIsBusy(false);
+      setBusyMode(null);
     }
   };
 
   const submitNewRows = async () => {
-    setIsBusy(true);
+    setBusyMode('creating');
     setError(null);
     try {
       await onCreateEmployees(selectedNewRows);
@@ -168,21 +178,23 @@ export function EmployeeTemplateImportDialog({
       console.error(caughtError);
       setError(t.employees.templateImport.errors.createFailed);
     } finally {
-      setIsBusy(false);
+      setBusyMode(null);
     }
   };
 
   const submitUpdateRows = async () => {
-    setIsBusy(true);
+    setBusyMode('updating');
+    setUpdateProgress({ completed: 0, total: selectedUpdateRows.length });
     setError(null);
     try {
-      await onUpdateEmployees(selectedUpdateRows);
+      await onUpdateEmployees(selectedUpdateRows, setUpdateProgress);
       onClose();
     } catch (caughtError) {
       console.error(caughtError);
       setError(t.employees.templateImport.errors.updateFailed);
     } finally {
-      setIsBusy(false);
+      setBusyMode(null);
+      setUpdateProgress(null);
     }
   };
 
@@ -256,6 +268,11 @@ export function EmployeeTemplateImportDialog({
         </Stack>
       </DialogContent>
       <DialogActions>
+        {busyMode === 'updating' && updateProgress ? (
+          <Box sx={{ flexGrow: 1, minWidth: 320 }}>
+            <ApplyUpdateProgress progress={updateProgress} />
+          </Box>
+        ) : null}
         <Button onClick={onClose} disabled={isBusy}>
           {t.employees.templateImport.actions.cancel}
         </Button>
@@ -273,15 +290,45 @@ export function EmployeeTemplateImportDialog({
           <Button
             variant="contained"
             disabled={selectedUpdateRows.length === 0 || isBusy}
+            startIcon={
+              busyMode === 'updating' ? (
+                <CircularProgress color="inherit" size={16} />
+              ) : undefined
+            }
             onClick={() => void submitUpdateRows()}
           >
-            {interpolate(t.employees.templateImport.actions.applySelected, {
-              count: String(selectedUpdateRows.length),
-            })}
+            {busyMode === 'updating'
+              ? t.employees.templateImport.actions.applyingSelected
+              : interpolate(t.employees.templateImport.actions.applySelected, {
+                  count: String(selectedUpdateRows.length),
+                })}
           </Button>
         )}
       </DialogActions>
     </Dialog>
+  );
+}
+
+function ApplyUpdateProgress({
+  progress,
+}: {
+  progress: EmployeeImportProgress;
+}) {
+  const t = useTranslations();
+  const value =
+    progress.total > 0 ? (progress.completed / progress.total) * 100 : 0;
+  return (
+    <Alert severity="info">
+      <Stack spacing={1}>
+        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+          {interpolate(t.employees.templateImport.progress.applying, {
+            completed: String(progress.completed),
+            total: String(progress.total),
+          })}
+        </Typography>
+        <LinearProgress variant="determinate" value={value} />
+      </Stack>
+    </Alert>
   );
 }
 

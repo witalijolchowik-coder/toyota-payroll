@@ -398,6 +398,7 @@ export const pl = {
         previewUpdate: 'Podgląd zmian',
         createSelected: 'Utwórz pracowników: {{count}}',
         applySelected: 'Zastosuj zmiany: {{count}}',
+        applyingSelected: 'Stosowanie zmian...',
         cancel: 'Anuluj',
       },
       table: {
@@ -456,6 +457,9 @@ export const pl = {
       notifications: {
         created: 'Utworzono pracowników: {{count}}.',
         updated: 'Zaktualizowano pracowników: {{count}}.',
+      },
+      progress: {
+        applying: 'Stosowanie zmian: {{completed}} / {{total}}',
       },
       errors: {
         fileRequired: 'Wybierz plik CSV przygotowany z szablonu.',

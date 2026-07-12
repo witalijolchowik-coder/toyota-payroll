@@ -32,6 +32,7 @@ import {
 import {
   createEmployeesFromTemplatePreview,
   updateEmployeesFromTemplatePreview,
+  type EmployeeImportProgress,
 } from '../services/employeeImportService';
 import type {
   Employee,
@@ -203,8 +204,9 @@ export function EmployeesPage() {
 
   const handleUpdateEmployeesFromTemplate = async (
     rows: BulkEmployeeUpdatePreviewRow[],
+    onProgress?: (progress: EmployeeImportProgress) => void,
   ) => {
-    const result = await updateEmployeesFromTemplatePreview(rows);
+    const result = await updateEmployeesFromTemplatePreview(rows, onProgress);
     notify({
       message: interpolate(t.employees.templateImport.notifications.updated, {
         count: String(result.updatedEmployeeIds.length),
