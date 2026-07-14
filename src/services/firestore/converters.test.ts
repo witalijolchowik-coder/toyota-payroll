@@ -130,7 +130,7 @@ describe('Firestore converters', () => {
     expect(() =>
       employeeConverter.fromFirestore(
         snapshot('employees/employee-1', {
-          teta_number: '',
+          teta_number: 123,
           first_name: 'Test',
           last_name: 'Employee',
           is_active: true,

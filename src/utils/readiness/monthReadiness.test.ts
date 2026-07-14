@@ -141,7 +141,7 @@ describe('month readiness assessment', () => {
     expect(readiness.participants).toBe(1);
     expect(readiness.issues.map((issue) => issue.code)).toEqual(
       expect.arrayContaining([
-        'employee-missing-identity',
+        'employee-missing-pesel',
         'department-unresolved-na0',
         'employee-missing-shift',
       ]),
