@@ -31,6 +31,8 @@ import {
   mapEmployeeDocument,
 } from './firestore/mappers';
 import { getFirestoreRepositories } from './firestoreService';
+import { recordAuditEntry } from './auditService';
+import { preserveFirstToyotaEmploymentDate } from '../utils/payroll';
 
 export type EmployeeServiceErrorCode =
   'firebase-unavailable' | 'authentication-required' | 'duplicate-teta';
@@ -95,6 +97,9 @@ async function assertUniqueActiveTeta(
   ignoredEmployeeId?: EmployeeId,
 ) {
   if (!input.isActive) {
+    return;
+  }
+  if (!input.tetaNumber.trim()) {
     return;
   }
 
@@ -176,6 +181,10 @@ export async function createEmployee(
     pesel: normalized.pesel,
     passport_number: normalized.passportNumber,
     foreign_document_number: normalized.foreignDocumentNumber,
+    citizenship: normalized.citizenship ?? null,
+    first_toyota_employment_date: timestampOrNull(
+      normalized.firstToyotaEmploymentDate ?? null,
+    ),
     is_active: true,
     department_id: normalized.departmentId,
     shift_assignment: normalized.shiftAssignment,
@@ -197,6 +206,21 @@ export async function createEmployee(
     note: null,
   });
 
+  await recordAuditEntry({
+    entityPath: `employees/${employee.id}`,
+    action: 'create',
+    actorUid,
+    changes: {
+      operation: 'employee-created',
+      employment_start_date:
+        normalized.employmentStartDate?.toISOString() ?? null,
+      first_toyota_employment_date:
+        normalized.firstToyotaEmploymentDate?.toISOString() ?? null,
+      department_id: normalized.departmentId,
+      shift_assignment: normalized.shiftAssignment,
+    },
+  });
+
   return employee.id;
 }
 
@@ -215,6 +239,10 @@ export async function updateEmployee(
   const previousEmployee = previousEmployeeSnapshot.exists()
     ? mapEmployeeDocument(employeeId, previousEmployeeSnapshot.data())
     : null;
+  const stableFirstToyotaEmploymentDate = preserveFirstToyotaEmploymentDate(
+    previousEmployee?.firstToyotaEmploymentDate,
+    normalized.firstToyotaEmploymentDate,
+  );
 
   await updateDoc(repositories.employee(employeeId), {
     teta_number: normalized.tetaNumber,
@@ -223,6 +251,10 @@ export async function updateEmployee(
     pesel: normalized.pesel,
     passport_number: normalized.passportNumber,
     foreign_document_number: normalized.foreignDocumentNumber,
+    citizenship: normalized.citizenship ?? null,
+    first_toyota_employment_date: timestampOrNull(
+      stableFirstToyotaEmploymentDate,
+    ),
     department_id: normalized.departmentId,
     shift_assignment: normalized.shiftAssignment,
     employment_start_date: timestampOrNull(normalized.employmentStartDate),
@@ -246,6 +278,39 @@ export async function updateEmployee(
       note: null,
     });
   }
+
+  await recordAuditEntry({
+    entityPath: `employees/${employeeId}`,
+    action: 'update',
+    actorUid,
+    changes: {
+      operation: 'employee-updated',
+      before: previousEmployee
+        ? {
+            teta_number: previousEmployee.tetaNumber,
+            employment_start_date:
+              previousEmployee.employmentStartDate?.toISOString() ?? null,
+            employment_end_date:
+              previousEmployee.employmentEndDate?.toISOString() ?? null,
+            first_toyota_employment_date:
+              previousEmployee.firstToyotaEmploymentDate?.toISOString() ?? null,
+            department_id: previousEmployee.departmentId,
+            shift_assignment: previousEmployee.shiftAssignment,
+          }
+        : null,
+      after: {
+        teta_number: normalized.tetaNumber,
+        employment_start_date:
+          normalized.employmentStartDate?.toISOString() ?? null,
+        employment_end_date:
+          normalized.employmentEndDate?.toISOString() ?? null,
+        first_toyota_employment_date:
+          stableFirstToyotaEmploymentDate?.toISOString() ?? null,
+        department_id: normalized.departmentId,
+        shift_assignment: normalized.shiftAssignment,
+      },
+    },
+  });
 }
 
 export async function deactivateEmployee(
@@ -258,6 +323,12 @@ export async function deactivateEmployee(
     is_active: false,
     updated_at: serverTimestamp(),
     updated_by: actorUid,
+  });
+  await recordAuditEntry({
+    entityPath: `employees/${employeeId}`,
+    action: 'update',
+    actorUid,
+    changes: { operation: 'employee-deactivated', is_active: false },
   });
 }
 

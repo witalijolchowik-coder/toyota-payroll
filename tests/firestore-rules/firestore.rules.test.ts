@@ -207,6 +207,8 @@ describe('Firestore security rules', () => {
         pesel: '87010409887',
         passport_number: null,
         foreign_document_number: null,
+        citizenship: 'PL',
+        first_toyota_employment_date: new Date('2025-09-01T00:00:00Z'),
         is_active: true,
         department_id: 'metal',
         shift_assignment: 'RED',
@@ -245,13 +247,27 @@ describe('Firestore security rules', () => {
     await assertFails(deleteDoc(employee));
   });
 
-  it('rejects invalid employee fields and metadata actor spoofing', async () => {
+  it('allows preparation without TETA and rejects invalid fields or actor spoofing', async () => {
     const uid = 'coordinator-1';
     const firestore = testEnvironment.authenticatedContext(uid).firestore();
 
-    await assertFails(
+    await assertSucceeds(
       setDoc(doc(firestore, 'employees', 'employee-empty-teta'), {
         teta_number: '',
+        first_name: 'Jan',
+        last_name: 'Kowalski',
+        is_active: true,
+        department_id: null,
+        shift_assignment: null,
+        employment_start_date: null,
+        employment_end_date: null,
+        ...modificationMetadata(uid),
+      }),
+    );
+
+    await assertFails(
+      setDoc(doc(firestore, 'employees', 'employee-invalid-teta'), {
+        teta_number: 1001,
         first_name: 'Jan',
         last_name: 'Kowalski',
         is_active: true,

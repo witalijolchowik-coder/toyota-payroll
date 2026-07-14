@@ -1,5 +1,8 @@
 import EditOutlined from '@mui/icons-material/EditOutlined';
 import PersonOffOutlined from '@mui/icons-material/PersonOffOutlined';
+import HomeWorkOutlined from '@mui/icons-material/HomeWorkOutlined';
+import HouseOutlined from '@mui/icons-material/HouseOutlined';
+import WarningAmberOutlined from '@mui/icons-material/WarningAmberOutlined';
 import {
   Chip,
   IconButton,
@@ -17,7 +20,15 @@ import {
 
 import { useTranslations } from '../../hooks/useTranslations';
 import { interpolate } from '../../i18n/pl';
-import type { Department, Employee } from '../../types/firestore';
+import type {
+  Department,
+  Employee,
+  EmployeeEntitlement,
+} from '../../types/firestore';
+import {
+  hasCurrentStatusConflict,
+  isEmployeeActiveOnDate,
+} from '../../utils/payroll';
 
 interface EmployeesTableProps {
   employees: Employee[];
@@ -25,6 +36,11 @@ interface EmployeesTableProps {
   isLoading: boolean;
   onEdit: (employee: Employee) => void;
   onDeactivate: (employee: Employee) => void;
+  entitlements: EmployeeEntitlement[];
+  onAccommodation: (
+    employee: Employee,
+    currentAccommodation: EmployeeEntitlement | null,
+  ) => void;
 }
 
 const dateFormatter = new Intl.DateTimeFormat('pl-PL', {
@@ -39,6 +55,8 @@ export function EmployeesTable({
   isLoading,
   onEdit,
   onDeactivate,
+  entitlements,
+  onAccommodation,
 }: EmployeesTableProps) {
   const t = useTranslations();
   const departmentsById = new Map(
@@ -73,6 +91,24 @@ export function EmployeesTable({
               ))
             : employees.map((employee) => {
                 const employeeName = `${employee.firstName} ${employee.lastName}`;
+                const currentlyActive = isEmployeeActiveOnDate(
+                  employee,
+                  new Date(),
+                );
+                const statusConflict = hasCurrentStatusConflict(
+                  employee,
+                  new Date(),
+                );
+                const today = new Date().toISOString().slice(0, 10);
+                const currentAccommodation =
+                  entitlements.find(
+                    (item) =>
+                      item.employeeId === employee.id &&
+                      item.type === 'COMPANY_ACCOMMODATION' &&
+                      item.status === 'ACTIVE' &&
+                      item.validFrom <= today &&
+                      (!item.validTo || item.validTo >= today),
+                  ) ?? null;
                 return (
                   <TableRow hover key={employee.id}>
                     <TableCell>
@@ -102,13 +138,22 @@ export function EmployeesTable({
                       <Chip
                         size="small"
                         label={
-                          employee.isActive
+                          currentlyActive
                             ? t.employees.status.active
                             : t.employees.status.inactive
                         }
-                        color={employee.isActive ? 'success' : 'default'}
-                        variant={employee.isActive ? 'filled' : 'outlined'}
+                        color={currentlyActive ? 'success' : 'default'}
+                        variant={currentlyActive ? 'filled' : 'outlined'}
                       />
+                      {statusConflict ? (
+                        <Tooltip title={t.employees.table.statusConflict}>
+                          <WarningAmberOutlined
+                            color="warning"
+                            fontSize="small"
+                            sx={{ ml: 1 }}
+                          />
+                        </Tooltip>
+                      ) : null}
                     </TableCell>
                     <TableCell align="right">
                       <Stack
@@ -116,6 +161,34 @@ export function EmployeesTable({
                         spacing={0.5}
                         sx={{ justifyContent: 'flex-end' }}
                       >
+                        <Tooltip
+                          title={
+                            currentAccommodation
+                              ? t.employees.accommodation.companyActive
+                              : t.employees.accommodation.companyInactive
+                          }
+                        >
+                          <IconButton
+                            size="small"
+                            aria-label={
+                              currentAccommodation
+                                ? t.employees.accommodation.companyActive
+                                : t.employees.accommodation.companyInactive
+                            }
+                            onClick={() =>
+                              onAccommodation(employee, currentAccommodation)
+                            }
+                          >
+                            {currentAccommodation ? (
+                              <HomeWorkOutlined
+                                fontSize="small"
+                                color="primary"
+                              />
+                            ) : (
+                              <HouseOutlined fontSize="small" />
+                            )}
+                          </IconButton>
+                        </Tooltip>
                         <Tooltip
                           title={interpolate(t.employees.table.edit, {
                             name: employeeName,

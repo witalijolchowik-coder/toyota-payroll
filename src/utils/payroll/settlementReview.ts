@@ -49,6 +49,7 @@ export interface SettlementReviewSummary {
 }
 
 const unresolvedIssueCodes = new Set<SettlementReviewIssueCode>([
+  'missing-first-toyota-employment-date',
   'unresolved-frequency-bonus-setting',
   'unresolved-work-time-classification',
   'company-accommodation-missing-variant',
@@ -79,6 +80,7 @@ export function groupPayrollDraftWarning(
 ): SettlementReviewIssueGroup {
   if (
     warning.code === 'missing-employment-start' ||
+    warning.code === 'missing-first-toyota-employment-date' ||
     warning.code === 'employee-not-participating'
   ) {
     return 'employment';

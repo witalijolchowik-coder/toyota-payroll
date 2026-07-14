@@ -197,7 +197,9 @@ export function SettlementExportPanel({
                 )
               }
             >
-              {t.settlement.export.downloadToyota}
+              {exportPackage.warnings.length > 0
+                ? t.settlement.export.downloadIncomplete
+                : t.settlement.export.downloadToyota}
             </Button>
             <Button
               variant="outlined"

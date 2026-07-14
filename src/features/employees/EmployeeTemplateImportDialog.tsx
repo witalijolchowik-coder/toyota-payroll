@@ -26,7 +26,10 @@ import {
 
 import { useTranslations } from '../../hooks/useTranslations';
 import { interpolate } from '../../i18n/pl';
-import type { EmployeeImportProgress } from '../../services/employeeImportService';
+import type {
+  EmployeeBulkUpdateResult,
+  EmployeeImportProgress,
+} from '../../services/employeeImportService';
 import type { Department, Employee } from '../../types/firestore';
 import {
   buildBulkEmployeeUpdatePreview,
@@ -51,7 +54,7 @@ interface EmployeeTemplateImportDialogProps {
   onUpdateEmployees: (
     rows: BulkEmployeeUpdatePreviewRow[],
     onProgress?: (progress: EmployeeImportProgress) => void,
-  ) => Promise<void>;
+  ) => Promise<EmployeeBulkUpdateResult>;
 }
 
 type TemplateTab = 'new' | 'update';
@@ -101,6 +104,8 @@ export function EmployeeTemplateImportDialog({
   const [busyMode, setBusyMode] = useState<BusyMode | null>(null);
   const [updateProgress, setUpdateProgress] =
     useState<EmployeeImportProgress | null>(null);
+  const [updateResult, setUpdateResult] =
+    useState<EmployeeBulkUpdateResult | null>(null);
   const isBusy = busyMode !== null;
 
   const selectedNewRows = useMemo(
@@ -119,6 +124,7 @@ export function EmployeeTemplateImportDialog({
     }
     setBusyMode('analyzing');
     setError(null);
+    setUpdateResult(null);
     try {
       const rows = buildNewEmployeeTemplatePreview(
         await newFile.text(),
@@ -187,8 +193,11 @@ export function EmployeeTemplateImportDialog({
     setUpdateProgress({ completed: 0, total: selectedUpdateRows.length });
     setError(null);
     try {
-      await onUpdateEmployees(selectedUpdateRows, setUpdateProgress);
-      onClose();
+      const result = await onUpdateEmployees(
+        selectedUpdateRows,
+        setUpdateProgress,
+      );
+      setUpdateResult(result);
     } catch (caughtError) {
       console.error(caughtError);
       setError(t.employees.templateImport.errors.updateFailed);
@@ -263,6 +272,7 @@ export function EmployeeTemplateImportDialog({
               onFileChange={setUpdateFile}
               onAnalyze={() => void analyzeUpdateFile()}
               onToggle={(rowId) => toggleSetValue(setSelectedUpdateIds, rowId)}
+              result={updateResult}
             />
           )}
         </Stack>
@@ -459,6 +469,7 @@ interface BulkUpdatePanelProps {
   onFileChange: (file: File | null) => void;
   onAnalyze: () => void;
   onToggle: (rowId: string) => void;
+  result: EmployeeBulkUpdateResult | null;
 }
 
 function BulkUpdatePanel({
@@ -472,6 +483,7 @@ function BulkUpdatePanel({
   onFileChange,
   onAnalyze,
   onToggle,
+  result,
 }: BulkUpdatePanelProps) {
   const t = useTranslations();
   const includedCount = useMemo(
@@ -482,6 +494,30 @@ function BulkUpdatePanel({
   );
   return (
     <Stack spacing={2}>
+      {result ? (
+        <Alert
+          severity={
+            result.rows.some((row) => row.status === 'error')
+              ? 'warning'
+              : 'success'
+          }
+        >
+          {interpolate(t.employees.templateImport.resultSummary, {
+            updated: String(
+              result.rows.filter((row) => row.status === 'updated').length,
+            ),
+            skipped: String(
+              result.rows.filter((row) => row.status === 'skipped').length,
+            ),
+            blocked: String(
+              result.rows.filter((row) => row.status === 'blocked').length,
+            ),
+            errors: String(
+              result.rows.filter((row) => row.status === 'error').length,
+            ),
+          })}
+        </Alert>
+      ) : null}
       <Typography variant="body2" color="text.secondary">
         {interpolate(t.employees.templateImport.updateTemplateInfo, {
           count: String(Math.max(0, includedCount)),
@@ -520,6 +556,9 @@ function BulkUpdatePanel({
                   </TableCell>
                   <TableCell>
                     {t.employees.templateImport.table.warnings}
+                  </TableCell>
+                  <TableCell>
+                    {t.employees.templateImport.table.result}
                   </TableCell>
                 </TableRow>
               </TableHead>
@@ -588,6 +627,32 @@ function BulkUpdatePanel({
                       </TableCell>
                       <TableCell>
                         <WarningChips warnings={row.warnings} />
+                      </TableCell>
+                      <TableCell>
+                        {result?.rows.find((item) => item.rowId === row.id) ? (
+                          <Chip
+                            size="small"
+                            label={
+                              t.employees.templateImport.applyStatus[
+                                result.rows.find(
+                                  (item) => item.rowId === row.id,
+                                )!.status
+                              ]
+                            }
+                            color={
+                              result.rows.find((item) => item.rowId === row.id)!
+                                .status === 'updated'
+                                ? 'success'
+                                : result.rows.find(
+                                      (item) => item.rowId === row.id,
+                                    )!.status === 'error'
+                                  ? 'error'
+                                  : 'default'
+                            }
+                          />
+                        ) : (
+                          t.employees.templateImport.empty
+                        )}
                       </TableCell>
                     </TableRow>
                   );

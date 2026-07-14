@@ -53,6 +53,10 @@ function initialValues(employee?: Employee): EmployeeFormValues {
     pesel: employee?.pesel ?? '',
     passportNumber: employee?.passportNumber ?? '',
     foreignDocumentNumber: employee?.foreignDocumentNumber ?? '',
+    citizenship: employee?.citizenship ?? '',
+    firstToyotaEmploymentDate: dateInputValue(
+      employee?.firstToyotaEmploymentDate ?? null,
+    ),
     departmentId: employee?.departmentId ?? '',
     shiftAssignment: employee?.shiftAssignment ?? '',
     assignmentEffectiveDate: dateInputValue(
@@ -155,12 +159,14 @@ export function EmployeeFormDialog({
 
             <TextField
               autoFocus
-              required
               label={t.employees.form.teta}
               value={values.tetaNumber}
               onChange={handleChange('tetaNumber')}
               error={Boolean(errors.tetaNumber)}
-              helperText={messageForError(errors.tetaNumber)}
+              helperText={
+                messageForError(errors.tetaNumber) ??
+                t.employees.form.tetaReadinessHelper
+              }
               slotProps={{ htmlInput: { autoComplete: 'off' } }}
             />
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
@@ -185,6 +191,26 @@ export function EmployeeFormDialog({
                 slotProps={{ htmlInput: { autoComplete: 'family-name' } }}
               />
             </Stack>
+            <TextField
+              select
+              label={t.employees.form.citizenship}
+              value={values.citizenship}
+              onChange={handleChange('citizenship')}
+              helperText={t.employees.form.citizenshipHelper}
+            >
+              <MenuItem value="">
+                {t.employees.form.citizenshipUnknown}
+              </MenuItem>
+              <MenuItem value="PL">
+                {t.employees.form.citizenshipOptions.PL}
+              </MenuItem>
+              <MenuItem value="UA">
+                {t.employees.form.citizenshipOptions.UA}
+              </MenuItem>
+              <MenuItem value="OTHER">
+                {t.employees.form.citizenshipOptions.OTHER}
+              </MenuItem>
+            </TextField>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <TextField
                 fullWidth
@@ -276,6 +302,15 @@ export function EmployeeFormDialog({
               </Alert>
             ) : null}
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <TextField
+                fullWidth
+                type="date"
+                label={t.employees.form.firstToyotaEmploymentDate}
+                value={values.firstToyotaEmploymentDate}
+                onChange={handleChange('firstToyotaEmploymentDate')}
+                helperText={t.employees.form.firstToyotaEmploymentDateHelper}
+                slotProps={{ inputLabel: { shrink: true } }}
+              />
               <TextField
                 required
                 fullWidth

@@ -50,7 +50,7 @@ function validInput(
 }
 
 describe('employee validation', () => {
-  it('requires TETA number, first name, last name, and employment start', () => {
+  it('allows preparation without TETA but requires name and employment start', () => {
     expect(
       validateEmployeeInput(
         validInput({
@@ -61,7 +61,6 @@ describe('employee validation', () => {
         }),
       ),
     ).toEqual({
-      tetaNumber: 'required',
       firstName: 'required',
       lastName: 'required',
       employmentStartDate: 'required',

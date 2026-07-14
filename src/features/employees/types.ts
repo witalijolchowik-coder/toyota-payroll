@@ -11,6 +11,8 @@ export interface EmployeeFormValues {
   pesel: string;
   passportNumber: string;
   foreignDocumentNumber: string;
+  citizenship: '' | 'PL' | 'UA' | 'OTHER';
+  firstToyotaEmploymentDate: string;
   departmentId: DepartmentId | '';
   shiftAssignment: EmployeeColorShift | '';
   assignmentEffectiveDate: string;
@@ -25,6 +27,8 @@ export type EmployeeFieldName =
   | 'pesel'
   | 'passportNumber'
   | 'foreignDocumentNumber'
+  | 'citizenship'
+  | 'firstToyotaEmploymentDate'
   | 'assignmentEffectiveDate'
   | 'employmentStartDate'
   | 'employmentEndDate';

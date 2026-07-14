@@ -351,11 +351,13 @@ export function prepareSettlementExportPackage({
     .map(mapSozOvertimeNoteEntry)
     .filter((entry): entry is SozOvertimeNoteEntry => entry !== null);
   const note = renderSozOvertimeNote(noteEntries);
+  const incomplete = warnings.length > 0;
+  const prefix = incomplete ? `ROZLICZENIE_NIEZAMKNIETE_${monthId}` : null;
 
   return {
     monthId,
     toyota: {
-      fileName: `Toyota_rozliczenie_${monthId}.xls`,
+      fileName: prefix ? `${prefix}.xls` : `Toyota_rozliczenie_${monthId}.xls`,
       headers: [...TOYOTA_EXPORT_HEADERS],
       rows: toyotaRows,
       excelXml: renderExcelXml({
@@ -365,9 +367,15 @@ export function prepareSettlementExportPackage({
       }),
     },
     soz: {
-      plFileName: `SOZ_TBPL_PL_${monthId}.csv`,
-      foreignFileName: `SOZ_TBPL_UA_${monthId}.csv`,
-      noteFileName: `SOZ_notatka_nadgodziny_niedoczas_${monthId}.txt`,
+      plFileName: prefix
+        ? `${prefix}_SOZ_PL.csv`
+        : `SOZ_TBPL_PL_${monthId}.csv`,
+      foreignFileName: prefix
+        ? `${prefix}_SOZ_UA.csv`
+        : `SOZ_TBPL_UA_${monthId}.csv`,
+      noteFileName: prefix
+        ? `${prefix}_NOTATKA.txt`
+        : `SOZ_notatka_nadgodziny_niedoczas_${monthId}.txt`,
       headers: [...SOZ_CSV_HEADERS],
       polishRows,
       foreignRows,

@@ -9,9 +9,11 @@ import {
   CardContent,
   Chip,
   CircularProgress,
+  FormControlLabel,
   MenuItem,
   Skeleton,
   Stack,
+  Switch,
   TextField,
   ToggleButton,
   ToggleButtonGroup,
@@ -39,6 +41,7 @@ import type {
 } from '../../types/firestore';
 import {
   calculateMonthlyDrafts,
+  isEmployeeActiveOnDate,
   resolveMonthlyEmployeeEntitlements,
 } from '../../utils/payroll';
 import { CalendarConstructorToolbar } from './CalendarConstructorToolbar';
@@ -108,6 +111,7 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
     EmployeeColorShift | 'all' | 'unassigned'
   >('all');
   const [calendarFilter, setCalendarFilter] = useState('all');
+  const [currentStateOnly, setCurrentStateOnly] = useState(false);
   const [calendarDisplayMode, setCalendarDisplayMode] = useState<
     'hours' | 'shifts'
   >('hours');
@@ -231,6 +235,9 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
     calculationDrafts.map((draft) => [draft.employeeId, draft]),
   );
   const filteredEmployees = participatingEmployees.filter((employee) => {
+    if (currentStateOnly && !isEmployeeActiveOnDate(employee, new Date())) {
+      return false;
+    }
     const search = employeeSearch.trim().toLocaleLowerCase('pl-PL');
     const employeeName =
       `${employee.lastName} ${employee.firstName} ${employee.tetaNumber}`.toLocaleLowerCase(
@@ -557,6 +564,15 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
                     count: filteredEmployees.length.toString(),
                   })}
                 </Typography>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={currentStateOnly}
+                      onChange={(_, checked) => setCurrentStateOnly(checked)}
+                    />
+                  }
+                  label={t.settlement.constructor.filters.currentState}
+                />
                 <ToggleButtonGroup
                   exclusive
                   size="small"

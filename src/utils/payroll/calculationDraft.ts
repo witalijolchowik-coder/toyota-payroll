@@ -33,6 +33,7 @@ import {
   type EmploymentPeriod,
 } from './employment';
 import { dateToIsoDate, getPayrollMonthDateRange } from './month';
+import { baseSalaryForFirstToyotaEmploymentDate } from './employeeReadiness';
 import { resolveEffectivePayrollSetting } from './settings';
 import { getPayrollVirtualDefaultHours } from './virtualDefaults';
 import {
@@ -45,6 +46,7 @@ import {
 export type PayrollDraftWarningCode =
   | 'employee-not-participating'
   | 'missing-employment-start'
+  | 'missing-first-toyota-employment-date'
   | 'attendance-absence-conflict'
   | 'explicit-non-working-day'
   | 'attendance-outside-employment'
@@ -155,6 +157,7 @@ export interface EmployeeMonthlyCalculationDraft {
     entries: PayrollDraftAdjustmentEntry[];
   };
   components: {
+    baseSalaryBrutto: number | null;
     frequencyBonusBrutto: number | null;
     holidayWorkBonusBrutto: number;
     transportAllowanceNetto: number;
@@ -454,12 +457,19 @@ function calculateCompanyAccommodationDeduction({
     };
   }
 
-  const mediaMonthly = configuredAmount(
-    settings,
-    'company_housing_media',
-    monthId,
-    DEFAULT_COMPANY_HOUSING_MEDIA,
-  );
+  const mediaMonthly =
+    resolveEffectivePayrollSetting(
+      settings,
+      'company_housing_media',
+      monthId,
+      assignment.variantKey,
+    )?.amount ??
+    configuredAmount(
+      settings,
+      'company_housing_media',
+      monthId,
+      DEFAULT_COMPANY_HOUSING_MEDIA,
+    );
   const rentMonthly = rentSetting.amount;
   const media = roundMoney((mediaMonthly / monthDays) * chargedDays);
   const rent = roundMoney((rentMonthly / monthDays) * chargedDays);
@@ -498,6 +508,12 @@ export function calculateEmployeeMonthlyDraft({
   const warnings: PayrollDraftWarning[] = [];
   if (!employee.employmentStartDate) {
     warnings.push(warning('missing-employment-start'));
+  }
+  const baseSalaryBrutto = baseSalaryForFirstToyotaEmploymentDate(
+    employee.firstToyotaEmploymentDate,
+  );
+  if (baseSalaryBrutto === null) {
+    warnings.push(warning('missing-first-toyota-employment-date'));
   }
   if (!participatesInMonth) {
     warnings.push(warning('employee-not-participating'));
@@ -902,6 +918,7 @@ export function calculateEmployeeMonthlyDraft({
       entries: adjustmentEntries,
     },
     components: {
+      baseSalaryBrutto,
       frequencyBonusBrutto: frequencyAmount,
       holidayWorkBonusBrutto,
       transportAllowanceNetto,

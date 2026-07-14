@@ -63,6 +63,8 @@ Names are resolved from `/employees` in the UI and are not duplicated into opera
 
 TETA is the only import-matching and external-report identifier. Firestore IDs must never be used for business matching or shown as coordinator-facing identity.
 
+During employee-data preparation TETA may be blank, but finalization and report readiness must reject that employee. Employee identity also stores optional `citizenship` and the stable `first_toyota_employment_date`; the latter is the salary-tier basis and must survive re-employment updates.
+
 Firestore does not provide unique field constraints. TETA uniqueness therefore requires an application or server-side check when the Employees module is implemented; rules alone cannot guarantee it safely under concurrent writes.
 
 ## Departments and employee color shifts

@@ -99,7 +99,7 @@ function readRotationBaseAssignment(
 
 export const employeeConverter = createConverter<EmployeeDocument>(
   (data, path) => ({
-    teta_number: readNonEmptyString(data, 'teta_number', path),
+    teta_number: readString(data, 'teta_number', path),
     first_name: readNonEmptyString(data, 'first_name', path),
     last_name: readNonEmptyString(data, 'last_name', path),
     pesel: readOptionalNullableString(data, 'pesel', path) ?? null,
@@ -107,6 +107,16 @@ export const employeeConverter = createConverter<EmployeeDocument>(
       readOptionalNullableString(data, 'passport_number', path) ?? null,
     foreign_document_number:
       readOptionalNullableString(data, 'foreign_document_number', path) ?? null,
+    citizenship:
+      data.citizenship === undefined || data.citizenship === null
+        ? null
+        : readEnum(data, 'citizenship', path, ['PL', 'UA', 'OTHER'] as const),
+    first_toyota_employment_date:
+      readOptionalNullableTimestamp(
+        data,
+        'first_toyota_employment_date',
+        path,
+      ) ?? null,
     is_active: readBoolean(data, 'is_active', path),
     department_id:
       readOptionalNullableString(data, 'department_id', path) ?? null,

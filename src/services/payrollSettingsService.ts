@@ -22,6 +22,7 @@ import {
   mapPayrollSettingDocument,
 } from './firestore/mappers';
 import { getFirestoreRepositories } from './firestoreService';
+import { recordAuditEntry } from './auditService';
 
 export type PayrollSettingsServiceErrorCode =
   | 'firebase-unavailable'
@@ -117,6 +118,19 @@ export async function createPayrollSettingVersion(
     created_by: uid,
     updated_at: serverTimestamp(),
     updated_by: uid,
+  });
+  await recordAuditEntry({
+    entityPath: `payrollSettings/${reference.id}`,
+    action: 'create',
+    actorUid: uid,
+    changes: {
+      operation: 'payroll-setting-version-created',
+      setting_key: normalized.settingKey,
+      variant_key: normalized.variantKey,
+      amount: normalized.amount,
+      valid_from: normalized.validFrom,
+      valid_to: normalized.validTo,
+    },
   });
   return reference.id;
 }

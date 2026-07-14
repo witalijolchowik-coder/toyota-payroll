@@ -55,11 +55,6 @@ describe('employee template import', () => {
 
   it.each([
     [
-      'missing TETA',
-      ['', 'Anna', 'Kowalska', '', '', '', '2026-06-03'],
-      'missing-teta',
-    ],
-    [
       'missing first name',
       ['WT-001', '', 'Kowalska', '', '', '', '2026-06-03'],
       'missing-first-name',
@@ -80,6 +75,18 @@ describe('employee template import', () => {
     expect(preview[0].status).toBe('blocked');
     expect(preview[0].warnings).toContain(warning);
     expect(preview[0].createInput).toBeNull();
+  });
+
+  it('allows preparation of a new employee without TETA and reports a warning', () => {
+    const preview = buildNewEmployeeTemplatePreview(
+      csv([['', 'Anna', 'Kowalska', '', '', '', '2026-06-03']]),
+      [],
+      [],
+    );
+
+    expect(preview[0].status).toBe('new');
+    expect(preview[0].warnings).toContain('missing-teta');
+    expect(preview[0].createInput?.tetaNumber).toBe('');
   });
 
   it('does not create an existing employee with duplicate TETA', () => {

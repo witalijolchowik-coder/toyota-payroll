@@ -7,6 +7,7 @@ import { Alert, Button, Card, Divider, Stack } from '@mui/material';
 import { PageHeader } from '../components/layout/PageHeader';
 import { DeactivateEmployeeDialog } from '../features/employees/DeactivateEmployeeDialog';
 import { EmployeeEntitlementFormDialog } from '../features/employees/EmployeeEntitlementFormDialog';
+import { EmployeeAccommodationDialog } from '../features/employees/EmployeeAccommodationDialog';
 import { EmployeeEntitlementsPanel } from '../features/employees/EmployeeEntitlementsPanel';
 import { EmployeeFormDialog } from '../features/employees/EmployeeFormDialog';
 import { EmployeeTemplateImportDialog } from '../features/employees/EmployeeTemplateImportDialog';
@@ -40,6 +41,7 @@ import type {
   EmployeeEntitlement,
   EmployeeEntitlementCreateInput,
 } from '../types/firestore';
+import { isEmployeeActiveOnDate } from '../utils/payroll';
 
 type EmployeeFormState =
   { mode: 'add' } | { mode: 'edit'; employee: Employee } | null;
@@ -83,14 +85,19 @@ export function EmployeesPage() {
     null,
   );
   const [isDeactivating, setIsDeactivating] = useState(false);
+  const [accommodationState, setAccommodationState] = useState<{
+    employee: Employee;
+    currentAccommodation: EmployeeEntitlement | null;
+  } | null>(null);
 
   const filteredEmployees = useMemo(() => {
     const normalizedSearch = search.trim().toLocaleLowerCase('pl-PL');
     return employees.filter((employee) => {
       const matchesStatus =
         status === 'all' ||
-        (status === 'active' && employee.isActive) ||
-        (status === 'inactive' && !employee.isActive);
+        (status === 'active' && isEmployeeActiveOnDate(employee, new Date())) ||
+        (status === 'inactive' &&
+          !isEmployeeActiveOnDate(employee, new Date()));
       const searchableValue =
         `${employee.firstName} ${employee.lastName} ${employee.tetaNumber}`.toLocaleLowerCase(
           'pl-PL',
@@ -213,6 +220,7 @@ export function EmployeesPage() {
       }),
       severity: 'success',
     });
+    return result;
   };
 
   const hasFilters = Boolean(search.trim()) || status !== 'all';
@@ -293,6 +301,10 @@ export function EmployeesPage() {
             isLoading={isLoading || areDepartmentsLoading}
             onEdit={(employee) => setFormState({ mode: 'edit', employee })}
             onDeactivate={setDeactivationTarget}
+            entitlements={entitlements}
+            onAccommodation={(employee, currentAccommodation) =>
+              setAccommodationState({ employee, currentAccommodation })
+            }
           />
         ) : (
           <EmployeesEmptyState filtered={hasFilters} />
@@ -345,6 +357,33 @@ export function EmployeesPage() {
         />
       ) : null}
 
+      {accommodationState ? (
+        <EmployeeAccommodationDialog
+          employee={accommodationState.employee}
+          currentAccommodation={accommodationState.currentAccommodation}
+          entitlements={entitlements}
+          accommodationVariants={accommodationVariants}
+          onClose={() => setAccommodationState(null)}
+          onMoveIn={async (input) => {
+            await addEntitlement(input);
+            notify({
+              message: t.employees.accommodation.moveInSaved,
+              severity: 'success',
+            });
+          }}
+          onMoveOut={async (entitlement, firstDayOutside) => {
+            await editEntitlement(entitlement.id, {
+              validTo: previousIsoDate(firstDayOutside),
+              note: entitlement.note,
+            });
+            notify({
+              message: t.employees.accommodation.moveOutSaved,
+              severity: 'success',
+            });
+          }}
+        />
+      ) : null}
+
       {isImportOpen ? (
         <EmployeeTemplateImportDialog
           employees={employees}
@@ -356,6 +395,12 @@ export function EmployeesPage() {
       ) : null}
     </Stack>
   );
+}
+
+function previousIsoDate(value: string): string {
+  const date = new Date(`${value}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() - 1);
+  return date.toISOString().slice(0, 10);
 }
 
 function readErrorMessage(

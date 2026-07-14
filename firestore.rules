@@ -105,6 +105,8 @@ service cloud.firestore {
           'pesel',
           'passport_number',
           'foreign_document_number',
+          'citizenship',
+          'first_toyota_employment_date',
           'is_active',
           'department_id',
           'shift_assignment',
@@ -115,7 +117,7 @@ service cloud.firestore {
           'updated_at',
           'updated_by'
         ])
-        && isNonEmptyString(data.teta_number)
+        && data.teta_number is string
         && isNonEmptyString(data.first_name)
         && isNonEmptyString(data.last_name)
         && (!data.keys().hasAny(['pesel']) || isNullableString(data.pesel))
@@ -123,6 +125,11 @@ service cloud.firestore {
           || isNullableString(data.passport_number))
         && (!data.keys().hasAny(['foreign_document_number'])
           || isNullableString(data.foreign_document_number))
+        && (!data.keys().hasAny(['citizenship'])
+          || data.citizenship == null
+          || data.citizenship in ['PL', 'UA', 'OTHER'])
+        && (!data.keys().hasAny(['first_toyota_employment_date'])
+          || isNullableTimestamp(data.first_toyota_employment_date))
         && data.is_active is bool
         && (!data.keys().hasAny(['department_id'])
           || isNullableString(data.department_id))
@@ -691,6 +698,8 @@ service cloud.firestore {
           'pesel',
           'passport_number',
           'foreign_document_number',
+          'citizenship',
+          'first_toyota_employment_date',
           'is_active',
           'department_id',
           'shift_assignment',

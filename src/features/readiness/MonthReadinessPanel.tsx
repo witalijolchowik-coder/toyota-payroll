@@ -125,6 +125,37 @@ export function MonthReadinessPanel({
                 }
                 severity={data.monthExists ? 'info' : 'blocking'}
               />
+              <ReadinessMetric
+                label={t.dashboard.readiness.metrics.preparation}
+                value={
+                  data.levels.dataPreparationPossible
+                    ? t.dashboard.readiness.levels.allowed
+                    : t.dashboard.readiness.levels.blocked
+                }
+                severity={
+                  data.levels.dataPreparationPossible ? 'info' : 'blocking'
+                }
+              />
+              <ReadinessMetric
+                label={t.dashboard.readiness.metrics.draft}
+                value={
+                  data.levels.draftCalculationPossible
+                    ? t.dashboard.readiness.levels.allowed
+                    : t.dashboard.readiness.levels.blocked
+                }
+                severity={
+                  data.levels.draftCalculationPossible ? 'info' : 'blocking'
+                }
+              />
+              <ReadinessMetric
+                label={t.dashboard.readiness.metrics.finalization}
+                value={
+                  data.levels.finalizationAllowed
+                    ? t.dashboard.readiness.levels.allowed
+                    : t.dashboard.readiness.levels.blocked
+                }
+                severity={data.levels.finalizationAllowed ? 'info' : 'blocking'}
+              />
             </Box>
 
             <Divider sx={{ my: 2.5 }} />

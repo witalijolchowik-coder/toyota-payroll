@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import AddOutlined from '@mui/icons-material/AddOutlined';
 import EditOutlined from '@mui/icons-material/EditOutlined';
 import {
@@ -22,6 +22,10 @@ import {
 import { PageHeader } from '../components/layout/PageHeader';
 import { DepartmentFormDialog } from '../features/settings/DepartmentFormDialog';
 import { PayrollSettingFormDialog } from '../features/settings/PayrollSettingFormDialog';
+import {
+  AccommodationCategoryFormDialog,
+  type AccommodationCategoryInput,
+} from '../features/settings/AccommodationCategoryFormDialog';
 import { useDepartments } from '../features/settings/useDepartments';
 import { usePayrollSettings } from '../features/settings/usePayrollSettings';
 import { useNotification } from '../hooks/useNotification';
@@ -67,6 +71,31 @@ export function SettingsPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [departmentFormState, setDepartmentFormState] =
     useState<DepartmentFormState>(null);
+  const [isAccommodationFormOpen, setIsAccommodationFormOpen] = useState(false);
+  const accommodationCategories = useMemo(
+    () =>
+      settings
+        .filter(
+          (setting) =>
+            setting.settingKey === 'accommodation_allowance' &&
+            setting.variantKey,
+        )
+        .map((rent) => ({
+          key: rent.variantKey!,
+          name: rent.variantName ?? rent.variantKey!,
+          validFrom: rent.validFrom,
+          validTo: rent.validTo,
+          accommodation: rent.amount,
+          media:
+            settings.find(
+              (setting) =>
+                setting.settingKey === 'company_housing_media' &&
+                setting.variantKey === rent.variantKey &&
+                setting.validFrom === rent.validFrom,
+            )?.amount ?? 0,
+        })),
+    [settings],
+  );
 
   const handleCreate = async (input: PayrollSettingCreateInput) => {
     await createVersion(input);
@@ -91,6 +120,33 @@ export function SettingsPage() {
     await addDepartment(input as DepartmentCreateInput);
     notify({
       message: t.organization.departments.notifications.created,
+      severity: 'success',
+    });
+  };
+
+  const handleAccommodationCategory = async (
+    input: AccommodationCategoryInput,
+  ) => {
+    await createVersion({
+      settingKey: 'accommodation_allowance',
+      variantKey: input.key,
+      variantName: input.name,
+      amount: input.accommodationAmount,
+      validFrom: input.validFrom,
+      validTo: null,
+      description: input.description,
+    });
+    await createVersion({
+      settingKey: 'company_housing_media',
+      variantKey: input.key,
+      variantName: input.name,
+      amount: input.mediaAmount,
+      validFrom: input.validFrom,
+      validTo: null,
+      description: input.description,
+    });
+    notify({
+      message: t.settings.accommodation.saved,
       severity: 'success',
     });
   };
@@ -123,6 +179,89 @@ export function SettingsPage() {
           Firebase i uprawnienia.
         </Alert>
       ) : null}
+
+      <Card>
+        <Box
+          sx={{
+            px: 3,
+            py: 2,
+            display: 'flex',
+            gap: 2,
+            alignItems: { xs: 'flex-start', sm: 'center' },
+            flexDirection: { xs: 'column', sm: 'row' },
+            justifyContent: 'space-between',
+          }}
+        >
+          <div>
+            <Typography variant="h6">
+              {t.settings.accommodation.title}
+            </Typography>
+            <Typography color="text.secondary">
+              {t.settings.accommodation.description}
+            </Typography>
+          </div>
+          <Button
+            variant="outlined"
+            startIcon={<AddOutlined />}
+            onClick={() => setIsAccommodationFormOpen(true)}
+          >
+            {t.settings.accommodation.add}
+          </Button>
+        </Box>
+        <TableContainer>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell>{t.settings.accommodation.table.name}</TableCell>
+                <TableCell align="right">
+                  {t.settings.accommodation.table.media}
+                </TableCell>
+                <TableCell align="right">
+                  {t.settings.accommodation.table.accommodation}
+                </TableCell>
+                <TableCell align="right">
+                  {t.settings.accommodation.table.total}
+                </TableCell>
+                <TableCell>{t.settings.accommodation.table.validity}</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {accommodationCategories.map((category) => (
+                <TableRow key={`${category.key}:${category.validFrom}`} hover>
+                  <TableCell>
+                    <Typography sx={{ fontWeight: 700 }}>
+                      {category.name}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {category.key}
+                    </Typography>
+                  </TableCell>
+                  <TableCell align="right">
+                    {currency.format(category.media)}
+                  </TableCell>
+                  <TableCell align="right">
+                    {currency.format(category.accommodation)}
+                  </TableCell>
+                  <TableCell align="right">
+                    {currency.format(category.media + category.accommodation)}
+                  </TableCell>
+                  <TableCell>
+                    {category.validFrom} –{' '}
+                    {category.validTo ?? t.settings.accommodation.noEnd}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+        {!isLoading && accommodationCategories.length === 0 ? (
+          <Box sx={{ px: 3, py: 4, textAlign: 'center' }}>
+            <Typography color="text.secondary">
+              {t.settings.accommodation.empty}
+            </Typography>
+          </Box>
+        ) : null}
+      </Card>
 
       <Card>
         <TableContainer>
@@ -298,6 +437,13 @@ export function SettingsPage() {
           }
           onClose={() => setDepartmentFormState(null)}
           onSubmit={handleDepartmentSubmit}
+        />
+      ) : null}
+
+      {isAccommodationFormOpen ? (
+        <AccommodationCategoryFormDialog
+          onClose={() => setIsAccommodationFormOpen(false)}
+          onSubmit={handleAccommodationCategory}
         />
       ) : null}
     </Stack>

@@ -59,6 +59,9 @@ The attached design history contains several generations of the architecture. Th
 - [L4 source of truth, status model and import reconciliation](business-rules/l4-source-of-truth.md)
   - ZUS import priority, manual L4 as preliminary, three L4 business statuses,
     reconciliation, counters, filters and calendar meaning
+- [Employee readiness, allowances and accommodation](business-rules/employee-readiness-accommodation.md)
+  - employment and identity gates, salary tiers, attendance-proportional
+    allowances, effective-dated accommodation and unfinished exports
 
 Approved business-rules specifications govern payroll semantics. Architecture
 documents continue to govern system structure and implementation boundaries.

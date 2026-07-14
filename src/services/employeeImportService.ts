@@ -5,6 +5,8 @@ import type {
   NewEmployeeTemplatePreviewRow,
 } from '../features/employees/employeeTemplateImport';
 import { createEmployee, updateEmployee } from './employeesService';
+import { auth } from '../config/firebase';
+import { recordAuditEntry } from './auditService';
 
 const EMPLOYEE_IMPORT_UPDATE_CONCURRENCY = 5;
 
@@ -61,38 +63,87 @@ export async function createEmployeesFromTemplatePreview(
 export interface EmployeeBulkUpdateResult {
   updatedEmployeeIds: EmployeeId[];
   skippedCount: number;
+  rows: EmployeeBulkUpdateRowResult[];
+}
+
+export type EmployeeBulkUpdateRowStatus =
+  'updated' | 'skipped' | 'blocked' | 'error';
+
+export interface EmployeeBulkUpdateRowResult {
+  rowId: string;
+  employeeId: EmployeeId | null;
+  status: EmployeeBulkUpdateRowStatus;
+  reason: string | null;
 }
 
 export async function updateEmployeesFromTemplatePreview(
   rows: readonly BulkEmployeeUpdatePreviewRow[],
   onProgress?: (progress: EmployeeImportProgress) => void,
 ): Promise<EmployeeBulkUpdateResult> {
-  const updateRows = rows.filter(
-    (row) =>
-      (row.status === 'ready' || row.status === 'warning') &&
-      row.employee &&
-      row.updateInput,
-  );
+  const updateRows = [...rows];
 
   const updatedEmployeeIds: EmployeeId[] = [];
+  const rowResults: EmployeeBulkUpdateRowResult[] = [];
   let completed = 0;
   onProgress?.({ completed, total: updateRows.length });
   await runWithConcurrency(
     updateRows,
     EMPLOYEE_IMPORT_UPDATE_CONCURRENCY,
     async (row) => {
-      if (row.employee && row.updateInput) {
-        await updateEmployee(row.employee.id, row.updateInput);
-        updatedEmployeeIds.push(row.employee.id);
+      if (!row.employee || !row.updateInput) {
+        rowResults.push({
+          rowId: row.id,
+          employeeId: row.employee?.id ?? null,
+          status: row.status === 'blocked' ? 'blocked' : 'skipped',
+          reason: row.warnings.join(', ') || null,
+        });
+      } else {
+        try {
+          await updateEmployee(row.employee.id, row.updateInput);
+          updatedEmployeeIds.push(row.employee.id);
+          rowResults.push({
+            rowId: row.id,
+            employeeId: row.employee.id,
+            status: 'updated',
+            reason: null,
+          });
+        } catch (error) {
+          rowResults.push({
+            rowId: row.id,
+            employeeId: row.employee.id,
+            status: 'error',
+            reason: error instanceof Error ? error.message : String(error),
+          });
+        }
       }
       completed += 1;
       onProgress?.({ completed, total: updateRows.length });
     },
   );
 
+  const actorUid = auth?.currentUser?.uid;
+  if (actorUid) {
+    await recordAuditEntry({
+      entityPath: 'employees',
+      action: 'update',
+      actorUid,
+      changes: {
+        operation: 'bulk-employee-update',
+        total: rows.length,
+        updated: rowResults.filter((row) => row.status === 'updated').length,
+        skipped: rowResults.filter((row) => row.status === 'skipped').length,
+        blocked: rowResults.filter((row) => row.status === 'blocked').length,
+        errors: rowResults.filter((row) => row.status === 'error').length,
+      },
+    });
+  }
+
   return {
     updatedEmployeeIds,
-    skippedCount: rows.length - updateRows.length,
+    skippedCount: rowResults.filter((row) => row.status === 'skipped').length,
+    rows: rowResults.sort((left, right) =>
+      left.rowId.localeCompare(right.rowId),
+    ),
   };
 }
 

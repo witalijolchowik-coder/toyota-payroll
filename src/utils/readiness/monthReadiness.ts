@@ -7,6 +7,7 @@ import type {
   PayrollMonth,
   PayrollSetting,
   ScheduleCorrection,
+  Absence,
 } from '../../types/firestore';
 import { PAYROLL_SETTING_KEYS } from '../../types/firestore';
 import {
@@ -15,6 +16,8 @@ import {
   createPayrollMonthCalendar,
   getPayrollMonthDateRange,
   resolveEffectivePayrollSetting,
+  hasCurrentStatusConflict,
+  requiredEmployeeDocumentIssues,
 } from '../payroll';
 import { generateEmployeeMonthlySchedule } from '../schedule';
 
@@ -25,6 +28,13 @@ export type ReadinessIssueCode =
   | 'calendar-overrides-unresolved'
   | 'employee-missing-employment-start'
   | 'employee-missing-identity'
+  | 'employee-missing-teta'
+  | 'employee-missing-citizenship'
+  | 'employee-missing-pesel'
+  | 'employee-missing-passport'
+  | 'employee-missing-first-toyota-employment-date'
+  | 'employee-current-status-conflict'
+  | 'unconfirmed-reported-l4'
   | 'employee-missing-department'
   | 'employee-missing-shift'
   | 'department-unresolved-na0'
@@ -34,7 +44,9 @@ export type ReadinessIssueCode =
   | 'payroll-setting-conflict'
   | 'entitlement-overlap'
   | 'housing-conflict'
-  | 'company-accommodation-missing-variant';
+  | 'company-accommodation-missing-variant'
+  | 'company-accommodation-setting-missing'
+  | 'own-housing-setting-missing';
 
 export interface ReadinessIssue {
   code: ReadinessIssueCode;
@@ -63,6 +75,11 @@ export interface MonthReadinessSummary {
     info: number;
   };
   issues: ReadinessIssue[];
+  levels: {
+    dataPreparationPossible: boolean;
+    draftCalculationPossible: boolean;
+    finalizationAllowed: boolean;
+  };
 }
 
 export interface MonthReadinessInput {
@@ -74,18 +91,12 @@ export interface MonthReadinessInput {
   scheduleCorrections?: readonly ScheduleCorrection[];
   entitlements: readonly EmployeeEntitlement[];
   payrollSettings: readonly PayrollSetting[];
+  absences?: readonly Absence[];
+  today?: Date;
 }
 
 function employeeName(employee: Employee): string {
   return `${employee.lastName} ${employee.firstName}`.trim();
-}
-
-function hasIdentity(employee: Employee): boolean {
-  return Boolean(
-    employee.pesel?.trim() ||
-    employee.passportNumber?.trim() ||
-    employee.foreignDocumentNumber?.trim(),
-  );
 }
 
 function employeeParticipates(employee: Employee, monthId: MonthId): boolean {
@@ -143,6 +154,8 @@ export function assessMonthReadiness({
   scheduleCorrections = [],
   entitlements,
   payrollSettings,
+  absences = [],
+  today = new Date(),
 }: MonthReadinessInput): MonthReadinessSummary {
   const summary: MonthReadinessSummary = {
     monthId,
@@ -150,6 +163,11 @@ export function assessMonthReadiness({
     participants: 0,
     counters: { blocking: 0, warning: 0, optional: 0, info: 0 },
     issues: [],
+    levels: {
+      dataPreparationPossible: true,
+      draftCalculationPossible: false,
+      finalizationAllowed: false,
+    },
   };
   const departmentsById = new Map(
     departments.map((department) => [department.id, department]),
@@ -194,10 +212,37 @@ export function assessMonthReadiness({
     }
     summary.participants += 1;
 
-    if (!hasIdentity(employee)) {
+    if (!employee.tetaNumber.trim()) {
       addIssue(summary, {
         ...baseIssue,
-        code: 'employee-missing-identity',
+        code: 'employee-missing-teta',
+        severity: 'blocking',
+        target: 'employees',
+      });
+    }
+
+    if (!employee.firstToyotaEmploymentDate) {
+      addIssue(summary, {
+        ...baseIssue,
+        code: 'employee-missing-first-toyota-employment-date',
+        severity: 'blocking',
+        target: 'employees',
+      });
+    }
+
+    requiredEmployeeDocumentIssues(employee).forEach((code) => {
+      addIssue(summary, {
+        ...baseIssue,
+        code: `employee-${code}` as ReadinessIssueCode,
+        severity: 'blocking',
+        target: 'employees',
+      });
+    });
+
+    if (hasCurrentStatusConflict(employee, today)) {
+      addIssue(summary, {
+        ...baseIssue,
+        code: 'employee-current-status-conflict',
         severity: 'warning',
         target: 'employees',
       });
@@ -207,7 +252,7 @@ export function assessMonthReadiness({
       addIssue(summary, {
         ...baseIssue,
         code: 'employee-missing-department',
-        severity: 'optional',
+        severity: 'blocking',
         target: 'employees',
       });
     } else if (employee.departmentId.toLocaleUpperCase('pl-PL') === 'NA0') {
@@ -223,7 +268,7 @@ export function assessMonthReadiness({
         addIssue(summary, {
           ...baseIssue,
           code: 'department-missing-or-inactive',
-          severity: 'warning',
+          severity: 'blocking',
           target: 'employees',
           context: employee.departmentId,
         });
@@ -253,11 +298,34 @@ export function assessMonthReadiness({
       addIssue(summary, {
         ...baseIssue,
         code: 'schedule-unresolved-day',
-        severity: 'warning',
+        severity: 'blocking',
         target: 'settlement',
         context: unresolvedDay.date,
       });
     }
+
+    const monthRange = getPayrollMonthDateRange(monthId);
+    const monthStart = monthRange.start.toISOString().slice(0, 10);
+    const monthEnd = monthRange.end.toISOString().slice(0, 10);
+    absences
+      .filter(
+        (absence) =>
+          absence.employeeId === employee.id &&
+          absence.status === 'ACTIVE' &&
+          absence.absenceCode === 'L4' &&
+          absence.source === 'manual' &&
+          absence.startDate <= monthEnd &&
+          absence.endDate >= monthStart,
+      )
+      .forEach((absence) =>
+        addIssue(summary, {
+          ...baseIssue,
+          code: 'unconfirmed-reported-l4',
+          severity: 'blocking',
+          target: 'absences',
+          context: `${absence.startDate}–${absence.endDate}`,
+        }),
+      );
 
     const employeeEntitlements = activeEntitlementsForEmployee(
       employee,
@@ -308,16 +376,83 @@ export function assessMonthReadiness({
           target: 'employees',
         }),
       );
+
+    const overlapsMonth = (entitlement: EmployeeEntitlement) =>
+      entitlement.validFrom <= monthEnd &&
+      (entitlement.validTo ?? '9999-12-31') >= monthStart;
+
+    employeeEntitlements.filter(overlapsMonth).forEach((entitlement) => {
+      if (entitlement.type === 'OWN_HOUSING_ALLOWANCE') {
+        if (
+          !resolveEffectivePayrollSetting(
+            payrollSettings,
+            'own_housing_allowance',
+            monthId,
+          )
+        ) {
+          addIssue(summary, {
+            ...baseIssue,
+            code: 'own-housing-setting-missing',
+            severity: 'blocking',
+            target: 'settings',
+          });
+        }
+        return;
+      }
+      if (entitlement.type !== 'COMPANY_ACCOMMODATION') {
+        return;
+      }
+      const variant = entitlement.accommodationVariantKey?.trim();
+      if (!variant) {
+        return;
+      }
+      const hasRent = resolveEffectivePayrollSetting(
+        payrollSettings,
+        'accommodation_allowance',
+        monthId,
+        variant,
+      );
+      const hasMedia =
+        resolveEffectivePayrollSetting(
+          payrollSettings,
+          'company_housing_media',
+          monthId,
+          variant,
+        ) ??
+        resolveEffectivePayrollSetting(
+          payrollSettings,
+          'company_housing_media',
+          monthId,
+        );
+      if (!hasRent || !hasMedia) {
+        addIssue(summary, {
+          ...baseIssue,
+          code: 'company-accommodation-setting-missing',
+          severity: 'blocking',
+          target: 'settings',
+          context: variant,
+        });
+      }
+    });
   });
 
-  PAYROLL_SETTING_KEYS.forEach((settingKey) => {
+  PAYROLL_SETTING_KEYS.filter(
+    (settingKey) =>
+      settingKey !== 'accommodation_allowance' &&
+      settingKey !== 'own_housing_allowance' &&
+      settingKey !== 'company_housing_media',
+  ).forEach((settingKey) => {
     try {
       if (
         !resolveEffectivePayrollSetting(payrollSettings, settingKey, monthId)
       ) {
         addIssue(summary, {
           code: 'payroll-setting-missing',
-          severity: 'warning',
+          severity:
+            settingKey === 'laundry_allowance' ||
+            settingKey === 'transport_allowance'
+              ? 'blocking'
+              : 'warning',
           target: 'settings',
           context: settingKey,
         });
@@ -354,5 +489,13 @@ export function assessMonthReadiness({
     });
   });
 
+  summary.levels = {
+    dataPreparationPossible: true,
+    draftCalculationPossible: Boolean(month) && summary.participants > 0,
+    finalizationAllowed:
+      Boolean(month) &&
+      summary.participants > 0 &&
+      summary.counters.blocking === 0,
+  };
   return summary;
 }

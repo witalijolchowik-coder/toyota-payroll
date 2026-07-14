@@ -25,6 +25,8 @@ function employee(overrides: Partial<Employee> = {}): Employee {
     pesel: '90010112345',
     passportNumber: null,
     foreignDocumentNumber: null,
+    citizenship: 'PL',
+    firstToyotaEmploymentDate: new Date('2025-09-01T00:00:00Z'),
     isActive: true,
     departmentId: 'paint',
     shiftAssignment: 'RED',

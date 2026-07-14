@@ -30,6 +30,8 @@ export function normalizeEmployeeInput(
     pesel: input.pesel?.trim() || null,
     passportNumber: input.passportNumber?.trim() || null,
     foreignDocumentNumber: input.foreignDocumentNumber?.trim() || null,
+    citizenship: input.citizenship ?? null,
+    firstToyotaEmploymentDate: input.firstToyotaEmploymentDate ?? null,
     departmentId: input.departmentId?.trim() || null,
     shiftAssignment: input.shiftAssignment ?? null,
   };
@@ -46,6 +48,8 @@ export function employeeInputFromForm(
     pesel: values.pesel,
     passportNumber: values.passportNumber,
     foreignDocumentNumber: values.foreignDocumentNumber,
+    citizenship: values.citizenship || null,
+    firstToyotaEmploymentDate: dateFromInput(values.firstToyotaEmploymentDate),
     isActive,
     departmentId: values.departmentId || null,
     shiftAssignment: isEmployeeColorShift(values.shiftAssignment)
@@ -63,9 +67,6 @@ export function validateEmployeeInput(
   const normalized = normalizeEmployeeInput(input);
   const errors: EmployeeValidationErrors = {};
 
-  if (!normalized.tetaNumber) {
-    errors.tetaNumber = 'required';
-  }
   if (!normalized.firstName) {
     errors.firstName = 'required';
   }
@@ -98,6 +99,10 @@ export function isTetaNumberUniqueAmongActiveEmployees(
   ignoredEmployeeId?: EmployeeId,
 ): boolean {
   const normalizedCandidate = normalizeTetaNumber(tetaNumber);
+
+  if (!normalizedCandidate) {
+    return true;
+  }
 
   return !employees.some(
     (employee) =>

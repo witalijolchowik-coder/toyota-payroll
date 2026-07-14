@@ -58,6 +58,9 @@ export function mapEmployeeDocument(
     pesel: document.pesel ?? null,
     passportNumber: document.passport_number ?? null,
     foreignDocumentNumber: document.foreign_document_number ?? null,
+    citizenship: document.citizenship ?? null,
+    firstToyotaEmploymentDate:
+      document.first_toyota_employment_date?.toDate() ?? null,
     isActive: document.is_active,
     departmentId: document.department_id ?? null,
     shiftAssignment: document.shift_assignment ?? null,

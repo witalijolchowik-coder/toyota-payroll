@@ -182,7 +182,7 @@ export function buildNewEmployeeTemplatePreview(
     if (duplicateTetas.has(raw.tetaNumber)) {
       warnings.push('duplicate-teta-in-file');
     }
-    if (existingByTeta.has(raw.tetaNumber)) {
+    if (raw.tetaNumber && existingByTeta.has(raw.tetaNumber)) {
       warnings.push('existing-teta');
     }
     if (hasIdentityConflict(existingByIdentity, raw, raw.tetaNumber)) {
@@ -504,7 +504,6 @@ function resolveNewEmployeeTemplateStatus(
     return 'conflict';
   }
   const blockingWarnings: EmployeeTemplateWarningCode[] = [
-    'missing-teta',
     'missing-first-name',
     'missing-last-name',
     'missing-employment-start',
@@ -574,6 +573,8 @@ function employeeToUpdateInput(employee: Employee): EmployeeCreateInput {
     shiftAssignment: employee.shiftAssignment,
     employmentStartDate: employee.employmentStartDate,
     employmentEndDate: employee.employmentEndDate,
+    citizenship: employee.citizenship,
+    firstToyotaEmploymentDate: employee.firstToyotaEmploymentDate,
   };
 }
 

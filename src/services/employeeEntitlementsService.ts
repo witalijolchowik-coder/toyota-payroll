@@ -15,6 +15,7 @@ import type {
 } from '../types/firestore';
 import { mapEmployeeEntitlementDocument } from './firestore/mappers';
 import { getFirestoreRepositories } from './firestoreService';
+import { recordAuditEntry } from './auditService';
 
 export type EmployeeEntitlementServiceErrorCode =
   'firebase-unavailable' | 'authentication-required' | 'invalid-input';
@@ -109,6 +110,22 @@ export async function createEmployeeEntitlement(
     updated_at: serverTimestamp(),
     updated_by: uid,
   });
+  await recordAuditEntry({
+    entityPath: `employeeEntitlements/${reference.id}`,
+    action: 'create',
+    actorUid: uid,
+    changes: {
+      operation:
+        normalized.type === 'COMPANY_ACCOMMODATION'
+          ? 'accommodation-move-in'
+          : 'entitlement-created',
+      employee_id: normalized.employeeId,
+      type: normalized.type,
+      valid_from: normalized.validFrom,
+      valid_to: normalized.validTo,
+      accommodation_variant_key: normalized.accommodationVariantKey,
+    },
+  });
   return reference.id;
 }
 
@@ -125,6 +142,18 @@ export async function updateEmployeeEntitlement(
     updated_at: serverTimestamp(),
     updated_by: uid,
   });
+  await recordAuditEntry({
+    entityPath: `employeeEntitlements/${entitlementId}`,
+    action: 'update',
+    actorUid: uid,
+    changes: {
+      operation: validTo
+        ? 'accommodation-or-entitlement-ended'
+        : 'entitlement-updated',
+      valid_to: validTo,
+      note,
+    },
+  });
 }
 
 export async function cancelEmployeeEntitlement(
@@ -135,5 +164,11 @@ export async function cancelEmployeeEntitlement(
     status: 'CANCELLED',
     updated_at: serverTimestamp(),
     updated_by: uid,
+  });
+  await recordAuditEntry({
+    entityPath: `employeeEntitlements/${entitlementId}`,
+    action: 'update',
+    actorUid: uid,
+    changes: { operation: 'entitlement-cancelled', status: 'CANCELLED' },
   });
 }

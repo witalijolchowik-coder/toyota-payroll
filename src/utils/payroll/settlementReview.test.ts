@@ -79,6 +79,7 @@ function draft(
       entries: [],
     },
     components: {
+      baseSalaryBrutto: 5_160,
       frequencyBonusBrutto: 400,
       holidayWorkBonusBrutto: 0,
       transportAllowanceNetto: 275,

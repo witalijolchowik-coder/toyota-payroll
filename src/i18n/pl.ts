@@ -129,6 +129,13 @@ export const pl = {
         warning: 'Ostrzeżenia',
         optional: 'Opcjonalne',
         month: 'Dokument miesiąca',
+        preparation: 'Przygotowanie danych',
+        draft: 'Wersja robocza',
+        finalization: 'Finalizacja',
+      },
+      levels: {
+        allowed: 'Możliwe',
+        blocked: 'Zablokowane',
       },
       severity: {
         blocking: 'Blokuje',
@@ -143,6 +150,16 @@ export const pl = {
         'employee-missing-employment-start':
           'Brakuje daty rozpoczęcia zatrudnienia.',
         'employee-missing-identity': 'Brakuje danych identyfikacyjnych do SOZ.',
+        'employee-missing-teta': 'Brakuje numeru TETA.',
+        'employee-missing-citizenship': 'Brakuje informacji o obywatelstwie.',
+        'employee-missing-pesel': 'Brak numeru PESEL.',
+        'employee-missing-passport': 'Brak numeru paszportu.',
+        'employee-missing-first-toyota-employment-date':
+          'Brakuje daty pierwszego zatrudnienia w Toyota.',
+        'employee-current-status-conflict':
+          'Aktualny status techniczny jest sprzeczny z okresem zatrudnienia.',
+        'unconfirmed-reported-l4':
+          'Zgłoszone L4 nie zostało jeszcze potwierdzone raportem ZUS.',
         'employee-missing-department': 'Pracownik nie ma przypisanego działu.',
         'employee-missing-shift': 'Pracownik nie ma przypisanej zmiany.',
         'department-unresolved-na0':
@@ -161,6 +178,10 @@ export const pl = {
           'Mieszkanie firmowe pokrywa się z dodatkiem za własne mieszkanie.',
         'company-accommodation-missing-variant':
           'Mieszkanie firmowe nie ma wybranego wariantu.',
+        'company-accommodation-setting-missing':
+          'Brakuje stawki czynszu lub mediów dla wariantu mieszkania.',
+        'own-housing-setting-missing':
+          'Brakuje stawki dodatku za własne mieszkanie.',
       },
     },
   },
@@ -220,6 +241,8 @@ export const pl = {
       noStartDate: 'brak daty rozpoczęcia',
       edit: 'Edytuj pracownika: {{name}}',
       deactivate: 'Dezaktywuj pracownika: {{name}}',
+      statusConflict:
+        'Status techniczny różni się od statusu wynikającego z dat zatrudnienia.',
     },
     status: {
       active: 'Aktywny',
@@ -253,11 +276,25 @@ export const pl = {
       description:
         'Numer TETA jest podstawowym identyfikatorem biznesowym pracownika.',
       teta: 'Numer TETA',
+      tetaReadinessHelper:
+        'Możesz zapisać pracownika bez TETA, ale finalizacja miesiąca będzie zablokowana.',
       firstName: 'Imię',
       lastName: 'Nazwisko',
       pesel: 'PESEL',
       passportNumber: 'Paszport',
       foreignDocumentNumber: 'Inny dokument cudzoziemca',
+      citizenship: 'Obywatelstwo',
+      citizenshipHelper:
+        'Obywatelstwo określa wymagane dokumenty do finalizacji.',
+      citizenshipUnknown: 'Nie określono',
+      citizenshipOptions: {
+        PL: 'Polska',
+        UA: 'Ukraina',
+        OTHER: 'Inne',
+      },
+      firstToyotaEmploymentDate: 'Data pierwszego zatrudnienia w Toyota',
+      firstToyotaEmploymentDateHelper:
+        'Stała data używana do ustalenia podstawy wynagrodzenia. Nie zmienia się przy nowej umowie ani ponownym zatrudnieniu.',
       identityOptional: 'Opcjonalnie. Wymagane do poprawnego splitu SOZ.',
       foreignDocumentHelper:
         'Uzupełnij tylko wtedy, gdy dokument cudzoziemca nie jest paszportem.',
@@ -290,6 +327,29 @@ export const pl = {
       created: 'Pracownik został dodany.',
       updated: 'Dane pracownika zostały zapisane.',
       deactivated: 'Pracownik został dezaktywowany.',
+    },
+    accommodation: {
+      companyActive: 'Zakwaterowanie firmowe aktywne',
+      companyInactive: 'Brak zakwaterowania firmowego',
+      moveInTitle: 'Zakwaterowanie pracownika',
+      moveOutTitle: 'Wykwaterowanie pracownika',
+      moveInDate: 'Data zakwaterowania',
+      moveOutDate: 'Data wykwaterowania',
+      moveInDateHelper:
+        'Wybrana data jest pierwszym dniem zakwaterowania firmowego.',
+      moveOutDateHelper:
+        'Wybrana data jest pierwszym dniem, w którym pracownik nie mieszka już w zakwaterowaniu firmowym.',
+      category: 'Kategoria zakwaterowania',
+      noCategories:
+        'Najpierw dodaj aktywną kategorię zakwaterowania w ustawieniach.',
+      overlap:
+        'Okres zakwaterowania pokrywa się z innym aktywnym okresem mieszkaniowym.',
+      saveFailed: 'Nie udało się zapisać zmiany zakwaterowania.',
+      moveInSaved: 'Zakwaterowanie zostało zapisane.',
+      moveOutSaved: 'Wykwaterowanie zostało zapisane.',
+      cancel: 'Anuluj',
+      confirmMoveIn: 'Zapisz zakwaterowanie',
+      confirmMoveOut: 'Zapisz wykwaterowanie',
     },
     import: {
       open: 'Import pracowników',
@@ -386,6 +446,8 @@ export const pl = {
       employmentRange: '{{start}} – {{end}}',
       employmentOpenRange: 'od {{start}}',
       changeDescription: '{{field}}: {{oldValue}} → {{newValue}}',
+      resultSummary:
+        'Zaktualizowano: {{updated}}, pominięto: {{skipped}}, zablokowano: {{blocked}}, błędy: {{errors}}.',
       tabs: {
         newEmployees: 'Nowi pracownicy',
         updateEmployees: 'Aktualizacja danych',
@@ -413,6 +475,7 @@ export const pl = {
         shift: 'Zmiana',
         changes: 'Zmiany',
         warnings: 'Ostrzeżenia',
+        result: 'Wynik zapisu',
       },
       newStatus: {
         new: 'Nowy',
@@ -426,6 +489,12 @@ export const pl = {
         warning: 'Z ostrzeżeniem',
         blocked: 'Zablokowane',
         'no-changes': 'Bez zmian',
+      },
+      applyStatus: {
+        updated: 'Zaktualizowano',
+        skipped: 'Pominięto',
+        blocked: 'Zablokowano',
+        error: 'Błąd zapisu',
       },
       warnings: {
         'missing-teta': 'Brakuje numeru TETA.',
@@ -876,6 +945,40 @@ export const pl = {
       cancelFailed: 'Nie udało się anulować korekty.',
     },
   },
+  settings: {
+    accommodation: {
+      title: 'Kategorie zakwaterowania',
+      description:
+        'Wersjonowane stawki mediów i zakwaterowania. Zmiana ceny nie przepisuje historii.',
+      add: 'Dodaj wersję kategorii',
+      saved: 'Wersja kategorii zakwaterowania została zapisana.',
+      empty: 'Brak skonfigurowanych kategorii zakwaterowania.',
+      noEnd: 'bezterminowo',
+      table: {
+        name: 'Kategoria / adres',
+        media: 'Media',
+        accommodation: 'Zakwaterowanie',
+        total: 'Razem',
+        validity: 'Obowiązuje',
+      },
+      form: {
+        title: 'Kategoria zakwaterowania',
+        versionInfo:
+          'Zapis tworzy nową wersję stawek. Wcześniejsze miesiące zachowują dotychczasowe wartości.',
+        key: 'Kod kategorii',
+        name: 'Nazwa kategorii',
+        description: 'Opis lub adres',
+        descriptionHelper:
+          'Opcjonalnie: adres, budynek albo inna nazwa operacyjna.',
+        media: 'Media miesięcznie (PLN)',
+        accommodation: 'Zakwaterowanie miesięcznie (PLN)',
+        validFrom: 'Obowiązuje od',
+        saveFailed: 'Nie udało się zapisać wersji kategorii.',
+        cancel: 'Anuluj',
+        save: 'Zapisz wersję',
+      },
+    },
+  },
   settlement: {
     page: {
       eyebrow: 'Rozliczenia',
@@ -951,6 +1054,8 @@ export const pl = {
         'employee-not-participating':
           'Pracownik nie należy do tego miesiąca według okresu zatrudnienia.',
         'missing-employment-start': 'Brakuje daty rozpoczęcia zatrudnienia.',
+        'missing-first-toyota-employment-date':
+          'Brakuje daty pierwszego zatrudnienia w Toyota.',
         'attendance-absence-conflict':
           'Jawne godziny pracy pokrywają się z aktywną nieobecnością.',
         'explicit-non-working-day': 'Jawne godziny zapisano w dniu wolnym.',
@@ -1066,6 +1171,7 @@ export const pl = {
       ready: 'Eksport bez ostrzeżeń',
       warningCount: 'Ostrzeżenia: {{count}}',
       downloadToyota: 'Pobierz zestawienie dla Toyota',
+      downloadIncomplete: 'Pobierz wersję niezakończoną',
       downloadSozPl: 'Pobierz CSV do SOZ — PL',
       downloadSozForeign: 'Pobierz CSV do SOZ — cudzoziemcy',
       downloadNote: 'Pobierz notatkę SOZ',
@@ -1128,6 +1234,7 @@ export const pl = {
         conflicts: 'Konflikty',
         warnings: 'Uwagi',
         result: 'Widoczni pracownicy: {{count}}',
+        currentState: 'Aktualny stan',
       },
       notifications: {
         applied: 'Zmiana została zastosowana.',
