@@ -19,6 +19,12 @@ import type {
   NewEmployeeTemplatePreviewRow,
 } from '../features/employees/employeeTemplateImport';
 import type { EmployeeStatusFilter } from '../features/employees/types';
+import {
+  employeeMatchesListMode,
+  nextEmployeeSort,
+  sortEmployees,
+  type EmployeeSortState,
+} from '../features/employees/employeeTableModel';
 import { useEmployees } from '../features/employees/useEmployees';
 import { useEmployeeEntitlements } from '../features/employees/useEmployeeEntitlements';
 import { useDepartments } from '../features/settings/useDepartments';
@@ -41,7 +47,6 @@ import type {
   EmployeeEntitlement,
   EmployeeEntitlementCreateInput,
 } from '../types/firestore';
-import { isEmployeeActiveOnDate } from '../utils/payroll';
 
 type EmployeeFormState =
   { mode: 'add' } | { mode: 'edit'; employee: Employee } | null;
@@ -76,7 +81,11 @@ export function EmployeesPage() {
     cancelEntitlement,
   } = useEmployeeEntitlements();
   const [search, setSearch] = useState('');
-  const [status, setStatus] = useState<EmployeeStatusFilter>('all');
+  const [status, setStatus] = useState<EmployeeStatusFilter>('active');
+  const [sort, setSort] = useState<EmployeeSortState>({
+    key: 'employee',
+    direction: 'asc',
+  });
   const [formState, setFormState] = useState<EmployeeFormState>(null);
   const [entitlementFormState, setEntitlementFormState] =
     useState<EntitlementFormState>(null);
@@ -92,12 +101,12 @@ export function EmployeesPage() {
 
   const filteredEmployees = useMemo(() => {
     const normalizedSearch = search.trim().toLocaleLowerCase('pl-PL');
-    return employees.filter((employee) => {
-      const matchesStatus =
-        status === 'all' ||
-        (status === 'active' && isEmployeeActiveOnDate(employee, new Date())) ||
-        (status === 'inactive' &&
-          !isEmployeeActiveOnDate(employee, new Date()));
+    const matching = employees.filter((employee) => {
+      const matchesStatus = employeeMatchesListMode(
+        employee,
+        status,
+        new Date(),
+      );
       const searchableValue =
         `${employee.firstName} ${employee.lastName} ${employee.tetaNumber}`.toLocaleLowerCase(
           'pl-PL',
@@ -107,7 +116,8 @@ export function EmployeesPage() {
         (!normalizedSearch || searchableValue.includes(normalizedSearch))
       );
     });
-  }, [employees, search, status]);
+    return sortEmployees(matching, departments, sort);
+  }, [departments, employees, search, sort, status]);
 
   const handleFormSubmit = async (input: EmployeeCreateInput) => {
     if (formState?.mode === 'edit') {
@@ -223,7 +233,7 @@ export function EmployeesPage() {
     return result;
   };
 
-  const hasFilters = Boolean(search.trim()) || status !== 'all';
+  const hasFilters = Boolean(search.trim()) || status !== 'active';
 
   useEffect(() => {
     const editEmployeeId = searchParams.get('editEmployeeId');
@@ -299,6 +309,11 @@ export function EmployeesPage() {
             employees={filteredEmployees}
             departments={departments}
             isLoading={isLoading || areDepartmentsLoading}
+            mode={status}
+            sort={sort}
+            onSort={(key) =>
+              setSort((current) => nextEmployeeSort(current, key))
+            }
             onEdit={(employee) => setFormState({ mode: 'edit', employee })}
             onDeactivate={setDeactivationTarget}
             entitlements={entitlements}

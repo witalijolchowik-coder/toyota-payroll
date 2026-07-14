@@ -44,4 +44,4 @@ export interface EmployeeFormSubmission {
   input: EmployeeCreateInput;
 }
 
-export type EmployeeStatusFilter = 'all' | 'active' | 'inactive';
+export type EmployeeStatusFilter = 'active' | 'archive';

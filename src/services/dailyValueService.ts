@@ -9,6 +9,7 @@ import {
 import type {
   DailyValueDocument,
   DailyValueUpsertInput,
+  Absence,
   EmployeeId,
   IsoDate,
   MonthId,
@@ -88,6 +89,7 @@ function assertHours(hours: number) {
 export async function saveManualDailyValue(
   monthId: MonthId,
   input: DailyValueUpsertInput,
+  absenceToCancel: Absence | null = null,
 ): Promise<void> {
   assertHours(input.hours);
   const firestore = getFirestoreClient();
@@ -106,9 +108,32 @@ export async function saveManualDailyValue(
     dailyValues,
     dailyValueDocumentId(input.employeeId, input.date),
   );
+  const auditReference = doc(repositories.auditLog);
+  if (
+    absenceToCancel &&
+    (absenceToCancel.source !== 'manual' ||
+      absenceToCancel.status !== 'ACTIVE' ||
+      absenceToCancel.startDate !== absenceToCancel.endDate ||
+      absenceToCancel.startDate !== input.date)
+  ) {
+    throw new DailyValueServiceError('invalid-hours');
+  }
+  const absenceReference = absenceToCancel
+    ? doc(
+        repositories.forMonth(absenceToCancel.monthId).absences,
+        absenceToCancel.id,
+      )
+    : null;
 
   await runTransaction(firestore, async (transaction) => {
     const snapshot = await transaction.get(reference);
+    if (absenceReference) {
+      transaction.update(absenceReference, {
+        status: 'CANCELLED',
+        updated_at: serverTimestamp(),
+        updated_by: actorUid,
+      });
+    }
 
     if (snapshot.exists()) {
       if (snapshot.data().source === 'attendance_import') {
@@ -123,6 +148,22 @@ export async function saveManualDailyValue(
           updated_at: serverTimestamp(),
           updated_by: actorUid,
         });
+        transaction.set(auditReference, {
+          entity_path: reference.path,
+          action: 'update',
+          actor_uid: actorUid,
+          occurred_at: serverTimestamp(),
+          changes: {
+            date: input.date,
+            employee_id: input.employeeId,
+            teta_number: input.tetaNumber,
+            previous_hours:
+              snapshot.data().manual_override?.hours ?? snapshot.data().hours,
+            new_hours: input.hours,
+            change_kind: 'actual-hours-override',
+            replaced_absence: absenceToCancel?.absenceCode ?? null,
+          },
+        });
         return;
       }
 
@@ -132,6 +173,21 @@ export async function saveManualDailyValue(
         work_time_correction: workTimeCorrection,
         updated_at: serverTimestamp(),
         updated_by: actorUid,
+      });
+      transaction.set(auditReference, {
+        entity_path: reference.path,
+        action: 'update',
+        actor_uid: actorUid,
+        occurred_at: serverTimestamp(),
+        changes: {
+          date: input.date,
+          employee_id: input.employeeId,
+          teta_number: input.tetaNumber,
+          previous_hours: snapshot.data().hours,
+          new_hours: input.hours,
+          change_kind: 'actual-hours',
+          replaced_absence: absenceToCancel?.absenceCode ?? null,
+        },
       });
       return;
     }
@@ -151,6 +207,21 @@ export async function saveManualDailyValue(
       updated_at: serverTimestamp(),
       updated_by: actorUid,
     });
+    transaction.set(auditReference, {
+      entity_path: reference.path,
+      action: 'create',
+      actor_uid: actorUid,
+      occurred_at: serverTimestamp(),
+      changes: {
+        date: input.date,
+        employee_id: input.employeeId,
+        teta_number: input.tetaNumber,
+        previous_hours: null,
+        new_hours: input.hours,
+        change_kind: 'actual-hours',
+        replaced_absence: absenceToCancel?.absenceCode ?? null,
+      },
+    });
   });
 }
 
@@ -168,14 +239,16 @@ export async function clearManualDailyValue(
   const actorUid = await requireActorUid();
   const dailyValues = repositories.forMonth(monthId).dailyValues;
   const reference = doc(dailyValues, dailyValueDocumentId(employeeId, date));
+  const auditReference = doc(repositories.auditLog);
 
   await runTransaction(firestore, async (transaction) => {
     const snapshot = await transaction.get(reference);
+    const existingDocument = snapshot.exists() ? snapshot.data() : null;
     const operation = resolveManualAttendanceClearOperation(
-      snapshot.exists()
+      existingDocument
         ? {
-            source: snapshot.data().source,
-            manualOverride: dailyValueManualOverride(snapshot.data()),
+            source: existingDocument.source,
+            manualOverride: dailyValueManualOverride(existingDocument),
           }
         : null,
     );
@@ -186,10 +259,36 @@ export async function clearManualDailyValue(
         updated_at: serverTimestamp(),
         updated_by: actorUid,
       });
+      transaction.set(auditReference, {
+        entity_path: reference.path,
+        action: 'update',
+        actor_uid: actorUid,
+        occurred_at: serverTimestamp(),
+        changes: {
+          date,
+          employee_id: employeeId,
+          previous_hours: existingDocument?.manual_override?.hours ?? null,
+          new_hours: existingDocument?.hours ?? null,
+          change_kind: 'clear-manual-override',
+        },
+      });
       return;
     }
     if (operation === 'delete-manual-daily-value') {
       transaction.delete(reference);
+      transaction.set(auditReference, {
+        entity_path: reference.path,
+        action: 'delete',
+        actor_uid: actorUid,
+        occurred_at: serverTimestamp(),
+        changes: {
+          date,
+          employee_id: employeeId,
+          previous_hours: existingDocument?.hours ?? null,
+          new_hours: null,
+          change_kind: 'clear-manual-value',
+        },
+      });
     }
   });
 }

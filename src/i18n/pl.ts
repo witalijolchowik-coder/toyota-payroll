@@ -222,6 +222,7 @@ export const pl = {
       all: 'Wszyscy',
       active: 'Aktywni',
       inactive: 'Nieaktywni',
+      archive: 'Archiwum',
       clear: 'Wyczyść wyszukiwanie',
     },
     table: {
@@ -235,6 +236,15 @@ export const pl = {
       department: 'Dział',
       shiftAssignment: 'Zmiana',
       employmentPeriod: 'Okres zatrudnienia',
+      activeEmploymentDates: 'Pierwsze zatrudnienie / aktualna umowa',
+      archiveEmploymentDates: 'Pierwsze zatrudnienie / zakończenie',
+      noFirstToyotaDate: 'brak pierwszej daty',
+      noFinalEndDate: 'brak daty zakończenia',
+      shiftShort: {
+        RED: 'Red',
+        WHITE: 'White',
+        BLUE: 'Blue',
+      },
       status: 'Status',
       actions: 'Działania',
       noEndDate: 'bez daty końcowej',
@@ -687,7 +697,15 @@ export const pl = {
       allStatuses: 'Wszystkie statusy',
     },
     types: {
-      UZ: 'UŻ / UZ',
+      L4: 'L4',
+      UW: 'Urlop wypoczynkowy',
+      UZ: 'UŻ',
+      NN: 'Nieobecność nieusprawiedliwiona',
+      NU: 'Nieobecność usprawiedliwiona',
+      NI: 'Nieobecność do wyjaśnienia',
+      OPD: 'Opieka nad dzieckiem',
+      KRW: 'Krwiodawstwo',
+      WZN: 'Wezwanie / zwolnienie',
     },
     status: {
       ACTIVE: 'Aktywna',
@@ -1205,7 +1223,7 @@ export const pl = {
         hours: 'Godziny',
         L4: 'L4',
         UW: 'Urlop',
-        UZ: 'UŻ / UZ',
+        UZ: 'UŻ',
         NN: 'NN',
         'clear-manual': 'Wyczyść',
       },
@@ -1214,7 +1232,7 @@ export const pl = {
       apply: 'Zastosuj',
       clearSelection: 'Wyczyść zaznaczenie',
       noSelection:
-        'Kliknij komórkę, aby otworzyć kalendarz pracownika albo zaznaczyć zakres dla wybranego narzędzia.',
+        'W trybie Przegląd kliknij nazwisko, aby otworzyć kalendarz pracownika, albo dzień, aby edytować ten dzień. Aktywne narzędzie zakresowe zmienia kliknięcie w zaznaczanie zakresu.',
       selection: '{{employee}}: {{start}} – {{end}}',
       blocked: {
         'settled-month': 'Nie można zapisywać zmian w zamkniętym miesiącu.',
@@ -1254,7 +1272,7 @@ export const pl = {
       departmentAndShift: '{{department}} · {{shift}}',
       departmentUnavailable: 'Dział / zmiana: brak w modelu danych',
       helper:
-        'Kliknij dzień, aby edytować godziny. Nieobecności dodawaj z konstruktora kalendarza w widoku ogólnym.',
+        'Kliknij dzień, aby edytować rzeczywiste godziny lub nieobecność w tym samym edytorze.',
       settledReadOnly:
         'Ten miesiąc jest zamknięty, dlatego kalendarz pracownika jest tylko do odczytu.',
       warning: 'Wymaga weryfikacji',
@@ -1297,7 +1315,8 @@ export const pl = {
       futureDay: 'Nie można edytować przyszłego dnia.',
       outsideEmployment: 'Data poza okresem zatrudnienia pracownika.',
       settledMonth: 'Zamknięty miesiąc jest tylko do odczytu.',
-      edit: 'Edytuj godziny: {{employee}}, {{date}}',
+      edit: 'Edytuj dzień: {{employee}}, {{date}}',
+      openEmployeeCalendar: 'Otwórz kalendarz pracownika: {{employee}}',
       absence:
         'Nieobecność {{code}} — edycja jest dostępna w module Nieobecności.',
       reportedL4Label: 'L4 zgł.',
@@ -1344,14 +1363,33 @@ export const pl = {
       create: 'Utwórz miesiąc',
     },
     editor: {
-      title: 'Godziny pracy',
+      title: 'Edycja dnia',
       description: '{{employee}} · {{date}}',
+      tabs: {
+        hours: 'Godziny',
+        absence: 'Nieobecność',
+      },
+      planContext: 'Plan dnia: {{hours}} h · {{shift}}',
+      actualHours: 'Godziny rzeczywiste',
       hours: 'Liczba godzin',
       helper:
         'Wprowadź wartość od 0 do 24. Wartość domyślna nie zostanie zapisana.',
       note: 'Powód lub notatka',
       noteHelper:
         'Opcjonalnie opisz ręczny wpis lub przyczynę korekty wartości z importu.',
+      absenceType: 'Rodzaj nieobecności',
+      hoursAbsenceConflict:
+        'Zapis godzin zastąpi ręcznie wprowadzoną nieobecność dla tego dnia.',
+      confirmReplacement:
+        'Potwierdzam zastąpienie istniejących danych dla tego dnia.',
+      confirmedL4ReadOnly:
+        'Potwierdzone L4 pochodzi z importu ZUS i nie może być zmienione w tym oknie.',
+      multiDayAbsenceReadOnly:
+        'Ta nieobecność obejmuje kilka dni. Zmień jej zakres w module Nieobecności, aby nie usunąć pozostałych dni.',
+      importedHoursReadOnly:
+        'Oryginalne godziny z importu nie mogą zostać zastąpione nieobecnością w tym oknie.',
+      manualL4Notice:
+        'Ręczne L4 zostanie zapisane jako „Zgłoszone” i będzie wymagało potwierdzenia importem ZUS.',
       workTime: {
         title: 'Korekta czasu pracy',
         plannedShift: 'Planowana zmiana',
@@ -1360,8 +1398,12 @@ export const pl = {
         actualEnd: 'Rzeczywisty koniec',
         optional: 'Opcjonalnie, format GG:MM.',
         invalidTime: 'Wprowadź godzinę w formacie GG:MM.',
+        unresolvedShift:
+          'Nie udało się ustalić zmiany dla tego dnia. Wybierz zmianę przed zapisem; system nie zgaduje jej automatycznie.',
         preview:
           'Rozbicie: praca normalna {{normal}} h, czas prywatny {{private}} h, nadgodziny 50% {{overtime50}} h, nadgodziny 100% {{overtime100}} h.',
+        previewExtended:
+          'Plan {{planned}} h, rzeczywiście {{actual}} h, czas prywatny {{private}} h, nadgodziny 50% {{overtime50}} h, nadgodziny 100% {{overtime100}} h, nocne {{night}} h.',
       },
       cancel: 'Anuluj',
       save: 'Zapisz',
@@ -1378,6 +1420,8 @@ export const pl = {
           'Do zapisu wymagane jest aktywne uwierzytelnienie Firebase.',
         firebase:
           'Nie można połączyć się z Firebase. Sprawdź konfigurację aplikacji.',
+        absenceSave:
+          'Nie udało się zapisać nieobecności. Wprowadzone dane pozostały w formularzu.',
       },
     },
     loading: 'Ładowanie rozliczenia miesięcznego',
@@ -1385,6 +1429,9 @@ export const pl = {
       created: 'Miesiąc został utworzony.',
       dailyValueSaved: 'Godziny zostały zapisane.',
       dailyValueCleared: 'Wartość ręczna została usunięta.',
+      absenceSaved: 'Nieobecność została zapisana.',
+      manualL4Saved:
+        'L4 zapisano jako zgłoszone i oczekujące na potwierdzenie ZUS.',
     },
     errors: {
       title: 'Nie udało się otworzyć miesiąca',

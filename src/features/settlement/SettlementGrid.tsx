@@ -62,6 +62,7 @@ interface SettlementGridProps {
     day: CalendarDay,
     value: ReturnType<typeof resolveSettlementCellValue>,
     hasGoverningAbsence: boolean,
+    plannedDay?: PlannedScheduleDay,
   ) => void;
   selection?: CalendarRangeSelection | null;
   onSelectCell?: (
@@ -69,7 +70,9 @@ interface SettlementGridProps {
     day: CalendarDay,
     value: ReturnType<typeof resolveSettlementCellValue>,
     hasGoverningAbsence: boolean,
+    plannedDay?: PlannedScheduleDay,
   ) => void;
+  onOpenEmployeeCalendar?: (employee: Employee) => void;
 }
 
 const weekdayFormatter = new Intl.DateTimeFormat('pl-PL', {
@@ -95,6 +98,7 @@ export function SettlementGrid({
   onEditCell,
   selection = null,
   onSelectCell,
+  onOpenEmployeeCalendar,
 }: SettlementGridProps) {
   const t = useTranslations();
   const departmentsById = new Map(
@@ -195,9 +199,32 @@ export function SettlementGrid({
                       zIndex: 2,
                     })}
                   >
-                    <Typography variant="body2" noWrap sx={{ fontWeight: 750 }}>
-                      {employee.firstName} {employee.lastName}
-                    </Typography>
+                    <ButtonBase
+                      onClick={() => onOpenEmployeeCalendar?.(employee)}
+                      aria-label={interpolate(
+                        t.settlement.grid.openEmployeeCalendar,
+                        {
+                          employee: `${employee.firstName} ${employee.lastName}`,
+                        },
+                      )}
+                      sx={{
+                        borderRadius: 1,
+                        textAlign: 'left',
+                        '&:hover': { color: 'primary.main' },
+                      }}
+                    >
+                      <Typography
+                        variant="body2"
+                        noWrap
+                        sx={{
+                          fontWeight: 750,
+                          textDecoration: 'underline',
+                          textUnderlineOffset: 3,
+                        }}
+                      >
+                        {employee.firstName} {employee.lastName}
+                      </Typography>
+                    </ButtonBase>
                     <Typography
                       variant="caption"
                       color="text.secondary"
@@ -312,6 +339,7 @@ export function SettlementGrid({
                                   day,
                                   value,
                                   hasGoverningAbsence,
+                                  plannedDay,
                                 )
                               }
                               sx={{

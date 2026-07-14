@@ -44,7 +44,9 @@ interface EmployeeCalendarDialogProps {
     day: CalendarDay,
     value: SettlementCellValue,
     hasGoverningAbsence: boolean,
+    plannedDay?: import('../../utils/schedule').PlannedScheduleDay,
   ) => void;
+  plannedSchedule?: import('../../utils/schedule').PlannedScheduleDay[];
 }
 
 const weekdayLabels = ['pon.', 'wt.', 'śr.', 'czw.', 'pt.', 'sob.', 'niedz.'];
@@ -65,12 +67,16 @@ export function EmployeeCalendarDialog({
   isSettled,
   onClose,
   onEditDay,
+  plannedSchedule = [],
 }: EmployeeCalendarDialogProps) {
   const t = useTranslations();
   const dailyValuesByDate = new Map(
     dailyValues
       .filter((value) => value.employeeId === employee.id)
       .map((value) => [value.date, value]),
+  );
+  const plannedScheduleByDate = new Map(
+    plannedSchedule.map((day) => [day.date, day]),
   );
   const employeeAbsences = absences.filter(
     (absence) => absence.employeeId === employee.id,
@@ -229,6 +235,7 @@ export function EmployeeCalendarDialog({
                           cell.day,
                           value,
                           absenceResolution.kind !== 'none',
+                          plannedScheduleByDate.get(cell.day.isoDate),
                         )
                       }
                       sx={{

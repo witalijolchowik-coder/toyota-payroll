@@ -14,6 +14,7 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TableSortLabel,
   Tooltip,
   Typography,
 } from '@mui/material';
@@ -25,10 +26,12 @@ import type {
   Employee,
   EmployeeEntitlement,
 } from '../../types/firestore';
-import {
-  hasCurrentStatusConflict,
-  isEmployeeActiveOnDate,
-} from '../../utils/payroll';
+import { hasCurrentStatusConflict } from '../../utils/payroll';
+import type {
+  EmployeeListMode,
+  EmployeeSortKey,
+  EmployeeSortState,
+} from './employeeTableModel';
 
 interface EmployeesTableProps {
   employees: Employee[];
@@ -41,6 +44,9 @@ interface EmployeesTableProps {
     employee: Employee,
     currentAccommodation: EmployeeEntitlement | null,
   ) => void;
+  mode: EmployeeListMode;
+  sort: EmployeeSortState;
+  onSort: (key: EmployeeSortKey) => void;
 }
 
 const dateFormatter = new Intl.DateTimeFormat('pl-PL', {
@@ -57,6 +63,9 @@ export function EmployeesTable({
   onDeactivate,
   entitlements,
   onAccommodation,
+  mode,
+  sort,
+  onSort,
 }: EmployeesTableProps) {
   const t = useTranslations();
   const departmentsById = new Map(
@@ -68,13 +77,41 @@ export function EmployeesTable({
       <Table sx={{ minWidth: 760 }}>
         <TableHead>
           <TableRow>
-            <TableCell>{t.employees.table.teta}</TableCell>
-            <TableCell>{t.employees.table.employee}</TableCell>
+            <SortableHeader
+              column="teta"
+              sort={sort}
+              onSort={onSort}
+              label={t.employees.table.teta}
+            />
+            <SortableHeader
+              column="employee"
+              sort={sort}
+              onSort={onSort}
+              label={t.employees.table.employee}
+            />
             <TableCell>{t.employees.table.identity}</TableCell>
-            <TableCell>{t.employees.table.department}</TableCell>
-            <TableCell>{t.employees.table.shiftAssignment}</TableCell>
-            <TableCell>{t.employees.table.employmentPeriod}</TableCell>
-            <TableCell>{t.employees.table.status}</TableCell>
+            <SortableHeader
+              column="department"
+              sort={sort}
+              onSort={onSort}
+              label={t.employees.table.department}
+            />
+            <SortableHeader
+              column="shift"
+              sort={sort}
+              onSort={onSort}
+              label={t.employees.table.shiftAssignment}
+            />
+            <SortableHeader
+              column="employment"
+              sort={sort}
+              onSort={onSort}
+              label={
+                mode === 'active'
+                  ? t.employees.table.activeEmploymentDates
+                  : t.employees.table.archiveEmploymentDates
+              }
+            />
             <TableCell align="right">{t.employees.table.actions}</TableCell>
           </TableRow>
         </TableHead>
@@ -82,7 +119,7 @@ export function EmployeesTable({
           {isLoading
             ? Array.from({ length: 4 }, (_, index) => (
                 <TableRow key={index}>
-                  {Array.from({ length: 8 }, (__, cellIndex) => (
+                  {Array.from({ length: 7 }, (__, cellIndex) => (
                     <TableCell key={cellIndex}>
                       <Skeleton />
                     </TableCell>
@@ -91,10 +128,6 @@ export function EmployeesTable({
               ))
             : employees.map((employee) => {
                 const employeeName = `${employee.firstName} ${employee.lastName}`;
-                const currentlyActive = isEmployeeActiveOnDate(
-                  employee,
-                  new Date(),
-                );
                 const statusConflict = hasCurrentStatusConflict(
                   employee,
                   new Date(),
@@ -112,39 +145,33 @@ export function EmployeesTable({
                 return (
                   <TableRow hover key={employee.id}>
                     <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 750 }}>
+                      <Typography variant="body2" sx={{ fontWeight: 400 }}>
                         {employee.tetaNumber}
                       </Typography>
                     </TableCell>
-                    <TableCell>{employeeName}</TableCell>
+                    <TableCell>
+                      <Typography variant="body2" sx={{ fontWeight: 750 }}>
+                        {employeeName}
+                      </Typography>
+                    </TableCell>
                     <TableCell>
                       <Typography variant="body2">
                         {formatIdentity(employee, t)}
                       </Typography>
                     </TableCell>
                     <TableCell>
-                      {employee.departmentId
-                        ? (departmentsById.get(employee.departmentId)?.name ??
-                          employee.departmentId)
-                        : t.organization.departments.unassigned}
+                      {departmentChip(
+                        employee.departmentId
+                          ? (departmentsById.get(employee.departmentId)?.name ??
+                              employee.departmentId)
+                          : t.organization.departments.unassigned,
+                      )}
                     </TableCell>
                     <TableCell>
-                      {employee.shiftAssignment
-                        ? t.organization.shifts[employee.shiftAssignment]
-                        : t.organization.shifts.unassigned}
+                      {shiftChip(employee.shiftAssignment, t)}
                     </TableCell>
-                    <TableCell>{formatEmploymentPeriod(employee, t)}</TableCell>
                     <TableCell>
-                      <Chip
-                        size="small"
-                        label={
-                          currentlyActive
-                            ? t.employees.status.active
-                            : t.employees.status.inactive
-                        }
-                        color={currentlyActive ? 'success' : 'default'}
-                        variant={currentlyActive ? 'filled' : 'outlined'}
-                      />
+                      {formatEmploymentDates(employee, mode, t)}
                       {statusConflict ? (
                         <Tooltip title={t.employees.table.statusConflict}>
                           <WarningAmberOutlined
@@ -251,17 +278,98 @@ function formatIdentity(
   return values.length > 0 ? values.join(' · ') : t.employees.table.noIdentity;
 }
 
-function formatEmploymentPeriod(
+function formatEmploymentDates(
   employee: Employee,
+  mode: EmployeeListMode,
   t: ReturnType<typeof useTranslations>,
 ): string {
-  if (!employee.employmentStartDate) {
-    return t.employees.table.noStartDate;
-  }
+  const first = employee.firstToyotaEmploymentDate
+    ? dateFormatter.format(employee.firstToyotaEmploymentDate)
+    : t.employees.table.noFirstToyotaDate;
+  const second =
+    mode === 'active'
+      ? employee.employmentStartDate
+      : employee.employmentEndDate;
+  const fallback =
+    mode === 'active'
+      ? t.employees.table.noStartDate
+      : t.employees.table.noFinalEndDate;
+  return `${first} / ${second ? dateFormatter.format(second) : fallback}`;
+}
 
-  const start = dateFormatter.format(employee.employmentStartDate);
-  const end = employee.employmentEndDate
-    ? dateFormatter.format(employee.employmentEndDate)
-    : t.employees.table.noEndDate;
-  return `${start} – ${end}`;
+function SortableHeader({
+  column,
+  sort,
+  onSort,
+  label,
+}: {
+  column: EmployeeSortKey;
+  sort: EmployeeSortState;
+  onSort: (key: EmployeeSortKey) => void;
+  label: string;
+}) {
+  const active = sort.key === column;
+  return (
+    <TableCell sortDirection={active ? sort.direction : false}>
+      <TableSortLabel
+        active={active}
+        direction={active ? sort.direction : 'asc'}
+        onClick={() => onSort(column)}
+        aria-label={label}
+      >
+        {label}
+      </TableSortLabel>
+    </TableCell>
+  );
+}
+
+const departmentStyles: Record<string, { bg: string; color: string }> = {
+  Metal: { bg: '#dbeafe', color: '#1e3a8a' },
+  Szwalnia: { bg: '#fce7f3', color: '#831843' },
+  Montaż: { bg: '#dcfce7', color: '#14532d' },
+  PU: { bg: '#fef3c7', color: '#78350f' },
+  Headliner: { bg: '#ede9fe', color: '#4c1d95' },
+  Magazyn: { bg: '#e5e7eb', color: '#1f2937' },
+};
+
+function departmentChip(label: string) {
+  const style = departmentStyles[label] ?? { bg: '#f3f4f6', color: '#374151' };
+  return (
+    <Chip
+      size="small"
+      label={label}
+      sx={{ bgcolor: style.bg, color: style.color, fontWeight: 700 }}
+    />
+  );
+}
+
+function shiftChip(
+  shift: Employee['shiftAssignment'],
+  t: ReturnType<typeof useTranslations>,
+) {
+  if (!shift)
+    return (
+      <Chip
+        size="small"
+        variant="outlined"
+        label={t.organization.shifts.unassigned}
+      />
+    );
+  const label = t.employees.table.shiftShort[shift];
+  const styles = {
+    RED: { bgcolor: '#fee2e2', color: '#991b1b' },
+    WHITE: {
+      bgcolor: '#ffffff',
+      color: '#374151',
+      border: '1px solid #9ca3af',
+    },
+    BLUE: { bgcolor: '#dbeafe', color: '#1e3a8a' },
+  } as const;
+  return (
+    <Chip
+      size="small"
+      label={label}
+      sx={{ ...styles[shift], fontWeight: 700 }}
+    />
+  );
 }

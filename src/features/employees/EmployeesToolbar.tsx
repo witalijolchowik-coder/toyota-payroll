@@ -1,14 +1,12 @@
 import CloseOutlined from '@mui/icons-material/CloseOutlined';
 import SearchOutlined from '@mui/icons-material/SearchOutlined';
 import {
-  FormControl,
   IconButton,
   InputAdornment,
-  InputLabel,
-  MenuItem,
-  Select,
   Stack,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
 
 import { useTranslations } from '../../hooks/useTranslations';
@@ -59,23 +57,21 @@ export function EmployeesToolbar({
           },
         }}
       />
-      <FormControl sx={{ minWidth: { sm: 180 } }}>
-        <InputLabel id="employee-status-filter-label">
-          {t.employees.search.statusLabel}
-        </InputLabel>
-        <Select
-          labelId="employee-status-filter-label"
-          value={status}
-          label={t.employees.search.statusLabel}
-          onChange={(event) =>
-            onStatusChange(event.target.value as EmployeeStatusFilter)
-          }
-        >
-          <MenuItem value="all">{t.employees.search.all}</MenuItem>
-          <MenuItem value="active">{t.employees.search.active}</MenuItem>
-          <MenuItem value="inactive">{t.employees.search.inactive}</MenuItem>
-        </Select>
-      </FormControl>
+      <ToggleButtonGroup
+        exclusive
+        size="small"
+        value={status}
+        onChange={(_, value: EmployeeStatusFilter | null) => {
+          if (value) onStatusChange(value);
+        }}
+        aria-label={t.employees.search.statusLabel}
+        sx={{ minWidth: { sm: 210 }, alignSelf: { sm: 'center' } }}
+      >
+        <ToggleButton value="active">{t.employees.search.active}</ToggleButton>
+        <ToggleButton value="archive">
+          {t.employees.search.archive}
+        </ToggleButton>
+      </ToggleButtonGroup>
     </Stack>
   );
 }

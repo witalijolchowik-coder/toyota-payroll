@@ -283,7 +283,7 @@ function normalizeInterval(
 
   let start = parseClockMinutes(interval.startTime);
   let end = parseClockMinutes(interval.endTime);
-  if (end <= start) {
+  if (end < start) {
     end += MINUTES_PER_DAY;
   }
 

@@ -6,6 +6,8 @@ import {
   query,
   serverTimestamp,
   updateDoc,
+  writeBatch,
+  runTransaction,
   orderBy,
 } from 'firebase/firestore';
 
@@ -45,6 +47,8 @@ import {
   getFirestoreClient,
   getFirestoreRepositories,
 } from './firestoreService';
+import { appendAuditEntryToBatch } from './auditService';
+import { dailyValueDocumentId } from './firestore/paths';
 
 export type AbsenceServiceErrorCode =
   | 'firebase-unavailable'
@@ -388,7 +392,7 @@ async function assertNoBlockingL4(
 export async function createAbsence(
   input: AbsenceCreateInput,
 ): Promise<string> {
-  const { repositories, uid } = requireContext();
+  const { firestore, repositories, uid } = requireContext();
   const normalized = {
     ...input,
     absenceCode: normalizeAbsenceCode(input.absenceCode),
@@ -398,7 +402,9 @@ export async function createAbsence(
   await assertWritableMonth(monthId);
   await assertNoBlockingL4(normalized);
 
-  const reference = await addDoc(repositories.forMonth(monthId).absences, {
+  const reference = doc(repositories.forMonth(monthId).absences);
+  const batch = writeBatch(firestore);
+  batch.set(reference, {
     employee_id: normalized.employeeId,
     teta_number: normalized.tetaNumber,
     absence_code: normalized.absenceCode,
@@ -414,6 +420,21 @@ export async function createAbsence(
     updated_at: serverTimestamp(),
     updated_by: uid,
   });
+  appendAuditEntryToBatch(batch, repositories, {
+    entityPath: reference.path,
+    action: 'create',
+    actorUid: uid,
+    changes: {
+      employee_id: normalized.employeeId,
+      teta_number: normalized.tetaNumber,
+      date: normalized.startDate,
+      previous_value: null,
+      new_value: normalized.absenceCode,
+      change_kind:
+        normalized.absenceCode === 'L4' ? 'manual-l4-reported' : 'day-absence',
+    },
+  });
+  await batch.commit();
   return reference.id;
 }
 
@@ -664,18 +685,129 @@ export async function updateAbsence(
   );
 }
 
+export async function saveDayAbsence({
+  existingAbsence,
+  input,
+}: {
+  existingAbsence?: Absence | null;
+  input: AbsenceCreateInput;
+}): Promise<string> {
+  if (
+    existingAbsence &&
+    (existingAbsence.source !== 'manual' ||
+      existingAbsence.status !== 'ACTIVE' ||
+      existingAbsence.startDate !== existingAbsence.endDate)
+  ) {
+    throw new AbsenceServiceError('read-only-record');
+  }
+  const { firestore, repositories, uid } = requireContext();
+  const normalized: AbsenceCreateInput = {
+    ...input,
+    absenceCode: normalizeAbsenceCode(input.absenceCode),
+  };
+  assertValidInput(normalized, existingAbsence?.monthId);
+  const monthId = ownerMonthId(normalized.startDate);
+  await assertWritableMonth(monthId);
+  await assertNoBlockingL4(normalized, existingAbsence?.id);
+
+  const absenceReference = doc(repositories.forMonth(monthId).absences);
+  const previousAbsenceReference = existingAbsence
+    ? doc(repositories.forMonth(monthId).absences, existingAbsence.id)
+    : null;
+  const dailyValueReference = doc(
+    repositories.forMonth(monthId).dailyValues,
+    dailyValueDocumentId(normalized.employeeId, normalized.startDate),
+  );
+  const auditReference = doc(repositories.auditLog);
+
+  await runTransaction(firestore, async (transaction) => {
+    const dailyValueSnapshot = await transaction.get(dailyValueReference);
+    if (
+      dailyValueSnapshot.exists() &&
+      dailyValueSnapshot.data().source !== 'manual'
+    ) {
+      throw new AbsenceServiceError('read-only-record');
+    }
+    if (previousAbsenceReference) {
+      transaction.update(previousAbsenceReference, {
+        status: 'CANCELLED',
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      });
+    }
+    if (dailyValueSnapshot.exists()) {
+      transaction.delete(dailyValueReference);
+    }
+    transaction.set(absenceReference, {
+      employee_id: normalized.employeeId,
+      teta_number: normalized.tetaNumber,
+      absence_code: normalized.absenceCode,
+      start_date: normalized.startDate,
+      end_date: normalized.endDate,
+      hours_per_day: null,
+      source: 'manual',
+      import_id: null,
+      status: 'ACTIVE',
+      note: normalized.note,
+      created_at: serverTimestamp(),
+      created_by: uid,
+      updated_at: serverTimestamp(),
+      updated_by: uid,
+    });
+    transaction.set(auditReference, {
+      entity_path: absenceReference.path,
+      action:
+        existingAbsence || dailyValueSnapshot.exists() ? 'update' : 'create',
+      actor_uid: uid,
+      occurred_at: serverTimestamp(),
+      changes: {
+        employee_id: normalized.employeeId,
+        teta_number: normalized.tetaNumber,
+        date: normalized.startDate,
+        previous_value:
+          existingAbsence?.absenceCode ??
+          (dailyValueSnapshot.exists()
+            ? dailyValueSnapshot.data().hours
+            : null),
+        new_value: normalized.absenceCode,
+        change_kind:
+          normalized.absenceCode === 'L4'
+            ? 'manual-l4-reported'
+            : 'hours-to-absence',
+      },
+    });
+  });
+  return absenceReference.id;
+}
+
 export async function cancelAbsence(absence: Absence): Promise<void> {
   if (absence.source !== 'manual' || absence.status !== 'ACTIVE') {
     throw new AbsenceServiceError('read-only-record');
   }
-  const { repositories, uid } = requireContext();
+  const { firestore, repositories, uid } = requireContext();
   await assertWritableMonth(absence.monthId);
-  await updateDoc(
-    doc(repositories.forMonth(absence.monthId).absences, absence.id),
-    {
-      status: 'CANCELLED',
-      updated_at: serverTimestamp(),
-      updated_by: uid,
-    },
+  const reference = doc(
+    repositories.forMonth(absence.monthId).absences,
+    absence.id,
   );
+  const batch = writeBatch(firestore);
+  batch.update(reference, {
+    status: 'CANCELLED',
+    updated_at: serverTimestamp(),
+    updated_by: uid,
+  });
+  appendAuditEntryToBatch(batch, repositories, {
+    entityPath: reference.path,
+    action: 'update',
+    actorUid: uid,
+    changes: {
+      employee_id: absence.employeeId,
+      teta_number: absence.tetaNumber,
+      date: absence.startDate,
+      previous_value: absence.absenceCode,
+      new_value: null,
+      change_kind: 'absence-replacement',
+    },
+  });
+  await batch.commit();
 }

@@ -19,6 +19,21 @@ describe('daily work-time deviations', () => {
     });
   });
 
+  it('treats equal actual start and end as zero worked hours', () => {
+    expect(
+      resolveDailyWorkTimeDeviation({
+        planned: plannedIntervalForShift('FIRST'),
+        actual: { startTime: '06:00', endTime: '06:00' },
+        isWorkingDay: true,
+      }),
+    ).toMatchObject({
+      normalWorkHours: 0,
+      privateTimeHours: 8,
+      overtime50Hours: 0,
+      overtime100Hours: 0,
+    });
+  });
+
   it('classifies late start and late finish as private time plus covering extra time', () => {
     expect(
       resolveDailyWorkTimeDeviation({

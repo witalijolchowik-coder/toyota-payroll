@@ -23,7 +23,7 @@ import {
 import { useTranslations } from '../../hooks/useTranslations';
 import { useNotification } from '../../hooks/useNotification';
 import { interpolate } from '../../i18n/pl';
-import { createAbsence } from '../../services/absencesService';
+import { createAbsence, saveDayAbsence } from '../../services/absencesService';
 import {
   SettlementServiceError,
   type SettlementServiceErrorCode,
@@ -44,6 +44,7 @@ import {
   isEmployeeActiveOnDate,
   resolveMonthlyEmployeeEntitlements,
 } from '../../utils/payroll';
+import type { AbsenceCode } from '../../utils/absences';
 import { CalendarConstructorToolbar } from './CalendarConstructorToolbar';
 import {
   calendarConstructorBlockedReason,
@@ -64,6 +65,10 @@ import {
   type CalendarDay,
   type SettlementCellValue,
 } from './monthUtils';
+import {
+  generateEmployeeMonthlySchedule,
+  type PlannedScheduleDay,
+} from '../../utils/schedule';
 import { parseDailyHoursInput } from './dailyValueEntry';
 import { PayrollDraftPanel } from './PayrollDraftPanel';
 import {
@@ -96,6 +101,7 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
     day: CalendarDay;
     value: SettlementCellValue;
     hasGoverningAbsence: boolean;
+    plannedDay?: PlannedScheduleDay;
   } | null>(null);
   const [selectedTool, setSelectedTool] =
     useState<CalendarConstructorTool>('review');
@@ -305,9 +311,15 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
     containsOutsideEmployment,
   });
 
-  const selectConstructorCell = (employee: Employee, day: CalendarDay) => {
+  const selectConstructorCell = (
+    employee: Employee,
+    day: CalendarDay,
+    value: SettlementCellValue,
+    hasGoverningAbsence: boolean,
+    plannedDay?: PlannedScheduleDay,
+  ) => {
     if (selectedTool === 'review') {
-      setFocusedEmployee(employee);
+      setEditingCell({ employee, day, value, hasGoverningAbsence, plannedDay });
       return;
     }
     setSelection((current) =>
@@ -608,9 +620,8 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
             isSettled={data.month.isSettled}
             displayMode={calendarDisplayMode}
             selection={selection}
-            onSelectCell={(employee, day) =>
-              selectConstructorCell(employee, day)
-            }
+            onSelectCell={selectConstructorCell}
+            onOpenEmployeeCalendar={setFocusedEmployee}
           />
           <SettlementReviewPanel
             drafts={calculationDrafts}
@@ -664,16 +675,37 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
           day={editingCell.day}
           value={editingCell.value}
           hasGoverningAbsence={editingCell.hasGoverningAbsence}
+          plannedDay={editingCell.plannedDay}
+          governingAbsence={
+            participatingAbsences.find(
+              (absence) =>
+                absence.employeeId === editingCell.employee.id &&
+                absence.status === 'ACTIVE' &&
+                absence.startDate <= editingCell.day.isoDate &&
+                absence.endDate >= editingCell.day.isoDate,
+            ) ?? null
+          }
           onClose={() => setEditingCell(null)}
           onSave={async (hours, note, workTimeCorrection) => {
-            await saveManualDailyValue(monthId, {
-              employeeId: editingCell.employee.id,
-              tetaNumber: editingCell.employee.tetaNumber,
-              date: editingCell.day.isoDate,
-              hours,
-              note,
-              workTimeCorrection,
-            });
+            const existingAbsence = participatingAbsences.find(
+              (absence) =>
+                absence.employeeId === editingCell.employee.id &&
+                absence.status === 'ACTIVE' &&
+                absence.startDate <= editingCell.day.isoDate &&
+                absence.endDate >= editingCell.day.isoDate,
+            );
+            await saveManualDailyValue(
+              monthId,
+              {
+                employeeId: editingCell.employee.id,
+                tetaNumber: editingCell.employee.tetaNumber,
+                date: editingCell.day.isoDate,
+                hours,
+                note,
+                workTimeCorrection,
+              },
+              existingAbsence ?? null,
+            );
             await reload();
             notify({
               message: t.settlement.notifications.dailyValueSaved,
@@ -692,6 +724,42 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
               severity: 'success',
             });
           }}
+          onSaveAbsence={async (code: AbsenceCode, note) => {
+            const existing = participatingAbsences.find(
+              (absence) =>
+                absence.employeeId === editingCell.employee.id &&
+                absence.status === 'ACTIVE' &&
+                absence.startDate <= editingCell.day.isoDate &&
+                absence.endDate >= editingCell.day.isoDate,
+            );
+            if (
+              existing?.source === 'absence_import' ||
+              (existing && existing.startDate !== existing.endDate)
+            ) {
+              throw new Error('read-only-record');
+            }
+            const absenceInput = {
+              employeeId: editingCell.employee.id,
+              tetaNumber: editingCell.employee.tetaNumber,
+              absenceCode: code,
+              startDate: editingCell.day.isoDate,
+              endDate: editingCell.day.isoDate,
+              hoursPerDay: null,
+              note,
+            };
+            await saveDayAbsence({
+              existingAbsence: existing,
+              input: absenceInput,
+            });
+            await reload();
+            notify({
+              message:
+                code === 'L4'
+                  ? t.settlement.notifications.manualL4Saved
+                  : t.settlement.notifications.absenceSaved,
+              severity: 'success',
+            });
+          }}
         />
       ) : null}
 
@@ -704,13 +772,25 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
           absences={participatingAbsences}
           departments={data.departments}
           isSettled={data.month.isSettled}
+          plannedSchedule={generateEmployeeMonthlySchedule({
+            employee: focusedEmployee,
+            days,
+            departments: data.departments,
+            options: {
+              assignments: data.employeeAssignments,
+              corrections: data.scheduleCorrections,
+              publicHolidays,
+              publicHolidayNames,
+            },
+          })}
           onClose={() => setFocusedEmployee(null)}
-          onEditDay={(day, value, hasGoverningAbsence) =>
+          onEditDay={(day, value, hasGoverningAbsence, plannedDay) =>
             setEditingCell({
               employee: focusedEmployee,
               day,
               value,
               hasGoverningAbsence,
+              plannedDay,
             })
           }
         />

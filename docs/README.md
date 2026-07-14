@@ -90,6 +90,7 @@ documents continue to govern system structure and implementation boundaries.
 - [ADR 0020: Preview-first initial employee base import](decisions/0020-initial-employee-base-import.md)
 - [ADR 0021: Template-based employee import and bulk update](decisions/0021-employee-import-templates.md)
 - [ADR 0022: Department schedule planning foundation](decisions/0022-department-schedule-planning.md)
+- [ADR 0023: Employee register and shared day editor](decisions/0023-employee-register-and-day-editor.md)
 
 ## Audit and readiness reports
 
