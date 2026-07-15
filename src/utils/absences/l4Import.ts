@@ -173,21 +173,8 @@ export function parseL4ReportWorkbook(
     .filter((row): row is L4ImportSourceRow => Boolean(row));
 }
 
-function isConsecutive(
-  first: { startDate: IsoDate; endDate: IsoDate },
-  second: {
-    startDate: IsoDate;
-    endDate: IsoDate;
-  },
-): boolean {
-  const dayAfterFirst = new Date(`${first.endDate}T00:00:00.000Z`);
-  dayAfterFirst.setUTCDate(dayAfterFirst.getUTCDate() + 1);
-  const dayAfterSecond = new Date(`${second.endDate}T00:00:00.000Z`);
-  dayAfterSecond.setUTCDate(dayAfterSecond.getUTCDate() + 1);
-  return (
-    dayAfterFirst.toISOString().slice(0, 10) === second.startDate ||
-    dayAfterSecond.toISOString().slice(0, 10) === first.startDate
-  );
+export function isL4ImportType(value: string): boolean {
+  return /L\s*4/i.test(value.trim());
 }
 
 function classifyMatchedL4Row(
@@ -238,14 +225,10 @@ function classifyMatchedL4Row(
   const manualMatch = manualL4Existing.find(
     (absence) =>
       absence.monthId === ownerMonthId &&
-      (absenceRangesOverlap(absence, {
+      absenceRangesOverlap(absence, {
         startDate: row.startDate!,
         endDate: row.endDate!,
-      }) ||
-        isConsecutive(absence, {
-          startDate: row.startDate!,
-          endDate: row.endDate!,
-        })),
+      }),
   );
   if (manualMatch) {
     return { status: 'confirm-manual', message: 'confirm-manual' };
@@ -260,20 +243,6 @@ function classifyMatchedL4Row(
   );
   if (activeNonL4Overlap) {
     return { status: 'overlap-review', message: 'overlap-review' };
-  }
-  const consecutive = importedExisting.find(
-    (absence) =>
-      normalizeAbsenceCode(absence.absenceCode) === 'L4' &&
-      isConsecutive(absence, {
-        startDate: row.startDate!,
-        endDate: row.endDate!,
-      }),
-  );
-  if (consecutive) {
-    return {
-      status: 'continuation-review',
-      message: 'continuation-review',
-    };
   }
   if (!context.existingMonthIds.has(ownerMonthId)) {
     return { status: 'month-missing', message: 'month-missing' };
@@ -311,7 +280,7 @@ export function buildL4ImportPreview(
         message: row.errors[0] ?? 'invalid-row',
       };
     }
-    if (normalizeAbsenceCode(row.absenceType) !== 'L4') {
+    if (!isL4ImportType(row.absenceType)) {
       return {
         ...row,
         id,

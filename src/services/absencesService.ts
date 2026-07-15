@@ -145,20 +145,6 @@ function ownerMonthIdsForRange(
   return uniqueMonthIds(result);
 }
 
-function areConsecutiveAbsenceRanges(
-  first: { startDate: IsoDate; endDate: IsoDate },
-  second: { startDate: IsoDate; endDate: IsoDate },
-): boolean {
-  const dayAfterFirst = new Date(`${first.endDate}T00:00:00.000Z`);
-  dayAfterFirst.setUTCDate(dayAfterFirst.getUTCDate() + 1);
-  const dayAfterSecond = new Date(`${second.endDate}T00:00:00.000Z`);
-  dayAfterSecond.setUTCDate(dayAfterSecond.getUTCDate() + 1);
-  return (
-    dayAfterFirst.toISOString().slice(0, 10) === second.startDate ||
-    dayAfterSecond.toISOString().slice(0, 10) === first.startDate
-  );
-}
-
 async function loadAbsencesOwnedByMonths(
   monthIds: MonthId[],
 ): Promise<Absence[]> {
@@ -557,8 +543,7 @@ export async function applyL4ImportRows({
           absence.source === 'manual' &&
           absence.monthId === monthId &&
           normalizeAbsenceCode(absence.absenceCode) === 'L4' &&
-          (absenceRangesOverlap(absence, { startDate, endDate }) ||
-            areConsecutiveAbsenceRanges(absence, { startDate, endDate })),
+          absenceRangesOverlap(absence, { startDate, endDate }),
       );
       if (manualToConfirm) {
         await updateDoc(

@@ -86,13 +86,13 @@ If a row is unmatched or ambiguous, the coordinator may select an existing
 employee manually in the preview. Manual resolution does not bypass safety
 checks: the row is classified again before it can become ready for import.
 
-Preview statuses include ready, duplicate, overlap requiring review,
-continuation requiring review, unmatched, ambiguous, invalid, unsupported type
-and missing owner month.
+Preview statuses include ready, duplicate, overlap requiring review, unmatched,
+ambiguous, invalid, unsupported type and missing owner month.
 
-Exact active duplicates are skipped. Overlaps, possible continuations and
-non-L4 conflicts require review. Imported absence documents are stored once
-under the start month:
+Exact active duplicates are skipped. Adjacent, non-overlapping L4 periods are
+separate absence documents and are imported without merging or manual review.
+Actual date overlaps and non-L4 conflicts require review. Imported absence
+documents are stored once under the start month:
 
 ```text
 months/{startMonthId}/absences/{absenceId}
@@ -101,14 +101,15 @@ months/{startMonthId}/absences/{absenceId}
 The full absence date range is preserved, including cross-month and
 cross-year periods.
 
-Only `L4` is supported in this importer. Other absence types stay out of the
-write set.
+Only L4 is supported in this importer. A source value containing `L4` plus any
+additional comment, for example `L4 + opieka/szpital`, is treated as L4. Other
+absence types stay out of the write set.
 
 ## Known limitations
 
 - Ambiguous/unmatched L4 rows can be resolved manually to an existing employee,
-  but rows that still require duplicate, overlap, continuation or missing-month
-  review remain blocked from import.
+  but rows that still require duplicate, overlap or missing-month review remain
+  blocked from import.
 - Toyota-specific calendar override governance remains open.
 - Readiness is an operational guide, not final month closing or payroll
   approval.

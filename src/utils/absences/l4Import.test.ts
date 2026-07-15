@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { Absence, Employee } from '../../types/firestore';
 import {
   buildL4ImportPreview,
+  isL4ImportType,
   l4RowsToCreate,
   parseL4DateCell,
   resolveL4ImportPreviewRow,
@@ -116,7 +117,7 @@ describe('L4 import helpers', () => {
     ).toBe('unmatched');
   });
 
-  it('skips exact imported duplicates and sends imported overlaps or continuations to review', () => {
+  it('skips exact imported duplicates, reviews overlaps and accepts adjacent L4 documents', () => {
     const employees = [employee('employee-1', 'Jan', 'Kowalski', '100')];
     const context = {
       employees,
@@ -139,7 +140,30 @@ describe('L4 import helpers', () => {
         [row({ startDate: '2026-07-11', endDate: '2026-07-12' })],
         context,
       )[0]?.status,
-    ).toBe('continuation-review');
+    ).toBe('ready');
+  });
+
+  it('treats source text containing L4 plus a comment as L4', () => {
+    expect(isL4ImportType('L4 + opieka/szpital')).toBe(true);
+    expect(isL4ImportType('komentarz L 4 szpital')).toBe(true);
+    expect(isL4ImportType('UW')).toBe(false);
+
+    const preview = buildL4ImportPreview(
+      [row({ absenceType: 'L4 + opieka/szpital' })],
+      {
+        employees: [employee('employee-1', 'Jan', 'Kowalski', '100')],
+        existingAbsences: [],
+        existingMonthIds: new Set(['2026-07']),
+        today: '2026-07-12',
+      },
+    );
+
+    expect(preview[0]).toMatchObject({
+      status: 'ready',
+      employeeId: 'employee-1',
+      tetaNumber: '100',
+    });
+    expect(l4RowsToCreate(preview)).toHaveLength(1);
   });
 
   it('confirms a matching manual L4 instead of creating a parallel duplicate', () => {
@@ -162,6 +186,12 @@ describe('L4 import helpers', () => {
         context,
       )[0]?.status,
     ).toBe('confirm-manual');
+    expect(
+      buildL4ImportPreview(
+        [row({ startDate: '2026-07-11', endDate: '2026-07-12' })],
+        context,
+      )[0]?.status,
+    ).toBe('ready');
   });
 
   it('marks imported future-start L4 as anomalous and not creatable', () => {
