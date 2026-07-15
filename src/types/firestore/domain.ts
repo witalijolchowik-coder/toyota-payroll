@@ -24,6 +24,7 @@ import type {
   ReportStatus,
   ScheduleCorrectionKind,
   ScheduleCorrectionStatus,
+  ShiftConfigurationStatus,
   SettlementReviewStatus,
   SettlementTotalsDocument,
   TetaNumber,
@@ -62,6 +63,29 @@ export interface Department extends ModificationMetadata {
   rotationBaseAssignment?: Partial<
     Record<EmployeeColorShift, ActualWorkingShift>
   > | null;
+}
+
+export interface ShiftInterval {
+  startTime: string;
+  endTime: string;
+}
+
+export interface ShiftHoursVersion extends ModificationMetadata {
+  id: string;
+  validFrom: IsoDate;
+  intervals: Record<ActualWorkingShift, ShiftInterval>;
+  active: boolean;
+  note: string | null;
+}
+
+export interface DepartmentShiftCorrection extends ModificationMetadata {
+  id: string;
+  departmentId: DepartmentId;
+  effectiveDate: IsoDate;
+  shiftMode: Exclude<DepartmentShiftMode, 'UNKNOWN'>;
+  groupAssignments: Partial<Record<EmployeeColorShift, ActualWorkingShift>>;
+  status: ShiftConfigurationStatus;
+  note: string | null;
 }
 
 export interface EmployeeAssignment extends ModificationMetadata {

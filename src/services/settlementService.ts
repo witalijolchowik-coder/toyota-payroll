@@ -23,6 +23,8 @@ import type {
   PayrollMonth,
   ScheduleCorrection,
   SettlementReviewState,
+  ShiftHoursVersion,
+  DepartmentShiftCorrection,
 } from '../types/firestore';
 import { loadAbsencesOverlappingMonth } from './absencesService';
 import { canonicalDepartmentsFallback } from './departmentsService';
@@ -37,6 +39,8 @@ import {
   mapPayrollSettingDocument,
   mapScheduleCorrectionDocument,
   mapSettlementReviewDocument,
+  mapShiftHoursVersionDocument,
+  mapDepartmentShiftCorrectionDocument,
 } from './firestore/mappers';
 import {
   getFirestoreClient,
@@ -65,6 +69,8 @@ export interface SettlementMonthData {
   payrollSettings: PayrollSetting[];
   adjustments: Adjustment[];
   reviewStates: SettlementReviewState[];
+  shiftHoursVersions: ShiftHoursVersion[];
+  departmentShiftCorrections: DepartmentShiftCorrection[];
 }
 
 async function requireActorUid(): Promise<string> {
@@ -123,6 +129,8 @@ export async function loadSettlementMonth(
     payrollSettings,
     adjustments,
     reviewStates,
+    shiftHoursVersions,
+    departmentShiftCorrections,
   ] = await Promise.all([
     optionalSettlementLayer(async () => {
       const snapshot = await getDocs(repositories.employeeEntitlements);
@@ -188,6 +196,18 @@ export async function loadSettlementMonth(
         mapSettlementReviewDocument(document.id, monthId, document.data()),
       );
     }, [] as SettlementReviewState[]),
+    optionalSettlementLayer(async () => {
+      const snapshot = await getDocs(repositories.shiftHoursVersions);
+      return snapshot.docs.map((document) =>
+        mapShiftHoursVersionDocument(document.id, document.data()),
+      );
+    }, [] as ShiftHoursVersion[]),
+    optionalSettlementLayer(async () => {
+      const snapshot = await getDocs(repositories.departmentShiftCorrections);
+      return snapshot.docs.map((document) =>
+        mapDepartmentShiftCorrectionDocument(document.id, document.data()),
+      );
+    }, [] as DepartmentShiftCorrection[]),
   ]);
 
   return {
@@ -202,6 +222,8 @@ export async function loadSettlementMonth(
     payrollSettings,
     adjustments,
     reviewStates,
+    shiftHoursVersions,
+    departmentShiftCorrections,
   };
 }
 

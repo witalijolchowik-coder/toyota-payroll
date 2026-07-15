@@ -49,6 +49,21 @@ export interface DailyWorkTimeDeviation {
   unresolved: boolean;
 }
 
+export type PlanToFactOutcome =
+  | 'MATCHES_PLAN'
+  | 'STARTED_EARLIER'
+  | 'STARTED_LATER'
+  | 'ENDED_EARLIER'
+  | 'ENDED_LATER'
+  | 'WORKED_MORE'
+  | 'WORKED_LESS'
+  | 'PLANNED_DAY_OFF'
+  | 'SATURDAY'
+  | 'SUNDAY'
+  | 'PUBLIC_HOLIDAY'
+  | 'DIFFERENT_INTERVAL'
+  | 'REQUIRES_REVIEW';
+
 export interface MonthlyWorkTimeBalanceInput {
   privateTimeHours: number;
   coverableNiHours: number;
@@ -113,6 +128,9 @@ export function resolveDailyWorkTimeDeviation({
 }: DailyWorkTimeDeviationInput): DailyWorkTimeDeviation {
   const plannedInterval = normalizeInterval(planned);
   const actualInterval = normalizeInterval(actual ?? planned, plannedInterval);
+  const actualNightHours = nightOverlapHours(
+    segment(actualInterval.start, actualInterval.end),
+  );
   const dayIs100 = isSaturday || isSunday || isPublicHoliday;
 
   if (!isWorkingDay) {
@@ -134,7 +152,7 @@ export function resolveDailyWorkTimeDeviation({
         coverableNiHours: 0,
         holidayWorkBonusEligible: isPublicHoliday && overtime100Hours > 0,
         nightOvertimeHours: 0,
-        nightAllowanceHours: 0,
+        nightAllowanceHours: actualNightHours,
         unresolved: false,
       },
       classificationOverride,
@@ -181,11 +199,43 @@ export function resolveDailyWorkTimeDeviation({
       coverableNiHours: 0,
       holidayWorkBonusEligible: isPublicHoliday && extraHours > 0,
       nightOvertimeHours: roundHours(overtime100FromNight),
-      nightAllowanceHours: 0,
+      nightAllowanceHours: actualNightHours,
       unresolved: false,
     },
     classificationOverride,
   );
+}
+
+export function resolvePlanToFactOutcomes({
+  planned,
+  actual,
+  isWorkingDay,
+  isSaturday = false,
+  isSunday = false,
+  isPublicHoliday = false,
+}: Omit<
+  DailyWorkTimeDeviationInput,
+  'classificationOverride'
+>): PlanToFactOutcome[] {
+  if (!actual) return ['MATCHES_PLAN'];
+  const plan = normalizeInterval(planned);
+  const fact = normalizeInterval(actual, plan);
+  const outcomes: PlanToFactOutcome[] = [];
+  if (!isWorkingDay) outcomes.push('PLANNED_DAY_OFF');
+  if (isSaturday) outcomes.push('SATURDAY');
+  if (isSunday) outcomes.push('SUNDAY');
+  if (isPublicHoliday) outcomes.push('PUBLIC_HOLIDAY');
+  if (fact.start < plan.start) outcomes.push('STARTED_EARLIER');
+  if (fact.start > plan.start) outcomes.push('STARTED_LATER');
+  if (fact.end < plan.end) outcomes.push('ENDED_EARLIER');
+  if (fact.end > plan.end) outcomes.push('ENDED_LATER');
+  const planHours = (plan.end - plan.start) / 60;
+  const actualHours = (fact.end - fact.start) / 60;
+  if (actualHours > planHours) outcomes.push('WORKED_MORE');
+  if (actualHours < planHours) outcomes.push('WORKED_LESS');
+  if (fact.start !== plan.start || fact.end !== plan.end)
+    outcomes.push('DIFFERENT_INTERVAL');
+  return outcomes.length === 0 ? ['MATCHES_PLAN'] : [...new Set(outcomes)];
 }
 
 export function balanceMonthlyWorkTimeDeviations({

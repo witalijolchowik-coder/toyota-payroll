@@ -32,8 +32,10 @@ import type {
 import { ABSENCE_CODES, type AbsenceCode } from '../../utils/absences';
 import {
   DEFAULT_SHIFT_INTERVALS,
+  intervalHours,
   isValidClockTime,
   resolveDailyWorkTimeDeviation,
+  resolvePlanToFactOutcomes,
 } from '../../utils/payroll';
 import type { PlannedScheduleDay } from '../../utils/schedule';
 import {
@@ -87,7 +89,7 @@ export function DailyValueEditorDialog({
   const [tab, setTab] = useState<'hours' | 'absence'>(
     hasGoverningAbsence ? 'absence' : 'hours',
   );
-  const [input, setInput] = useState(() => defaultHours.toString());
+  const input = defaultHours.toString();
   const [note, setNote] = useState(
     () => value.coordinatorNote ?? governingAbsence?.note ?? '',
   );
@@ -95,10 +97,16 @@ export function DailyValueEditorDialog({
     () => value.workTimeCorrection?.plannedShift ?? plannedShiftFromSchedule,
   );
   const [actualStartTime, setActualStartTime] = useState(
-    () => value.workTimeCorrection?.actualStartTime ?? '',
+    () =>
+      value.workTimeCorrection?.actualStartTime ??
+      plannedDay?.plannedStartTime ??
+      '',
   );
   const [actualEndTime, setActualEndTime] = useState(
-    () => value.workTimeCorrection?.actualEndTime ?? '',
+    () =>
+      value.workTimeCorrection?.actualEndTime ??
+      plannedDay?.plannedEndTime ??
+      '',
   );
   const [absenceCode, setAbsenceCode] = useState<AbsenceCode>(
     () => (governingAbsence?.absenceCode as AbsenceCode | undefined) ?? 'L4',
@@ -110,16 +118,21 @@ export function DailyValueEditorDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const employeeName = `${employee.lastName} ${employee.firstName}`;
   const plannedInterval = plannedShift
-    ? DEFAULT_SHIFT_INTERVALS[plannedShift]
+    ? plannedDay?.shift === plannedShift &&
+      plannedDay.plannedStartTime &&
+      plannedDay.plannedEndTime
+      ? {
+          startTime: plannedDay.plannedStartTime,
+          endTime: plannedDay.plannedEndTime,
+        }
+      : DEFAULT_SHIFT_INTERVALS[plannedShift]
     : null;
   const parsedHours = parseDailyHoursInput(input);
   const inferredActual =
-    parsedHours.kind === 'value' && plannedInterval
+    plannedInterval && actualStartTime && actualEndTime
       ? {
-          startTime: actualStartTime || plannedInterval.startTime,
-          endTime:
-            actualEndTime ||
-            addHoursToClockTime(plannedInterval.startTime, parsedHours.hours),
+          startTime: actualStartTime,
+          endTime: actualEndTime,
         }
       : null;
   const timeValidationError = Boolean(
@@ -127,6 +140,11 @@ export function DailyValueEditorDialog({
     (!isValidClockTime(inferredActual.startTime) ||
       !isValidClockTime(inferredActual.endTime)),
   );
+  const actualTotal =
+    inferredActual && !timeValidationError ? intervalHours(inferredActual) : 0;
+  const effectiveParsedHours = timeValidationError
+    ? parsedHours
+    : ({ kind: 'value', hours: actualTotal } as const);
   const workTimePreview =
     inferredActual && plannedInterval && plannedShift && !timeValidationError
       ? resolveDailyWorkTimeDeviation({
@@ -138,6 +156,17 @@ export function DailyValueEditorDialog({
           isPublicHoliday: day.isHoliday,
         })
       : null;
+  const outcomes =
+    inferredActual && plannedInterval && plannedShift && !timeValidationError
+      ? resolvePlanToFactOutcomes({
+          planned: { shift: plannedShift, ...plannedInterval },
+          actual: inferredActual,
+          isWorkingDay: day.isWorkingDay,
+          isSaturday: day.date.getUTCDay() === 6,
+          isSunday: day.date.getUTCDay() === 0,
+          isPublicHoliday: day.isHoliday,
+        })
+      : [];
   const hasExplicitHours =
     value.kind === 'manual' ||
     value.kind === 'imported' ||
@@ -185,14 +214,14 @@ export function DailyValueEditorDialog({
 
     if (confirmedImportedL4 || (hasGoverningAbsence && !replacementConfirmed))
       return;
-    if (parsedHours.kind === 'error') {
-      setValidationError(parsedHours.code);
+    if (effectiveParsedHours.kind === 'error') {
+      setValidationError(effectiveParsedHours.code);
       return;
     }
     if (timeValidationError || !plannedShift || !plannedInterval) return;
     const normalizedNote = note.trim() || null;
     const mutation = decideDailyValueMutation({
-      parsed: parsedHours,
+      parsed: effectiveParsedHours,
       currentKind: value.kind,
       currentHours: value.hours,
       currentNote: value.coordinatorNote,
@@ -206,17 +235,17 @@ export function DailyValueEditorDialog({
     });
     if (mutation === 'none') return onClose();
     if (mutation === 'clear') return void clearValue();
-    if (parsedHours.kind !== 'value' || !inferredActual) return;
+    if (effectiveParsedHours.kind !== 'value' || !inferredActual) return;
 
     setIsSubmitting(true);
     setSubmitError(null);
     try {
       const needsCorrection =
-        parsedHours.hours !== plannedHours ||
-        actualStartTime !== '' ||
-        actualEndTime !== '';
+        effectiveParsedHours.hours !== plannedHours ||
+        actualStartTime !== plannedInterval.startTime ||
+        actualEndTime !== plannedInterval.endTime;
       await onSave(
-        parsedHours.hours,
+        effectiveParsedHours.hours,
         normalizedNote,
         needsCorrection
           ? {
@@ -298,23 +327,15 @@ export function DailyValueEditorDialog({
                   </>
                 ) : null}
                 <TextField
-                  autoFocus
                   label={t.settlement.editor.actualHours}
-                  value={input}
-                  onChange={(event) => {
-                    setInput(event.target.value);
-                    setValidationError(null);
-                    setSubmitError(null);
-                  }}
+                  value={formatHours(actualTotal)}
+                  disabled
                   error={Boolean(validationError)}
                   helperText={
                     validationError
                       ? validationMessage(validationError, t)
                       : t.settlement.editor.helper
                   }
-                  slotProps={{
-                    htmlInput: { inputMode: 'decimal', autoComplete: 'off' },
-                  }}
                 />
                 <Stack spacing={1.25}>
                   {!plannedShift ? (
@@ -326,9 +347,14 @@ export function DailyValueEditorDialog({
                     select
                     label={t.settlement.editor.workTime.plannedShift}
                     value={plannedShift}
-                    onChange={(event) =>
-                      setPlannedShift(event.target.value as ActualWorkingShift)
-                    }
+                    onChange={(event) => {
+                      const next = event.target.value as ActualWorkingShift;
+                      const interval = DEFAULT_SHIFT_INTERVALS[next];
+                      setPlannedShift(next);
+                      if (!actualStartTime)
+                        setActualStartTime(interval.startTime);
+                      if (!actualEndTime) setActualEndTime(interval.endTime);
+                    }}
                   >
                     <MenuItem value="FIRST">
                       {t.organization.actualWorkingShifts.FIRST}
@@ -340,6 +366,15 @@ export function DailyValueEditorDialog({
                       {t.organization.actualWorkingShifts.NIGHT}
                     </MenuItem>
                   </TextField>
+                  {plannedInterval ? (
+                    <Alert severity="info">
+                      {interpolate(t.settlement.editor.workTime.planDetails, {
+                        start: plannedInterval.startTime,
+                        end: plannedInterval.endTime,
+                        hours: formatHours(plannedHours),
+                      })}
+                    </Alert>
+                  ) : null}
                   <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
                     <TextField
                       label={t.settlement.editor.workTime.actualStart}
@@ -365,32 +400,44 @@ export function DailyValueEditorDialog({
                     />
                   </Stack>
                   {workTimePreview ? (
-                    <Alert
-                      severity={workTimePreview.unresolved ? 'warning' : 'info'}
-                    >
-                      {interpolate(
-                        t.settlement.editor.workTime.previewExtended,
-                        {
-                          planned: formatHours(plannedHours),
-                          actual:
-                            parsedHours.kind === 'value'
-                              ? formatHours(parsedHours.hours)
-                              : '—',
-                          private: formatHours(
-                            workTimePreview.privateTimeHours,
-                          ),
-                          overtime50: formatHours(
-                            workTimePreview.overtime50Hours,
-                          ),
-                          overtime100: formatHours(
-                            workTimePreview.overtime100Hours,
-                          ),
-                          night: formatHours(
-                            workTimePreview.nightOvertimeHours,
-                          ),
-                        },
-                      )}
-                    </Alert>
+                    <Stack spacing={1}>
+                      <Alert
+                        severity={
+                          workTimePreview.unresolved ? 'warning' : 'info'
+                        }
+                      >
+                        {interpolate(
+                          t.settlement.editor.workTime.previewExtended,
+                          {
+                            planned: formatHours(plannedHours),
+                            actual:
+                              effectiveParsedHours.kind === 'value'
+                                ? formatHours(effectiveParsedHours.hours)
+                                : '—',
+                            private: formatHours(
+                              workTimePreview.privateTimeHours,
+                            ),
+                            overtime50: formatHours(
+                              workTimePreview.overtime50Hours,
+                            ),
+                            overtime100: formatHours(
+                              workTimePreview.overtime100Hours,
+                            ),
+                            night: formatHours(
+                              workTimePreview.nightAllowanceHours,
+                            ),
+                          },
+                        )}
+                      </Alert>
+                      <Typography variant="caption" color="text.secondary">
+                        {outcomes
+                          .map(
+                            (outcome) =>
+                              t.settlement.editor.workTime.outcomes[outcome],
+                          )
+                          .join(' · ')}
+                      </Typography>
+                    </Stack>
                   ) : null}
                 </Stack>
               </>
@@ -500,12 +547,6 @@ export function DailyValueEditorDialog({
       </form>
     </Dialog>
   );
-}
-
-function addHoursToClockTime(start: string, hours: number): string {
-  const [hour, minute] = start.split(':').map(Number);
-  const total = (hour! * 60 + minute! + Math.round(hours * 60)) % (24 * 60);
-  return `${String(Math.floor(total / 60)).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`;
 }
 
 function validationMessage(

@@ -6,18 +6,20 @@ import type {
   EmployeeColorShift,
   IsoDate,
   ScheduleCorrection,
+  DepartmentShiftCorrection,
+  ShiftHoursVersion,
 } from '../../types/firestore';
-import {
-  CANONICAL_DEPARTMENTS,
-  allowedColorShiftsForMode,
-  getCanonicalDepartmentDefinition,
-} from '../organization';
+import { CANONICAL_DEPARTMENTS } from '../organization';
 import {
   STANDARD_WORKING_DAY_HOURS,
   type PayrollCalendarOverrideMap,
   isPayrollWorkingDay,
 } from '../payroll';
 import { dateToIsoDate } from '../payroll/month';
+import {
+  resolveDepartmentRotationShift,
+  resolveShiftInterval,
+} from './shiftConfiguration';
 
 export type PlannedScheduleSource =
   | 'automatic'
@@ -47,6 +49,9 @@ export interface PlannedScheduleDay {
   shiftAssignment: EmployeeColorShift | null;
   reason: string | null;
   holidayName: string | null;
+  plannedStartTime: string | null;
+  plannedEndTime: string | null;
+  plannedDuration: number | null;
 }
 
 export interface MonthlyScheduleOptions {
@@ -55,6 +60,8 @@ export interface MonthlyScheduleOptions {
   overrides?: PayrollCalendarOverrideMap;
   assignments?: readonly EmployeeAssignment[];
   corrections?: readonly ScheduleCorrection[];
+  departmentShiftCorrections?: readonly DepartmentShiftCorrection[];
+  shiftHoursVersions?: readonly ShiftHoursVersion[];
 }
 
 export function generateEmployeeMonthlySchedule({
@@ -91,13 +98,19 @@ export function generateEmployeeMonthlySchedule({
       assignments: options.assignments ?? [],
       bhpDates,
       publicHolidayNames: options.publicHolidayNames,
+      departmentShiftCorrections: options.departmentShiftCorrections ?? [],
+      shiftHoursVersions: options.shiftHoursVersions ?? [],
     });
 
     if (!correction || base.status === 'OUTSIDE_EMPLOYMENT') {
       return base;
     }
 
-    return applyScheduleCorrection(base, correction);
+    return applyScheduleCorrection(
+      base,
+      correction,
+      options.shiftHoursVersions ?? [],
+    );
   });
 }
 
@@ -134,46 +147,22 @@ export function resolveRotatingShift({
   department,
   shiftAssignment,
   date,
+  corrections = [],
 }: {
   department: Department;
   shiftAssignment: EmployeeColorShift;
   date: IsoDate;
+  corrections?: readonly DepartmentShiftCorrection[];
 }): ActualWorkingShift | null {
-  const canonical = getCanonicalDepartmentDefinition(department.id);
-  const shiftMode =
-    department.shiftMode === 'UNKNOWN'
-      ? canonical?.shiftMode
-      : department.shiftMode;
-  if (!shiftMode) {
-    return null;
-  }
-
-  const allowedColors = allowedColorShiftsForMode(shiftMode);
-  if (!allowedColors.includes(shiftAssignment)) {
-    return null;
-  }
-
-  const anchorWeekStart =
-    department.rotationAnchorWeekStart ??
-    canonical?.rotationAnchor.weekStartIsoDate;
-  const baseAssignment =
-    department.rotationBaseAssignment ??
-    canonical?.rotationAnchor.baseAssignment;
-  const baseShift = baseAssignment?.[shiftAssignment];
-
-  if (!anchorWeekStart || !baseShift) {
-    return null;
-  }
-
-  if (shiftMode === 'TWO_SHIFT') {
-    return rotateShift(baseShift, date, anchorWeekStart, ['FIRST', 'SECOND']);
-  }
-
-  return rotateShift(baseShift, date, anchorWeekStart, [
-    'NIGHT',
-    'SECOND',
-    'FIRST',
-  ]);
+  return resolveDepartmentRotationShift({
+    departmentId: department.id,
+    shiftAssignment,
+    date,
+    corrections,
+    fallbackMode: department.shiftMode,
+    fallbackAnchor: department.rotationAnchorWeekStart,
+    fallbackAssignments: department.rotationBaseAssignment,
+  });
 }
 
 export function getBhpIsoDates(
@@ -227,6 +216,8 @@ function resolveAutomaticScheduleDay({
   assignments,
   bhpDates,
   publicHolidayNames,
+  departmentShiftCorrections,
+  shiftHoursVersions,
 }: {
   employee: Employee;
   day: { date: Date; isoDate: IsoDate; isWorkingDay: boolean };
@@ -234,6 +225,8 @@ function resolveAutomaticScheduleDay({
   assignments: readonly EmployeeAssignment[];
   bhpDates: ReadonlySet<IsoDate>;
   publicHolidayNames?: ReadonlyMap<IsoDate, string>;
+  departmentShiftCorrections: readonly DepartmentShiftCorrection[];
+  shiftHoursVersions: readonly ShiftHoursVersion[];
 }): PlannedScheduleDay {
   if (!isDateWithinEmployeePeriod(employee, day.isoDate)) {
     return createScheduleDay(employee, day.isoDate, {
@@ -244,6 +237,9 @@ function resolveAutomaticScheduleDay({
       label: '—',
       reason: null,
       holidayName: null,
+      plannedStartTime: null,
+      plannedEndTime: null,
+      plannedDuration: null,
     });
   }
 
@@ -257,6 +253,9 @@ function resolveAutomaticScheduleDay({
       label: holidayName ? 'Ś' : 'W',
       reason: holidayName,
       holidayName,
+      plannedStartTime: null,
+      plannedEndTime: null,
+      plannedDuration: 0,
     });
   }
 
@@ -280,6 +279,7 @@ function resolveAutomaticScheduleDay({
       shiftAssignment: assignment.shiftAssignment,
       reason: null,
       holidayName,
+      ...plannedIntervalFields('FIRST', day.isoDate, shiftHoursVersions),
     });
   }
 
@@ -294,28 +294,22 @@ function resolveAutomaticScheduleDay({
       shiftAssignment: assignment.shiftAssignment,
       reason: 'department-unresolved',
       holidayName,
+      plannedStartTime: null,
+      plannedEndTime: null,
+      plannedDuration: null,
     });
   }
 
-  if (!assignment.shiftAssignment) {
-    return createScheduleDay(employee, day.isoDate, {
-      status: 'UNRESOLVED',
-      source: 'unresolved',
-      hours: null,
-      shift: null,
-      label: '!',
-      departmentId: assignment.departmentId,
-      shiftAssignment: null,
-      reason: 'shift-unresolved-after-bhp',
-      holidayName,
-    });
-  }
-
-  const shift = resolveRotatingShift({
-    department,
-    shiftAssignment: assignment.shiftAssignment,
-    date: day.isoDate,
-  });
+  // A missing color group is not a payroll blocker. After BHP the employee
+  // continues on shift 1 until a dated group assignment becomes available.
+  const shift = assignment.shiftAssignment
+    ? resolveRotatingShift({
+        department,
+        shiftAssignment: assignment.shiftAssignment,
+        date: day.isoDate,
+        corrections: departmentShiftCorrections,
+      })
+    : 'FIRST';
 
   if (!shift) {
     return createScheduleDay(employee, day.isoDate, {
@@ -328,6 +322,9 @@ function resolveAutomaticScheduleDay({
       shiftAssignment: assignment.shiftAssignment,
       reason: 'rotation-unresolved',
       holidayName,
+      plannedStartTime: null,
+      plannedEndTime: null,
+      plannedDuration: null,
     });
   }
 
@@ -341,12 +338,14 @@ function resolveAutomaticScheduleDay({
     shiftAssignment: assignment.shiftAssignment,
     reason: null,
     holidayName,
+    ...plannedIntervalFields(shift, day.isoDate, shiftHoursVersions),
   });
 }
 
 function applyScheduleCorrection(
   base: PlannedScheduleDay,
   correction: ScheduleCorrection,
+  shiftHoursVersions: readonly ShiftHoursVersion[],
 ): PlannedScheduleDay {
   if (correction.kind === 'DAY_OFF') {
     return {
@@ -357,6 +356,9 @@ function applyScheduleCorrection(
       shift: null,
       label: 'W',
       reason: correction.note,
+      plannedStartTime: null,
+      plannedEndTime: null,
+      plannedDuration: 0,
     };
   }
 
@@ -369,6 +371,9 @@ function applyScheduleCorrection(
       shift: 'FIRST',
       label: 'BHP / 1',
       reason: correction.note,
+      plannedStartTime: base.plannedStartTime,
+      plannedEndTime: base.plannedEndTime,
+      plannedDuration: correction.plannedHours ?? base.plannedDuration,
     };
   }
 
@@ -380,6 +385,11 @@ function applyScheduleCorrection(
         ? 'SECOND'
         : 'NIGHT');
   const hours = correction.plannedHours ?? STANDARD_WORKING_DAY_HOURS;
+  const interval = plannedIntervalFields(
+    shift,
+    correction.date,
+    shiftHoursVersions,
+  );
 
   return {
     ...base,
@@ -389,6 +399,8 @@ function applyScheduleCorrection(
     shift,
     label: `${hours} / ${shiftCode(shift)}`,
     reason: correction.note,
+    ...interval,
+    plannedDuration: correction.plannedHours ?? interval.plannedDuration,
   };
 }
 
@@ -412,30 +424,28 @@ function createScheduleDay(
   };
 }
 
-function rotateShift(
-  baseShift: ActualWorkingShift,
+function plannedIntervalFields(
+  shift: ActualWorkingShift,
   date: IsoDate,
-  anchorWeekStart: IsoDate,
-  cycle: readonly ActualWorkingShift[],
-): ActualWorkingShift | null {
-  const baseIndex = cycle.indexOf(baseShift);
-  if (baseIndex < 0) {
-    return null;
-  }
-
-  const weekOffset = wholeWeeksBetween(anchorWeekStart, date);
-  const index = positiveModulo(baseIndex + weekOffset, cycle.length);
-  return cycle[index];
+  versions: readonly ShiftHoursVersion[],
+): Pick<
+  PlannedScheduleDay,
+  'plannedStartTime' | 'plannedEndTime' | 'plannedDuration'
+> {
+  const interval = resolveShiftInterval(shift, date, versions);
+  const start = clockMinutes(interval.startTime);
+  let end = clockMinutes(interval.endTime);
+  if (end <= start) end += 24 * 60;
+  return {
+    plannedStartTime: interval.startTime,
+    plannedEndTime: interval.endTime,
+    plannedDuration: (end - start) / 60,
+  };
 }
 
-function wholeWeeksBetween(anchorWeekStart: IsoDate, date: IsoDate): number {
-  const milliseconds =
-    isoDateToDate(date).getTime() - isoDateToDate(anchorWeekStart).getTime();
-  return Math.floor(milliseconds / (7 * 24 * 60 * 60 * 1000));
-}
-
-function positiveModulo(value: number, divisor: number): number {
-  return ((value % divisor) + divisor) % divisor;
+function clockMinutes(value: string): number {
+  const [hours, minutes] = value.split(':').map(Number);
+  return hours! * 60 + minutes!;
 }
 
 function shiftCode(shift: ActualWorkingShift): '1' | '2' | 'N' {

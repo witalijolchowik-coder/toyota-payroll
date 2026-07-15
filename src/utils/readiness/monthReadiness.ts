@@ -8,6 +8,8 @@ import type {
   PayrollSetting,
   ScheduleCorrection,
   Absence,
+  DepartmentShiftCorrection,
+  ShiftHoursVersion,
 } from '../../types/firestore';
 import { PAYROLL_SETTING_KEYS } from '../../types/firestore';
 import {
@@ -89,6 +91,8 @@ export interface MonthReadinessInput {
   departments: readonly Department[];
   employeeAssignments?: readonly EmployeeAssignment[];
   scheduleCorrections?: readonly ScheduleCorrection[];
+  departmentShiftCorrections?: readonly DepartmentShiftCorrection[];
+  shiftHoursVersions?: readonly ShiftHoursVersion[];
   entitlements: readonly EmployeeEntitlement[];
   payrollSettings: readonly PayrollSetting[];
   absences?: readonly Absence[];
@@ -152,6 +156,8 @@ export function assessMonthReadiness({
   departments,
   employeeAssignments = [],
   scheduleCorrections = [],
+  departmentShiftCorrections = [],
+  shiftHoursVersions = [],
   entitlements,
   payrollSettings,
   absences = [],
@@ -291,6 +297,8 @@ export function assessMonthReadiness({
       options: {
         assignments: employeeAssignments,
         corrections: scheduleCorrections,
+        departmentShiftCorrections,
+        shiftHoursVersions,
       },
     });
     const unresolvedDay = schedule.find((day) => day.status === 'UNRESOLVED');

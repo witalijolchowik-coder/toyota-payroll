@@ -65,6 +65,17 @@ export const firestorePaths = {
     )}`;
   },
   departments: 'departments',
+  shiftHoursVersions: 'shiftHoursVersions',
+  shiftHoursVersion(versionId: string) {
+    return `shiftHoursVersions/${assertPathSegment(versionId, 'versionId')}`;
+  },
+  departmentShiftCorrections: 'departmentShiftCorrections',
+  departmentShiftCorrection(correctionId: string) {
+    return `departmentShiftCorrections/${assertPathSegment(
+      correctionId,
+      'correctionId',
+    )}`;
+  },
   department(departmentId: string) {
     return `departments/${assertPathSegment(departmentId, 'departmentId')}`;
   },

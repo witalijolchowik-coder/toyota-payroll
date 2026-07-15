@@ -614,6 +614,8 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
             departments={data.departments}
             employeeAssignments={data.employeeAssignments}
             scheduleCorrections={data.scheduleCorrections}
+            departmentShiftCorrections={data.departmentShiftCorrections}
+            shiftHoursVersions={data.shiftHoursVersions}
             publicHolidays={publicHolidays}
             publicHolidayNames={publicHolidayNames}
             absences={filteredAbsences}
@@ -779,6 +781,8 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
             options: {
               assignments: data.employeeAssignments,
               corrections: data.scheduleCorrections,
+              departmentShiftCorrections: data.departmentShiftCorrections,
+              shiftHoursVersions: data.shiftHoursVersions,
               publicHolidays,
               publicHolidayNames,
             },

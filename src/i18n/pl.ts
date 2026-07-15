@@ -964,6 +964,35 @@ export const pl = {
     },
   },
   settings: {
+    shiftConfiguration: {
+      title: 'Godziny i korekta zmian',
+      description:
+        'Wersjonowane godziny zmian oraz lokalne dla działu punkty korekty rotacji.',
+      hoursTitle: 'Godziny zmian',
+      correctionTitle: 'Korekta zmian',
+      validFrom: 'Obowiązuje od',
+      startTime: 'Godzina rozpoczęcia',
+      endTime: 'Godzina zakończenia',
+      saveHours: 'Zapisz wersję godzin',
+      correctionDate: 'Data korekty',
+      department: 'Dział',
+      mode: 'Tryb zmianowy',
+      group: 'Grupa',
+      preview: 'Podgląd rotacji',
+      week: 'Tydzień od',
+      history: 'Zapisane punkty korekty',
+      impactWarning:
+        'Zmiana może przeliczyć plan w otwartych miesiącach. Ręczne godziny i potwierdzone nieobecności pozostaną zapisane, ale wartości zależne od poprzedniego planu mogą wymagać weryfikacji.',
+      reviewImpact: 'Sprawdź i potwierdź wpływ',
+      impactConfirmed: 'Wpływ został potwierdzony',
+      saveCorrection: 'Zapisz korektę zmian',
+      invalidHours:
+        'Każda zmiana musi mieć prawidłowy przedział od–do, nie dłuższy niż 12 godzin.',
+      invalidMapping:
+        'Każda grupa musi mieć inną dozwoloną zmianę. W trybie dwuzmianowym nie używa się grupy Blue ani zmiany nocnej.',
+      loadError: 'Nie udało się wczytać konfiguracji zmian.',
+      saveError: 'Nie udało się zapisać konfiguracji zmian.',
+    },
     accommodation: {
       title: 'Kategorie zakwaterowania',
       description:
@@ -1393,6 +1422,7 @@ export const pl = {
       workTime: {
         title: 'Korekta czasu pracy',
         plannedShift: 'Planowana zmiana',
+        planDetails: 'Planowane: {{start}}–{{end}}, {{hours}} h.',
         plannedInterval: 'Plan: {{start}}–{{end}}',
         actualStart: 'Rzeczywisty start',
         actualEnd: 'Rzeczywisty koniec',
@@ -1404,6 +1434,21 @@ export const pl = {
           'Rozbicie: praca normalna {{normal}} h, czas prywatny {{private}} h, nadgodziny 50% {{overtime50}} h, nadgodziny 100% {{overtime100}} h.',
         previewExtended:
           'Plan {{planned}} h, rzeczywiście {{actual}} h, czas prywatny {{private}} h, nadgodziny 50% {{overtime50}} h, nadgodziny 100% {{overtime100}} h, nocne {{night}} h.',
+        outcomes: {
+          MATCHES_PLAN: 'Zgodne z planem',
+          STARTED_EARLIER: 'Wcześniejsze rozpoczęcie',
+          STARTED_LATER: 'Późniejsze rozpoczęcie',
+          ENDED_EARLIER: 'Wcześniejsze zakończenie',
+          ENDED_LATER: 'Późniejsze zakończenie',
+          WORKED_MORE: 'Praca ponad plan',
+          WORKED_LESS: 'Praca poniżej planu',
+          PLANNED_DAY_OFF: 'Praca w planowany dzień wolny',
+          SATURDAY: 'Praca w sobotę',
+          SUNDAY: 'Praca w niedzielę',
+          PUBLIC_HOLIDAY: 'Praca w święto',
+          DIFFERENT_INTERVAL: 'Niezgodność z planem',
+          REQUIRES_REVIEW: 'Wymaga weryfikacji',
+        },
       },
       cancel: 'Anuluj',
       save: 'Zapisz',

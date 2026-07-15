@@ -12,6 +12,7 @@ export type ActualWorkingShift = 'FIRST' | 'SECOND' | 'NIGHT';
 export type DepartmentShiftMode = 'UNKNOWN' | 'TWO_SHIFT' | 'THREE_SHIFT';
 export type EmployeeAssignmentStatus = 'ACTIVE' | 'CANCELLED';
 export type ScheduleCorrectionStatus = 'ACTIVE' | 'CANCELLED';
+export type ShiftConfigurationStatus = 'ACTIVE' | 'CANCELLED';
 export type ScheduleCorrectionKind =
   | 'FIRST_SHIFT'
   | 'SECOND_SHIFT'
@@ -56,6 +57,27 @@ export interface DepartmentDocument extends ModificationMetadataDocument {
   rotation_base_assignment?: Partial<
     Record<EmployeeColorShift, ActualWorkingShift>
   > | null;
+}
+
+export interface ShiftIntervalDocument {
+  start_time: string;
+  end_time: string;
+}
+
+export interface ShiftHoursVersionDocument extends ModificationMetadataDocument {
+  valid_from: IsoDate;
+  intervals: Record<ActualWorkingShift, ShiftIntervalDocument>;
+  active: boolean;
+  note: string | null;
+}
+
+export interface DepartmentShiftCorrectionDocument extends ModificationMetadataDocument {
+  department_id: DepartmentId;
+  effective_date: IsoDate;
+  shift_mode: Exclude<DepartmentShiftMode, 'UNKNOWN'>;
+  group_assignments: Partial<Record<EmployeeColorShift, ActualWorkingShift>>;
+  status: ShiftConfigurationStatus;
+  note: string | null;
 }
 
 export interface EmployeeAssignmentDocument

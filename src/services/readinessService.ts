@@ -6,11 +6,13 @@ import type { MonthReadinessSummary } from '../utils/readiness';
 import { canonicalDepartmentsFallback } from './departmentsService';
 import {
   mapDepartmentDocument,
+  mapDepartmentShiftCorrectionDocument,
   mapEmployeeAssignmentDocument,
   mapEmployeeDocument,
   mapEmployeeEntitlementDocument,
   mapMonthDocument,
   mapPayrollSettingDocument,
+  mapShiftHoursVersionDocument,
 } from './firestore/mappers';
 import { getFirestoreRepositories } from './firestoreService';
 import { loadAbsencesOverlappingMonth } from './absencesService';
@@ -32,6 +34,8 @@ export async function loadMonthReadiness(
     entitlements,
     payrollSettings,
     absences,
+    shiftHoursVersions,
+    departmentShiftCorrections,
   ] = await Promise.all([
     (async () => {
       const snapshot = await getDocs(repositories.departments);
@@ -68,6 +72,18 @@ export async function loadMonthReadiness(
       );
     })(),
     loadAbsencesOverlappingMonth(monthId),
+    (async () => {
+      const snapshot = await getDocs(repositories.shiftHoursVersions);
+      return snapshot.docs.map((document) =>
+        mapShiftHoursVersionDocument(document.id, document.data()),
+      );
+    })(),
+    (async () => {
+      const snapshot = await getDocs(repositories.departmentShiftCorrections);
+      return snapshot.docs.map((document) =>
+        mapDepartmentShiftCorrectionDocument(document.id, document.data()),
+      );
+    })(),
   ]);
 
   return assessMonthReadiness({
@@ -83,5 +99,7 @@ export async function loadMonthReadiness(
     entitlements,
     payrollSettings,
     absences,
+    shiftHoursVersions,
+    departmentShiftCorrections,
   });
 }

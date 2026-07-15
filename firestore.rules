@@ -174,6 +174,83 @@ service cloud.firestore {
         && hasModificationMetadata(data);
     }
 
+    function validShiftInterval(interval) {
+      return interval is map
+        && interval.keys().hasAll(['start_time', 'end_time'])
+        && interval.keys().hasOnly(['start_time', 'end_time'])
+        && isClockTime(interval.start_time)
+        && isClockTime(interval.end_time)
+        && interval.start_time != interval.end_time;
+    }
+
+    function validShiftHoursVersion(data) {
+      return data.keys().hasAll([
+          'valid_from', 'intervals', 'active', 'note',
+          'created_at', 'created_by', 'updated_at', 'updated_by'
+        ])
+        && data.keys().hasOnly([
+          'valid_from', 'intervals', 'active', 'note',
+          'created_at', 'created_by', 'updated_at', 'updated_by'
+        ])
+        && isIsoDate(data.valid_from)
+        && data.intervals is map
+        && data.intervals.keys().hasAll(['FIRST', 'SECOND', 'NIGHT'])
+        && data.intervals.keys().hasOnly(['FIRST', 'SECOND', 'NIGHT'])
+        && validShiftInterval(data.intervals.FIRST)
+        && validShiftInterval(data.intervals.SECOND)
+        && validShiftInterval(data.intervals.NIGHT)
+        && data.active is bool
+        && isNullableString(data.note)
+        && hasModificationMetadata(data);
+    }
+
+    function validGroupShift(value) {
+      return value in ['FIRST', 'SECOND', 'NIGHT'];
+    }
+
+    function validDepartmentShiftCorrection(data) {
+      return data.keys().hasAll([
+          'department_id', 'effective_date', 'shift_mode',
+          'group_assignments', 'status', 'note',
+          'created_at', 'created_by', 'updated_at', 'updated_by'
+        ])
+        && data.keys().hasOnly([
+          'department_id', 'effective_date', 'shift_mode',
+          'group_assignments', 'status', 'note',
+          'created_at', 'created_by', 'updated_at', 'updated_by'
+        ])
+        && data.department_id in [
+          'metal', 'szwalnia', 'montaz', 'pu', 'headliner', 'magazyn'
+        ]
+        && isIsoDate(data.effective_date)
+        && data.shift_mode in ['TWO_SHIFT', 'THREE_SHIFT']
+        && data.group_assignments is map
+        && (
+          (
+            data.shift_mode == 'TWO_SHIFT'
+            && data.group_assignments.keys().hasAll(['RED', 'WHITE'])
+            && data.group_assignments.keys().hasOnly(['RED', 'WHITE'])
+            && data.group_assignments.RED in ['FIRST', 'SECOND']
+            && data.group_assignments.WHITE in ['FIRST', 'SECOND']
+            && data.group_assignments.RED != data.group_assignments.WHITE
+          )
+          || (
+            data.shift_mode == 'THREE_SHIFT'
+            && data.group_assignments.keys().hasAll(['RED', 'WHITE', 'BLUE'])
+            && data.group_assignments.keys().hasOnly(['RED', 'WHITE', 'BLUE'])
+            && validGroupShift(data.group_assignments.RED)
+            && validGroupShift(data.group_assignments.WHITE)
+            && validGroupShift(data.group_assignments.BLUE)
+            && data.group_assignments.RED != data.group_assignments.WHITE
+            && data.group_assignments.RED != data.group_assignments.BLUE
+            && data.group_assignments.WHITE != data.group_assignments.BLUE
+          )
+        )
+        && data.status in ['ACTIVE', 'CANCELLED']
+        && isNullableString(data.note)
+        && hasModificationMetadata(data);
+    }
+
     function validEmployeeAssignment(data) {
       return data.keys().hasAll([
           'employee_id',
@@ -660,6 +737,32 @@ service cloud.firestore {
         && request.resource.data.active == true
         && hasCreateMetadata(request.resource.data);
       allow update, delete: if false;
+    }
+
+    match /shiftHoursVersions/{versionId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated()
+        && validShiftHoursVersion(request.resource.data)
+        && request.resource.data.active == true
+        && hasCreateMetadata(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    match /departmentShiftCorrections/{correctionId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated()
+        && validDepartmentShiftCorrection(request.resource.data)
+        && request.resource.data.status == 'ACTIVE'
+        && hasCreateMetadata(request.resource.data);
+      allow update: if isAuthenticated()
+        && resource.data.status == 'ACTIVE'
+        && validDepartmentShiftCorrection(request.resource.data)
+        && hasUpdateMetadata(request.resource.data)
+        && request.resource.data.status == 'CANCELLED'
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'updated_at', 'updated_by'
+        ]);
+      allow delete: if false;
     }
 
     match /departments/{departmentId} {

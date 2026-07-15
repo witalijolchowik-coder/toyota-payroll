@@ -181,6 +181,7 @@ export function EmployeeCalendarDialog({
                 return <Box key={cell.id} />;
               }
               const persistedValue = dailyValuesByDate.get(cell.day.isoDate);
+              const plannedDay = plannedScheduleByDate.get(cell.day.isoDate);
               const value = resolveSettlementCellValue({
                 employee,
                 day: cell.day,
@@ -235,7 +236,7 @@ export function EmployeeCalendarDialog({
                           cell.day,
                           value,
                           absenceResolution.kind !== 'none',
-                          plannedScheduleByDate.get(cell.day.isoDate),
+                          plannedDay,
                         )
                       }
                       sx={{
@@ -278,6 +279,23 @@ export function EmployeeCalendarDialog({
                             sx={{ fontWeight: 800 }}
                           >
                             {absenceLabel}
+                          </Typography>
+                        ) : null}
+                        {plannedDay?.plannedStartTime &&
+                        plannedDay.plannedEndTime &&
+                        plannedDay.plannedDuration !== null ? (
+                          <Typography variant="caption" color="text.secondary">
+                            {interpolate(
+                              t.settlement.editor.workTime.planDetails,
+                              {
+                                start: plannedDay.plannedStartTime,
+                                end: plannedDay.plannedEndTime,
+                                hours:
+                                  plannedDay.plannedDuration.toLocaleString(
+                                    'pl-PL',
+                                  ),
+                              },
+                            )}
                           </Typography>
                         ) : null}
                         <Typography

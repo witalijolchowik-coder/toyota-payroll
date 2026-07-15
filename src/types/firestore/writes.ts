@@ -49,6 +49,20 @@ export interface DepartmentCreateInput {
   active: boolean;
 }
 
+export interface ShiftHoursVersionCreateInput {
+  validFrom: IsoDate;
+  intervals: Record<ActualWorkingShift, { startTime: string; endTime: string }>;
+  note: string | null;
+}
+
+export interface DepartmentShiftCorrectionCreateInput {
+  departmentId: DepartmentId;
+  effectiveDate: IsoDate;
+  shiftMode: Exclude<DepartmentShiftMode, 'UNKNOWN'>;
+  groupAssignments: Partial<Record<EmployeeColorShift, ActualWorkingShift>>;
+  note: string | null;
+}
+
 export type DepartmentUpdateInput = Pick<
   DepartmentCreateInput,
   'name' | 'shiftMode' | 'active'

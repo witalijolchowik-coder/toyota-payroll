@@ -1613,4 +1613,82 @@ describe('Firestore security rules', () => {
       }),
     );
   });
+
+  it('allows approved users to create valid effective shift hours', async () => {
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    await assertSucceeds(
+      setDoc(doc(firestore, 'shiftHoursVersions', '2026-07-01'), {
+        valid_from: '2026-07-01',
+        intervals: {
+          FIRST: { start_time: '06:00', end_time: '14:00' },
+          SECOND: { start_time: '14:00', end_time: '22:00' },
+          NIGHT: { start_time: '22:00', end_time: '06:00' },
+        },
+        active: true,
+        note: null,
+        ...modificationMetadata(uid),
+      }),
+    );
+  });
+
+  it('allows coherent department corrections and denies duplicate mappings', async () => {
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const payload = {
+      department_id: 'metal',
+      effective_date: '2026-07-06',
+      shift_mode: 'THREE_SHIFT',
+      group_assignments: { RED: 'FIRST', WHITE: 'NIGHT', BLUE: 'SECOND' },
+      status: 'ACTIVE',
+      note: null,
+      ...modificationMetadata(uid),
+    };
+    await assertSucceeds(
+      setDoc(
+        doc(firestore, 'departmentShiftCorrections', 'metal-2026-07-06'),
+        payload,
+      ),
+    );
+    await assertFails(
+      setDoc(doc(firestore, 'departmentShiftCorrections', 'invalid'), {
+        ...payload,
+        group_assignments: { RED: 'FIRST', WHITE: 'FIRST', BLUE: 'NIGHT' },
+      }),
+    );
+  });
+
+  it('denies inactive users and deletion of historical shift configuration', async () => {
+    await seedAppUser('inactive-user', { active: false });
+    const inactive = testEnvironment
+      .authenticatedContext('inactive-user')
+      .firestore();
+    await assertFails(
+      setDoc(doc(inactive, 'departmentShiftCorrections', 'denied'), {
+        department_id: 'szwalnia',
+        effective_date: '2026-07-06',
+        shift_mode: 'TWO_SHIFT',
+        group_assignments: { RED: 'FIRST', WHITE: 'SECOND' },
+        status: 'ACTIVE',
+        note: null,
+        ...modificationMetadata('inactive-user'),
+      }),
+    );
+
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const reference = doc(firestore, 'departmentShiftCorrections', 'protected');
+    await assertSucceeds(
+      setDoc(reference, {
+        department_id: 'szwalnia',
+        effective_date: '2026-07-06',
+        shift_mode: 'TWO_SHIFT',
+        group_assignments: { RED: 'FIRST', WHITE: 'SECOND' },
+        status: 'ACTIVE',
+        note: null,
+        ...modificationMetadata(uid),
+      }),
+    );
+    await assertFails(deleteDoc(reference));
+  });
 });

@@ -28,6 +28,7 @@ import {
 } from '../features/settings/AccommodationCategoryFormDialog';
 import { useDepartments } from '../features/settings/useDepartments';
 import { usePayrollSettings } from '../features/settings/usePayrollSettings';
+import { ShiftConfigurationPanel } from '../features/settings/ShiftConfigurationPanel';
 import { useNotification } from '../hooks/useNotification';
 import { useTranslations } from '../hooks/useTranslations';
 import type {
@@ -262,6 +263,8 @@ export function SettingsPage() {
           </Box>
         ) : null}
       </Card>
+
+      <ShiftConfigurationPanel departments={departments} />
 
       <Card>
         <TableContainer>

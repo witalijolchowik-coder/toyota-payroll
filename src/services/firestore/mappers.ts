@@ -30,6 +30,10 @@ import type {
   ScheduleCorrectionDocument,
   SettlementReviewDocument,
   SettlementReviewState,
+  ShiftHoursVersion,
+  ShiftHoursVersionDocument,
+  DepartmentShiftCorrection,
+  DepartmentShiftCorrectionDocument,
 } from '../../types/firestore';
 
 function modificationMetadata(document: {
@@ -81,6 +85,41 @@ export function mapDepartmentDocument(
     active: document.active,
     rotationAnchorWeekStart: document.rotation_anchor_week_start ?? null,
     rotationBaseAssignment: document.rotation_base_assignment ?? null,
+    ...modificationMetadata(document),
+  };
+}
+
+export function mapShiftHoursVersionDocument(
+  id: string,
+  document: ShiftHoursVersionDocument,
+): ShiftHoursVersion {
+  return {
+    id,
+    validFrom: document.valid_from,
+    intervals: Object.fromEntries(
+      Object.entries(document.intervals).map(([shift, interval]) => [
+        shift,
+        { startTime: interval.start_time, endTime: interval.end_time },
+      ]),
+    ) as ShiftHoursVersion['intervals'],
+    active: document.active,
+    note: document.note,
+    ...modificationMetadata(document),
+  };
+}
+
+export function mapDepartmentShiftCorrectionDocument(
+  id: string,
+  document: DepartmentShiftCorrectionDocument,
+): DepartmentShiftCorrection {
+  return {
+    id,
+    departmentId: document.department_id,
+    effectiveDate: document.effective_date,
+    shiftMode: document.shift_mode,
+    groupAssignments: { ...document.group_assignments },
+    status: document.status,
+    note: document.note,
     ...modificationMetadata(document),
   };
 }

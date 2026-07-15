@@ -67,6 +67,20 @@ function workTimeCorrectionPayload(
   };
 }
 
+function auditWorkTimeCorrection(
+  input: WorkTimeCorrectionInput | null | undefined,
+) {
+  if (!input) return null;
+  return {
+    planned_shift: input.plannedShift,
+    planned_start_time: input.plannedStartTime,
+    planned_end_time: input.plannedEndTime,
+    actual_start_time: input.actualStartTime,
+    actual_end_time: input.actualEndTime,
+    classification_override: input.classificationOverride ?? null,
+  };
+}
+
 async function requireActorUid(): Promise<string> {
   if (!auth) {
     throw new DailyValueServiceError('firebase-unavailable');
@@ -161,6 +175,11 @@ export async function saveManualDailyValue(
               snapshot.data().manual_override?.hours ?? snapshot.data().hours,
             new_hours: input.hours,
             change_kind: 'actual-hours-override',
+            previous_work_time_correction:
+              snapshot.data().work_time_correction ?? null,
+            new_work_time_correction: auditWorkTimeCorrection(
+              input.workTimeCorrection,
+            ),
             replaced_absence: absenceToCancel?.absenceCode ?? null,
           },
         });
@@ -186,6 +205,11 @@ export async function saveManualDailyValue(
           previous_hours: snapshot.data().hours,
           new_hours: input.hours,
           change_kind: 'actual-hours',
+          previous_work_time_correction:
+            snapshot.data().work_time_correction ?? null,
+          new_work_time_correction: auditWorkTimeCorrection(
+            input.workTimeCorrection,
+          ),
           replaced_absence: absenceToCancel?.absenceCode ?? null,
         },
       });
@@ -219,6 +243,10 @@ export async function saveManualDailyValue(
         previous_hours: null,
         new_hours: input.hours,
         change_kind: 'actual-hours',
+        previous_work_time_correction: null,
+        new_work_time_correction: auditWorkTimeCorrection(
+          input.workTimeCorrection,
+        ),
         replaced_absence: absenceToCancel?.absenceCode ?? null,
       },
     });

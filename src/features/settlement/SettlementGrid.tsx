@@ -24,6 +24,8 @@ import type {
   Employee,
   EmployeeAssignment,
   ScheduleCorrection,
+  DepartmentShiftCorrection,
+  ShiftHoursVersion,
   IsoDate,
 } from '../../types/firestore';
 import { resolveGoverningAbsence } from '../../utils/absences';
@@ -52,6 +54,8 @@ interface SettlementGridProps {
   departments?: Department[];
   employeeAssignments?: EmployeeAssignment[];
   scheduleCorrections?: ScheduleCorrection[];
+  departmentShiftCorrections?: DepartmentShiftCorrection[];
+  shiftHoursVersions?: ShiftHoursVersion[];
   publicHolidays?: ReadonlySet<IsoDate>;
   publicHolidayNames?: ReadonlyMap<IsoDate, string>;
   absences?: Absence[];
@@ -90,6 +94,8 @@ export function SettlementGrid({
   departments = [],
   employeeAssignments = [],
   scheduleCorrections = [],
+  departmentShiftCorrections = [],
+  shiftHoursVersions = [],
   publicHolidays,
   publicHolidayNames,
   absences = [],
@@ -176,6 +182,8 @@ export function SettlementGrid({
                   options: {
                     assignments: employeeAssignments,
                     corrections: scheduleCorrections,
+                    departmentShiftCorrections,
+                    shiftHoursVersions,
                     publicHolidays,
                     publicHolidayNames,
                   },
@@ -392,7 +400,21 @@ export function SettlementGrid({
                                     ) : null}
                                   </>
                                 ) : (
-                                  displayLabel
+                                  <>
+                                    {displayLabel}
+                                    {cellDeviationMarker(value, plannedDay) ? (
+                                      <Box
+                                        component="span"
+                                        sx={{
+                                          display: 'block',
+                                          fontSize: '0.65rem',
+                                          lineHeight: 1.1,
+                                        }}
+                                      >
+                                        {cellDeviationMarker(value, plannedDay)}
+                                      </Box>
+                                    ) : null}
+                                  </>
                                 )}
                               </Box>
                             </ButtonBase>
@@ -511,6 +533,25 @@ function cellDisplayLabel({
   return plannedDay?.label ?? (value.hours === null ? emptyLabel : hoursLabel);
 }
 
+function cellDeviationMarker(
+  value: ReturnType<typeof resolveSettlementCellValue>,
+  plannedDay?: PlannedScheduleDay,
+): string {
+  if (!value.workTimeCorrection) return '';
+  const markers: string[] = [];
+  if (
+    plannedDay &&
+    plannedDay.plannedDuration !== null &&
+    value.hours !== null
+  ) {
+    if (value.hours > plannedDay.plannedDuration) markers.push('+');
+    if (value.hours < plannedDay.plannedDuration) markers.push('−');
+  }
+  const { actualStartTime, actualEndTime } = value.workTimeCorrection;
+  if (actualStartTime >= '22:00' || actualEndTime <= '06:00') markers.push('N');
+  return markers.join(' ');
+}
+
 function buildTooltip({
   value,
   plannedDay,
@@ -575,6 +616,15 @@ function buildTooltip({
     } else if (plannedDay.status === 'WORKING') {
       parts.push(t.settlement.grid.scheduleAutomatic);
     }
+  }
+
+  if (value.workTimeCorrection) {
+    parts.push(
+      interpolate(t.settlement.employeeCalendar.actualInterval, {
+        start: value.workTimeCorrection.actualStartTime,
+        end: value.workTimeCorrection.actualEndTime,
+      }),
+    );
   }
 
   if (isSettled) {

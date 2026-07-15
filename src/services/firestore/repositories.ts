@@ -23,6 +23,8 @@ import type {
   ReportDocument,
   ScheduleCorrectionDocument,
   SettlementReviewDocument,
+  ShiftHoursVersionDocument,
+  DepartmentShiftCorrectionDocument,
 } from '../../types/firestore';
 import {
   absenceConverter,
@@ -40,6 +42,8 @@ import {
   reportConverter,
   scheduleCorrectionConverter,
   settlementReviewConverter,
+  shiftHoursVersionConverter,
+  departmentShiftCorrectionConverter,
 } from './converters';
 import { firestorePaths } from './paths';
 
@@ -58,6 +62,8 @@ export interface MonthRepositoryBoundary {
 export interface FirestoreRepositoryBoundaries {
   readonly payrollSettings: CollectionReference<PayrollSettingDocument>;
   readonly departments: CollectionReference<DepartmentDocument>;
+  readonly shiftHoursVersions: CollectionReference<ShiftHoursVersionDocument>;
+  readonly departmentShiftCorrections: CollectionReference<DepartmentShiftCorrectionDocument>;
   readonly employees: CollectionReference<EmployeeDocument>;
   employee(employeeId: string): DocumentReference<EmployeeDocument>;
   readonly employeeAssignments: CollectionReference<EmployeeAssignmentDocument>;
@@ -89,6 +95,14 @@ export function createFirestoreRepositoryBoundaries(
     firestore,
     firestorePaths.departments,
   ).withConverter(departmentConverter);
+  const shiftHoursVersions = collection(
+    firestore,
+    firestorePaths.shiftHoursVersions,
+  ).withConverter(shiftHoursVersionConverter);
+  const departmentShiftCorrections = collection(
+    firestore,
+    firestorePaths.departmentShiftCorrections,
+  ).withConverter(departmentShiftCorrectionConverter);
   const employeeEntitlements = collection(
     firestore,
     firestorePaths.employeeEntitlements,
@@ -110,6 +124,8 @@ export function createFirestoreRepositoryBoundaries(
   return {
     payrollSettings,
     departments,
+    shiftHoursVersions,
+    departmentShiftCorrections,
     employees,
     employee(employeeId) {
       return doc(firestore, firestorePaths.employee(employeeId)).withConverter(

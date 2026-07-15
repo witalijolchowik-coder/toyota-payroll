@@ -22,6 +22,8 @@ import type {
   ReportDocument,
   ScheduleCorrectionDocument,
   SettlementReviewDocument,
+  ShiftHoursVersionDocument,
+  DepartmentShiftCorrectionDocument,
   SettlementTotalsDocument,
 } from '../../types/firestore';
 import {
@@ -97,6 +99,22 @@ function readRotationBaseAssignment(
   return result;
 }
 
+function readShiftIntervals(data: DocumentData, path: string) {
+  const intervals = readObject(data, 'intervals', path);
+  return Object.fromEntries(
+    (['FIRST', 'SECOND', 'NIGHT'] as const).map((shift) => {
+      const interval = readObject(intervals, shift, path);
+      return [
+        shift,
+        {
+          start_time: readNonEmptyString(interval, 'start_time', path),
+          end_time: readNonEmptyString(interval, 'end_time', path),
+        },
+      ];
+    }),
+  ) as ShiftHoursVersionDocument['intervals'];
+}
+
 export const employeeConverter = createConverter<EmployeeDocument>(
   (data, path) => ({
     teta_number: readString(data, 'teta_number', path),
@@ -165,6 +183,32 @@ export const departmentConverter = createConverter<DepartmentDocument>(
     ...metadata(data, path),
   }),
 );
+
+export const shiftHoursVersionConverter =
+  createConverter<ShiftHoursVersionDocument>((data, path) => ({
+    valid_from: readNonEmptyString(data, 'valid_from', path),
+    intervals: readShiftIntervals(data, path),
+    active: readBoolean(data, 'active', path),
+    note: readNullableString(data, 'note', path),
+    ...metadata(data, path),
+  }));
+
+export const departmentShiftCorrectionConverter =
+  createConverter<DepartmentShiftCorrectionDocument>((data, path) => ({
+    department_id: readNonEmptyString(data, 'department_id', path),
+    effective_date: readNonEmptyString(data, 'effective_date', path),
+    shift_mode: readEnum(data, 'shift_mode', path, [
+      'TWO_SHIFT',
+      'THREE_SHIFT',
+    ] as const),
+    group_assignments: readRotationBaseAssignment(
+      readObject(data, 'group_assignments', path),
+      path,
+    ),
+    status: readEnum(data, 'status', path, ['ACTIVE', 'CANCELLED'] as const),
+    note: readNullableString(data, 'note', path),
+    ...metadata(data, path),
+  }));
 
 export const employeeAssignmentConverter =
   createConverter<EmployeeAssignmentDocument>((data, path) => ({

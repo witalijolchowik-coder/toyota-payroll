@@ -42,6 +42,9 @@ describe('DailyValueEditorDialog', () => {
           shiftAssignment: 'RED',
           reason: null,
           holidayName: null,
+          plannedStartTime: '06:00',
+          plannedEndTime: '14:00',
+          plannedDuration: 8,
         }}
         onClose={vi.fn()}
         onSave={vi.fn()}
