@@ -74,7 +74,7 @@ describe('daily work-time deviations', () => {
       normalWorkHours: 8,
       overtime50Hours: 0,
       overtime100Hours: 2,
-      nightAllowanceHours: 0,
+      nightAllowanceHours: 2,
     });
     expect(result.overtime100Reasons).toContain('NIGHT');
   });
@@ -90,7 +90,7 @@ describe('daily work-time deviations', () => {
       normalWorkHours: 8,
       overtime50Hours: 0,
       overtime100Hours: 2,
-      nightAllowanceHours: 0,
+      nightAllowanceHours: 2,
     });
   });
 

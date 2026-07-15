@@ -54,12 +54,12 @@ describe('DailyValueEditorDialog', () => {
     );
 
     expect(screen.getByLabelText('Godziny rzeczywiste')).toHaveValue('8');
-    fireEvent.change(screen.getByLabelText('Godziny rzeczywiste'), {
-      target: { value: '10' },
+    fireEvent.change(screen.getByLabelText('Rzeczywisty koniec'), {
+      target: { value: '16:00' },
     });
     expect(screen.getByText(/nadgodziny 50% 2 h/i)).toBeInTheDocument();
-    fireEvent.change(screen.getByLabelText('Godziny rzeczywiste'), {
-      target: { value: '6' },
+    fireEvent.change(screen.getByLabelText('Rzeczywisty koniec'), {
+      target: { value: '12:00' },
     });
     expect(screen.getByText(/czas prywatny 2 h/i)).toBeInTheDocument();
   });
