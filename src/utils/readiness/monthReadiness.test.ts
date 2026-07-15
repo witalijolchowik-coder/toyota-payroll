@@ -5,6 +5,7 @@ import type {
   Employee,
   EmployeeEntitlement,
   PayrollSetting,
+  DailyValue,
 } from '../../types/firestore';
 import { assessMonthReadiness } from './monthReadiness';
 
@@ -187,6 +188,55 @@ describe('month readiness assessment', () => {
           code: 'payroll-setting-missing',
           context: 'transport_allowance',
         }),
+      ]),
+    );
+  });
+
+  it('marks stored actual-time interpretation for review after the plan changes', () => {
+    const dailyValue: DailyValue = {
+      ...metadata,
+      id: 'daily',
+      monthId: '2026-07',
+      employeeId: 'employee-1',
+      tetaNumber: '100',
+      date: '2026-07-08',
+      hours: 11,
+      source: 'manual',
+      importId: null,
+      note: null,
+      manualOverride: null,
+      workTimeCorrection: {
+        plannedShift: 'FIRST',
+        plannedStartTime: '06:00',
+        plannedEndTime: '14:00',
+        actualStartTime: '05:00',
+        actualEndTime: '16:00',
+        classificationOverride: null,
+      },
+    };
+    const readiness = assessMonthReadiness({
+      monthId: '2026-07',
+      month: {} as never,
+      employees: [employee()],
+      departments: [
+        department({
+          rotationAnchorWeekStart: '2026-07-06',
+          rotationBaseAssignment: {
+            RED: 'SECOND',
+            WHITE: 'FIRST',
+            BLUE: 'NIGHT',
+          },
+        }),
+      ],
+      entitlements: [],
+      payrollSettings: allSettings,
+      dailyValues: [dailyValue],
+    });
+
+    expect(readiness.issues.map((issue) => issue.code)).toEqual(
+      expect.arrayContaining([
+        'shift-plan-manual-actual-review',
+        'shift-plan-overtime-review',
       ]),
     );
   });

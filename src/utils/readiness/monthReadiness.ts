@@ -10,6 +10,7 @@ import type {
   Absence,
   DepartmentShiftCorrection,
   ShiftHoursVersion,
+  DailyValue,
 } from '../../types/firestore';
 import { PAYROLL_SETTING_KEYS } from '../../types/firestore';
 import {
@@ -20,6 +21,7 @@ import {
   resolveEffectivePayrollSetting,
   hasCurrentStatusConflict,
   requiredEmployeeDocumentIssues,
+  resolveDailyWorkTimeDeviation,
 } from '../payroll';
 import { generateEmployeeMonthlySchedule } from '../schedule';
 
@@ -42,6 +44,10 @@ export type ReadinessIssueCode =
   | 'department-unresolved-na0'
   | 'department-missing-or-inactive'
   | 'schedule-unresolved-day'
+  | 'shift-plan-manual-actual-review'
+  | 'shift-plan-overtime-review'
+  | 'shift-plan-private-time-review'
+  | 'shift-plan-work-conflict'
   | 'payroll-setting-missing'
   | 'payroll-setting-conflict'
   | 'entitlement-overlap'
@@ -96,6 +102,7 @@ export interface MonthReadinessInput {
   entitlements: readonly EmployeeEntitlement[];
   payrollSettings: readonly PayrollSetting[];
   absences?: readonly Absence[];
+  dailyValues?: readonly DailyValue[];
   today?: Date;
 }
 
@@ -161,6 +168,7 @@ export function assessMonthReadiness({
   entitlements,
   payrollSettings,
   absences = [],
+  dailyValues = [],
   today = new Date(),
 }: MonthReadinessInput): MonthReadinessSummary {
   const summary: MonthReadinessSummary = {
@@ -311,6 +319,69 @@ export function assessMonthReadiness({
         context: unresolvedDay.date,
       });
     }
+
+    const scheduleByDate = new Map(schedule.map((day) => [day.date, day]));
+    dailyValues
+      .filter(
+        (value) =>
+          value.employeeId === employee.id && Boolean(value.workTimeCorrection),
+      )
+      .forEach((value) => {
+        const currentPlan = scheduleByDate.get(value.date);
+        const storedPlan = value.workTimeCorrection!;
+        if (!currentPlan || !storedPlanDiffers(currentPlan, storedPlan)) return;
+
+        addIssue(summary, {
+          ...baseIssue,
+          code: 'shift-plan-manual-actual-review',
+          severity: 'warning',
+          target: 'settlement',
+          context: value.date,
+        });
+        const deviation = resolveDailyWorkTimeDeviation({
+          planned: {
+            shift: storedPlan.plannedShift,
+            startTime: storedPlan.plannedStartTime,
+            endTime: storedPlan.plannedEndTime,
+          },
+          actual: {
+            startTime: storedPlan.actualStartTime,
+            endTime: storedPlan.actualEndTime,
+          },
+          isWorkingDay: true,
+          classificationOverride: storedPlan.classificationOverride,
+        });
+        if (deviation.overtime50Hours > 0 || deviation.overtime100Hours > 0) {
+          addIssue(summary, {
+            ...baseIssue,
+            code: 'shift-plan-overtime-review',
+            severity: 'warning',
+            target: 'settlement',
+            context: value.date,
+          });
+        }
+        if (deviation.privateTimeHours > 0) {
+          addIssue(summary, {
+            ...baseIssue,
+            code: 'shift-plan-private-time-review',
+            severity: 'warning',
+            target: 'settlement',
+            context: value.date,
+          });
+        }
+        if (
+          currentPlan.status === 'DAY_OFF' ||
+          currentPlan.status === 'PUBLIC_HOLIDAY'
+        ) {
+          addIssue(summary, {
+            ...baseIssue,
+            code: 'shift-plan-work-conflict',
+            severity: 'warning',
+            target: 'settlement',
+            context: value.date,
+          });
+        }
+      });
 
     const monthRange = getPayrollMonthDateRange(monthId);
     const monthStart = monthRange.start.toISOString().slice(0, 10);
@@ -506,4 +577,15 @@ export function assessMonthReadiness({
       summary.counters.blocking === 0,
   };
   return summary;
+}
+
+function storedPlanDiffers(
+  current: ReturnType<typeof generateEmployeeMonthlySchedule>[number],
+  stored: NonNullable<DailyValue['workTimeCorrection']>,
+): boolean {
+  return (
+    current.shift !== stored.plannedShift ||
+    current.plannedStartTime !== stored.plannedStartTime ||
+    current.plannedEndTime !== stored.plannedEndTime
+  );
 }

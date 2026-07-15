@@ -13,6 +13,7 @@ import {
   mapMonthDocument,
   mapPayrollSettingDocument,
   mapShiftHoursVersionDocument,
+  mapDailyValueDocument,
 } from './firestore/mappers';
 import { getFirestoreRepositories } from './firestoreService';
 import { loadAbsencesOverlappingMonth } from './absencesService';
@@ -36,6 +37,7 @@ export async function loadMonthReadiness(
     absences,
     shiftHoursVersions,
     departmentShiftCorrections,
+    dailyValues,
   ] = await Promise.all([
     (async () => {
       const snapshot = await getDocs(repositories.departments);
@@ -84,6 +86,14 @@ export async function loadMonthReadiness(
         mapDepartmentShiftCorrectionDocument(document.id, document.data()),
       );
     })(),
+    (async () => {
+      const snapshot = await getDocs(
+        repositories.forMonth(monthId).dailyValues,
+      );
+      return snapshot.docs.map((document) =>
+        mapDailyValueDocument(document.id, monthId, document.data()),
+      );
+    })(),
   ]);
 
   return assessMonthReadiness({
@@ -101,5 +111,6 @@ export async function loadMonthReadiness(
     absences,
     shiftHoursVersions,
     departmentShiftCorrections,
+    dailyValues,
   });
 }

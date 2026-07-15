@@ -31,7 +31,10 @@ import {
   previewDepartmentRotation,
   validateDepartmentShiftCorrection,
   validateShiftHours,
+  type ShiftCorrectionImpactSummary,
 } from '../../utils/schedule';
+import { previewShiftCorrectionImpact } from '../../services/shiftCorrectionImpactService';
+import { ShiftCorrectionImpactDialog } from './ShiftCorrectionImpactDialog';
 import { useShiftConfiguration } from './useShiftConfiguration';
 
 const SHIFTS: ActualWorkingShift[] = ['FIRST', 'SECOND', 'NIGHT'];
@@ -58,7 +61,13 @@ export function ShiftConfigurationPanel({
     WHITE: 'SECOND',
     BLUE: 'NIGHT',
   });
-  const [confirmation, setConfirmation] = useState(false);
+  const [impactOpen, setImpactOpen] = useState(false);
+  const [impactLoading, setImpactLoading] = useState(false);
+  const [impactApplying, setImpactApplying] = useState(false);
+  const [impact, setImpact] = useState<ShiftCorrectionImpactSummary | null>(
+    null,
+  );
+  const [impactError, setImpactError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const correctionValidation = validateDepartmentShiftCorrection({
     shiftMode,
@@ -89,18 +98,47 @@ export function ShiftConfigurationPanel({
   const saveCorrection = async (event: FormEvent) => {
     event.preventDefault();
     setSubmitError(null);
-    if (!departmentId || !correctionValidation.valid || !confirmation) return;
+    if (!departmentId || !correctionValidation.valid) return;
+    setImpactOpen(true);
+    setImpactLoading(true);
+    setImpact(null);
+    setImpactError(null);
     try {
-      await config.createCorrection({
+      const result = await previewShiftCorrectionImpact({
         departmentId,
         effectiveDate,
         shiftMode,
         groupAssignments: assignments,
-        note: null,
       });
-      setConfirmation(false);
+      setImpact(result);
     } catch {
-      setSubmitError(t.settings.shiftConfiguration.saveError);
+      setImpactError(t.settings.shiftConfiguration.impact.analysisError);
+    } finally {
+      setImpactLoading(false);
+    }
+  };
+
+  const applyCorrection = async () => {
+    if (!impact) return;
+    setImpactApplying(true);
+    setImpactError(null);
+    try {
+      await config.createCorrection(
+        {
+          departmentId,
+          effectiveDate,
+          shiftMode,
+          groupAssignments: assignments,
+          note: null,
+        },
+        impact,
+      );
+      setImpactOpen(false);
+      setImpact(null);
+    } catch {
+      setImpactError(t.settings.shiftConfiguration.impact.applyError);
+    } finally {
+      setImpactApplying(false);
     }
   };
 
@@ -310,32 +348,17 @@ export function ShiftConfigurationPanel({
                   </TableBody>
                 </Table>
               </TableContainer>
-              <Alert severity="warning">
-                {t.settings.shiftConfiguration.impactWarning}
-              </Alert>
-              <Button
-                type="button"
-                variant={confirmation ? 'contained' : 'outlined'}
-                color={confirmation ? 'warning' : 'primary'}
-                onClick={() => setConfirmation((value) => !value)}
-                sx={{ alignSelf: 'flex-start' }}
-              >
-                {confirmation
-                  ? t.settings.shiftConfiguration.impactConfirmed
-                  : t.settings.shiftConfiguration.reviewImpact}
-              </Button>
               <Button
                 type="submit"
                 variant="contained"
                 disabled={
                   !departmentId ||
                   !correctionValidation.valid ||
-                  !confirmation ||
                   config.isLoading
                 }
                 sx={{ alignSelf: 'flex-start' }}
               >
-                {t.settings.shiftConfiguration.saveCorrection}
+                {t.settings.shiftConfiguration.reviewImpact}
               </Button>
             </Stack>
           </Box>
@@ -356,6 +379,21 @@ export function ShiftConfigurationPanel({
             </Box>
           ) : null}
         </Stack>
+        <ShiftCorrectionImpactDialog
+          open={impactOpen}
+          departmentName={
+            departments.find((department) => department.id === departmentId)
+              ?.name ?? departmentId
+          }
+          impact={impact}
+          loading={impactLoading}
+          applying={impactApplying}
+          error={impactError}
+          onCancel={() => {
+            if (!impactApplying) setImpactOpen(false);
+          }}
+          onApply={() => void applyCorrection()}
+        />
       </CardContent>
     </Card>
   );

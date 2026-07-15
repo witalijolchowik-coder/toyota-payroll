@@ -168,6 +168,14 @@ export const pl = {
           'Przypisany dział nie istnieje albo jest nieaktywny.',
         'schedule-unresolved-day':
           'Nie udało się wyznaczyć planu pracy dla co najmniej jednego dnia.',
+        'shift-plan-manual-actual-review':
+          'Zmiana planu wpłynęła na ręcznie skorygowany czas pracy.',
+        'shift-plan-overtime-review':
+          'Nadgodziny wymagają ponownej weryfikacji po zmianie planu.',
+        'shift-plan-private-time-review':
+          'Czas prywatny wymaga ponownej weryfikacji po zmianie planu.',
+        'shift-plan-work-conflict':
+          'Faktyczna praca koliduje z nowym planem dnia.',
         'payroll-setting-missing':
           'Brakuje aktywnej stawki dla wybranego miesiąca.',
         'payroll-setting-conflict':
@@ -986,6 +994,84 @@ export const pl = {
       reviewImpact: 'Sprawdź i potwierdź wpływ',
       impactConfirmed: 'Wpływ został potwierdzony',
       saveCorrection: 'Zapisz korektę zmian',
+      impact: {
+        title: 'Wpływ korekty zmian',
+        loading: 'Obliczanie rzeczywistego wpływu korekty…',
+        range: 'Zakres zmian: {{start}} – {{end}}',
+        boundedByNext:
+          'Zakres kończy się przed kolejnym zapisanym punktem korekty tego działu.',
+        zeroImpact:
+          'W otwartych miesiącach nie zmieni się żaden plan dnia. Punkt konfiguracji można mimo to zapisać.',
+        strongConfirmation:
+          'W zakresie znajdują się fakty ręczne lub nieobecności. Nie zostaną usunięte, ale wskazane dni mogą wymagać ponownej weryfikacji.',
+        counters: {
+          employees: 'Pracownicy objęci zmianą',
+          planDays: 'Dni planu do przeliczenia',
+          manual: 'Ręczne korekty czasu',
+          overtime: 'Nadgodziny',
+          shortage: 'Niedoczas / czas prywatny',
+          absences: 'Nieobecności',
+          confirmedL4: 'Potwierdzone L4',
+          review: 'Wymaga ponownej weryfikacji',
+        },
+        groups: {
+          recalculated: 'Dane, które zostaną przeliczone',
+          preserved: 'Dane, które pozostaną bez zmian',
+          review: 'Dane wymagające sprawdzenia',
+        },
+        recalculated: [
+          'wygenerowana zmiana i przedział planu',
+          'porównanie planu z faktycznym czasem',
+          'składniki pochodne zależne od planu',
+        ],
+        preserved: [
+          'ręcznie wpisany faktyczny przedział od–do',
+          'potwierdzone L4 i pozostałe nieobecności',
+          'zatrudnienie, przypisania i pozostałe dane pracownika',
+        ],
+        review: [
+          'faktyczny czas zapisany względem poprzedniego planu',
+          'nadgodziny zależne od poprzedniego planu',
+          'niedoczas i czas prywatny zależne od poprzedniego planu',
+        ],
+        showDetails: 'Pokaż szczegóły',
+        hideDetails: 'Ukryj szczegóły',
+        filter: {
+          label: 'Filtr szczegółów',
+          options: {
+            all: 'Wszystkie zmienione dni',
+            review: 'Wymagające weryfikacji',
+            manual: 'Z ręcznym czasem',
+            overtime: 'Z nadgodzinami',
+            absence: 'Z nieobecnością',
+          },
+        },
+        table: {
+          employee: 'Pracownik',
+          teta: 'TETA',
+          date: 'Data',
+          before: 'Plan przed',
+          after: 'Plan po',
+          markers: 'Znaczniki',
+        },
+        markers: {
+          manual: 'Ręczny czas',
+          overtime: 'Nadgodziny',
+          shortage: 'Niedoczas / prywatny',
+          absence: 'Nieobecność',
+          confirmedL4: 'Potwierdzone L4',
+          review: 'Do weryfikacji',
+        },
+        noDetails: 'Brak wierszy spełniających wybrany filtr.',
+        notApplicable: 'Dzień wolny / brak planu',
+        cancel: 'Anuluj',
+        apply: 'Zastosuj korektę',
+        applying: 'Zapisywanie korekty…',
+        analysisError:
+          'Nie udało się obliczyć wpływu korekty. Dane nie zostały zapisane.',
+        applyError:
+          'Nie udało się zapisać korekty. Podgląd pozostaje otwarty — sprawdź połączenie i spróbuj ponownie.',
+      },
       invalidHours:
         'Każda zmiana musi mieć prawidłowy przedział od–do, nie dłuższy niż 12 godzin.',
       invalidMapping:

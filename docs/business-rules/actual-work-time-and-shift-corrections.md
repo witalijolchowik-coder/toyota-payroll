@@ -26,6 +26,24 @@ Korekta jest lokalna dla działu i ma dokładną datę obowiązywania. Dopuszcza
 
 PU i Headliner mogą przechodzić między trybem dwu- i trzyzmianowym przez kolejne punkty korekty. Ścieżka: `/departmentShiftCorrections/{correctionId}`.
 
+### Podgląd wpływu przed zapisem
+
+Przed zapisaniem punktu korekty system porównuje wygenerowany plan przed i po proponowanej zmianie. Analiza obejmuje wyłącznie wybrany dział, aktywne okresy zatrudnienia i efektywne przypisania działu oraz grupy. Uwzględnia BHP, ręczne wyjątki planu, wersjonowane godziny zmian i tryb dwu- lub trzyzmianowy.
+
+Segment zaczyna się w dacie korekty. Kończy się w ostatnim dniu aktualnie otwartych miesięcy albo dzień przed następnym aktywnym punktem korekty tego samego działu — zależnie od tego, która granica wystąpi wcześniej. Poprzedni punkt określa plan „przed”, a kolejny punkt nie jest przeliczany przez wcześniejszą korektę. Zamkniętych miesięcy i innych działów podgląd nie skanuje.
+
+Dzień jest zmieniony tylko wtedy, gdy różni się co najmniej jedna istotna wartość planu: zmiana, początek, koniec, czas trwania lub status dnia. Liczniki używają unikalnych par pracownik–dzień i pokazują: pracowników objętych zmianą, zmienione dni planu, ręczne przedziały czasu, nadgodziny, niedoczas/czas prywatny, nieobecności, potwierdzone L4 oraz dni wymagające ponownej weryfikacji. Szczegóły pokazują TETA, datę, plan przed i po oraz znaczniki danych istniejących w danym dniu.
+
+Jeżeli wynik wynosi zero, punkt konfiguracji można zapisać bez alarmującego ostrzeżenia. Analiza nie wykonuje żadnych zapisów. Dla dużego zakresu interfejs pokazuje stan obliczania, blokuje podwójne zatwierdzenie i udostępnia przewijaną, filtrowaną tabelę szczegółów.
+
+### Ochrona faktów i ponowna weryfikacja
+
+Po zatwierdzeniu zapisywany jest wyłącznie nowy punkt konfiguracji. Wirtualny plan jest następnie generowany z aktualnej konfiguracji. Ręczny przedział rzeczywisty, potwierdzone L4, pozostałe nieobecności, daty zatrudnienia, przypisania i inne fakty pracownika nie są usuwane ani nadpisywane.
+
+Zmiana planu może zmienić interpretację istniejącego faktu czasu. Gotowość miesiąca porównuje plan zapisany przy ręcznym przedziale z aktualnie generowanym planem. Rozbieżność tworzy precyzyjne ostrzeżenie dla ręcznego czasu, nadgodzin, czasu prywatnego albo pracy kolidującej z nowym dniem wolnym. Sama potwierdzona nieobecność nie staje się błędem wskutek zmiany planu.
+
+Wpis audytowy korekty zawiera identyfikator korekty, dział, datę, zakres wpływu, poprzednie i nowe mapowanie oraz wszystkie liczniki podsumowania. Nie kopiuje listy nazwisk ani pełnej tabeli szczegółów.
+
 ## Plan dnia i BHP
 
 Plan zawiera kod zmiany, początek, koniec i czas trwania. Brak grupy nie kasuje planu: po BHP stosowana jest zmiana 1 do czasu przypisania grupy lub wyjątku. BHP ma pierwszeństwo przed rotacją, obejmuje pierwsze dwa rzeczywiste dni robocze, odbywa się na zmianie 1 i liczy 8 godzin.

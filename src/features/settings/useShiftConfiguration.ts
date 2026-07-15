@@ -12,6 +12,7 @@ import type {
   ShiftHoursVersion,
   ShiftHoursVersionCreateInput,
 } from '../../types/firestore';
+import type { ShiftCorrectionImpactSummary } from '../../utils/schedule';
 
 export function useShiftConfiguration() {
   const [shiftHoursVersions, setShiftHoursVersions] = useState<
@@ -54,8 +55,11 @@ export function useShiftConfiguration() {
       await createShiftHoursVersion(input);
       await reload();
     },
-    createCorrection: async (input: DepartmentShiftCorrectionCreateInput) => {
-      await createDepartmentShiftCorrection(input);
+    createCorrection: async (
+      input: DepartmentShiftCorrectionCreateInput,
+      impact?: ShiftCorrectionImpactSummary,
+    ) => {
+      await createDepartmentShiftCorrection(input, impact);
       await reload();
     },
   };

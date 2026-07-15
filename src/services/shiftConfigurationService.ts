@@ -4,6 +4,7 @@ import {
   getDocs,
   serverTimestamp,
   updateDoc,
+  writeBatch,
 } from 'firebase/firestore';
 
 import { auth } from '../config/firebase';
@@ -16,8 +17,9 @@ import type {
 import {
   validateDepartmentShiftCorrection,
   validateShiftHours,
+  type ShiftCorrectionImpactSummary,
 } from '../utils/schedule';
-import { recordAuditEntry } from './auditService';
+import { appendAuditEntryToBatch, recordAuditEntry } from './auditService';
 import {
   mapDepartmentShiftCorrectionDocument,
   mapShiftHoursVersionDocument,
@@ -108,6 +110,7 @@ export async function createShiftHoursVersion(
 
 export async function createDepartmentShiftCorrection(
   input: DepartmentShiftCorrectionCreateInput,
+  impact?: ShiftCorrectionImpactSummary,
 ): Promise<string> {
   const validation = validateDepartmentShiftCorrection({
     shiftMode: input.shiftMode,
@@ -128,7 +131,9 @@ export async function createDepartmentShiftCorrection(
   ) {
     throw new ShiftConfigurationServiceError('duplicate-correction');
   }
-  const reference = await addDoc(repositories.departmentShiftCorrections, {
+  const reference = doc(repositories.departmentShiftCorrections);
+  const batch = writeBatch(repositories.departmentShiftCorrections.firestore);
+  batch.set(reference, {
     department_id: input.departmentId,
     effective_date: input.effectiveDate,
     shift_mode: input.shiftMode,
@@ -140,17 +145,48 @@ export async function createDepartmentShiftCorrection(
     updated_at: serverTimestamp(),
     updated_by: uid,
   });
-  await recordAuditEntry({
+  const previousCorrection = impact?.previousCorrectionId
+    ? existing.find(
+        (correction) => correction.id === impact.previousCorrectionId,
+      )
+    : null;
+  appendAuditEntryToBatch(batch, repositories, {
     entityPath: `departmentShiftCorrections/${reference.id}`,
     action: 'create',
     actorUid: uid,
     changes: {
+      correction_id: reference.id,
       department_id: input.departmentId,
       effective_date: input.effectiveDate,
       shift_mode: input.shiftMode,
       group_assignments: input.groupAssignments,
+      previous_mapping: previousCorrection
+        ? {
+            shift_mode: previousCorrection.shiftMode,
+            group_assignments: previousCorrection.groupAssignments,
+          }
+        : null,
+      new_mapping: {
+        shift_mode: input.shiftMode,
+        group_assignments: input.groupAssignments,
+      },
+      impact: impact
+        ? {
+            range_start: impact.rangeStart,
+            range_end: impact.rangeEnd,
+            affected_employees: impact.employeeCount,
+            changed_plan_days: impact.changedPlanDayCount,
+            manual_actual_days: impact.manualActualCount,
+            overtime_days: impact.overtimeCount,
+            shortage_private_time_days: impact.shortageOrPrivateTimeCount,
+            absence_days: impact.absenceCount,
+            confirmed_l4_days: impact.confirmedL4Count,
+            review_required_days: impact.reviewRequiredCount,
+          }
+        : null,
     },
   });
+  await batch.commit();
   return reference.id;
 }
 
