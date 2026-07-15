@@ -3,7 +3,7 @@ import { vi } from 'vitest';
 
 import { SettlementGrid } from './SettlementGrid';
 import { createCalendarDays } from './monthUtils';
-import type { Department, Employee } from '../../types/firestore';
+import type { DailyValue, Department, Employee } from '../../types/firestore';
 
 const metadata = {
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -79,5 +79,44 @@ describe('SettlementGrid', () => {
       }),
     );
     expect(editDay).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows a readable overtime and night breakdown in hours mode', () => {
+    const dailyValue: DailyValue = {
+      id: 'employee-1_2026-06-01',
+      monthId: '2026-06',
+      employeeId: employee.id,
+      tetaNumber: employee.tetaNumber,
+      date: '2026-06-01',
+      hours: 11,
+      source: 'manual',
+      importId: null,
+      note: null,
+      manualOverride: null,
+      workTimeCorrection: {
+        plannedShift: 'SECOND',
+        plannedStartTime: '14:00',
+        plannedEndTime: '22:00',
+        actualStartTime: '13:00',
+        actualEndTime: '00:00',
+        classificationOverride: null,
+      },
+      ...metadata,
+    };
+
+    render(
+      <SettlementGrid
+        employees={[employee]}
+        departments={[department]}
+        days={createCalendarDays('2026-06')}
+        dailyValues={[dailyValue]}
+        displayMode="hours"
+      />,
+    );
+
+    expect(screen.getByText('11 h')).toBeInTheDocument();
+    expect(screen.getByText('+1 h · 50%')).toBeInTheDocument();
+    expect(screen.getByText('+2 h · 100%')).toBeInTheDocument();
+    expect(screen.getByText('2 h · noc')).toBeInTheDocument();
   });
 });

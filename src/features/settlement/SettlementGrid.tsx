@@ -34,6 +34,10 @@ import {
   type AttendanceWarning,
 } from '../../utils/attendance';
 import {
+  resolveDailyWorkTimeDeviation,
+  type DailyWorkTimeDeviation,
+} from '../../utils/payroll';
+import {
   isDateInRangeSelection,
   type CalendarRangeSelection,
 } from './calendarConstructor';
@@ -86,6 +90,7 @@ const weekdayFormatter = new Intl.DateTimeFormat('pl-PL', {
 
 const employeeColumnWidth = 220;
 const dayColumnMinWidth = 30;
+const detailedHoursColumnMinWidth = 58;
 
 export function SettlementGrid({
   employees,
@@ -129,7 +134,12 @@ export function SettlementGrid({
         <Table
           size="small"
           sx={{
-            minWidth: employeeColumnWidth + days.length * dayColumnMinWidth,
+            minWidth:
+              employeeColumnWidth +
+              days.length *
+                (displayMode === 'hours'
+                  ? detailedHoursColumnMinWidth
+                  : dayColumnMinWidth),
             tableLayout: 'fixed',
           }}
         >
@@ -150,7 +160,10 @@ export function SettlementGrid({
                   align="center"
                   sx={{
                     width: `${100 / Math.max(days.length, 1)}%`,
-                    minWidth: dayColumnMinWidth,
+                    minWidth:
+                      displayMode === 'hours'
+                        ? detailedHoursColumnMinWidth
+                        : dayColumnMinWidth,
                     p: 0.35,
                     ...calendarBackground(day),
                   }}
@@ -278,6 +291,11 @@ export function SettlementGrid({
                       emptyLabel: t.settlement.grid.empty,
                       displayMode,
                     });
+                    const workTimeBreakdown = resolveGridWorkTimeBreakdown({
+                      value,
+                      day,
+                      plannedDay,
+                    });
                     const hasGoverningAbsence =
                       absenceResolution.kind !== 'none';
                     const warnings = resolveAttendanceWarnings({
@@ -293,6 +311,7 @@ export function SettlementGrid({
                       absenceResolution,
                       warnings,
                       isSettled,
+                      workTimeBreakdown,
                       t,
                     });
                     const canEdit =
@@ -317,7 +336,10 @@ export function SettlementGrid({
                         align="center"
                         sx={{
                           width: `${100 / Math.max(days.length, 1)}%`,
-                          minWidth: dayColumnMinWidth,
+                          minWidth:
+                            displayMode === 'hours'
+                              ? detailedHoursColumnMinWidth
+                              : dayColumnMinWidth,
                           px: 0.5,
                           py: 0.75,
                           ...cellBackground(value.calendarState, day),
@@ -374,7 +396,7 @@ export function SettlementGrid({
                                               : 'error.main',
                                         fontWeight: 800,
                                       }
-                                    : cellValueSx(value.kind)
+                                    : {}
                                 }
                               >
                                 {absenceLabel ? (
@@ -400,21 +422,13 @@ export function SettlementGrid({
                                     ) : null}
                                   </>
                                 ) : (
-                                  <>
-                                    {displayLabel}
-                                    {cellDeviationMarker(value, plannedDay) ? (
-                                      <Box
-                                        component="span"
-                                        sx={{
-                                          display: 'block',
-                                          fontSize: '0.65rem',
-                                          lineHeight: 1.1,
-                                        }}
-                                      >
-                                        {cellDeviationMarker(value, plannedDay)}
-                                      </Box>
-                                    ) : null}
-                                  </>
+                                  <CellHoursContent
+                                    displayLabel={displayLabel}
+                                    displayMode={displayMode}
+                                    valueKind={value.kind}
+                                    workTimeBreakdown={workTimeBreakdown}
+                                    t={t}
+                                  />
                                 )}
                               </Box>
                             </ButtonBase>
@@ -533,23 +547,144 @@ function cellDisplayLabel({
   return plannedDay?.label ?? (value.hours === null ? emptyLabel : hoursLabel);
 }
 
-function cellDeviationMarker(
-  value: ReturnType<typeof resolveSettlementCellValue>,
-  plannedDay?: PlannedScheduleDay,
-): string {
-  if (!value.workTimeCorrection) return '';
-  const markers: string[] = [];
-  if (
-    plannedDay &&
-    plannedDay.plannedDuration !== null &&
-    value.hours !== null
-  ) {
-    if (value.hours > plannedDay.plannedDuration) markers.push('+');
-    if (value.hours < plannedDay.plannedDuration) markers.push('−');
-  }
-  const { actualStartTime, actualEndTime } = value.workTimeCorrection;
-  if (actualStartTime >= '22:00' || actualEndTime <= '06:00') markers.push('N');
-  return markers.join(' ');
+function resolveGridWorkTimeBreakdown({
+  value,
+  day,
+  plannedDay,
+}: {
+  value: ReturnType<typeof resolveSettlementCellValue>;
+  day: CalendarDay;
+  plannedDay?: PlannedScheduleDay;
+}): DailyWorkTimeDeviation | null {
+  const correction = value.workTimeCorrection;
+  if (!correction) return null;
+
+  return resolveDailyWorkTimeDeviation({
+    planned: {
+      shift: correction.plannedShift,
+      startTime: correction.plannedStartTime,
+      endTime: correction.plannedEndTime,
+    },
+    actual: {
+      startTime: correction.actualStartTime,
+      endTime: correction.actualEndTime,
+    },
+    isWorkingDay:
+      plannedDay?.status === 'WORKING' ||
+      plannedDay?.status === 'BHP' ||
+      day.isWorkingDay,
+    isSaturday: day.date.getUTCDay() === 6,
+    isSunday: day.date.getUTCDay() === 0,
+    isPublicHoliday: day.isHoliday,
+    classificationOverride: correction.classificationOverride,
+  });
+}
+
+function CellHoursContent({
+  displayLabel,
+  displayMode,
+  valueKind,
+  workTimeBreakdown,
+  t,
+}: {
+  displayLabel: string;
+  displayMode: 'hours' | 'shifts';
+  valueKind: ReturnType<typeof resolveSettlementCellValue>['kind'];
+  workTimeBreakdown: DailyWorkTimeDeviation | null;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const showBreakdown =
+    displayMode === 'hours' &&
+    workTimeBreakdown &&
+    (workTimeBreakdown.overtime50Hours > 0 ||
+      workTimeBreakdown.overtime100Hours > 0 ||
+      workTimeBreakdown.nightAllowanceHours > 0);
+
+  return (
+    <Box
+      component="span"
+      sx={{
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: 0.3,
+        py: showBreakdown ? 0.25 : 0,
+      }}
+    >
+      <Box component="span" sx={cellValueSx(valueKind)}>
+        {displayLabel}
+      </Box>
+      {showBreakdown ? (
+        <Box
+          component="span"
+          sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}
+        >
+          {workTimeBreakdown.overtime50Hours > 0 ? (
+            <WorkTimeBadge
+              tone="warning"
+              label={interpolate(t.settlement.grid.workTime.overtime50, {
+                hours: formatCompactHours(workTimeBreakdown.overtime50Hours),
+              })}
+            />
+          ) : null}
+          {workTimeBreakdown.overtime100Hours > 0 ? (
+            <WorkTimeBadge
+              tone="error"
+              label={interpolate(t.settlement.grid.workTime.overtime100, {
+                hours: formatCompactHours(workTimeBreakdown.overtime100Hours),
+              })}
+            />
+          ) : null}
+          {workTimeBreakdown.nightAllowanceHours > 0 ? (
+            <WorkTimeBadge
+              tone="info"
+              label={interpolate(t.settlement.grid.workTime.night, {
+                hours: formatCompactHours(
+                  workTimeBreakdown.nightAllowanceHours,
+                ),
+              })}
+            />
+          ) : null}
+        </Box>
+      ) : null}
+    </Box>
+  );
+}
+
+function WorkTimeBadge({
+  tone,
+  label,
+}: {
+  tone: 'warning' | 'error' | 'info';
+  label: string;
+}) {
+  return (
+    <Box
+      component="span"
+      sx={{
+        display: 'block',
+        minWidth: 46,
+        borderRadius: 0.75,
+        border: 1,
+        borderColor: `${tone}.main`,
+        bgcolor: (theme) => alpha(theme.palette[tone].main, 0.08),
+        color: `${tone}.dark`,
+        fontSize: '0.56rem',
+        fontWeight: 800,
+        lineHeight: 1.2,
+        letterSpacing: 0.1,
+        px: 0.35,
+        py: 0.15,
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {label}
+    </Box>
+  );
+}
+
+function formatCompactHours(hours: number): string {
+  return hours.toLocaleString('pl-PL', { maximumFractionDigits: 2 });
 }
 
 function buildTooltip({
@@ -558,6 +693,7 @@ function buildTooltip({
   absenceResolution,
   warnings,
   isSettled,
+  workTimeBreakdown,
   t,
 }: {
   value: ReturnType<typeof resolveSettlementCellValue>;
@@ -565,6 +701,7 @@ function buildTooltip({
   absenceResolution: ReturnType<typeof resolveGoverningAbsence>;
   warnings: AttendanceWarning[];
   isSettled: boolean;
+  workTimeBreakdown: DailyWorkTimeDeviation | null;
   t: ReturnType<typeof useTranslations>;
 }): string {
   const parts: string[] = [];
@@ -596,6 +733,17 @@ function buildTooltip({
     parts.push(t.settlement.grid.importedValue);
   } else if (value.kind === 'manual') {
     parts.push(t.settlement.grid.manualValue);
+  }
+
+  if (workTimeBreakdown) {
+    parts.push(
+      interpolate(t.settlement.grid.workTime.tooltip, {
+        normal: formatCompactHours(workTimeBreakdown.normalWorkHours),
+        overtime50: formatCompactHours(workTimeBreakdown.overtime50Hours),
+        overtime100: formatCompactHours(workTimeBreakdown.overtime100Hours),
+        night: formatCompactHours(workTimeBreakdown.nightAllowanceHours),
+      }),
+    );
   }
 
   if (plannedDay) {

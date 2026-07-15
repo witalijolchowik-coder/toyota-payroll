@@ -1366,6 +1366,13 @@ export const pl = {
         hours: 'Godziny',
         shifts: 'Zmiany',
       },
+      workTime: {
+        overtime50: '+{{hours}} h · 50%',
+        overtime100: '+{{hours}} h · 100%',
+        night: '{{hours}} h · noc',
+        tooltip:
+          'Rozkład czasu: podstawowe {{normal}} h, nadgodziny 50% {{overtime50}} h, nadgodziny 100% {{overtime100}} h, nocne {{night}} h.',
+      },
     },
     legend: {
       title: 'Oznaczenia kalendarza',
