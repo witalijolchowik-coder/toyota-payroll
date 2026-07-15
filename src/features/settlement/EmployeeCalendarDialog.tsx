@@ -25,6 +25,10 @@ import type {
 import { resolveGoverningAbsence } from '../../utils/absences';
 import { resolveAttendanceWarnings } from '../../utils/attendance';
 import {
+  intervalHours,
+  resolveDailyWorkTimeDeviation,
+} from '../../utils/payroll';
+import {
   isDayWithinEmployment,
   resolveSettlementCellValue,
   type CalendarDay,
@@ -216,6 +220,25 @@ export function EmployeeCalendarDialog({
                   : interpolate(t.settlement.grid.hours, {
                       hours: value.hours.toLocaleString('pl-PL'),
                     });
+              const workTimeBreakdown = value.workTimeCorrection
+                ? resolveDailyWorkTimeDeviation({
+                    planned: {
+                      shift: value.workTimeCorrection.plannedShift,
+                      startTime: value.workTimeCorrection.plannedStartTime,
+                      endTime: value.workTimeCorrection.plannedEndTime,
+                    },
+                    actual: {
+                      startTime: value.workTimeCorrection.actualStartTime,
+                      endTime: value.workTimeCorrection.actualEndTime,
+                    },
+                    isWorkingDay:
+                      plannedDay?.status === 'WORKING' ||
+                      plannedDay?.status === 'BHP',
+                    isSaturday: cell.day.date.getUTCDay() === 6,
+                    isSunday: cell.day.date.getUTCDay() === 0,
+                    isPublicHoliday: cell.day.isHoliday,
+                  })
+                : null;
 
               return (
                 <Tooltip
@@ -323,6 +346,43 @@ export function EmployeeCalendarDialog({
                               {
                                 start: value.workTimeCorrection.actualStartTime,
                                 end: value.workTimeCorrection.actualEndTime,
+                              },
+                            )}
+                          </Typography>
+                        ) : null}
+                        {workTimeBreakdown ? (
+                          <Typography variant="caption" color="text.secondary">
+                            {interpolate(
+                              t.settlement.editor.workTime.previewExtended,
+                              {
+                                planned: intervalHours({
+                                  startTime:
+                                    value.workTimeCorrection!.plannedStartTime,
+                                  endTime:
+                                    value.workTimeCorrection!.plannedEndTime,
+                                }).toLocaleString('pl-PL'),
+                                actual: intervalHours({
+                                  startTime:
+                                    value.workTimeCorrection!.actualStartTime,
+                                  endTime:
+                                    value.workTimeCorrection!.actualEndTime,
+                                }).toLocaleString('pl-PL'),
+                                private:
+                                  workTimeBreakdown.privateTimeHours.toLocaleString(
+                                    'pl-PL',
+                                  ),
+                                overtime50:
+                                  workTimeBreakdown.overtime50Hours.toLocaleString(
+                                    'pl-PL',
+                                  ),
+                                overtime100:
+                                  workTimeBreakdown.overtime100Hours.toLocaleString(
+                                    'pl-PL',
+                                  ),
+                                night:
+                                  workTimeBreakdown.nightAllowanceHours.toLocaleString(
+                                    'pl-PL',
+                                  ),
                               },
                             )}
                           </Typography>
