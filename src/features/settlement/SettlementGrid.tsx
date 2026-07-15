@@ -14,6 +14,8 @@ import {
   type SxProps,
   type Theme,
 } from '@mui/material';
+import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded';
+import WbSunnyRoundedIcon from '@mui/icons-material/WbSunnyRounded';
 
 import { useTranslations } from '../../hooks/useTranslations';
 import { interpolate } from '../../i18n/pl';
@@ -593,12 +595,13 @@ function CellHoursContent({
   workTimeBreakdown: DailyWorkTimeDeviation | null;
   t: ReturnType<typeof useTranslations>;
 }) {
+  const overtime = workTimeBreakdown
+    ? resolveOvertimePresentation(workTimeBreakdown)
+    : null;
   const showBreakdown =
     displayMode === 'hours' &&
-    workTimeBreakdown &&
-    (workTimeBreakdown.overtime50Hours > 0 ||
-      workTimeBreakdown.overtime100Hours > 0 ||
-      workTimeBreakdown.nightAllowanceHours > 0);
+    overtime &&
+    (overtime.dayHours > 0 || overtime.nightHours > 0);
 
   return (
     <Box
@@ -611,37 +614,42 @@ function CellHoursContent({
         py: showBreakdown ? 0.25 : 0,
       }}
     >
-      <Box component="span" sx={cellValueSx(valueKind)}>
+      <Box
+        component="span"
+        sx={
+          showBreakdown
+            ? { color: 'text.secondary', fontStyle: 'italic' }
+            : cellValueSx(valueKind)
+        }
+      >
         {displayLabel}
       </Box>
       {showBreakdown ? (
         <Box
           component="span"
-          sx={{ display: 'flex', flexDirection: 'column', gap: 0.25 }}
+          sx={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 0.7,
+            whiteSpace: 'nowrap',
+          }}
         >
-          {workTimeBreakdown.overtime50Hours > 0 ? (
-            <WorkTimeBadge
-              tone="warning"
-              label={interpolate(t.settlement.grid.workTime.overtime50, {
-                hours: formatCompactHours(workTimeBreakdown.overtime50Hours),
+          {overtime.dayHours > 0 ? (
+            <OvertimeIndicator
+              kind="day"
+              hours={overtime.dayHours}
+              label={interpolate(t.settlement.grid.workTime.dayAriaLabel, {
+                hours: formatCompactHours(overtime.dayHours),
               })}
             />
           ) : null}
-          {workTimeBreakdown.overtime100Hours > 0 ? (
-            <WorkTimeBadge
-              tone="error"
-              label={interpolate(t.settlement.grid.workTime.overtime100, {
-                hours: formatCompactHours(workTimeBreakdown.overtime100Hours),
-              })}
-            />
-          ) : null}
-          {workTimeBreakdown.nightAllowanceHours > 0 ? (
-            <WorkTimeBadge
-              tone="info"
-              label={interpolate(t.settlement.grid.workTime.night, {
-                hours: formatCompactHours(
-                  workTimeBreakdown.nightAllowanceHours,
-                ),
+          {overtime.nightHours > 0 ? (
+            <OvertimeIndicator
+              kind="night"
+              hours={overtime.nightHours}
+              label={interpolate(t.settlement.grid.workTime.nightAriaLabel, {
+                hours: formatCompactHours(overtime.nightHours),
               })}
             />
           ) : null}
@@ -651,36 +659,51 @@ function CellHoursContent({
   );
 }
 
-function WorkTimeBadge({
-  tone,
+function OvertimeIndicator({
+  kind,
+  hours,
   label,
 }: {
-  tone: 'warning' | 'error' | 'info';
+  kind: 'day' | 'night';
+  hours: number;
   label: string;
 }) {
+  const Icon = kind === 'day' ? WbSunnyRoundedIcon : DarkModeRoundedIcon;
+
   return (
     <Box
       component="span"
+      aria-label={label}
       sx={{
-        display: 'block',
-        minWidth: 46,
-        borderRadius: 0.75,
-        border: 1,
-        borderColor: `${tone}.main`,
-        bgcolor: (theme) => alpha(theme.palette[tone].main, 0.08),
-        color: `${tone}.dark`,
-        fontSize: '0.56rem',
-        fontWeight: 800,
-        lineHeight: 1.2,
-        letterSpacing: 0.1,
-        px: 0.35,
-        py: 0.15,
-        whiteSpace: 'nowrap',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 0.15,
+        color: kind === 'day' ? 'warning.dark' : 'secondary.main',
       }}
     >
-      {label}
+      <Icon sx={{ fontSize: 12 }} />
+      <Box
+        component="span"
+        sx={{ fontSize: '0.63rem', fontWeight: 750, lineHeight: 1 }}
+      >
+        +{formatCompactHours(hours)}h
+      </Box>
     </Box>
   );
+}
+
+function resolveOvertimePresentation(breakdown: DailyWorkTimeDeviation): {
+  dayHours: number;
+  nightHours: number;
+} {
+  const nightHours = Math.min(
+    breakdown.extraHours,
+    breakdown.nightOvertimeHours,
+  );
+  return {
+    dayHours: Math.max(0, breakdown.extraHours - nightHours),
+    nightHours,
+  };
 }
 
 function formatCompactHours(hours: number): string {
@@ -736,12 +759,12 @@ function buildTooltip({
   }
 
   if (workTimeBreakdown) {
+    const overtime = resolveOvertimePresentation(workTimeBreakdown);
     parts.push(
       interpolate(t.settlement.grid.workTime.tooltip, {
         normal: formatCompactHours(workTimeBreakdown.normalWorkHours),
-        overtime50: formatCompactHours(workTimeBreakdown.overtime50Hours),
-        overtime100: formatCompactHours(workTimeBreakdown.overtime100Hours),
-        night: formatCompactHours(workTimeBreakdown.nightAllowanceHours),
+        day: formatCompactHours(overtime.dayHours),
+        night: formatCompactHours(overtime.nightHours),
       }),
     );
   }

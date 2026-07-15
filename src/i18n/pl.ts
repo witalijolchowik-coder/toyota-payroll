@@ -1367,11 +1367,10 @@ export const pl = {
         shifts: 'Zmiany',
       },
       workTime: {
-        overtime50: '+{{hours}} h · 50%',
-        overtime100: '+{{hours}} h · 100%',
-        night: '{{hours}} h · noc',
+        dayAriaLabel: 'Nadgodziny dzienne: {{hours}} h',
+        nightAriaLabel: 'Nadgodziny nocne: {{hours}} h',
         tooltip:
-          'Rozkład czasu: podstawowe {{normal}} h, nadgodziny 50% {{overtime50}} h, nadgodziny 100% {{overtime100}} h, nocne {{night}} h.',
+          'Rozkład czasu: podstawowe {{normal}} h, nadgodziny dzienne {{day}} h, nadgodziny nocne {{night}} h.',
       },
     },
     legend: {

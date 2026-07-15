@@ -115,8 +115,14 @@ describe('SettlementGrid', () => {
     );
 
     expect(screen.getByText('11 h')).toBeInTheDocument();
-    expect(screen.getByText('+1 h · 50%')).toBeInTheDocument();
-    expect(screen.getByText('+2 h · 100%')).toBeInTheDocument();
-    expect(screen.getByText('2 h · noc')).toBeInTheDocument();
+    expect(screen.getByLabelText('Nadgodziny dzienne: 1 h')).toHaveTextContent(
+      '+1h',
+    );
+    expect(screen.getByLabelText('Nadgodziny nocne: 2 h')).toHaveTextContent(
+      '+2h',
+    );
+    expect(screen.queryByText('50%')).not.toBeInTheDocument();
+    expect(screen.queryByText('100%')).not.toBeInTheDocument();
+    expect(screen.queryByText('2 h · noc')).not.toBeInTheDocument();
   });
 });
