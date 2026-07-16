@@ -226,4 +226,21 @@ describe('monthly work-time balancing', () => {
       }).paidOvertime100Hours,
     ).toBe(14);
   });
+
+  it('reserves explicitly linked 100% hours before ordinary shortage allocation', () => {
+    expect(
+      balanceMonthlyWorkTimeDeviations({
+        privateTimeHours: 4,
+        coverableNiHours: 0,
+        overtime50Hours: 4,
+        overtime100Hours: 8,
+        preferredOvertime100CoverageHours: 8,
+      }),
+    ).toMatchObject({
+      preferredOvertime100CoverageHours: 8,
+      privateTimeCoveredHours: 4,
+      paidOvertime50Hours: 0,
+      paidOvertime100Hours: 0,
+    });
+  });
 });

@@ -13,6 +13,9 @@ import {
 
 import { useTranslations } from '../../hooks/useTranslations';
 import { interpolate } from '../../i18n/pl';
+import { auth } from '../../config/firebase';
+import { recordAuditEntry } from '../../services/auditService';
+import { firestorePaths } from '../../services/firestore/paths';
 import type {
   DailyValue,
   Department,
@@ -129,6 +132,26 @@ export function SettlementExportPanel({
     reviewStates,
   ]);
   const warningCounts = countWarnings(exportPackage.warnings);
+  const runExport = (outputType: string, download: () => void) => {
+    const actorUid = auth?.currentUser?.uid;
+    if (actorUid) {
+      void recordAuditEntry({
+        entityPath: firestorePaths.month(monthId),
+        action: 'create',
+        actorUid,
+        changes: {
+          operation:
+            exportPackage.warnings.length > 0
+              ? 'unfinished-export-generated'
+              : 'completed-export-generated',
+          month_id: monthId,
+          output_type: outputType,
+          blocker_count: exportPackage.warnings.length,
+        },
+      });
+    }
+    download();
+  };
 
   return (
     <Card>
@@ -190,10 +213,12 @@ export function SettlementExportPanel({
               variant="contained"
               startIcon={<DownloadOutlined />}
               onClick={() =>
-                downloadTextFile(
-                  exportPackage.toyota.fileName,
-                  exportPackage.toyota.excelXml,
-                  'application/vnd.ms-excel;charset=utf-8',
+                runExport('toyota-xlsx', () =>
+                  downloadBinaryFile(
+                    exportPackage.toyota.fileName,
+                    exportPackage.toyota.workbook,
+                    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                  ),
                 )
               }
             >
@@ -205,10 +230,12 @@ export function SettlementExportPanel({
               variant="outlined"
               startIcon={<DownloadOutlined />}
               onClick={() =>
-                downloadTextFile(
-                  exportPackage.soz.plFileName,
-                  exportPackage.soz.polishCsv,
-                  'text/csv;charset=utf-8',
+                runExport('soz-pl-csv', () =>
+                  downloadTextFile(
+                    exportPackage.soz.plFileName,
+                    exportPackage.soz.polishCsv,
+                    'text/csv;charset=utf-8',
+                  ),
                 )
               }
             >
@@ -218,10 +245,12 @@ export function SettlementExportPanel({
               variant="outlined"
               startIcon={<DownloadOutlined />}
               onClick={() =>
-                downloadTextFile(
-                  exportPackage.soz.foreignFileName,
-                  exportPackage.soz.foreignCsv,
-                  'text/csv;charset=utf-8',
+                runExport('soz-foreign-csv', () =>
+                  downloadTextFile(
+                    exportPackage.soz.foreignFileName,
+                    exportPackage.soz.foreignCsv,
+                    'text/csv;charset=utf-8',
+                  ),
                 )
               }
             >
@@ -231,15 +260,53 @@ export function SettlementExportPanel({
               variant="outlined"
               startIcon={<DownloadOutlined />}
               onClick={() =>
-                downloadTextFile(
-                  exportPackage.soz.noteFileName,
-                  exportPackage.soz.note,
-                  'text/plain;charset=utf-8',
+                runExport('soz-compensation-note', () =>
+                  downloadTextFile(
+                    exportPackage.soz.noteFileName,
+                    exportPackage.soz.note,
+                    'text/plain;charset=utf-8',
+                  ),
                 )
               }
             >
               {t.settlement.export.downloadNote}
             </Button>
+            {exportPackage.soz.polishCompensationWorkbook &&
+            exportPackage.soz.polishCompensationFileName ? (
+              <Button
+                variant="outlined"
+                startIcon={<DownloadOutlined />}
+                onClick={() =>
+                  runExport('underwork-compensation-pl', () =>
+                    downloadBinaryFile(
+                      exportPackage.soz.polishCompensationFileName!,
+                      exportPackage.soz.polishCompensationWorkbook!,
+                      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    ),
+                  )
+                }
+              >
+                {t.settlement.export.downloadCompensationPl}
+              </Button>
+            ) : null}
+            {exportPackage.soz.foreignCompensationWorkbook &&
+            exportPackage.soz.foreignCompensationFileName ? (
+              <Button
+                variant="outlined"
+                startIcon={<DownloadOutlined />}
+                onClick={() =>
+                  runExport('underwork-compensation-foreign', () =>
+                    downloadBinaryFile(
+                      exportPackage.soz.foreignCompensationFileName!,
+                      exportPackage.soz.foreignCompensationWorkbook!,
+                      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    ),
+                  )
+                }
+              >
+                {t.settlement.export.downloadCompensationForeign}
+              </Button>
+            ) : null}
           </Stack>
 
           <Divider />
@@ -297,6 +364,23 @@ function countWarnings(warnings: { code: ExportReadinessWarningCode }[]) {
 
 function downloadTextFile(fileName: string, content: string, type: string) {
   const blob = new Blob([content], { type });
+  const href = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = href;
+  link.download = fileName;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(href);
+}
+
+function downloadBinaryFile(
+  fileName: string,
+  content: Uint8Array,
+  type: string,
+) {
+  const bytes = new Uint8Array(content);
+  const blob = new Blob([bytes.buffer], { type });
   const href = URL.createObjectURL(blob);
   const link = document.createElement('a');
   link.href = href;

@@ -118,12 +118,18 @@ export interface AbsenceCreateInput extends EmployeeReferenceInput {
   startDate: IsoDate;
   endDate: IsoDate;
   hoursPerDay: number | null;
+  linkedWorkDate?: IsoDate | null;
   note: string | null;
 }
 
 export type AbsenceUpdateInput = Pick<
   AbsenceCreateInput,
-  'absenceCode' | 'startDate' | 'endDate' | 'hoursPerDay' | 'note'
+  | 'absenceCode'
+  | 'startDate'
+  | 'endDate'
+  | 'hoursPerDay'
+  | 'linkedWorkDate'
+  | 'note'
 >;
 
 export interface EmployeeEntitlementCreateInput extends EmployeeReferenceInput {

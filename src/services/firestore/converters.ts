@@ -285,6 +285,18 @@ export const monthConverter = createConverter<MonthDocument>((data, path) => ({
     'calculation_error',
     path,
   ),
+  calculation_input_hash:
+    readOptionalNullableString(data, 'calculation_input_hash', path) ?? null,
+  calculation_run_id:
+    readOptionalNullableString(data, 'calculation_run_id', path) ?? null,
+  calculation_blocker_count:
+    data.calculation_blocker_count === undefined
+      ? 0
+      : readNumber(data, 'calculation_blocker_count', path),
+  calculation_warning_count:
+    data.calculation_warning_count === undefined
+      ? 0
+      : readNumber(data, 'calculation_warning_count', path),
   settled_at: readOptionalNullableTimestamp(data, 'settled_at', path),
   settled_by: readOptionalNullableString(data, 'settled_by', path),
   ...metadata(data, path),
@@ -311,11 +323,13 @@ export const employeeSettlementConverter =
       totals: totals as unknown as SettlementTotalsDocument,
       warnings: readStringArray(data, 'warnings', path),
       calculated_at: readTimestamp(data, 'calculated_at', path),
-      calculation_version: readNonEmptyString(
-        data,
-        'calculation_version',
-        path,
-      ),
+      calculation_version: readNumber(data, 'calculation_version', path),
+      calculation_run_id: readNonEmptyString(data, 'calculation_run_id', path),
+      input_hash: readNonEmptyString(data, 'input_hash', path),
+      status: readEnum(data, 'status', path, ['complete', 'blocked'] as const),
+      blocker_count: readNumber(data, 'blocker_count', path),
+      warning_count: readNumber(data, 'warning_count', path),
+      result: readObject(data, 'result', path),
     };
   });
 
@@ -472,6 +486,10 @@ export const absenceConverter = createConverter<AbsenceDocument>(
     start_date: readNonEmptyString(data, 'start_date', path),
     end_date: readNonEmptyString(data, 'end_date', path),
     hours_per_day: readNullableNumber(data, 'hours_per_day', path),
+    linked_work_date:
+      data.linked_work_date === undefined
+        ? null
+        : readNullableString(data, 'linked_work_date', path),
     source: readEnum(data, 'source', path, [
       'manual',
       'absence_import',

@@ -82,6 +82,8 @@ documents continue to govern system structure and implementation boundaries.
 - [ADR 0009: Attendance facts and imported-value overrides](decisions/0009-attendance-hours-rules.md)
 - [ADR 0010: Versioned payroll settings and monthly adjustments](decisions/0010-payroll-settings-adjustments.md)
 - [ADR 0011: In-memory monthly payroll calculation draft](decisions/0011-payroll-engine-draft.md)
+- [ADR 0025: Persistent monthly calculation and operational exports](decisions/0025-persistent-monthly-calculation-and-exports.md)
+- [Binding June 2026 export references](reference-export-structures.md)
 - [ADR 0012: Calendar Constructor reuses attendance and absence documents](decisions/0012-calendar-constructor.md)
 - [ADR 0013: Departments, color shifts and rotation foundation](decisions/0013-departments-shifts-rotation.md)
 - [ADR 0014: Work-time deviations extend DailyValue](decisions/0014-work-time-deviations.md)

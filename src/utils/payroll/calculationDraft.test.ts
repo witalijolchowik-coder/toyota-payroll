@@ -305,14 +305,14 @@ describe('employee monthly calculation draft', () => {
     expect(result.absences.groups).toEqual([]);
     expect(result.absences.l4Hours).toBe(0);
     expect(result.attendance.virtualHours).toBe(
-      22 * STANDARD_WORKING_DAY_HOURS,
+      21 * STANDARD_WORKING_DAY_HOURS,
     );
     expect(result.warnings.map((item) => item.code)).toContain(
       'unconfirmed-l4',
     );
   });
 
-  it('uses active L4 records for the frequency bonus reason and amount', () => {
+  it('uses confirmed L4 missed workdays for the frequency bonus amount', () => {
     const result = draft({
       absences: [
         absence({ id: 'l4-1', startDate: '2026-06-01' }),
@@ -325,11 +325,12 @@ describe('employee monthly calculation draft', () => {
     });
 
     expect(result.bonuses.frequency.l4RecordCount).toBe(2);
+    expect(result.bonuses.frequency.l4MissedWorkingDayCount).toBe(2);
     expect(result.bonuses.frequency.reason).toBe('ELIGIBLE');
     expect(result.totals.frequencyBonusAmount).toBe(300);
   });
 
-  it('zeros the frequency bonus when an active NN overlaps the month', () => {
+  it('does not automatically reduce the frequency bonus for NN', () => {
     const result = draft({
       absences: [
         absence({
@@ -341,9 +342,9 @@ describe('employee monthly calculation draft', () => {
       ],
     });
 
-    expect(result.bonuses.frequency.hasNnAbsence).toBe(true);
-    expect(result.bonuses.frequency.reason).toBe('NN_ABSENCE');
-    expect(result.totals.frequencyBonusAmount).toBe(0);
+    expect(result.bonuses.frequency.hasNnAbsence).toBe(false);
+    expect(result.bonuses.frequency.reason).toBe('ELIGIBLE');
+    expect(result.totals.frequencyBonusAmount).toBe(400);
   });
 
   it('does not reduce the frequency bonus for approved absences', () => {
@@ -411,6 +412,59 @@ describe('employee monthly calculation draft', () => {
     expect(result.workTime.overtime100Hours).toBe(8);
     expect(result.workTime.paidOvertime100Hours).toBe(8);
     expect(result.components.holidayWorkBonusBrutto).toBe(300);
+  });
+
+  it('uses explicitly linked Sunday 100% hours for WZN before ordinary balancing', () => {
+    const result = draft({
+      dailyValues: [
+        dailyValue({
+          id: 'employee-1_2026-06-07',
+          date: '2026-06-07',
+          hours: 8,
+          workTimeCorrection: {
+            plannedShift: 'FIRST',
+            plannedStartTime: '06:00',
+            plannedEndTime: '14:00',
+            actualStartTime: '06:00',
+            actualEndTime: '14:00',
+            classificationOverride: null,
+          },
+        }),
+      ],
+      absences: [
+        absence({
+          id: 'wzn-friday',
+          absenceCode: 'WZN',
+          startDate: '2026-06-05',
+          endDate: '2026-06-05',
+          linkedWorkDate: '2026-06-07',
+        }),
+      ],
+    });
+
+    expect(result.workTime.overtime100Hours).toBe(8);
+    expect(result.workTime.wznCompensatedHours).toBe(8);
+    expect(result.workTime.wznUnresolvedHours).toBe(0);
+    expect(result.workTime.paidOvertime100Hours).toBe(0);
+  });
+
+  it('blocks completion when WZN has no linked 100% work', () => {
+    const result = draft({
+      absences: [
+        absence({
+          id: 'wzn-unlinked',
+          absenceCode: 'WZN',
+          startDate: '2026-06-05',
+          endDate: '2026-06-05',
+          linkedWorkDate: null,
+        }),
+      ],
+    });
+
+    expect(result.workTime.wznUnresolvedHours).toBe(8);
+    expect(result.warnings.map((item) => item.code)).toContain(
+      'unresolved-wzn-link',
+    );
   });
 
   it('keeps work-time quantities separate from monetary salary calculation', () => {

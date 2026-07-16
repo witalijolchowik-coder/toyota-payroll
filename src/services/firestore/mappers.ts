@@ -178,6 +178,10 @@ export function mapMonthDocument(
     calculationCompletedAt: document.calculation_completed_at?.toDate() ?? null,
     calculationVersion: document.calculation_version,
     calculationError: document.calculation_error ?? null,
+    calculationInputHash: document.calculation_input_hash ?? null,
+    calculationRunId: document.calculation_run_id ?? null,
+    calculationBlockerCount: document.calculation_blocker_count ?? 0,
+    calculationWarningCount: document.calculation_warning_count ?? 0,
     settledAt: document.settled_at?.toDate() ?? null,
     settledBy: document.settled_by ?? null,
     ...modificationMetadata(document),
@@ -198,6 +202,12 @@ export function mapEmployeeSettlementDocument(
     warnings: [...document.warnings],
     calculatedAt: document.calculated_at.toDate(),
     calculationVersion: document.calculation_version,
+    calculationRunId: document.calculation_run_id,
+    inputHash: document.input_hash,
+    status: document.status,
+    blockerCount: document.blocker_count,
+    warningCount: document.warning_count,
+    result: { ...document.result },
   };
 }
 
@@ -293,6 +303,7 @@ export function mapAbsenceDocument(
     startDate: document.start_date,
     endDate: document.end_date,
     hoursPerDay: document.hours_per_day,
+    linkedWorkDate: document.linked_work_date,
     source: document.source,
     importId: document.import_id,
     status: document.status,

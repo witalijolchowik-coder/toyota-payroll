@@ -42,11 +42,15 @@ import {
   resolveDailyWorkTimeDeviation,
   type DailyWorkTimeDeviation,
 } from './workTimeDeviations';
+import type { PlannedScheduleDay } from '../schedule';
 
 export type PayrollDraftWarningCode =
   | 'employee-not-participating'
   | 'missing-employment-start'
   | 'missing-first-toyota-employment-date'
+  | 'missing-teta'
+  | 'missing-citizenship'
+  | 'missing-soz-identity'
   | 'attendance-absence-conflict'
   | 'explicit-non-working-day'
   | 'attendance-outside-employment'
@@ -55,10 +59,12 @@ export type PayrollDraftWarningCode =
   | 'unconfirmed-l4'
   | 'unresolved-frequency-bonus-setting'
   | 'unresolved-work-time-classification'
+  | 'unresolved-wzn-link'
   | 'housing-entitlement-conflict'
   | 'company-accommodation-missing-variant'
   | 'unresolved-company-accommodation-variant'
-  | 'unresolved-own-housing-setting';
+  | 'unresolved-own-housing-setting'
+  | 'critical-read-failure';
 
 export interface PayrollDraftWarning {
   code: PayrollDraftWarningCode;
@@ -94,6 +100,7 @@ export interface PayrollDraftFrequencyBonus {
   configuredSettingId: string | null;
   configuredAmount: number | null;
   l4RecordCount: number;
+  l4MissedWorkingDayCount: number;
   hasNnAbsence: boolean;
   reason: ReturnType<typeof calculateFrequencyBonus>['reason'];
 }
@@ -134,6 +141,7 @@ export interface EmployeeMonthlyCalculationDraft {
   };
   workTime: {
     normalWorkHours: number;
+    nightHours: number;
     privateTimeHours: number;
     privateTimeCoveredHours: number;
     uncoveredPrivateTimeHours: number;
@@ -145,6 +153,8 @@ export interface EmployeeMonthlyCalculationDraft {
     paidOvertime50Hours: number;
     paidOvertime100Hours: number;
     holidayWorkBonusEligible: boolean;
+    wznCompensatedHours: number;
+    wznUnresolvedHours: number;
     unresolvedClassificationDays: IsoDate[];
     niedoczasHours: number;
   };
@@ -194,6 +204,7 @@ export interface MonthlyCalculationDraftInput {
   adjustments: readonly Adjustment[];
   entitlements?: EmployeeSettlementEntitlements | null;
   calendarOptions?: PayrollCalendarOptions;
+  plannedSchedule?: readonly PlannedScheduleDay[];
 }
 
 export interface MonthlyCalculationDraftsInput extends Omit<
@@ -204,6 +215,10 @@ export interface MonthlyCalculationDraftsInput extends Omit<
   entitlementsByEmployeeId?: ReadonlyMap<
     string,
     EmployeeSettlementEntitlements
+  >;
+  plannedSchedulesByEmployeeId?: ReadonlyMap<
+    string,
+    readonly PlannedScheduleDay[]
   >;
 }
 
@@ -256,7 +271,7 @@ function warning(
 function addAbsenceHours(
   groups: Map<string, PayrollDraftAbsenceGroup>,
   code: string,
-  isWorkingDay: boolean,
+  nominalHours: number,
 ) {
   const current = groups.get(code) ?? {
     code,
@@ -264,7 +279,7 @@ function addAbsenceHours(
     nominalHours: 0,
   };
   current.dayCount += 1;
-  current.nominalHours += isWorkingDay ? STANDARD_WORKING_DAY_HOURS : 0;
+  current.nominalHours += nominalHours;
   groups.set(code, current);
 }
 
@@ -282,7 +297,17 @@ function configuredAmount(
 }
 
 function roundMoney(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
+  return Math.round(value * 100 + 1e-7) / 100;
+}
+
+function prorateMoney(
+  monthlyAmount: number,
+  numerator: number,
+  denominator: number,
+) {
+  if (denominator <= 0 || numerator <= 0) return 0;
+  const monthlyCents = Math.round(monthlyAmount * 100);
+  return Math.round((monthlyCents * numerator) / denominator) / 100;
 }
 
 function prorateByWorkedDays({
@@ -298,9 +323,10 @@ function prorateByWorkedDays({
     return 0;
   }
 
-  return roundMoney(
-    (monthlyAmount / eligibleWorkingDays) *
-      Math.min(physicallyWorkedDays, eligibleWorkingDays),
+  return prorateMoney(
+    monthlyAmount,
+    Math.min(physicallyWorkedDays, eligibleWorkingDays),
+    eligibleWorkingDays,
   );
 }
 
@@ -471,8 +497,8 @@ function calculateCompanyAccommodationDeduction({
       DEFAULT_COMPANY_HOUSING_MEDIA,
     );
   const rentMonthly = rentSetting.amount;
-  const media = roundMoney((mediaMonthly / monthDays) * chargedDays);
-  const rent = roundMoney((rentMonthly / monthDays) * chargedDays);
+  const media = prorateMoney(mediaMonthly, chargedDays, monthDays);
+  const rent = prorateMoney(rentMonthly, chargedDays, monthDays);
 
   return { media, rent, total: roundMoney(media + rent), warnings: [] };
 }
@@ -486,6 +512,7 @@ export function calculateEmployeeMonthlyDraft({
   adjustments,
   entitlements = null,
   calendarOptions = {},
+  plannedSchedule,
 }: MonthlyCalculationDraftInput): EmployeeMonthlyCalculationDraft {
   const range = getPayrollMonthDateRange(monthId);
   const employment = employmentPeriod(employee);
@@ -493,11 +520,16 @@ export function calculateEmployeeMonthlyDraft({
     employment,
     range,
   );
-  const individualNominalHours = calculateEmployeeNominalHours(
-    monthId,
-    employment,
-    calendarOptions,
-  );
+  const individualNominalHours = plannedSchedule
+    ? plannedSchedule.reduce(
+        (total, day) =>
+          total +
+          (day.status === 'WORKING' || day.status === 'BHP'
+            ? (day.hours ?? 0)
+            : 0),
+        0,
+      )
+    : calculateEmployeeNominalHours(monthId, employment, calendarOptions);
   const fullCalendarMonth =
     participatesInMonth &&
     individualNominalHours > 0 &&
@@ -508,6 +540,19 @@ export function calculateEmployeeMonthlyDraft({
   const warnings: PayrollDraftWarning[] = [];
   if (!employee.employmentStartDate) {
     warnings.push(warning('missing-employment-start'));
+  }
+  if (!employee.tetaNumber.trim()) {
+    warnings.push(warning('missing-teta'));
+  }
+  if (!employee.citizenship) {
+    warnings.push(warning('missing-citizenship'));
+  } else if (
+    (employee.citizenship === 'PL' && !employee.pesel?.trim()) ||
+    (employee.citizenship !== 'PL' &&
+      !employee.passportNumber?.trim() &&
+      !employee.foreignDocumentNumber?.trim())
+  ) {
+    warnings.push(warning('missing-soz-identity'));
   }
   const baseSalaryBrutto = baseSalaryForFirstToyotaEmploymentDate(
     employee.firstToyotaEmploymentDate,
@@ -549,11 +594,31 @@ export function calculateEmployeeMonthlyDraft({
   const outsideEmploymentValueDays: IsoDate[] = [];
   const absenceGroups = new Map<string, PayrollDraftAbsenceGroup>();
   const workTimeDeviations: DailyWorkTimeDeviation[] = [];
+  const workTimeDeviationsByDate = new Map<IsoDate, DailyWorkTimeDeviation>();
+  const recordWorkTimeDeviation = (
+    date: IsoDate,
+    deviation: DailyWorkTimeDeviation,
+  ) => {
+    workTimeDeviations.push(deviation);
+    workTimeDeviationsByDate.set(date, deviation);
+  };
   const unresolvedClassificationDays: IsoDate[] = [];
   const physicallyWorkedDates = new Set<IsoDate>();
+  const plannedScheduleByDate = new Map(
+    (plannedSchedule ?? []).map((day) => [day.date, day]),
+  );
 
   if (participatesInMonth) {
     createPayrollMonthCalendar(monthId, calendarOptions).forEach((day) => {
+      const plannedDay = plannedScheduleByDate.get(day.isoDate);
+      const isPlannedWorkingDay = plannedDay
+        ? plannedDay.status === 'WORKING' || plannedDay.status === 'BHP'
+        : day.isWorkingDay;
+      const plannedHours = plannedDay
+        ? (plannedDay.hours ?? 0)
+        : day.isWorkingDay
+          ? STANDARD_WORKING_DAY_HOURS
+          : 0;
       const isWithinEmployment = isDateWithinEmploymentPeriod(
         day.isoDate,
         employment,
@@ -568,7 +633,10 @@ export function calculateEmployeeMonthlyDraft({
         absenceResolution.kind === 'governed' &&
         absenceResolution.code === 'L4' &&
         absenceResolution.confirmation === 'reported';
-      const hasPayrollGoverningAbsence = hasGoverningAbsence && !hasReportedL4;
+      // A reported (manual) L4 is not a confirmed payroll sickness fact yet,
+      // but it still occupies the day. It must suppress virtual/planned work
+      // while remaining a completion blocker until reconciled with ZUS.
+      const hasPayrollGoverningAbsence = hasGoverningAbsence;
 
       if (absenceResolution.kind === 'ambiguous') {
         warnings.push(warning('ambiguous-absence', day.isoDate));
@@ -578,7 +646,7 @@ export function calculateEmployeeMonthlyDraft({
         addAbsenceHours(
           absenceGroups,
           normalizeAbsenceCode(absenceResolution.code),
-          day.isWorkingDay,
+          isPlannedWorkingDay ? plannedHours : 0,
         );
       }
 
@@ -587,7 +655,7 @@ export function calculateEmployeeMonthlyDraft({
         const attendanceWarnings = resolveAttendanceWarnings({
           hasExplicitValue: true,
           hasActiveAbsence: hasPayrollGoverningAbsence,
-          isWorkingDay: day.isWorkingDay,
+          isWorkingDay: isPlannedWorkingDay,
           isWithinEmployment,
         });
 
@@ -622,10 +690,11 @@ export function calculateEmployeeMonthlyDraft({
             day,
           });
           if (deviation) {
-            workTimeDeviations.push(deviation);
+            recordWorkTimeDeviation(day.isoDate, deviation);
           } else if (effective.hours > 0 && !hasPayrollGoverningAbsence) {
-            if (!day.isWorkingDay) {
-              workTimeDeviations.push(
+            if (!isPlannedWorkingDay) {
+              recordWorkTimeDeviation(
+                day.isoDate,
                 resolveDailyWorkTimeDeviation({
                   planned: plannedIntervalForShift('FIRST'),
                   actual: {
@@ -638,24 +707,15 @@ export function calculateEmployeeMonthlyDraft({
                   isPublicHoliday: day.isPublicHoliday,
                 }),
               );
-            } else if (effective.hours !== STANDARD_WORKING_DAY_HOURS) {
+            } else if (effective.hours !== plannedHours) {
               unresolvedClassificationDays.push(day.isoDate);
               warnings.push(
                 warning('unresolved-work-time-classification', day.isoDate),
               );
-              workTimeDeviations.push({
-                normalWorkHours: Math.min(
-                  effective.hours,
-                  STANDARD_WORKING_DAY_HOURS,
-                ),
-                privateTimeHours: Math.max(
-                  0,
-                  STANDARD_WORKING_DAY_HOURS - effective.hours,
-                ),
-                extraHours: Math.max(
-                  0,
-                  effective.hours - STANDARD_WORKING_DAY_HOURS,
-                ),
+              recordWorkTimeDeviation(day.isoDate, {
+                normalWorkHours: Math.min(effective.hours, plannedHours),
+                privateTimeHours: Math.max(0, plannedHours - effective.hours),
+                extraHours: Math.max(0, effective.hours - plannedHours),
                 overtime50Hours: 0,
                 overtime100Hours: 0,
                 overtime100Reasons: [],
@@ -666,9 +726,10 @@ export function calculateEmployeeMonthlyDraft({
                 unresolved: true,
               });
             } else {
-              workTimeDeviations.push(
+              recordWorkTimeDeviation(
+                day.isoDate,
                 resolveDailyWorkTimeDeviation({
-                  planned: plannedIntervalForShift('FIRST'),
+                  planned: plannedIntervalForScheduleDay(plannedDay),
                   isWorkingDay: true,
                 }),
               );
@@ -679,17 +740,19 @@ export function calculateEmployeeMonthlyDraft({
       }
 
       const virtual = getPayrollVirtualDefaultHours({
-        isWorkingDay: day.isWorkingDay,
+        isWorkingDay: isPlannedWorkingDay,
         isWithinEmployment,
         hasGoverningValue: hasPayrollGoverningAbsence,
       });
-      virtualHours += virtual ?? 0;
-      if (virtual && !hasPayrollGoverningAbsence) {
+      const effectiveVirtual = virtual === null ? null : plannedHours;
+      virtualHours += effectiveVirtual ?? 0;
+      if (effectiveVirtual && !hasPayrollGoverningAbsence) {
         physicallyWorkedDates.add(day.isoDate);
-        workTimeDeviations.push(
+        recordWorkTimeDeviation(
+          day.isoDate,
           resolveDailyWorkTimeDeviation({
-            planned: plannedIntervalForShift('FIRST'),
-            isWorkingDay: day.isWorkingDay,
+            planned: plannedIntervalForScheduleDay(plannedDay),
+            isWorkingDay: isPlannedWorkingDay,
             isSaturday: day.date.getUTCDay() === 6,
             isSunday: day.date.getUTCDay() === 0,
             isPublicHoliday: day.isPublicHoliday,
@@ -708,6 +771,16 @@ export function calculateEmployeeMonthlyDraft({
     monthId,
     employment,
     absences: payrollEffectiveAbsences as AbsenceRuleRecord[],
+    plannedWorkingDates: new Set(
+      (plannedSchedule ?? createPayrollMonthCalendar(monthId, calendarOptions))
+        .filter((day) =>
+          'status' in day
+            ? day.status === 'WORKING' || day.status === 'BHP'
+            : day.isWorkingDay &&
+              isDateWithinEmploymentPeriod(day.isoDate, employment),
+        )
+        .map((day) => ('isoDate' in day ? day.isoDate : day.date)),
+    ),
   });
   if (!frequencySetting) {
     warnings.push(warning('unresolved-frequency-bonus-setting'));
@@ -724,6 +797,10 @@ export function calculateEmployeeMonthlyDraft({
     employment,
     calendarOptions,
   });
+  const monthWorkingDays = createPayrollMonthCalendar(
+    monthId,
+    calendarOptions,
+  ).filter((day) => day.isWorkingDay).length;
 
   const activeAdjustments = adjustments.filter((adjustment) =>
     isActiveEmployeeAdjustment(employee, adjustment),
@@ -747,6 +824,7 @@ export function calculateEmployeeMonthlyDraft({
   const workTimeBeforeBalance = workTimeDeviations.reduce(
     (total, deviation) => ({
       normalWorkHours: total.normalWorkHours + deviation.normalWorkHours,
+      nightHours: total.nightHours + deviation.nightAllowanceHours,
       privateTimeHours: total.privateTimeHours + deviation.privateTimeHours,
       coverableNiHours: total.coverableNiHours + deviation.coverableNiHours,
       overtime50Hours: total.overtime50Hours + deviation.overtime50Hours,
@@ -756,6 +834,7 @@ export function calculateEmployeeMonthlyDraft({
     }),
     {
       normalWorkHours: 0,
+      nightHours: 0,
       privateTimeHours: 0,
       coverableNiHours: 0,
       overtime50Hours: 0,
@@ -763,9 +842,41 @@ export function calculateEmployeeMonthlyDraft({
       holidayWorkBonusEligible: false,
     },
   );
-  const workTimeBalance = balanceMonthlyWorkTimeDeviations(
-    workTimeBeforeBalance,
+  const remainingLinked100ByDate = new Map(
+    [...workTimeDeviationsByDate].map(([date, deviation]) => [
+      date,
+      deviation.overtime100Hours,
+    ]),
   );
+  let wznCompensatedHours = 0;
+  let wznUnresolvedHours = 0;
+  activeAbsences
+    .filter((absence) => normalizeAbsenceCode(absence.absenceCode) === 'WZN')
+    .forEach((absence) => {
+      const requiredHours =
+        absencePeriods.find((period) => period.id === absence.id)
+          ?.workingHours ?? 0;
+      const linkedDate = absence.linkedWorkDate;
+      const availableHours = linkedDate
+        ? (remainingLinked100ByDate.get(linkedDate) ?? 0)
+        : 0;
+      const compensatedHours = Math.min(requiredHours, availableHours);
+      wznCompensatedHours += compensatedHours;
+      wznUnresolvedHours += Math.max(0, requiredHours - compensatedHours);
+      if (linkedDate) {
+        remainingLinked100ByDate.set(
+          linkedDate,
+          Math.max(0, availableHours - compensatedHours),
+        );
+      }
+    });
+  if (wznUnresolvedHours > 0) {
+    warnings.push(warning('unresolved-wzn-link'));
+  }
+  const workTimeBalance = balanceMonthlyWorkTimeDeviations({
+    ...workTimeBeforeBalance,
+    preferredOvertime100CoverageHours: wznCompensatedHours,
+  });
   const hoursForCodes = (codes: ReadonlySet<string>) =>
     groups
       .filter((group) => codes.has(group.code))
@@ -790,7 +901,7 @@ export function calculateEmployeeMonthlyDraft({
       monthId,
       DEFAULT_TRANSPORT_ALLOWANCE,
     ),
-    eligibleWorkingDays,
+    eligibleWorkingDays: monthWorkingDays,
     physicallyWorkedDays: physicallyWorkedDates.size,
   });
   const laundryAllowanceBrutto = prorateByWorkedDays({
@@ -800,7 +911,7 @@ export function calculateEmployeeMonthlyDraft({
       monthId,
       DEFAULT_LAUNDRY_ALLOWANCE,
     ),
-    eligibleWorkingDays,
+    eligibleWorkingDays: monthWorkingDays,
     physicallyWorkedDays: physicallyWorkedDates.size,
   });
   const udtAllowanceBrutto =
@@ -888,6 +999,7 @@ export function calculateEmployeeMonthlyDraft({
     },
     workTime: {
       normalWorkHours: workTimeBeforeBalance.normalWorkHours,
+      nightHours: workTimeBeforeBalance.nightHours,
       privateTimeHours: workTimeBalance.privateTimeHours,
       privateTimeCoveredHours: workTimeBalance.privateTimeCoveredHours,
       uncoveredPrivateTimeHours: workTimeBalance.uncoveredPrivateTimeHours,
@@ -899,6 +1011,8 @@ export function calculateEmployeeMonthlyDraft({
       paidOvertime50Hours: workTimeBalance.paidOvertime50Hours,
       paidOvertime100Hours: workTimeBalance.paidOvertime100Hours,
       holidayWorkBonusEligible: workTimeBeforeBalance.holidayWorkBonusEligible,
+      wznCompensatedHours: workTimeBalance.preferredOvertime100CoverageHours,
+      wznUnresolvedHours,
       unresolvedClassificationDays,
       niedoczasHours: workTimeBalance.niedoczasHours,
     },
@@ -908,6 +1022,7 @@ export function calculateEmployeeMonthlyDraft({
         configuredSettingId: frequencySetting?.id ?? null,
         configuredAmount: frequencySetting?.amount ?? null,
         l4RecordCount: frequencyRule.l4RecordCount,
+        l4MissedWorkingDayCount: frequencyRule.l4MissedWorkingDayCount,
         hasNnAbsence: frequencyRule.hasNnAbsence,
         reason: frequencyRule.reason,
       },
@@ -950,6 +1065,7 @@ export function calculateEmployeeMonthlyDraft({
 export function calculateMonthlyDrafts({
   employees,
   entitlementsByEmployeeId,
+  plannedSchedulesByEmployeeId,
   ...input
 }: MonthlyCalculationDraftsInput): EmployeeMonthlyCalculationDraft[] {
   return employees.map((employee) =>
@@ -957,8 +1073,20 @@ export function calculateMonthlyDrafts({
       ...input,
       employee,
       entitlements: entitlementsByEmployeeId?.get(employee.id) ?? null,
+      plannedSchedule: plannedSchedulesByEmployeeId?.get(employee.id),
     }),
   );
+}
+
+function plannedIntervalForScheduleDay(day?: PlannedScheduleDay) {
+  if (day?.plannedStartTime && day.plannedEndTime && day.shift) {
+    return {
+      shift: day.shift,
+      startTime: day.plannedStartTime,
+      endTime: day.plannedEndTime,
+    };
+  }
+  return plannedIntervalForShift(day?.shift ?? 'FIRST');
 }
 
 function dailyWorkTimeDeviationFromValue({

@@ -52,31 +52,42 @@ describe('frequency bonus', () => {
     [3, 200],
     [4, 0],
     [5, 0],
-  ])('returns %s L4 amount from the approved schedule', (count, amount) => {
-    const result = calculateFrequencyBonus({
-      monthId: '2026-07',
-      employment: fullMonthEmployment,
-      absences: Array.from({ length: count }, (_, index) =>
-        absence(`l4-${index}`, 'L4'),
-      ),
-    });
+  ])(
+    'returns the approved amount for %s missed L4 workdays',
+    (count, amount) => {
+      const plannedWorkingDates = new Set(
+        Array.from(
+          { length: 5 },
+          (_, index) => `2026-07-${String(6 + index).padStart(2, '0')}`,
+        ),
+      );
+      const result = calculateFrequencyBonus({
+        monthId: '2026-07',
+        employment: fullMonthEmployment,
+        absences: count
+          ? [
+              absence('l4', 'L4', {
+                startDate: '2026-07-06',
+                endDate: `2026-07-${String(5 + count).padStart(2, '0')}`,
+              }),
+            ]
+          : [],
+        plannedWorkingDates,
+      });
 
-    expect(result.amount).toBe(amount);
-    expect(result.l4RecordCount).toBe(count);
-  });
+      expect(result.amount).toBe(amount);
+      expect(result.l4MissedWorkingDayCount).toBe(count);
+    },
+  );
 
-  it('returns zero when at least one NN absence overlaps the month', () => {
+  it('does not automatically reduce the bonus for NN', () => {
     expect(
       calculateFrequencyBonus({
         monthId: '2026-07',
         employment: fullMonthEmployment,
         absences: [absence('nn-1', 'NN')],
       }),
-    ).toMatchObject({
-      amount: 0,
-      hasNnAbsence: true,
-      reason: 'NN_ABSENCE',
-    });
+    ).toMatchObject({ amount: 400, hasNnAbsence: false, reason: 'ELIGIBLE' });
   });
 
   it('does not reduce the bonus for approved leave', () => {
@@ -107,5 +118,19 @@ describe('frequency bonus', () => {
         ],
       }),
     ).toMatchObject({ amount: 400, l4RecordCount: 0 });
+  });
+
+  it('does not count weekend days inside an L4 period', () => {
+    const result = calculateFrequencyBonus({
+      monthId: '2026-07',
+      employment: fullMonthEmployment,
+      absences: [
+        absence('weekend', 'L4', {
+          startDate: '2026-07-11',
+          endDate: '2026-07-12',
+        }),
+      ],
+    });
+    expect(result).toMatchObject({ amount: 400, l4MissedWorkingDayCount: 0 });
   });
 });

@@ -397,6 +397,10 @@ export async function createAbsence(
     start_date: normalized.startDate,
     end_date: normalized.endDate,
     hours_per_day: null,
+    linked_work_date:
+      normalized.absenceCode === 'WZN'
+        ? (normalized.linkedWorkDate ?? null)
+        : null,
     source: 'manual',
     import_id: null,
     status: 'ACTIVE',
@@ -471,6 +475,7 @@ export async function applyL4ImportRows({
         startDate,
         endDate,
         hoursPerDay: null,
+        linkedWorkDate: null,
         note: null,
       });
       await assertWritableMonth(monthId);
@@ -553,6 +558,7 @@ export async function applyL4ImportRows({
             end_date: endDate,
             source: 'absence_import',
             import_id: importId,
+            linked_work_date: null,
             note: `L4 import: ${fileName}, wiersz ${row.rowNumber}`,
             updated_at: serverTimestamp(),
             updated_by: uid,
@@ -576,6 +582,7 @@ export async function applyL4ImportRows({
         start_date: startDate,
         end_date: endDate,
         hours_per_day: null,
+        linked_work_date: null,
         source: 'absence_import',
         import_id: importId,
         status: 'ACTIVE',
@@ -650,6 +657,10 @@ export async function updateAbsence(
     startDate: input.startDate,
     endDate: input.endDate,
     hoursPerDay: null,
+    linkedWorkDate:
+      normalizeAbsenceCode(input.absenceCode) === 'WZN'
+        ? (input.linkedWorkDate ?? null)
+        : null,
     note: input.note,
   };
   assertValidInput(normalized, absence.monthId);
@@ -663,6 +674,7 @@ export async function updateAbsence(
       start_date: normalized.startDate,
       end_date: normalized.endDate,
       hours_per_day: null,
+      linked_work_date: normalized.linkedWorkDate ?? null,
       note: normalized.note,
       updated_at: serverTimestamp(),
       updated_by: uid,
@@ -730,6 +742,10 @@ export async function saveDayAbsence({
       start_date: normalized.startDate,
       end_date: normalized.endDate,
       hours_per_day: null,
+      linked_work_date:
+        normalized.absenceCode === 'WZN'
+          ? (normalized.linkedWorkDate ?? null)
+          : null,
       source: 'manual',
       import_id: null,
       status: 'ACTIVE',

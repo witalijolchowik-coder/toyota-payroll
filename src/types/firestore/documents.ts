@@ -114,6 +114,10 @@ export interface MonthDocument extends ModificationMetadataDocument {
   calculation_completed_at?: Timestamp | null;
   calculation_version: number;
   calculation_error?: string | null;
+  calculation_input_hash?: string | null;
+  calculation_run_id?: string | null;
+  calculation_blocker_count?: number;
+  calculation_warning_count?: number;
   settled_at?: Timestamp | null;
   settled_by?: string | null;
 }
@@ -129,7 +133,13 @@ export interface EmployeeSettlementDocument extends EmployeeReferenceDocument {
   totals: SettlementTotalsDocument;
   warnings: string[];
   calculated_at: Timestamp;
-  calculation_version: string;
+  calculation_version: number;
+  calculation_run_id: string;
+  input_hash: string;
+  status: 'complete' | 'blocked';
+  blocker_count: number;
+  warning_count: number;
+  result: Record<string, unknown>;
 }
 
 export const SETTLEMENT_REVIEW_STATUSES = [
@@ -199,6 +209,7 @@ export interface AbsenceDocument
   start_date: IsoDate;
   end_date: IsoDate;
   hours_per_day: number | null;
+  linked_work_date: IsoDate | null;
   source: AbsenceSource;
   import_id: string | null;
   status: AbsenceStatus;

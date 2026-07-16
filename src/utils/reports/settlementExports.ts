@@ -1,5 +1,6 @@
 import type { Employee, MonthId } from '../../types/firestore';
 import type { EmployeeMonthlyCalculationDraft } from '../payroll';
+import * as XLSX from 'xlsx';
 
 export type SozWorkerGroup = 'polish' | 'foreign' | 'missing-identity';
 export type ExportReadinessWarningCode =
@@ -29,7 +30,8 @@ export interface SettlementExportRecord {
     | 'lastName'
     | 'employmentStartDate'
     | 'employmentEndDate'
-  >;
+  > &
+    Partial<Pick<Employee, 'citizenship' | 'firstToyotaEmploymentDate'>>;
   departmentName?: string | null;
   identity?: ExportEmployeeIdentity | null;
   draft: EmployeeMonthlyCalculationDraft;
@@ -62,12 +64,17 @@ export interface SozExportRow {
 export interface SozOvertimeNoteEntry {
   employeeLabel: string;
   tetaNumber: string;
+  citizenshipGroup: 'Polska' | 'Cudzoziemcy';
+  employeeNominalHours: number;
+  shortageBeforeCompensationHours: number;
   sozOvertime50Hours: number;
   sozOvertime100Hours: number;
+  wznRelatedHours: number;
   paidOvertime50Hours: number;
   paidOvertime100Hours: number;
   coveringNiedoczas50Hours: number;
   coveringNiedoczas100Hours: number;
+  note: string;
 }
 
 export interface SettlementExportPackage {
@@ -76,7 +83,7 @@ export interface SettlementExportPackage {
     fileName: string;
     headers: string[];
     rows: ToyotaExportRow[];
-    excelXml: string;
+    workbook: Uint8Array;
   };
   soz: {
     plFileName: string;
@@ -89,34 +96,58 @@ export interface SettlementExportPackage {
     foreignCsv: string;
     note: string;
     noteEntries: SozOvertimeNoteEntry[];
+    polishCompensationWorkbook: Uint8Array | null;
+    foreignCompensationWorkbook: Uint8Array | null;
+    polishCompensationFileName: string | null;
+    foreignCompensationFileName: string | null;
   };
   warnings: ExportReadinessWarning[];
 }
 
 export const TOYOTA_EXPORT_HEADERS = [
-  'Ip',
   'Nazwisko',
   'Imię',
-  'dział',
-  'Data zatrudnienia ',
-  'Data zwolnienia ',
-  ...Array.from({ length: 31 }, (_, index) => String(index + 1)),
-  'Suma godzin',
-  'RNS',
-  'Niedoczas',
-  'Odróbka za niedoczas 50%',
-  'Odróbka za niedoczas 100%',
-  'Nadgodziny 50% do wypłaty',
-  'Nadgodziny 100% do wypłaty',
-  'Godziny nocne',
-  'L4',
-  'Urlop',
-  'Inne nieobecności',
-  'Premia frekwencyjna',
-  'Dodatek transportowy netto',
-  'Ekwiwalent za pranie',
-  'UDT',
-  'Potrącenia',
+  'Numer personalny',
+  'Agencja',
+  'Jednostka organizacyjna/Dział',
+  'Stanowisko',
+  'Stawka',
+  'Data zatrudnienia',
+  'Data zwolnienia',
+  'Plec',
+  'Obywatelstwo',
+  'Rok',
+  'Miesiąc',
+  'Zwolnienie L4 przez cały miesiąc',
+  'Godziny zwykłe (suma dzienne plus nocne) ',
+  'Godziny nocne (do wyliczenia dodatku za prace w porze nocnej)',
+  'Godziny 50',
+  'Godziny 100',
+  'Harmonogram - nominał pracownika na dany miesiąc',
+  'Czas nominalny',
+  'Godziny nieobecność nieusprawiedliwiona NN',
+  'Godziny nieobecność usprawiedliwiona płatna NU',
+  'Godziny nieobecność usprawiedliwiona bezpłatna (niepłatna) NI',
+  'Godziny urlop wypoczynkowy UW',
+  'Godziny urlop bezpłatny UB',
+  'Godziny opieka art. 188',
+  'Godziny urlop okolicznościowy UO',
+  'Godziny chorobowe L4',
+  'Godziny zasiłku (opiekuńczy, macierzyński, tacierzyński)',
+  'Godziny urlopu opieka z tytułu Art. 173 O5',
+  'Godziny urlopu z tytułu siły wyższej Art. 148 SR',
+  'Godziny niedoczas',
+  'Godziny postojowe',
+  'Godziny kwarantanny wypłacane jako godziny zwykłe',
+  'Godziny 200 %',
+  'Wolne za Nadgodziny',
+  'Odróbka za Niedoczas',
+  'Premia frekwencyjna / Kwota',
+  'Premia frekwencyjna / Podatek',
+  'Premia od Klienta / Kwota',
+  'Premia od klienta / Podatek',
+  'Ekwiwalent za prania  / Kwota',
+  'Ekwiwalent za prania  / Podatek',
 ] as const;
 
 export const SOZ_CSV_HEADERS = [
@@ -281,12 +312,27 @@ const sozColumn = {
   care188Hours: 17,
   l4Hours: 19,
   niedoczasHours: 23,
+  companyHousingMediaAmount: 50,
+  companyHousingMediaTax: 51,
+  companyHousingMediaDescription: 52,
+  companyHousingRentAmount: 53,
+  companyHousingRentTax: 54,
+  companyHousingRentDescription: 55,
+  otherDeductionAmount: 71,
+  otherDeductionTax: 72,
+  otherDeductionDescription: 73,
+  ownHousingAmount: 98,
+  ownHousingTax: 99,
+  ownHousingDescription: 100,
   transportAmount: 106,
   transportTax: 107,
   transportDescription: 108,
   frequencyBonusAmount: 122,
   frequencyBonusTax: 123,
   frequencyBonusDescription: 124,
+  clientBonusAmount: 126,
+  clientBonusTax: 127,
+  clientBonusDescription: 128,
   laundryAmount: 130,
   laundryTax: 131,
   laundryDescription: 132,
@@ -322,6 +368,13 @@ export function classifySozWorker(identity?: ExportEmployeeIdentity | null) {
   return 'missing-identity';
 }
 
+export function classifySozWorkerByCitizenship(
+  citizenship: Employee['citizenship'],
+): SozWorkerGroup {
+  if (!citizenship) return 'missing-identity';
+  return citizenship === 'PL' ? 'polish' : 'foreign';
+}
+
 export function prepareSettlementExportPackage({
   monthId,
   records,
@@ -335,8 +388,8 @@ export function prepareSettlementExportPackage({
     employeeName(first).localeCompare(employeeName(second), 'pl-PL'),
   );
   const warnings = buildExportReadinessWarnings(sortedRecords);
-  const toyotaRows = sortedRecords.map((record, index) =>
-    mapToyotaExportRow(record, index + 1),
+  const toyotaRows = sortedRecords.map((record) =>
+    mapToyotaExportRow(record, monthId, monthNominalHours),
   );
   const sozRows = sortedRecords.map((record) =>
     mapSozExportRow(record, monthId, monthNominalHours),
@@ -354,16 +407,35 @@ export function prepareSettlementExportPackage({
   const incomplete = warnings.length > 0;
   const prefix = incomplete ? `ROZLICZENIE_NIEZAMKNIETE_${monthId}` : null;
 
+  const polishCompensation = noteEntries.filter((entry) =>
+    sortedRecords.some(
+      (record) =>
+        record.employee.tetaNumber === entry.tetaNumber &&
+        record.employee.citizenship === 'PL',
+    ),
+  );
+  const foreignCompensation = noteEntries.filter((entry) =>
+    sortedRecords.some(
+      (record) =>
+        record.employee.tetaNumber === entry.tetaNumber &&
+        record.employee.citizenship !== 'PL' &&
+        Boolean(record.employee.citizenship),
+    ),
+  );
+
   return {
     monthId,
     toyota: {
-      fileName: prefix ? `${prefix}.xls` : `Toyota_rozliczenie_${monthId}.xls`,
+      fileName: prefix
+        ? `Zestawienie_godzin_TBPL_NIEZAKOŃCZONE_${monthId}.xlsx`
+        : `Zestawienie_godzin_TBPL_${monthId}.xlsx`,
       headers: [...TOYOTA_EXPORT_HEADERS],
       rows: toyotaRows,
-      excelXml: renderExcelXml({
-        sheetName: 'Arkusz1',
+      workbook: renderXlsxWorkbook({
+        sheetName: 'Godziny',
         headers: TOYOTA_EXPORT_HEADERS,
         rows: toyotaRows.map((row) => row.cells),
+        unfinished: incomplete,
       }),
     },
     soz: {
@@ -383,6 +455,18 @@ export function prepareSettlementExportPackage({
       foreignCsv: renderSozCsv(foreignRows),
       note,
       noteEntries,
+      polishCompensationWorkbook: polishCompensation.length
+        ? renderCompensationWorkbook(polishCompensation)
+        : null,
+      foreignCompensationWorkbook: foreignCompensation.length
+        ? renderCompensationWorkbook(foreignCompensation)
+        : null,
+      polishCompensationFileName: polishCompensation.length
+        ? `Odróbka_niedoczasu_PL_${monthId}.xlsx`
+        : null,
+      foreignCompensationFileName: foreignCompensation.length
+        ? `Odróbka_niedoczasu_CUDZOZIEMCY_${monthId}.xlsx`
+        : null,
     },
     warnings,
   };
@@ -392,11 +476,6 @@ export function buildExportReadinessWarnings(
   records: readonly SettlementExportRecord[],
 ): ExportReadinessWarning[] {
   const warnings: ExportReadinessWarning[] = [];
-  warnings.push({
-    code: 'unsupported-columns',
-    employeeId: null,
-    tetaNumber: null,
-  });
   if (records.length === 0) {
     warnings.push({
       code: 'empty-export',
@@ -420,7 +499,11 @@ export function buildExportReadinessWarnings(
         tetaNumber: record.employee.tetaNumber,
       });
     }
-    if (classifySozWorker(record.identity) === 'missing-identity') {
+    if (
+      classifySozWorkerByCitizenship(record.employee.citizenship) ===
+        'missing-identity' ||
+      classifySozWorker(record.identity) === 'missing-identity'
+    ) {
       warnings.push({
         code: 'missing-identity',
         employeeId: record.employee.id,
@@ -461,7 +544,8 @@ export function renderSozOvertimeNote(
 
 function mapToyotaExportRow(
   record: SettlementExportRecord,
-  ordinal: number,
+  monthId: MonthId,
+  monthNominalHours: number,
 ): ToyotaExportRow {
   const draft = record.draft;
   const paidOvertime50 = draft.workTime.paidOvertime50Hours;
@@ -474,12 +558,13 @@ function mapToyotaExportRow(
     0,
     draft.workTime.overtime100Hours - paidOvertime100,
   );
-  const days = Array.from({ length: 31 }, (_, index) =>
-    formatNullableNumber(
-      record.dailyCells?.find((cell) => cell.dayOfMonth === index + 1)?.hours ??
-        null,
-    ),
-  );
+  const [year, month] = monthId.split('-').map(Number);
+  const absence = (code: string) =>
+    draft.absences.groups.find((group) => group.code === code)?.nominalHours ??
+    0;
+  const fullMonthL4 =
+    draft.totals.nominalHours > 0 &&
+    draft.absences.l4Hours >= draft.totals.nominalHours;
   return {
     tetaNumber: record.employee.tetaNumber,
     paidOvertime50Hours: paidOvertime50,
@@ -487,29 +572,49 @@ function mapToyotaExportRow(
     overtimeCoveringNiedoczas50Hours: covering50,
     overtimeCoveringNiedoczas100Hours: covering100,
     cells: [
-      String(ordinal),
       record.employee.lastName,
       record.employee.firstName,
+      record.employee.tetaNumber,
+      'PS',
       record.departmentName ?? '',
+      '',
+      formatNullableNumber(draft.components.baseSalaryBrutto),
       formatDate(record.employee.employmentStartDate),
       formatDate(record.employee.employmentEndDate),
-      ...days,
-      formatNumber(draft.totals.workedHours),
-      formatNumber(draft.workTime.niedoczasHours),
-      formatNumber(draft.workTime.niedoczasHours),
-      formatNumber(covering50),
-      formatNumber(covering100),
+      '',
+      record.employee.citizenship ?? '',
+      String(year),
+      String(month),
+      fullMonthL4 ? 'Tak' : 'Nie',
+      formatNumber(draft.workTime.normalWorkHours),
+      formatNumber(draft.workTime.nightHours),
       formatNumber(paidOvertime50),
       formatNumber(paidOvertime100),
-      '0',
+      formatNumber(draft.totals.nominalHours),
+      formatNumber(monthNominalHours),
+      formatNumber(absence('NN')),
+      formatNumber(absence('NU')),
+      formatNumber(absence('NI')),
+      formatNumber(absence('UW')),
+      formatNumber(absence('UB')),
+      formatNumber(absence('OPD')),
+      formatNumber(absence('UO')),
       formatNumber(draft.absences.l4Hours),
-      formatNumber(draft.absences.vacationHours),
-      formatNumber(draft.absences.otherAbsenceHours),
+      formatNumber(absence('ZASILEK')),
+      formatNumber(absence('O5')),
+      formatNumber(absence('SILA_WYZSZA')),
+      formatNumber(draft.workTime.niedoczasHours),
+      '0',
+      '0',
+      '0',
+      formatNumber(absence('WZN')),
+      formatNumber(covering50 + covering100),
       formatNullableNumber(draft.components.frequencyBonusBrutto),
-      formatNumber(draft.components.transportAllowanceNetto),
+      draft.components.frequencyBonusBrutto === null ? '' : 'Brutto',
+      formatNumber(draft.components.holidayWorkBonusBrutto),
+      draft.components.holidayWorkBonusBrutto ? 'Brutto' : '',
       formatNumber(draft.components.laundryAllowanceBrutto),
-      formatNumber(draft.components.udtAllowanceBrutto),
-      formatNumber(draft.totals.deductions),
+      draft.components.laundryAllowanceBrutto ? 'Brutto' : '',
     ],
   };
 }
@@ -519,10 +624,11 @@ function mapSozExportRow(
   monthId: MonthId,
   monthNominalHours: number,
 ): SozExportRow | null {
-  const group = classifySozWorker(record.identity);
+  const group = classifySozWorkerByCitizenship(record.employee.citizenship);
   if (group === 'missing-identity') {
     return null;
   }
+  if (classifySozWorker(record.identity) === 'missing-identity') return null;
 
   const [year, month] = monthId.split('-').map(Number);
   const draft = record.draft;
@@ -538,7 +644,7 @@ function mapSozExportRow(
       ? 'Tak'
       : 'Nie';
   cells[sozColumn.normalHours] = formatNumber(draft.workTime.normalWorkHours);
-  cells[sozColumn.nightHours] = '0';
+  cells[sozColumn.nightHours] = formatNumber(draft.workTime.nightHours);
   cells[sozColumn.overtime50] = formatNumber(draft.workTime.overtime50Hours);
   cells[sozColumn.overtime100] = formatNumber(draft.workTime.overtime100Hours);
   cells[sozColumn.employeeNominal] = formatNumber(draft.totals.nominalHours);
@@ -551,6 +657,35 @@ function mapSozExportRow(
   cells[sozColumn.care188Hours] = '0';
   cells[sozColumn.l4Hours] = formatNumber(draft.absences.l4Hours);
   cells[sozColumn.niedoczasHours] = formatNumber(draft.workTime.niedoczasHours);
+  if (draft.components.companyAccommodationMediaDeduction > 0) {
+    cells[sozColumn.companyHousingMediaAmount] = formatNumber(
+      draft.components.companyAccommodationMediaDeduction,
+    );
+    cells[sozColumn.companyHousingMediaTax] = 'Netto';
+    cells[sozColumn.companyHousingMediaDescription] =
+      'Potrącenie za media – mieszkanie od Spółki';
+  }
+  if (draft.components.companyAccommodationRentDeduction > 0) {
+    cells[sozColumn.companyHousingRentAmount] = formatNumber(
+      draft.components.companyAccommodationRentDeduction,
+    );
+    cells[sozColumn.companyHousingRentTax] = 'Netto';
+    cells[sozColumn.companyHousingRentDescription] = 'Mieszkanie od Spółki';
+  }
+  if (draft.components.manualDecreases > 0) {
+    cells[sozColumn.otherDeductionAmount] = formatNumber(
+      draft.components.manualDecreases,
+    );
+    cells[sozColumn.otherDeductionTax] = 'Netto';
+    cells[sozColumn.otherDeductionDescription] = 'Korekta ręczna';
+  }
+  if (draft.components.ownHousingAllowanceBrutto > 0) {
+    cells[sozColumn.ownHousingAmount] = formatNumber(
+      draft.components.ownHousingAllowanceBrutto,
+    );
+    cells[sozColumn.ownHousingTax] = 'Brutto';
+    cells[sozColumn.ownHousingDescription] = 'Dodatek za mieszkanie';
+  }
   cells[sozColumn.transportAmount] = formatNumber(
     draft.components.transportAllowanceNetto,
   );
@@ -561,6 +696,15 @@ function mapSozExportRow(
   );
   cells[sozColumn.frequencyBonusTax] = 'Brutto';
   cells[sozColumn.frequencyBonusDescription] = 'Premia frekwencyjna';
+  const clientPremium =
+    draft.components.holidayWorkBonusBrutto +
+    draft.components.udtAllowanceBrutto +
+    draft.components.manualIncreases;
+  if (clientPremium > 0) {
+    cells[sozColumn.clientBonusAmount] = formatNumber(clientPremium);
+    cells[sozColumn.clientBonusTax] = 'Brutto';
+    cells[sozColumn.clientBonusDescription] = 'Premia od klienta';
+  }
   cells[sozColumn.laundryAmount] = formatNumber(
     draft.components.laundryAllowanceBrutto,
   );
@@ -590,12 +734,24 @@ function mapSozOvertimeNoteEntry(
   return {
     employeeLabel: employeeName(record),
     tetaNumber: record.employee.tetaNumber,
+    citizenshipGroup:
+      record.employee.citizenship === 'PL' ? 'Polska' : 'Cudzoziemcy',
+    employeeNominalHours: draft.totals.nominalHours,
+    shortageBeforeCompensationHours:
+      draft.workTime.niedoczasHours +
+      coveringNiedoczas50Hours +
+      coveringNiedoczas100Hours,
     sozOvertime50Hours: draft.workTime.overtime50Hours,
     sozOvertime100Hours: draft.workTime.overtime100Hours,
+    wznRelatedHours: draft.workTime.wznCompensatedHours,
     paidOvertime50Hours: draft.workTime.paidOvertime50Hours,
     paidOvertime100Hours: draft.workTime.paidOvertime100Hours,
     coveringNiedoczas50Hours,
     coveringNiedoczas100Hours,
+    note:
+      draft.workTime.wznCompensatedHours > 0
+        ? `WZN: ${formatNumber(draft.workTime.wznCompensatedHours)} h pokryto z powiązanych godzin 100%.`
+        : '',
   };
 }
 
@@ -642,48 +798,87 @@ function escapeCsvCell(value: string) {
   return value;
 }
 
-function renderExcelXml({
+function renderXlsxWorkbook({
   sheetName,
   headers,
   rows,
+  unfinished,
 }: {
   sheetName: string;
   headers: readonly string[];
   rows: readonly string[][];
+  unfinished: boolean;
 }) {
-  const renderRow = (cells: readonly string[]) =>
-    `<Row>${cells
-      .map(
-        (cell) =>
-          `<Cell><Data ss:Type="${isNumericCell(cell) ? 'Number' : 'String'}">${escapeXml(cell)}</Data></Cell>`,
-      )
-      .join('')}</Row>`;
-
-  return `<?xml version="1.0" encoding="UTF-8"?>
-<?mso-application progid="Excel.Sheet"?>
-<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet"
- xmlns:o="urn:schemas-microsoft-com:office:office"
- xmlns:x="urn:schemas-microsoft-com:office:excel"
- xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet"
- xmlns:html="http://www.w3.org/TR/REC-html40">
- <Worksheet ss:Name="${escapeXml(sheetName)}">
-  <Table>
-   ${renderRow(headers)}
-   ${rows.map(renderRow).join('\n   ')}
-  </Table>
- </Worksheet>
-</Workbook>`;
+  const values = [
+    ...(unfinished ? [[`ROZLICZENIE NIEZAKOŃCZONE — wymaga weryfikacji`]] : []),
+    [...headers],
+    ...rows,
+  ];
+  const worksheet = XLSX.utils.aoa_to_sheet(values);
+  const headerRow = unfinished ? 1 : 0;
+  worksheet['!cols'] = headers.map((header) => ({
+    wch: Math.min(34, Math.max(10, header.length / 1.8)),
+  }));
+  worksheet['!rows'] = values.map((_, index) => ({
+    hpt: index === headerRow ? 70 : index === 0 && unfinished ? 24 : 18,
+  }));
+  worksheet['!autofilter'] = {
+    ref: XLSX.utils.encode_range(
+      { r: headerRow, c: 0 },
+      { r: headerRow, c: headers.length - 1 },
+    ),
+  };
+  if (unfinished) {
+    worksheet['!merges'] = [
+      { s: { r: 0, c: 0 }, e: { r: 0, c: headers.length - 1 } },
+    ];
+  }
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+  return XLSX.write(workbook, {
+    bookType: 'xlsx',
+    type: 'array',
+  }) as Uint8Array;
 }
 
-function escapeXml(value: string) {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&apos;');
-}
-
-function isNumericCell(value: string) {
-  return /^-?\d+(\.\d+)?$/.test(value);
+function renderCompensationWorkbook(entries: readonly SozOvertimeNoteEntry[]) {
+  const headers = [
+    'Pracownik',
+    'TETA',
+    'Grupa obywatelstwa',
+    'Nominał pracownika',
+    'Niedoczas przed odróbką',
+    'Godziny 50 surowe',
+    'Godziny 100 surowe',
+    'Godziny powiązane z WZN',
+    'Odróbka z 50%',
+    'Odróbka z 100%',
+    'Odróbka razem',
+    'Pozostałe 50%',
+    'Pozostałe 100%',
+    'Wyjaśnienie',
+  ];
+  return renderXlsxWorkbook({
+    sheetName: 'Odróbka niedoczasu',
+    headers,
+    rows: entries.map((entry) => [
+      entry.employeeLabel,
+      entry.tetaNumber,
+      entry.citizenshipGroup,
+      formatNumber(entry.employeeNominalHours),
+      formatNumber(entry.shortageBeforeCompensationHours),
+      formatNumber(entry.sozOvertime50Hours),
+      formatNumber(entry.sozOvertime100Hours),
+      formatNumber(entry.wznRelatedHours),
+      formatNumber(entry.coveringNiedoczas50Hours),
+      formatNumber(entry.coveringNiedoczas100Hours),
+      formatNumber(
+        entry.coveringNiedoczas50Hours + entry.coveringNiedoczas100Hours,
+      ),
+      formatNumber(entry.paidOvertime50Hours),
+      formatNumber(entry.paidOvertime100Hours),
+      entry.note,
+    ]),
+    unfinished: false,
+  });
 }

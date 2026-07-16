@@ -44,6 +44,7 @@ interface FormValues {
   absenceCode: string;
   startDate: string;
   endDate: string;
+  linkedWorkDate: string;
   note: string;
 }
 
@@ -60,6 +61,7 @@ export function AbsenceFormDialog({
     absenceCode: absence?.absenceCode ?? 'L4',
     startDate: absence?.startDate ?? defaultStartDate,
     endDate: absence?.endDate ?? defaultStartDate,
+    linkedWorkDate: absence?.linkedWorkDate ?? '',
     note: absence?.note ?? '',
   });
   const [errors, setErrors] = useState<AbsenceValidationErrors>({});
@@ -96,6 +98,11 @@ export function AbsenceFormDialog({
       startDate: values.startDate,
       endDate: values.endDate,
       hoursPerDay: null,
+      linkedWorkDate:
+        normalizeAbsenceCode(values.absenceCode) === 'WZN' &&
+        values.linkedWorkDate
+          ? values.linkedWorkDate
+          : null,
       note: values.note.trim() || null,
     };
 
@@ -193,6 +200,16 @@ export function AbsenceFormDialog({
                 slotProps={{ inputLabel: { shrink: true } }}
               />
             </Stack>
+            {normalizeAbsenceCode(values.absenceCode) === 'WZN' ? (
+              <TextField
+                type="date"
+                label={t.absences.form.linkedWorkDate}
+                value={values.linkedWorkDate}
+                onChange={handleChange('linkedWorkDate')}
+                helperText={t.absences.form.linkedWorkDateHelper}
+                slotProps={{ inputLabel: { shrink: true } }}
+              />
+            ) : null}
             <TextField
               multiline
               minRows={2}

@@ -125,6 +125,10 @@ export interface PayrollMonth extends ModificationMetadata {
   calculationCompletedAt: Date | null;
   calculationVersion: number;
   calculationError: string | null;
+  calculationInputHash: string | null;
+  calculationRunId: string | null;
+  calculationBlockerCount: number;
+  calculationWarningCount: number;
   settledAt: Date | null;
   settledBy: string | null;
 }
@@ -137,7 +141,13 @@ export interface EmployeeSettlement {
   totals: SettlementTotalsDocument;
   warnings: string[];
   calculatedAt: Date;
-  calculationVersion: string;
+  calculationVersion: number;
+  calculationRunId: string;
+  inputHash: string;
+  status: 'complete' | 'blocked';
+  blockerCount: number;
+  warningCount: number;
+  result: Record<string, unknown>;
 }
 
 export interface SettlementReviewState extends ModificationMetadata {
@@ -194,6 +204,7 @@ export interface Absence extends ModificationMetadata {
   startDate: IsoDate;
   endDate: IsoDate;
   hoursPerDay: number | null;
+  linkedWorkDate?: IsoDate | null;
   source: AbsenceSource;
   importId: string | null;
   status: AbsenceStatus;

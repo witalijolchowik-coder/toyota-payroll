@@ -753,6 +753,9 @@ export const pl = {
       type: 'Rodzaj nieobecności',
       startDate: 'Data od',
       endDate: 'Data do',
+      linkedWorkDate: 'Dzień pracy kompensujący WZN',
+      linkedWorkDateHelper:
+        'Opcjonalnie wskaż dzień z godzinami 100%, które zostały przeznaczone na to wolne za nadgodziny.',
       note: 'Notatka',
       cancel: 'Anuluj',
       create: 'Dodaj',
@@ -1127,6 +1130,38 @@ export const pl = {
       employees: 'Liczba pracowników w miesiącu: {{count}}',
       calculationVersion: 'Wersja obliczeń: {{version}}',
     },
+    calculation: {
+      title: 'Rozliczenie miesiąca',
+      description:
+        'Wynik jest automatycznie przeliczany i zapisywany po zmianie danych źródłowych.',
+      pending: 'Oczekuje na przeliczenie',
+      running: 'Przeliczanie',
+      current: 'Rozliczenie aktualne',
+      changed: 'Miesiąc zmieniony — oczekuje na przeliczenie',
+      blocked: 'Rozliczenie zawiera blokery',
+      failed: 'Przeliczenie nie powiodło się',
+      locked: 'Miesiąc zablokowany',
+      recalculate: 'Przelicz miesiąc',
+      lock: 'Zablokuj miesiąc',
+      unlock: 'Odblokuj miesiąc',
+      writeFailed:
+        'Nie udało się zapisać wyniku obliczenia. Dane źródłowe pozostały zapisane; użyj ponownego przeliczenia.',
+      unlockConfirmation:
+        'Odblokowanie może zmienić wcześniejsze rozliczenie i eksporty. Miesiąc będzie wymagał ponownego przeliczenia i przeglądu. Czy kontynuować?',
+      recovery: {
+        title: 'Punkty odzyskiwania',
+        description:
+          'System zachowuje maksymalnie trzy zmienione stany miesiąca, w przybliżeniu co dwie godziny.',
+        create: 'Utwórz punkt teraz',
+        empty: 'Nie ma jeszcze punktu odzyskiwania dla tego miesiąca.',
+        ageMinutes: '{{count}} min temu',
+        ageHours: '{{count}} godz. temu',
+        ageHoursMinutes: '{{hours}} godz. {{minutes}} min temu',
+        itemCount: '{{count}} elementów',
+        restoreConfirmation:
+          'Bieżący stan miesiąca zostanie zastąpiony wybranym punktem odzyskiwania. Nowsze zmiany mogą zostać utracone, a miesiąc zostanie ponownie przeliczony. Czy kontynuować?',
+      },
+    },
     draft: {
       title: 'Rozliczenie miesięczne',
       description:
@@ -1189,6 +1224,11 @@ export const pl = {
         'missing-employment-start': 'Brakuje daty rozpoczęcia zatrudnienia.',
         'missing-first-toyota-employment-date':
           'Brakuje daty pierwszego zatrudnienia w Toyota.',
+        'missing-teta': 'Brakuje numeru TETA.',
+        'missing-citizenship':
+          'Brakuje obywatelstwa wymaganego do eksportu SOZ.',
+        'missing-soz-identity':
+          'Brakuje PESEL albo dokumentu cudzoziemca wymaganego do eksportu SOZ.',
         'attendance-absence-conflict':
           'Jawne godziny pracy pokrywają się z aktywną nieobecnością.',
         'explicit-non-working-day': 'Jawne godziny zapisano w dniu wolnym.',
@@ -1204,6 +1244,8 @@ export const pl = {
           'Nie znaleziono aktywnej konfiguracji premii frekwencyjnej.',
         'unresolved-work-time-classification':
           'Brakuje faktycznego startu/końca dla nietypowej liczby godzin.',
+        'unresolved-wzn-link':
+          'WZN nie ma pełnego powiązania z konkretnymi godzinami 100% przeznaczonymi na rekompensatę.',
         'housing-entitlement-conflict':
           'Dodatek za własne mieszkanie pokrywa się z mieszkaniem firmowym.',
         'company-accommodation-missing-variant':
@@ -1212,6 +1254,8 @@ export const pl = {
           'Nie znaleziono aktywnej stawki dla wariantu mieszkania firmowego.',
         'unresolved-own-housing-setting':
           'Nie znaleziono aktywnej stawki dodatku za własne mieszkanie.',
+        'critical-read-failure':
+          'Nie udało się odczytać części danych źródłowych. Wartości zależne pozostają nierozstrzygnięte.',
       },
     },
     review: {
@@ -1308,6 +1352,8 @@ export const pl = {
       downloadSozPl: 'Pobierz CSV do SOZ — PL',
       downloadSozForeign: 'Pobierz CSV do SOZ — cudzoziemcy',
       downloadNote: 'Pobierz notatkę SOZ',
+      downloadCompensationPl: 'Tabela odróbek — Polska',
+      downloadCompensationForeign: 'Tabela odróbek — cudzoziemcy',
       identityLimitation:
         'Split SOZ wymaga danych PESEL/paszport. Obecny model pracownika jeszcze ich nie przechowuje, dlatego brakujące dokumenty są pokazane jako braki danych.',
       counters: {

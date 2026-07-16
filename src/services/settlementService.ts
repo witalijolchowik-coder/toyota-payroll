@@ -71,6 +71,7 @@ export interface SettlementMonthData {
   reviewStates: SettlementReviewState[];
   shiftHoursVersions: ShiftHoursVersion[];
   departmentShiftCorrections: DepartmentShiftCorrection[];
+  sourceFailures: string[];
 }
 
 async function requireActorUid(): Promise<string> {
@@ -89,10 +90,13 @@ async function requireActorUid(): Promise<string> {
 async function optionalSettlementLayer<T>(
   loader: () => Promise<T>,
   fallback: T,
+  source: string,
+  failures: string[],
 ): Promise<T> {
   try {
     return await loader();
   } catch {
+    failures.push(source);
     return fallback;
   }
 }
@@ -118,6 +122,7 @@ export async function loadSettlementMonth(
   const employees = employeesSnapshot.docs.map((document) =>
     mapEmployeeDocument(document.id, document.data()),
   );
+  const sourceFailures: string[] = [];
 
   const [
     employeeEntitlements,
@@ -132,82 +137,136 @@ export async function loadSettlementMonth(
     shiftHoursVersions,
     departmentShiftCorrections,
   ] = await Promise.all([
-    optionalSettlementLayer(async () => {
-      const snapshot = await getDocs(repositories.employeeEntitlements);
-      return snapshot.docs.map((document) =>
-        mapEmployeeEntitlementDocument(document.id, document.data()),
-      );
-    }, [] as EmployeeEntitlement[]),
-    optionalSettlementLayer(async () => {
-      const snapshot = await getDocs(repositories.employeeAssignments);
-      return snapshot.docs.map((document) =>
-        mapEmployeeAssignmentDocument(document.id, document.data()),
-      );
-    }, [] as EmployeeAssignment[]),
-    optionalSettlementLayer(async () => {
-      const snapshot = await getDocs(
-        query(repositories.departments, orderBy('name')),
-      );
-      const mapped = snapshot.docs
-        .map((document) => mapDepartmentDocument(document.id, document.data()))
-        .filter((department) =>
-          canonicalDepartmentsFallback().some(
-            (canonical) => canonical.id === department.id,
-          ),
+    optionalSettlementLayer(
+      async () => {
+        const snapshot = await getDocs(repositories.employeeEntitlements);
+        return snapshot.docs.map((document) =>
+          mapEmployeeEntitlementDocument(document.id, document.data()),
         );
-      const byId = new Map(
-        mapped.map((department) => [department.id, department]),
-      );
-      return canonicalDepartmentsFallback().map(
-        (fallback) => byId.get(fallback.id) ?? fallback,
-      );
-    }, canonicalDepartmentsFallback()),
-    optionalSettlementLayer(async () => {
-      const snapshot = await getDocs(monthRepository.dailyValues);
-      return snapshot.docs.map((document) =>
-        mapDailyValueDocument(document.id, monthId, document.data()),
-      );
-    }, [] as DailyValue[]),
-    optionalSettlementLayer(async () => {
-      const snapshot = await getDocs(monthRepository.scheduleCorrections);
-      return snapshot.docs.map((document) =>
-        mapScheduleCorrectionDocument(document.id, monthId, document.data()),
-      );
-    }, [] as ScheduleCorrection[]),
+      },
+      [] as EmployeeEntitlement[],
+      'employeeEntitlements',
+      sourceFailures,
+    ),
+    optionalSettlementLayer(
+      async () => {
+        const snapshot = await getDocs(repositories.employeeAssignments);
+        return snapshot.docs.map((document) =>
+          mapEmployeeAssignmentDocument(document.id, document.data()),
+        );
+      },
+      [] as EmployeeAssignment[],
+      'employeeAssignments',
+      sourceFailures,
+    ),
+    optionalSettlementLayer(
+      async () => {
+        const snapshot = await getDocs(
+          query(repositories.departments, orderBy('name')),
+        );
+        const mapped = snapshot.docs
+          .map((document) =>
+            mapDepartmentDocument(document.id, document.data()),
+          )
+          .filter((department) =>
+            canonicalDepartmentsFallback().some(
+              (canonical) => canonical.id === department.id,
+            ),
+          );
+        const byId = new Map(
+          mapped.map((department) => [department.id, department]),
+        );
+        return canonicalDepartmentsFallback().map(
+          (fallback) => byId.get(fallback.id) ?? fallback,
+        );
+      },
+      canonicalDepartmentsFallback(),
+      'departments',
+      sourceFailures,
+    ),
+    optionalSettlementLayer(
+      async () => {
+        const snapshot = await getDocs(monthRepository.dailyValues);
+        return snapshot.docs.map((document) =>
+          mapDailyValueDocument(document.id, monthId, document.data()),
+        );
+      },
+      [] as DailyValue[],
+      'dailyValues',
+      sourceFailures,
+    ),
+    optionalSettlementLayer(
+      async () => {
+        const snapshot = await getDocs(monthRepository.scheduleCorrections);
+        return snapshot.docs.map((document) =>
+          mapScheduleCorrectionDocument(document.id, monthId, document.data()),
+        );
+      },
+      [] as ScheduleCorrection[],
+      'scheduleCorrections',
+      sourceFailures,
+    ),
     optionalSettlementLayer(
       () => loadAbsencesOverlappingMonth(monthId),
       [] as Absence[],
+      'absences',
+      sourceFailures,
     ),
-    optionalSettlementLayer(async () => {
-      const snapshot = await getDocs(repositories.payrollSettings);
-      return snapshot.docs.map((document) =>
-        mapPayrollSettingDocument(document.id, document.data()),
-      );
-    }, [] as PayrollSetting[]),
-    optionalSettlementLayer(async () => {
-      const snapshot = await getDocs(monthRepository.adjustments);
-      return snapshot.docs.map((document) =>
-        mapAdjustmentDocument(document.id, monthId, document.data()),
-      );
-    }, [] as Adjustment[]),
-    optionalSettlementLayer(async () => {
-      const snapshot = await getDocs(monthRepository.reviewStates);
-      return snapshot.docs.map((document) =>
-        mapSettlementReviewDocument(document.id, monthId, document.data()),
-      );
-    }, [] as SettlementReviewState[]),
-    optionalSettlementLayer(async () => {
-      const snapshot = await getDocs(repositories.shiftHoursVersions);
-      return snapshot.docs.map((document) =>
-        mapShiftHoursVersionDocument(document.id, document.data()),
-      );
-    }, [] as ShiftHoursVersion[]),
-    optionalSettlementLayer(async () => {
-      const snapshot = await getDocs(repositories.departmentShiftCorrections);
-      return snapshot.docs.map((document) =>
-        mapDepartmentShiftCorrectionDocument(document.id, document.data()),
-      );
-    }, [] as DepartmentShiftCorrection[]),
+    optionalSettlementLayer(
+      async () => {
+        const snapshot = await getDocs(repositories.payrollSettings);
+        return snapshot.docs.map((document) =>
+          mapPayrollSettingDocument(document.id, document.data()),
+        );
+      },
+      [] as PayrollSetting[],
+      'payrollSettings',
+      sourceFailures,
+    ),
+    optionalSettlementLayer(
+      async () => {
+        const snapshot = await getDocs(monthRepository.adjustments);
+        return snapshot.docs.map((document) =>
+          mapAdjustmentDocument(document.id, monthId, document.data()),
+        );
+      },
+      [] as Adjustment[],
+      'adjustments',
+      sourceFailures,
+    ),
+    optionalSettlementLayer(
+      async () => {
+        const snapshot = await getDocs(monthRepository.reviewStates);
+        return snapshot.docs.map((document) =>
+          mapSettlementReviewDocument(document.id, monthId, document.data()),
+        );
+      },
+      [] as SettlementReviewState[],
+      'reviewStates',
+      sourceFailures,
+    ),
+    optionalSettlementLayer(
+      async () => {
+        const snapshot = await getDocs(repositories.shiftHoursVersions);
+        return snapshot.docs.map((document) =>
+          mapShiftHoursVersionDocument(document.id, document.data()),
+        );
+      },
+      [] as ShiftHoursVersion[],
+      'shiftHoursVersions',
+      sourceFailures,
+    ),
+    optionalSettlementLayer(
+      async () => {
+        const snapshot = await getDocs(repositories.departmentShiftCorrections);
+        return snapshot.docs.map((document) =>
+          mapDepartmentShiftCorrectionDocument(document.id, document.data()),
+        );
+      },
+      [] as DepartmentShiftCorrection[],
+      'departmentShiftCorrections',
+      sourceFailures,
+    ),
   ]);
 
   return {
@@ -224,6 +283,7 @@ export async function loadSettlementMonth(
     reviewStates,
     shiftHoursVersions,
     departmentShiftCorrections,
+    sourceFailures,
   };
 }
 

@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import * as XLSX from 'xlsx';
 
 import type { EmployeeMonthlyCalculationDraft } from '../payroll';
 import {
   SOZ_CSV_HEADERS,
+  TOYOTA_EXPORT_HEADERS,
   classifySozWorker,
   prepareSettlementExportPackage,
   renderSozOvertimeNote,
@@ -46,6 +48,7 @@ describe('settlement export formats', () => {
         exportRecord({
           id: '2',
           tetaNumber: 'UA',
+          citizenship: 'UA',
           identity: { pesel: '12345678901', passport: 'FU419350' },
         }),
       ],
@@ -107,6 +110,7 @@ describe('settlement export formats', () => {
       records: [
         exportRecord({
           id: '1',
+          citizenship: 'UA',
           identity: { pesel: '12345678901', passport: 'FU419350' },
           draft: draft({
             overtime100Hours: 5,
@@ -150,6 +154,43 @@ describe('settlement export formats', () => {
     });
   });
 
+  it('creates a citizenship-specific compensation workbook only when needed', () => {
+    const result = prepareSettlementExportPackage({
+      monthId: '2026-06',
+      monthNominalHours: 168,
+      records: [
+        exportRecord({
+          id: '1',
+          draft: draft({
+            overtime50Hours: 4,
+            paidOvertime50Hours: 0,
+            overtime100Hours: 5,
+            paidOvertime100Hours: 3,
+            wznCompensatedHours: 2,
+          }),
+        }),
+      ],
+    });
+
+    expect(result.soz.polishCompensationWorkbook).not.toBeNull();
+    expect(result.soz.foreignCompensationWorkbook).toBeNull();
+    const workbook = XLSX.read(result.soz.polishCompensationWorkbook!, {
+      type: 'array',
+    });
+    const rows = XLSX.utils.sheet_to_json<string[]>(
+      workbook.Sheets[workbook.SheetNames[0]!]!,
+      { header: 1 },
+    );
+    expect(rows[0]).toEqual(
+      expect.arrayContaining([
+        'TETA',
+        'Nominał pracownika',
+        'Godziny powiązane z WZN',
+        'Wyjaśnienie',
+      ]),
+    );
+  });
+
   it('renders an empty note when there are no odróbki za niedoczas', () => {
     expect(renderSozOvertimeNote([])).toBe('Brak odróbek za niedoczas.\r\n');
   });
@@ -171,6 +212,49 @@ describe('settlement export formats', () => {
       'Czas nominalny',
     ]);
     expect(SOZ_CSV_HEADERS.join('|')).not.toMatch(/ZUS|PIT|net salary/i);
+  });
+
+  it('uses the binding 43-column Toyota confirmation schema and a real xlsx workbook', () => {
+    const result = prepareSettlementExportPackage({
+      monthId: '2026-06',
+      monthNominalHours: 168,
+      records: [exportRecord({ id: '1' })],
+    });
+    expect(TOYOTA_EXPORT_HEADERS).toHaveLength(43);
+    expect(TOYOTA_EXPORT_HEADERS.slice(0, 7)).toEqual([
+      'Nazwisko',
+      'Imię',
+      'Numer personalny',
+      'Agencja',
+      'Jednostka organizacyjna/Dział',
+      'Stanowisko',
+      'Stawka',
+    ]);
+    expect(result.toyota.workbook.slice(0, 2)).toEqual(
+      new Uint8Array([0x50, 0x4b]),
+    );
+    const workbook = XLSX.read(result.toyota.workbook, { type: 'array' });
+    expect(workbook.SheetNames).toEqual(['Godziny']);
+    expect(
+      XLSX.utils.sheet_to_json<string[]>(workbook.Sheets.Godziny!, {
+        header: 1,
+      })[0],
+    ).toEqual([...TOYOTA_EXPORT_HEADERS]);
+  });
+
+  it('exports canonical night hours to the binding Toyota and SOZ positions', () => {
+    const record = exportRecord({
+      id: '1',
+      draft: draft({ nightHours: 24 }),
+    });
+    const result = prepareSettlementExportPackage({
+      monthId: '2026-06',
+      monthNominalHours: 168,
+      records: [record],
+    });
+
+    expect(result.toyota.rows[0]?.cells[15]).toBe('24');
+    expect(result.soz.polishRows[0]?.cells[7]).toBe('24');
   });
 
   it('renders SOZ CSV with BOM, semicolon delimiter and positional repeated-column mapping', () => {
@@ -207,6 +291,7 @@ function exportRecord({
   lastName = 'Kowalski',
   identity = { pesel: '87010409887' },
   departmentName = 'PS',
+  citizenship = 'PL',
   draft: draftOverride,
 }: {
   id: string;
@@ -215,6 +300,7 @@ function exportRecord({
   lastName?: string;
   identity?: SettlementExportRecord['identity'];
   departmentName?: string | null;
+  citizenship?: 'PL' | 'UA' | 'OTHER' | null;
   draft?: EmployeeMonthlyCalculationDraft;
 }): SettlementExportRecord {
   return {
@@ -225,6 +311,8 @@ function exportRecord({
       lastName,
       employmentStartDate: new Date('2026-01-01T00:00:00.000Z'),
       employmentEndDate: null,
+      citizenship,
+      firstToyotaEmploymentDate: new Date('2026-04-01T00:00:00.000Z'),
     },
     identity,
     departmentName,
@@ -245,6 +333,8 @@ function draft(
     overtime100Hours?: number;
     paidOvertime50Hours?: number;
     paidOvertime100Hours?: number;
+    nightHours?: number;
+    wznCompensatedHours?: number;
   } = {},
 ): EmployeeMonthlyCalculationDraft {
   return {
@@ -283,6 +373,7 @@ function draft(
     },
     workTime: {
       normalWorkHours: 168,
+      nightHours: overrides.nightHours ?? 0,
       privateTimeHours: 0,
       privateTimeCoveredHours: 0,
       uncoveredPrivateTimeHours: 0,
@@ -294,6 +385,8 @@ function draft(
       paidOvertime50Hours: overrides.paidOvertime50Hours ?? 0,
       paidOvertime100Hours: overrides.paidOvertime100Hours ?? 0,
       holidayWorkBonusEligible: false,
+      wznCompensatedHours: overrides.wznCompensatedHours ?? 0,
+      wznUnresolvedHours: 0,
       unresolvedClassificationDays: [],
       niedoczasHours: 0,
     },
@@ -303,6 +396,7 @@ function draft(
         configuredSettingId: 'frequency',
         configuredAmount: 400,
         l4RecordCount: 0,
+        l4MissedWorkingDayCount: 0,
         hasNnAbsence: false,
         reason: 'ELIGIBLE',
       },

@@ -80,6 +80,8 @@ import { SettlementExportPanel } from './SettlementExportPanel';
 import { SettlementGrid } from './SettlementGrid';
 import { SettlementLegend } from './SettlementLegend';
 import { useSettlementMonth } from './useSettlementMonth';
+import { MonthlyCalculationStatusPanel } from './MonthlyCalculationStatusPanel';
+import { createMonthlyCalculationInputHash } from '../../services/monthlyCalculationService';
 
 interface SettlementMonthViewProps {
   monthId: MonthId;
@@ -227,7 +229,25 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
     employees: participatingEmployees,
     entitlements: data.employeeEntitlements,
   });
-  const calculationDrafts = calculateMonthlyDrafts({
+  const plannedSchedulesByEmployeeId = new Map(
+    participatingEmployees.map((employee) => [
+      employee.id,
+      generateEmployeeMonthlySchedule({
+        employee,
+        days,
+        departments: data.departments,
+        options: {
+          publicHolidays,
+          publicHolidayNames,
+          assignments: data.employeeAssignments,
+          corrections: data.scheduleCorrections,
+          departmentShiftCorrections: data.departmentShiftCorrections,
+          shiftHoursVersions: data.shiftHoursVersions,
+        },
+      }),
+    ]),
+  );
+  const calculationDraftsBase = calculateMonthlyDrafts({
     monthId,
     employees: participatingEmployees,
     dailyValues: participatingDailyValues,
@@ -235,7 +255,36 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
     payrollSettings: data.payrollSettings,
     adjustments: data.adjustments,
     entitlementsByEmployeeId,
+    plannedSchedulesByEmployeeId,
     calendarOptions: { publicHolidays },
+  });
+  const calculationDrafts = data.sourceFailures.length
+    ? calculationDraftsBase.map((draft) => ({
+        ...draft,
+        warnings: [
+          ...draft.warnings,
+          {
+            code: 'critical-read-failure' as const,
+            date: null,
+            message: data.sourceFailures.join(', '),
+          },
+        ],
+      }))
+    : calculationDraftsBase;
+  const calculationInputHash = createMonthlyCalculationInputHash({
+    monthId,
+    employees: participatingEmployees,
+    dailyValues: participatingDailyValues,
+    absences: participatingAbsences,
+    payrollSettings: data.payrollSettings,
+    adjustments: data.adjustments,
+    entitlements: data.employeeEntitlements,
+    assignments: data.employeeAssignments,
+    scheduleCorrections: data.scheduleCorrections,
+    departments: data.departments,
+    shiftHoursVersions: data.shiftHoursVersions,
+    departmentShiftCorrections: data.departmentShiftCorrections,
+    sourceFailures: data.sourceFailures,
   });
   const draftsByEmployeeId = new Map(
     calculationDrafts.map((draft) => [draft.employeeId, draft]),
@@ -472,6 +521,13 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
 
       {participatingEmployees.length > 0 ? (
         <>
+          <MonthlyCalculationStatusPanel
+            monthId={monthId}
+            month={data.month}
+            drafts={calculationDrafts}
+            inputHash={calculationInputHash}
+            onReload={reload}
+          />
           <CalendarConstructorToolbar
             selectedTool={selectedTool}
             onSelectedToolChange={(tool) => {

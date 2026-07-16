@@ -487,6 +487,7 @@ service cloud.firestore {
           'start_date',
           'end_date',
           'hours_per_day',
+          'linked_work_date',
           'source',
           'import_id',
           'status',
@@ -515,6 +516,16 @@ service cloud.firestore {
           || (data.hours_per_day is number
             && data.hours_per_day >= 0
             && data.hours_per_day <= 24))
+        && (
+          !data.keys().hasAny(['linked_work_date'])
+          || data.linked_work_date == null
+          || isIsoDate(data.linked_work_date)
+        )
+        && (
+          data.absence_code == 'WZN'
+          || !data.keys().hasAny(['linked_work_date'])
+          || data.linked_work_date == null
+        )
         && data.source in ['manual', 'absence_import']
         && (
           (data.source == 'manual' && data.import_id == null)
@@ -929,18 +940,140 @@ service cloud.firestore {
         && request.resource.data.calculation_version == 0
         && hasCreateMetadata(request.resource.data);
       allow update: if isAuthenticated()
-        && resource.data.is_settled == false
-        && request.resource.data.is_settled == false
         && hasUpdateMetadata(request.resource.data)
-        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'updated_at',
-          'updated_by'
-        ]);
+        && request.resource.data.year == resource.data.year
+        && request.resource.data.month == resource.data.month
+        && request.resource.data.month_start == resource.data.month_start
+        && request.resource.data.month_end == resource.data.month_end
+        && (
+          (
+            resource.data.is_settled == false
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'is_settled',
+              'calculation_status',
+              'calculation_started_at',
+              'calculation_completed_at',
+              'calculation_version',
+              'calculation_error',
+              'calculation_input_hash',
+              'calculation_run_id',
+              'calculation_blocker_count',
+              'calculation_warning_count',
+              'settled_at',
+              'settled_by',
+              'updated_at',
+              'updated_by'
+            ])
+            && request.resource.data.calculation_version is int
+            && request.resource.data.calculation_version >= resource.data.calculation_version
+            && (!request.resource.data.is_settled
+              || (request.resource.data.calculation_status == 'completed'
+                && request.resource.data.calculation_blocker_count == 0
+                && request.resource.data.settled_at == request.time
+                && request.resource.data.settled_by == request.auth.uid))
+          )
+          || (
+            resource.data.is_settled == true
+            && request.resource.data.is_settled == false
+            && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+              'is_settled',
+              'calculation_status',
+              'calculation_input_hash',
+              'settled_at',
+              'settled_by',
+              'updated_at',
+              'updated_by'
+            ])
+            && request.resource.data.calculation_status == 'queued'
+            && request.resource.data.calculation_input_hash == null
+            && request.resource.data.settled_at == null
+            && request.resource.data.settled_by == null
+          )
+        );
       allow delete: if false;
 
       match /employeeSettlements/{settlementId} {
         allow read: if isAuthenticated();
-        allow write: if false;
+        allow create, update: if isAuthenticated()
+          && monthExistsAndIsOpen(monthId)
+          && settlementId == request.resource.data.employee_id
+          && hasEmployeeReference(request.resource.data)
+          && request.resource.data.keys().hasAll([
+            'employee_id',
+            'teta_number',
+            'totals',
+            'warnings',
+            'calculated_at',
+            'calculation_version',
+            'calculation_run_id',
+            'input_hash',
+            'status',
+            'blocker_count',
+            'warning_count',
+            'result'
+          ])
+          && request.resource.data.keys().hasOnly([
+            'employee_id',
+            'teta_number',
+            'totals',
+            'warnings',
+            'calculated_at',
+            'calculation_version',
+            'calculation_run_id',
+            'input_hash',
+            'status',
+            'blocker_count',
+            'warning_count',
+            'result'
+          ])
+          && request.resource.data.calculated_at == request.time
+          && request.resource.data.calculation_version is int
+          && request.resource.data.calculation_version > 0
+          && isNonEmptyString(request.resource.data.calculation_run_id)
+          && isNonEmptyString(request.resource.data.input_hash)
+          && request.resource.data.status in ['complete', 'blocked']
+          && request.resource.data.blocker_count is int
+          && request.resource.data.blocker_count >= 0
+          && request.resource.data.warning_count is int
+          && request.resource.data.warning_count >= request.resource.data.blocker_count
+          && request.resource.data.warnings is list
+          && request.resource.data.totals is map
+          && request.resource.data.result is map;
+        allow delete: if isAuthenticated() && monthExistsAndIsOpen(monthId);
+      }
+
+      match /recoveryPoints/{recoveryPointId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated()
+          && monthExistsAndIsOpen(monthId)
+          && request.resource.data.keys().hasAll([
+            'month_id',
+            'input_hash',
+            'created_at',
+            'created_by',
+            'item_count',
+            'summary',
+            'snapshot'
+          ])
+          && request.resource.data.keys().hasOnly([
+            'month_id',
+            'input_hash',
+            'created_at',
+            'created_by',
+            'item_count',
+            'summary',
+            'snapshot'
+          ])
+          && request.resource.data.month_id == monthId
+          && isNonEmptyString(request.resource.data.input_hash)
+          && request.resource.data.created_at == request.time
+          && request.resource.data.created_by == request.auth.uid
+          && request.resource.data.item_count is int
+          && request.resource.data.item_count >= 0
+          && request.resource.data.summary is map
+          && request.resource.data.snapshot is map;
+        allow delete: if isAuthenticated() && monthExistsAndIsOpen(monthId);
+        allow update: if false;
       }
 
       match /reviewStates/{reviewStateId} {
@@ -1089,6 +1222,7 @@ service cloud.firestore {
                 'start_date',
                 'end_date',
                 'hours_per_day',
+                'linked_work_date',
                 'note',
                 'updated_at',
                 'updated_by'
@@ -1106,6 +1240,7 @@ service cloud.firestore {
                 'end_date',
                 'source',
                 'import_id',
+                'linked_work_date',
                 'note',
                 'updated_at',
                 'updated_by'

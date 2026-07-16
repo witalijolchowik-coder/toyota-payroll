@@ -69,6 +69,7 @@ export interface MonthlyWorkTimeBalanceInput {
   coverableNiHours: number;
   overtime50Hours: number;
   overtime100Hours: number;
+  preferredOvertime100CoverageHours?: number;
 }
 
 export interface MonthlyWorkTimeBalance {
@@ -82,6 +83,7 @@ export interface MonthlyWorkTimeBalance {
   overtime100Hours: number;
   paidOvertime50Hours: number;
   paidOvertime100Hours: number;
+  preferredOvertime100CoverageHours: number;
   niedoczasHours: number;
 }
 
@@ -243,12 +245,20 @@ export function balanceMonthlyWorkTimeDeviations({
   coverableNiHours,
   overtime50Hours,
   overtime100Hours,
+  preferredOvertime100CoverageHours = 0,
 }: MonthlyWorkTimeBalanceInput): MonthlyWorkTimeBalance {
+  const preferredCoverage = Math.min(
+    Math.max(0, preferredOvertime100CoverageHours),
+    overtime100Hours,
+  );
+  const overtime100AfterPreferredCoverage = roundHours(
+    overtime100Hours - preferredCoverage,
+  );
   const privateCoverageFrom50 = Math.min(privateTimeHours, overtime50Hours);
   const remainingPrivateAfter50 = privateTimeHours - privateCoverageFrom50;
   const privateCoverageFrom100 = Math.min(
     remainingPrivateAfter50,
-    overtime100Hours,
+    overtime100AfterPreferredCoverage,
   );
   const privateTimeCoveredHours = roundHours(
     privateCoverageFrom50 + privateCoverageFrom100,
@@ -258,7 +268,7 @@ export function balanceMonthlyWorkTimeDeviations({
     overtime50Hours - privateCoverageFrom50,
   );
   const remainingOvertime100 = roundHours(
-    overtime100Hours - privateCoverageFrom100,
+    overtime100AfterPreferredCoverage - privateCoverageFrom100,
   );
 
   const coverableCoverageFrom50 = Math.min(
@@ -293,6 +303,7 @@ export function balanceMonthlyWorkTimeDeviations({
     paidOvertime100Hours: roundHours(
       remainingOvertime100 - coverableCoverageFrom100,
     ),
+    preferredOvertime100CoverageHours: roundHours(preferredCoverage),
     niedoczasHours: roundHours(
       privateTimeHours -
         privateTimeCoveredHours +

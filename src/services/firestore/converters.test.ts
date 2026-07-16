@@ -347,10 +347,39 @@ describe('Firestore converters', () => {
       monthId: '2026-06',
       employeeId: 'employee-1',
       absenceCode: 'L4',
+      linkedWorkDate: null,
       status: 'ACTIVE',
       endDate: '2026-07-05',
     });
     expect(document).not.toHaveProperty('employee_name');
+  });
+
+  it('maps an explicit WZN work-date link without breaking older absences', () => {
+    const document = absenceConverter.fromFirestore(
+      snapshot('months/2026-06/absences/wzn-1', {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        absence_code: 'WZN',
+        start_date: '2026-06-08',
+        end_date: '2026-06-08',
+        hours_per_day: 8,
+        linked_work_date: '2026-06-07',
+        source: 'manual',
+        import_id: null,
+        status: 'ACTIVE',
+        note: null,
+        created_at: now,
+        created_by: 'test-user',
+        updated_at: now,
+        updated_by: 'test-user',
+      }),
+      {},
+    );
+
+    expect(mapAbsenceDocument('wzn-1', '2026-06', document)).toMatchObject({
+      absenceCode: 'WZN',
+      linkedWorkDate: '2026-06-07',
+    });
   });
 
   it('validates and maps a versioned payroll setting', () => {

@@ -616,7 +616,7 @@ describe('Firestore security rules', () => {
     );
   });
 
-  it('prevents a settled month from being reopened or modified', async () => {
+  it('allows an approved user to reopen a settled month only through the safe transition', async () => {
     await seedMonth('2026-07', true);
     const uid = 'coordinator-1';
     const firestore = testEnvironment.authenticatedContext(uid).firestore();
@@ -628,22 +628,121 @@ describe('Firestore security rules', () => {
         updated_by: uid,
       }),
     );
+    await assertSucceeds(
+      updateDoc(doc(firestore, 'months', '2026-07'), {
+        is_settled: false,
+        calculation_status: 'queued',
+        calculation_input_hash: null,
+        settled_at: null,
+        settled_by: null,
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
   });
 
-  it('denies client writes to calculated settlement snapshots', async () => {
+  it('allows exact calculated settlement snapshots in an open month and rejects invalid shapes', async () => {
     await seedMonth('2026-07', false);
     const firestore = testEnvironment
       .authenticatedContext('coordinator-1')
       .firestore();
 
+    await assertSucceeds(
+      setDoc(doc(firestore, 'months/2026-07/employeeSettlements/employee-1'), {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        totals: {
+          worked_hours: 168,
+          absence_hours: 0,
+          adjustment_hours: 0,
+          payable_hours: 168,
+        },
+        warnings: [],
+        calculated_at: serverTimestamp(),
+        calculation_version: 1,
+        calculation_run_id: 'run-1',
+        input_hash: 'v1-12345678',
+        status: 'complete',
+        blocker_count: 0,
+        warning_count: 0,
+        result: { monthId: '2026-07', totals: { workedHours: 168 } },
+      }),
+    );
+    await assertFails(
+      setDoc(doc(firestore, 'months/2026-07/employeeSettlements/employee-2'), {
+        employee_id: 'different-employee',
+        teta_number: 'TETA-1002',
+        totals: {},
+        warnings: [],
+        calculated_at: serverTimestamp(),
+        calculation_version: 1,
+        calculation_run_id: 'run-1',
+        input_hash: 'v1-12345678',
+        status: 'complete',
+        blocker_count: 0,
+        warning_count: 0,
+        result: {},
+      }),
+    );
+  });
+
+  it('denies calculated settlement writes in a settled month', async () => {
+    await seedMonth('2026-07', true);
+    const firestore = testEnvironment
+      .authenticatedContext('coordinator-1')
+      .firestore();
     await assertFails(
       setDoc(doc(firestore, 'months/2026-07/employeeSettlements/employee-1'), {
         employee_id: 'employee-1',
         teta_number: 'TETA-1001',
-        totals: {},
+        totals: {
+          worked_hours: 168,
+          absence_hours: 0,
+          adjustment_hours: 0,
+          payable_hours: 168,
+        },
         warnings: [],
         calculated_at: serverTimestamp(),
-        calculation_version: 'test',
+        calculation_version: 1,
+        calculation_run_id: 'run-1',
+        input_hash: 'v1-12345678',
+        status: 'complete',
+        blocker_count: 0,
+        warning_count: 0,
+        result: {},
+      }),
+    );
+  });
+
+  it('allows rolling recovery snapshots only in an open month', async () => {
+    await seedMonth('2026-07', false);
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const reference = doc(
+      firestore,
+      'months/2026-07/recoveryPoints/recovery-1',
+    );
+    const payload = {
+      month_id: '2026-07',
+      input_hash: 'v1-12345678',
+      created_at: serverTimestamp(),
+      created_by: uid,
+      item_count: 1,
+      summary: { dailyValues: 1 },
+      snapshot: {
+        dailyValues: [{ id: 'value-1', data: { hours: 8 } }],
+      },
+    };
+
+    await assertSucceeds(setDoc(reference, payload));
+    await assertFails(updateDoc(reference, { item_count: 2 }));
+    await assertSucceeds(deleteDoc(reference));
+
+    await seedMonth('2026-08', true);
+    await assertFails(
+      setDoc(doc(firestore, 'months/2026-08/recoveryPoints/recovery-1'), {
+        ...payload,
+        month_id: '2026-08',
       }),
     );
   });
@@ -1137,6 +1236,38 @@ describe('Firestore security rules', () => {
       }),
     );
     await assertFails(deleteDoc(reference));
+  });
+
+  it('allows a traceable WZN link and rejects that link on another absence type', async () => {
+    await seedMonth('2026-06', false);
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const base = {
+      employee_id: 'employee-1',
+      teta_number: 'TETA-1001',
+      start_date: '2026-06-05',
+      end_date: '2026-06-05',
+      hours_per_day: null,
+      linked_work_date: '2026-06-07',
+      source: 'manual',
+      import_id: null,
+      status: 'ACTIVE',
+      note: null,
+      ...modificationMetadata(uid),
+    };
+
+    await assertSucceeds(
+      setDoc(doc(firestore, 'months/2026-06/absences/wzn-linked'), {
+        ...base,
+        absence_code: 'WZN',
+      }),
+    );
+    await assertFails(
+      setDoc(doc(firestore, 'months/2026-06/absences/uw-linked'), {
+        ...base,
+        absence_code: 'UW',
+      }),
+    );
   });
 
   it('allows imported L4 creation but keeps imported absences read-only for client edits', async () => {
