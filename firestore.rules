@@ -63,18 +63,20 @@ service cloud.firestore {
           'requiresReview', 'blocker', 'warning', 'dayOff', 'weekend',
           'publicHoliday', 'future', 'outsideEmployment'
         ])
-        && (colors.worked + '|' + colors.firstShift + '|' +
-          colors.secondShift + '|' + colors.nightShift + '|' + colors.bhp + '|' +
-          colors.l4Active + '|' + colors.l4Inactive + '|' +
-          colors.l4Reported + '|' + colors.uw + '|' + colors.uz + '|' +
-          colors.nn + '|' + colors.nu + '|' + colors.ni + '|' + colors.opd + '|' +
-          colors.krw + '|' + colors.wzn + '|' + colors.overtime50 + '|' +
-          colors.overtime100 + '|' + colors.nightHours + '|' + colors.shortage + '|' +
-          colors.privateTime + '|' + colors.manualCorrection + '|' +
-          colors.requiresReview + '|' + colors.blocker + '|' + colors.warning + '|' +
-          colors.dayOff + '|' + colors.weekend + '|' + colors.publicHoliday + '|' +
-          colors.future + '|' + colors.outsideEmployment)
-          .matches('^#[0-9A-Fa-f]{6}(\\|#[0-9A-Fa-f]{6}){30}$');
+        && (colors.worked + colors.firstShift + colors.secondShift +
+          colors.nightShift + colors.bhp + colors.l4Active +
+          colors.l4Inactive + colors.l4Reported)
+          .matches('^(#[0-9A-Fa-f]{6}){8}$')
+        && (colors.uw + colors.uz + colors.nn + colors.nu + colors.ni +
+          colors.opd + colors.krw + colors.wzn)
+          .matches('^(#[0-9A-Fa-f]{6}){8}$')
+        && (colors.overtime50 + colors.overtime100 + colors.nightHours +
+          colors.shortage + colors.privateTime + colors.manualCorrection +
+          colors.requiresReview + colors.blocker)
+          .matches('^(#[0-9A-Fa-f]{6}){8}$')
+        && (colors.warning + colors.dayOff + colors.weekend +
+          colors.publicHoliday + colors.future + colors.outsideEmployment)
+          .matches('^(#[0-9A-Fa-f]{6}){6}$');
     }
 
     function validCalendarAppearance(data) {
