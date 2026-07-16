@@ -11,10 +11,10 @@ import {
   Stack,
   Tooltip,
   Typography,
-  alpha,
 } from '@mui/material';
 
 import { useTranslations } from '../../hooks/useTranslations';
+import { useCalendarAppearance } from '../../hooks/useCalendarAppearance';
 import { interpolate } from '../../i18n/pl';
 import type {
   Absence,
@@ -34,6 +34,10 @@ import {
   type CalendarDay,
   type SettlementCellValue,
 } from './monthUtils';
+import {
+  appearanceKeyForAbsence,
+  appearanceKeyForPlannedDay,
+} from '../../utils/calendarAppearance';
 
 interface EmployeeCalendarDialogProps {
   employee: Employee;
@@ -74,6 +78,7 @@ export function EmployeeCalendarDialog({
   plannedSchedule = [],
 }: EmployeeCalendarDialogProps) {
   const t = useTranslations();
+  const { palette } = useCalendarAppearance();
   const dailyValuesByDate = new Map(
     dailyValues
       .filter((value) => value.employeeId === employee.id)
@@ -204,6 +209,13 @@ export function EmployeeCalendarDialog({
                   : absenceResolution.kind === 'ambiguous'
                     ? absenceResolution.codes.join('/')
                     : null;
+              const appearanceKey =
+                absenceResolution.kind === 'governed'
+                  ? appearanceKeyForAbsence(
+                      absenceResolution.code,
+                      absenceResolution.confirmation,
+                    )
+                  : appearanceKeyForPlannedDay(plannedDay);
               const warnings = resolveAttendanceWarnings({
                 hasExplicitValue: Boolean(persistedValue),
                 hasActiveAbsence: absenceResolution.kind !== 'none',
@@ -270,14 +282,28 @@ export function EmployeeCalendarDialog({
                         textAlign: 'left',
                         border: 1,
                         borderColor:
-                          warnings.length > 0 ? 'warning.main' : 'divider',
+                          warnings.length > 0
+                            ? palette.warning.text
+                            : 'divider',
                         borderRadius: 2,
-                        bgcolor: (theme) =>
-                          cell.day.isHoliday
-                            ? alpha(theme.palette.error.main, 0.08)
-                            : cell.day.isWeekend
-                              ? theme.palette.action.hover
-                              : theme.palette.background.paper,
+                        bgcolor:
+                          value.calendarState === 'outside-employment'
+                            ? palette.outsideEmployment.background
+                            : cell.day.isFuture
+                              ? palette.future.background
+                              : absenceLabel
+                                ? palette[appearanceKey].background
+                                : cell.day.isHoliday
+                                  ? palette.publicHoliday.background
+                                  : cell.day.isWeekend
+                                    ? palette.weekend.background
+                                    : palette[appearanceKey].background,
+                        color:
+                          value.calendarState === 'outside-employment'
+                            ? palette.outsideEmployment.text
+                            : cell.day.isFuture
+                              ? palette.future.text
+                              : palette[appearanceKey].text,
                         opacity:
                           value.calendarState === 'outside-employment' ||
                           cell.day.isFuture
@@ -296,8 +322,8 @@ export function EmployeeCalendarDialog({
                             color={
                               absenceResolution.kind === 'governed' &&
                               absenceResolution.confirmation === 'reported'
-                                ? 'warning.dark'
-                                : 'error.main'
+                                ? palette.l4Reported.text
+                                : palette[appearanceKey].text
                             }
                             sx={{ fontWeight: 800 }}
                           >
@@ -326,8 +352,8 @@ export function EmployeeCalendarDialog({
                           color={
                             value.kind === 'manual' ||
                             value.kind === 'imported-override'
-                              ? 'primary.main'
-                              : 'text.secondary'
+                              ? palette.manualCorrection.text
+                              : palette[appearanceKey].text
                           }
                           sx={{
                             fontWeight:
@@ -340,7 +366,10 @@ export function EmployeeCalendarDialog({
                           {hoursLabel}
                         </Typography>
                         {value.workTimeCorrection ? (
-                          <Typography variant="caption" color="primary.main">
+                          <Typography
+                            variant="caption"
+                            sx={{ color: palette.manualCorrection.text }}
+                          >
                             {interpolate(
                               t.settlement.employeeCalendar.actualInterval,
                               {
@@ -388,7 +417,10 @@ export function EmployeeCalendarDialog({
                           </Typography>
                         ) : null}
                         {warnings.length > 0 ? (
-                          <Typography variant="caption" color="warning.dark">
+                          <Typography
+                            variant="caption"
+                            sx={{ color: palette.warning.text }}
+                          >
                             {t.settlement.employeeCalendar.warning}
                           </Typography>
                         ) : null}

@@ -18,32 +18,59 @@ import type {
 } from '../../types/firestore';
 import { currentPayrollMonthId } from '../../utils/payroll';
 import { validatePayrollSettingInput } from '../../utils/payroll/settings';
-
-const SETTING_OPTIONS: Array<{
-  value: KnownPayrollSettingKey;
-  label: string;
-}> = [
-  { value: 'frequency_bonus', label: 'Premia frekwencyjna' },
-  { value: 'transport_allowance', label: 'Dodatek transportowy' },
-  { value: 'accommodation_allowance', label: 'Zakwaterowanie' },
-  { value: 'udt_allowance', label: 'Dodatek UDT' },
-  { value: 'holiday_work_bonus', label: 'Dodatek za pracę w święto' },
-  { value: 'laundry_allowance', label: 'Dodatek za pranie' },
-  { value: 'own_housing_allowance', label: 'Dodatek za własne mieszkanie' },
-  { value: 'company_housing_media', label: 'Media w mieszkaniu firmowym' },
-];
+import { useTranslations } from '../../hooks/useTranslations';
 
 interface PayrollSettingFormDialogProps {
+  allowedKeys?: KnownPayrollSettingKey[];
+  initialKey?: KnownPayrollSettingKey;
   onClose: () => void;
   onSubmit: (input: PayrollSettingCreateInput) => Promise<void>;
 }
 
 export function PayrollSettingFormDialog({
+  allowedKeys,
+  initialKey,
   onClose,
   onSubmit,
 }: PayrollSettingFormDialogProps) {
-  const [settingKey, setSettingKey] =
-    useState<KnownPayrollSettingKey>('frequency_bonus');
+  const t = useTranslations();
+  const allOptions: Array<{ value: KnownPayrollSettingKey; label: string }> = [
+    {
+      value: 'frequency_bonus',
+      label: t.settings.settingForm.options.frequencyBonus,
+    },
+    {
+      value: 'transport_allowance',
+      label: t.settings.settingForm.options.transport,
+    },
+    {
+      value: 'accommodation_allowance',
+      label: t.settings.settingForm.options.accommodation,
+    },
+    { value: 'udt_allowance', label: t.settings.settingForm.options.udt },
+    {
+      value: 'holiday_work_bonus',
+      label: t.settings.settingForm.options.holidayWork,
+    },
+    {
+      value: 'laundry_allowance',
+      label: t.settings.settingForm.options.laundry,
+    },
+    {
+      value: 'own_housing_allowance',
+      label: t.settings.settingForm.options.ownHousing,
+    },
+    {
+      value: 'company_housing_media',
+      label: t.settings.settingForm.options.companyMedia,
+    },
+  ];
+  const settingOptions = allowedKeys
+    ? allOptions.filter((option) => allowedKeys.includes(option.value))
+    : allOptions;
+  const [settingKey, setSettingKey] = useState<KnownPayrollSettingKey>(
+    initialKey ?? settingOptions[0]?.value ?? 'frequency_bonus',
+  );
   const [variantKey, setVariantKey] = useState('');
   const [variantName, setVariantName] = useState('');
   const [amount, setAmount] = useState('400');
@@ -87,22 +114,16 @@ export function PayrollSettingFormDialog({
 
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>Dodaj wersję ustawienia</DialogTitle>
+      <DialogTitle>{t.settings.settingForm.title}</DialogTitle>
       <DialogContent>
         <Stack spacing={2.5} sx={{ pt: 1 }}>
-          <Alert severity="info">
-            Nowa wersja nie zmienia wcześniejszych okresów. Dla danego miesiąca
-            zostanie użyta najnowsza obowiązująca wersja.
-          </Alert>
+          <Alert severity="info">{t.settings.settingForm.versionInfo}</Alert>
           {submitError ? (
-            <Alert severity="error">
-              Nie udało się zapisać wersji. Sprawdź, czy miesiąc początkowy nie
-              należy do rozliczonej historii i czy taka wersja już nie istnieje.
-            </Alert>
+            <Alert severity="error">{t.settings.settingForm.saveFailed}</Alert>
           ) : null}
           <TextField
             select
-            label="Ustawienie"
+            label={t.settings.settingForm.setting}
             value={settingKey}
             onChange={(event) => {
               setSettingKey(event.target.value as KnownPayrollSettingKey);
@@ -111,7 +132,7 @@ export function PayrollSettingFormDialog({
               }
             }}
           >
-            {SETTING_OPTIONS.map((option) => (
+            {settingOptions.map((option) => (
               <MenuItem key={option.value} value={option.value}>
                 {option.label}
               </MenuItem>
@@ -120,39 +141,39 @@ export function PayrollSettingFormDialog({
           {isAccommodation ? (
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <TextField
-                label="Kod typu"
+                label={t.settings.settingForm.variantKey}
                 value={variantKey}
                 onChange={(event) => setVariantKey(event.target.value)}
                 error={showValidation && Boolean(validation.variantKey)}
-                helperText="Np. type-a"
+                helperText={t.settings.settingForm.variantKeyHelper}
                 fullWidth
               />
               <TextField
-                label="Nazwa typu"
+                label={t.settings.settingForm.variantName}
                 value={variantName}
                 onChange={(event) => setVariantName(event.target.value)}
                 error={showValidation && Boolean(validation.variantName)}
-                helperText="Np. Typ A"
+                helperText={t.settings.settingForm.variantNameHelper}
                 fullWidth
               />
             </Stack>
           ) : null}
           <TextField
-            label="Kwota brutto (PLN)"
+            label={t.settings.settingForm.amount}
             value={amount}
             onChange={(event) => setAmount(event.target.value)}
             error={showValidation && Boolean(validation.amount)}
             helperText={
               showValidation && validation.amount
-                ? 'Wprowadź nieujemną kwotę.'
-                : 'Wartość może zawierać część dziesiętną.'
+                ? t.settings.settingForm.invalidAmount
+                : t.settings.settingForm.amountHelper
             }
             inputMode="decimal"
           />
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <TextField
               type="month"
-              label="Obowiązuje od"
+              label={t.settings.settingForm.validFrom}
               value={validFrom}
               onChange={(event) => setValidFrom(event.target.value)}
               error={showValidation && Boolean(validation.validFrom)}
@@ -161,21 +182,21 @@ export function PayrollSettingFormDialog({
             />
             <TextField
               type="month"
-              label="Obowiązuje do"
+              label={t.settings.settingForm.validTo}
               value={validTo}
               onChange={(event) => setValidTo(event.target.value)}
               error={showValidation && Boolean(validation.validTo)}
               helperText={
                 showValidation && validation.validTo
-                  ? 'Koniec nie może poprzedzać początku.'
-                  : 'Opcjonalnie'
+                  ? t.settings.settingForm.invalidRange
+                  : t.settings.settingForm.optional
               }
               slotProps={{ inputLabel: { shrink: true } }}
               fullWidth
             />
           </Stack>
           <TextField
-            label="Opis"
+            label={t.settings.settingForm.description}
             value={description}
             onChange={(event) => setDescription(event.target.value)}
             multiline
@@ -185,14 +206,14 @@ export function PayrollSettingFormDialog({
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={isSubmitting}>
-          Anuluj
+          {t.settings.settingForm.cancel}
         </Button>
         <Button
           variant="contained"
           onClick={() => void handleSubmit()}
           disabled={isSubmitting}
         >
-          Dodaj wersję
+          {t.settings.settingForm.save}
         </Button>
       </DialogActions>
     </Dialog>

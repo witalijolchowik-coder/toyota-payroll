@@ -13,7 +13,7 @@ export function MonthlySettlementPage() {
   const [monthId, setMonthId] = useState<MonthId>(() => previousMonthId());
 
   return (
-    <Stack spacing={3}>
+    <Stack spacing={2}>
       <PageHeader
         eyebrow={t.settlement.page.eyebrow}
         title={t.settlement.page.title}

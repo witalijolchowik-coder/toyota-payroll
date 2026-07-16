@@ -69,6 +69,15 @@ export function ShiftConfigurationPanel({
   );
   const [impactError, setImpactError] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const activeHoursVersion = useMemo(
+    () =>
+      [...config.shiftHoursVersions]
+        .filter((version) => version.active && version.validFrom <= today)
+        .sort((first, second) =>
+          second.validFrom.localeCompare(first.validFrom),
+        )[0] ?? null,
+    [config.shiftHoursVersions, today],
+  );
   const correctionValidation = validateDepartmentShiftCorrection({
     shiftMode,
     groupAssignments: assignments,
@@ -164,7 +173,88 @@ export function ShiftConfigurationPanel({
               <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
                 {t.settings.shiftConfiguration.hoursTitle}
               </Typography>
+              {activeHoursVersion ? (
+                <Box
+                  sx={{
+                    border: 1,
+                    borderColor: 'divider',
+                    borderRadius: 2,
+                    px: 1.5,
+                    py: 1,
+                    bgcolor: 'background.default',
+                  }}
+                >
+                  <Typography variant="caption" color="text.secondary">
+                    {t.settings.shiftConfiguration.activeVersion}
+                  </Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                    {activeHoursVersion.validFrom} ·{' '}
+                    {SHIFTS.map(
+                      (shift) =>
+                        `${t.organization.actualWorkingShifts[shift]} ${activeHoursVersion.intervals[shift].startTime}–${activeHoursVersion.intervals[shift].endTime}`,
+                    ).join(' · ')}
+                  </Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    {t.settings.shiftConfiguration.historicalVersions}:{' '}
+                    {Math.max(config.shiftHoursVersions.length - 1, 0)}
+                  </Typography>
+                </Box>
+              ) : null}
+              <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+                {SHIFTS.map((shift) => (
+                  <Box
+                    key={shift}
+                    sx={{
+                      minWidth: 250,
+                      flex: 1,
+                      border: 1,
+                      borderColor: 'divider',
+                      borderRadius: 2,
+                      p: 1.25,
+                    }}
+                  >
+                    <Typography sx={{ fontWeight: 700 }}>
+                      {t.organization.actualWorkingShifts[shift]}
+                    </Typography>
+                    <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
+                      <TextField
+                        size="small"
+                        type="time"
+                        label={t.settings.shiftConfiguration.startTime}
+                        value={intervals[shift].startTime}
+                        onChange={(event) =>
+                          setIntervals((current) => ({
+                            ...current,
+                            [shift]: {
+                              ...current[shift],
+                              startTime: event.target.value,
+                            },
+                          }))
+                        }
+                        slotProps={{ inputLabel: { shrink: true } }}
+                      />
+                      <TextField
+                        size="small"
+                        type="time"
+                        label={t.settings.shiftConfiguration.endTime}
+                        value={intervals[shift].endTime}
+                        onChange={(event) =>
+                          setIntervals((current) => ({
+                            ...current,
+                            [shift]: {
+                              ...current[shift],
+                              endTime: event.target.value,
+                            },
+                          }))
+                        }
+                        slotProps={{ inputLabel: { shrink: true } }}
+                      />
+                    </Stack>
+                  </Box>
+                ))}
+              </Stack>
               <TextField
+                size="small"
                 type="date"
                 label={t.settings.shiftConfiguration.validFrom}
                 value={validFrom}
@@ -174,45 +264,6 @@ export function ShiftConfigurationPanel({
                 slotProps={{ inputLabel: { shrink: true } }}
                 sx={{ maxWidth: 240 }}
               />
-              <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
-                {SHIFTS.map((shift) => (
-                  <Stack key={shift} spacing={1} sx={{ minWidth: 210 }}>
-                    <Typography sx={{ fontWeight: 700 }}>
-                      {t.organization.actualWorkingShifts[shift]}
-                    </Typography>
-                    <TextField
-                      type="time"
-                      label={t.settings.shiftConfiguration.startTime}
-                      value={intervals[shift].startTime}
-                      onChange={(event) =>
-                        setIntervals((current) => ({
-                          ...current,
-                          [shift]: {
-                            ...current[shift],
-                            startTime: event.target.value,
-                          },
-                        }))
-                      }
-                      slotProps={{ inputLabel: { shrink: true } }}
-                    />
-                    <TextField
-                      type="time"
-                      label={t.settings.shiftConfiguration.endTime}
-                      value={intervals[shift].endTime}
-                      onChange={(event) =>
-                        setIntervals((current) => ({
-                          ...current,
-                          [shift]: {
-                            ...current[shift],
-                            endTime: event.target.value,
-                          },
-                        }))
-                      }
-                      slotProps={{ inputLabel: { shrink: true } }}
-                    />
-                  </Stack>
-                ))}
-              </Stack>
               <Button
                 type="submit"
                 variant="outlined"
@@ -372,7 +423,7 @@ export function ShiftConfigurationPanel({
                   {correction.effectiveDate} ·{' '}
                   {departments.find(
                     (department) => department.id === correction.departmentId,
-                  )?.name ?? correction.departmentId}{' '}
+                  )?.name ?? t.organization.departments.unassigned}{' '}
                   · {t.organization.shiftModes[correction.shiftMode]}
                 </Typography>
               ))}
@@ -383,7 +434,7 @@ export function ShiftConfigurationPanel({
           open={impactOpen}
           departmentName={
             departments.find((department) => department.id === departmentId)
-              ?.name ?? departmentId
+              ?.name ?? t.organization.departments.unassigned
           }
           impact={impact}
           loading={impactLoading}

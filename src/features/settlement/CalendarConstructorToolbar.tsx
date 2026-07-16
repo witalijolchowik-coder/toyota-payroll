@@ -79,13 +79,13 @@ export function CalendarConstructorToolbar({
 
   return (
     <Card>
-      <CardContent>
-        <Stack spacing={2}>
+      <CardContent sx={{ p: '14px !important' }}>
+        <Stack spacing={1}>
           <div>
-            <Typography variant="h6">
+            <Typography variant="subtitle1" sx={{ fontWeight: 800 }}>
               {t.settlement.constructor.title}
             </Typography>
-            <Typography color="text.secondary">
+            <Typography variant="body2" color="text.secondary">
               {t.settlement.constructor.description}
             </Typography>
           </div>
@@ -98,20 +98,27 @@ export function CalendarConstructorToolbar({
 
           <ToggleButtonGroup
             exclusive
+            size="small"
             value={selectedTool}
             onChange={(_, value: CalendarConstructorTool | null) => {
               if (value) {
                 onSelectedToolChange(value);
               }
             }}
-            sx={{ flexWrap: 'wrap', gap: 1 }}
+            sx={{ flexWrap: 'wrap', gap: 0.5 }}
           >
             {CALENDAR_CONSTRUCTOR_TOOLS.map((tool) => (
               <ToggleButton
                 key={tool}
                 value={tool}
                 disabled={isSettled && tool !== 'review'}
-                sx={{ border: 1, borderColor: 'divider', borderRadius: 2 }}
+                sx={{
+                  border: 1,
+                  borderColor: 'divider',
+                  borderRadius: 1.5,
+                  px: 1.25,
+                  py: 0.65,
+                }}
               >
                 <Stack
                   direction="row"
@@ -127,7 +134,7 @@ export function CalendarConstructorToolbar({
 
           <Stack
             direction={{ xs: 'column', md: 'row' }}
-            spacing={1.5}
+            spacing={1}
             sx={{ alignItems: { xs: 'stretch', md: 'flex-start' } }}
           >
             {selectedTool === 'hours' ? (

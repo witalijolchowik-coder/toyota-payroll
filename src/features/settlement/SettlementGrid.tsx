@@ -10,7 +10,6 @@ import {
   TableRow,
   Tooltip,
   Typography,
-  alpha,
   type SxProps,
   type Theme,
 } from '@mui/material';
@@ -18,6 +17,7 @@ import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded';
 import WbSunnyRoundedIcon from '@mui/icons-material/WbSunnyRounded';
 
 import { useTranslations } from '../../hooks/useTranslations';
+import { useCalendarAppearance } from '../../hooks/useCalendarAppearance';
 import { interpolate } from '../../i18n/pl';
 import type {
   Absence,
@@ -52,6 +52,13 @@ import {
   generateEmployeeMonthlySchedule,
   type PlannedScheduleDay,
 } from '../../utils/schedule';
+import {
+  appearanceKeyForAbsence,
+  appearanceKeyForPlannedDay,
+  type CalendarAppearanceKey,
+  type CalendarAppearancePalette,
+} from '../../utils/calendarAppearance';
+import { buildCalendarEmployeeRows } from './settlementCalendarLayout';
 
 interface SettlementGridProps {
   employees: Employee[];
@@ -90,9 +97,9 @@ const weekdayFormatter = new Intl.DateTimeFormat('pl-PL', {
   timeZone: 'UTC',
 });
 
-const employeeColumnWidth = 220;
-const dayColumnMinWidth = 30;
-const detailedHoursColumnMinWidth = 58;
+const employeeColumnWidth = 196;
+const dayColumnMinWidth = 34;
+const detailedHoursColumnMinWidth = 46;
 
 export function SettlementGrid({
   employees,
@@ -114,6 +121,7 @@ export function SettlementGrid({
   onOpenEmployeeCalendar,
 }: SettlementGridProps) {
   const t = useTranslations();
+  const { palette } = useCalendarAppearance();
   const departmentsById = new Map(
     departments.map((department) => [department.id, department]),
   );
@@ -129,13 +137,25 @@ export function SettlementGrid({
     employeeAbsences.push(absence);
     absencesByEmployee.set(absence.employeeId, employeeAbsences);
   });
+  const employeeRows = buildCalendarEmployeeRows({
+    employees,
+    departments,
+    assignments: employeeAssignments,
+    referenceDate: days[0]?.isoDate ?? ('1970-01-01' as IsoDate),
+    unassignedLabel: t.settlement.grid.unassignedDepartment,
+  });
 
   return (
-    <Card>
-      <TableContainer>
+    <Card sx={{ overflow: 'visible' }}>
+      <TableContainer
+        data-testid="settlement-calendar-scroll"
+        sx={{ maxHeight: 'calc(100vh - 92px)', overflow: 'auto' }}
+      >
         <Table
+          stickyHeader
           size="small"
           sx={{
+            width: '100%',
             minWidth:
               employeeColumnWidth +
               days.length *
@@ -151,7 +171,7 @@ export function SettlementGrid({
                 sx={leadingCellSx({
                   left: 0,
                   width: employeeColumnWidth,
-                  zIndex: 4,
+                  zIndex: 7,
                 })}
               >
                 {t.settlement.grid.employee}
@@ -161,26 +181,33 @@ export function SettlementGrid({
                   key={day.isoDate}
                   align="center"
                   sx={{
-                    width: `${100 / Math.max(days.length, 1)}%`,
+                    position: 'sticky',
+                    top: 0,
+                    zIndex: 5,
+                    width:
+                      displayMode === 'hours'
+                        ? detailedHoursColumnMinWidth
+                        : dayColumnMinWidth,
                     minWidth:
                       displayMode === 'hours'
                         ? detailedHoursColumnMinWidth
                         : dayColumnMinWidth,
                     p: 0.35,
-                    ...calendarBackground(day),
+                    ...calendarBackground(day, palette),
                   }}
                 >
                   <Typography
                     variant="caption"
-                    color={day.isFuture ? 'text.disabled' : 'text.secondary'}
-                    sx={{ display: 'block', textTransform: 'capitalize' }}
+                    sx={{
+                      display: 'block',
+                      color: 'inherit',
+                      opacity: day.isFuture ? 0.7 : 0.82,
+                      textTransform: 'capitalize',
+                    }}
                   >
                     {weekdayFormatter.format(day.date)}
                   </Typography>
-                  <Typography
-                    variant="subtitle2"
-                    color={day.isFuture ? 'text.disabled' : 'text.primary'}
-                  >
+                  <Typography variant="subtitle2" sx={{ color: 'inherit' }}>
                     {day.dayOfMonth}
                   </Typography>
                 </TableCell>
@@ -188,7 +215,8 @@ export function SettlementGrid({
             </TableRow>
           </TableHead>
           <TableBody>
-            {employees.map((employee) => {
+            {employeeRows.map((row) => {
+              const { employee } = row;
               const plannedScheduleByDate = new Map(
                 generateEmployeeMonthlySchedule({
                   employee,
@@ -204,11 +232,10 @@ export function SettlementGrid({
                   },
                 }).map((plannedDay) => [plannedDay.date, plannedDay]),
               );
-              const department = employee.departmentId
-                ? departmentsById.get(employee.departmentId)
+              const department = row.departmentId
+                ? departmentsById.get(row.departmentId)
                 : null;
-              const departmentLabel =
-                department?.name ?? t.organization.departments.unassigned;
+              const departmentLabel = department?.name ?? row.departmentLabel;
               const shiftLabel = employee.shiftAssignment
                 ? t.organization.shifts[employee.shiftAssignment]
                 : t.organization.shifts.unassigned;
@@ -216,12 +243,38 @@ export function SettlementGrid({
               return (
                 <TableRow hover key={employee.id}>
                   <TableCell
-                    sx={leadingCellSx({
-                      left: 0,
-                      width: employeeColumnWidth,
-                      zIndex: 2,
-                    })}
+                    sx={{
+                      ...leadingCellSx({
+                        left: 0,
+                        width: employeeColumnWidth,
+                        zIndex: 3,
+                      }),
+                      borderTop: row.isFirstInDepartment ? 2 : undefined,
+                      borderTopColor: row.isFirstInDepartment
+                        ? 'primary.light'
+                        : undefined,
+                      boxShadow: row.isFirstInDepartment
+                        ? (theme) =>
+                            `inset 4px 0 0 ${theme.palette.primary.main}`
+                        : undefined,
+                      pl: row.isFirstInDepartment ? 1.75 : 2,
+                    }}
                   >
+                    {row.isFirstInDepartment ? (
+                      <Typography
+                        variant="overline"
+                        color="primary"
+                        sx={{
+                          display: 'block',
+                          fontSize: '0.58rem',
+                          fontWeight: 800,
+                          lineHeight: 1.1,
+                          letterSpacing: '0.08em',
+                        }}
+                      >
+                        {departmentLabel}
+                      </Typography>
+                    ) : null}
                     <ButtonBase
                       onClick={() => onOpenEmployeeCalendar?.(employee)}
                       aria-label={interpolate(
@@ -254,7 +307,7 @@ export function SettlementGrid({
                       noWrap
                       sx={{ display: 'block' }}
                     >
-                      {departmentLabel} · {shiftLabel}
+                      {shiftLabel}
                     </Typography>
                   </TableCell>
                   {days.map((day) => {
@@ -280,6 +333,13 @@ export function SettlementGrid({
                         : absenceResolution.kind === 'ambiguous'
                           ? absenceResolution.codes.join('/')
                           : null;
+                    const appearanceKey =
+                      absenceResolution.kind === 'governed'
+                        ? appearanceKeyForAbsence(
+                            absenceResolution.code,
+                            absenceResolution.confirmation,
+                          )
+                        : appearanceKeyForPlannedDay(plannedDay);
                     const hoursLabel =
                       value.hours === null
                         ? t.settlement.grid.empty
@@ -337,18 +397,26 @@ export function SettlementGrid({
                         key={day.isoDate}
                         align="center"
                         sx={{
-                          width: `${100 / Math.max(days.length, 1)}%`,
+                          width:
+                            displayMode === 'hours'
+                              ? detailedHoursColumnMinWidth
+                              : dayColumnMinWidth,
                           minWidth:
                             displayMode === 'hours'
                               ? detailedHoursColumnMinWidth
                               : dayColumnMinWidth,
-                          px: 0.5,
-                          py: 0.75,
-                          ...cellBackground(value.calendarState, day),
+                          px: 0.2,
+                          py: 0.35,
+                          ...cellBackground(
+                            value.calendarState,
+                            day,
+                            palette,
+                            appearanceKey,
+                            Boolean(absenceLabel),
+                          ),
                           ...(warnings.length > 0
                             ? {
-                                boxShadow: (theme) =>
-                                  `inset 0 0 0 2px ${theme.palette.warning.main}`,
+                                boxShadow: `inset 0 0 0 2px ${palette.warning.text}`,
                               }
                             : {}),
                           ...(isSelected
@@ -389,13 +457,8 @@ export function SettlementGrid({
                                     ? {
                                         color:
                                           absenceResolution.kind === 'ambiguous'
-                                            ? 'warning.main'
-                                            : absenceResolution.kind ===
-                                                  'governed' &&
-                                                absenceResolution.confirmation ===
-                                                  'reported'
-                                              ? 'warning.dark'
-                                              : 'error.main',
+                                            ? palette.warning.text
+                                            : palette[appearanceKey].text,
                                         fontWeight: 800,
                                       }
                                     : {}
@@ -414,7 +477,7 @@ export function SettlementGrid({
                                         component="span"
                                         sx={{
                                           display: 'block',
-                                          color: 'warning.dark',
+                                          color: palette.warning.text,
                                           fontSize: '0.65rem',
                                           lineHeight: 1.1,
                                         }}
@@ -429,6 +492,8 @@ export function SettlementGrid({
                                     displayMode={displayMode}
                                     valueKind={value.kind}
                                     workTimeBreakdown={workTimeBreakdown}
+                                    appearanceKey={appearanceKey}
+                                    palette={palette}
                                     t={t}
                                   />
                                 )}
@@ -460,6 +525,7 @@ function leadingCellSx({
 }): SxProps<Theme> {
   return {
     position: 'sticky',
+    top: zIndex >= 7 ? 0 : undefined,
     left,
     width,
     minWidth: width,
@@ -474,40 +540,67 @@ function leadingCellSx({
 function cellBackground(
   state: ReturnType<typeof resolveSettlementCellValue>['calendarState'],
   day: CalendarDay,
+  palette: CalendarAppearancePalette,
+  appearanceKey: CalendarAppearanceKey,
+  hasAbsence: boolean,
 ): SxProps<Theme> {
   if (state === 'outside-employment') {
-    return { bgcolor: 'action.disabledBackground', color: 'text.disabled' };
+    return {
+      bgcolor: palette.outsideEmployment.background,
+      color: palette.outsideEmployment.text,
+    };
   }
   if (state === 'future') {
-    return { bgcolor: 'action.disabledBackground', color: 'text.disabled' };
+    return { bgcolor: palette.future.background, color: palette.future.text };
   }
-  return calendarBackground(day);
+  if (hasAbsence) {
+    return {
+      bgcolor: palette[appearanceKey].background,
+      color: palette[appearanceKey].text,
+    };
+  }
+  if (appearanceKey === 'dayOff') {
+    return {
+      bgcolor: palette.dayOff.background,
+      color: palette.dayOff.text,
+    };
+  }
+  return calendarBackground(day, palette);
 }
 
-function calendarBackground(day: CalendarDay): SxProps<Theme> {
+function calendarBackground(
+  day: CalendarDay,
+  palette: CalendarAppearancePalette,
+): SxProps<Theme> {
   if (day.isFuture) {
-    return { bgcolor: 'action.disabledBackground', color: 'text.disabled' };
+    return { bgcolor: palette.future.background, color: palette.future.text };
   }
   if (day.isHoliday) {
     return {
-      bgcolor: (theme) => alpha(theme.palette.error.main, 0.08),
+      bgcolor: palette.publicHoliday.background,
+      color: palette.publicHoliday.text,
     };
   }
   if (day.isWeekend) {
-    return { bgcolor: 'action.hover' };
+    return {
+      bgcolor: palette.weekend.background,
+      color: palette.weekend.text,
+    };
   }
-  return { bgcolor: 'background.paper' };
+  return { bgcolor: palette.worked.background, color: palette.worked.text };
 }
 
 function cellValueSx(
   kind: ReturnType<typeof resolveSettlementCellValue>['kind'],
+  appearanceKey: CalendarAppearanceKey,
+  palette: CalendarAppearancePalette,
 ): SxProps<Theme> {
   if (kind === 'virtual-default') {
-    return { color: 'text.secondary', fontStyle: 'italic' };
+    return { color: palette[appearanceKey].text, fontStyle: 'italic' };
   }
   if (kind === 'manual') {
     return {
-      color: 'primary.main',
+      color: palette.manualCorrection.text,
       fontWeight: 750,
       textDecoration: 'underline',
       textDecorationThickness: '2px',
@@ -515,11 +608,11 @@ function cellValueSx(
     };
   }
   if (kind === 'imported') {
-    return { color: 'secondary.main', fontWeight: 700 };
+    return { color: palette[appearanceKey].text, fontWeight: 700 };
   }
   if (kind === 'imported-override') {
     return {
-      color: 'warning.dark',
+      color: palette.manualCorrection.text,
       fontWeight: 800,
       textDecoration: 'underline',
       textDecorationThickness: '2px',
@@ -587,12 +680,16 @@ function CellHoursContent({
   displayMode,
   valueKind,
   workTimeBreakdown,
+  appearanceKey,
+  palette,
   t,
 }: {
   displayLabel: string;
   displayMode: 'hours' | 'shifts';
   valueKind: ReturnType<typeof resolveSettlementCellValue>['kind'];
   workTimeBreakdown: DailyWorkTimeDeviation | null;
+  appearanceKey: CalendarAppearanceKey;
+  palette: CalendarAppearancePalette;
   t: ReturnType<typeof useTranslations>;
 }) {
   const overtime = workTimeBreakdown
@@ -607,19 +704,20 @@ function CellHoursContent({
     <Box
       component="span"
       sx={{
-        display: 'flex',
-        flexDirection: 'column',
+        display: 'grid',
+        gridTemplateRows: '1.1rem 0.85rem',
         alignItems: 'center',
-        gap: 0.3,
-        py: showBreakdown ? 0.25 : 0,
+        justifyItems: 'center',
+        width: '100%',
+        minHeight: 31,
       }}
     >
       <Box
         component="span"
         sx={
           showBreakdown
-            ? { color: 'text.secondary', fontStyle: 'italic' }
-            : cellValueSx(valueKind)
+            ? { color: palette[appearanceKey].text, fontStyle: 'italic' }
+            : cellValueSx(valueKind, appearanceKey, palette)
         }
       >
         {displayLabel}
@@ -642,6 +740,7 @@ function CellHoursContent({
               label={interpolate(t.settlement.grid.workTime.dayAriaLabel, {
                 hours: formatCompactHours(overtime.dayHours),
               })}
+              palette={palette}
             />
           ) : null}
           {overtime.nightHours > 0 ? (
@@ -651,10 +750,13 @@ function CellHoursContent({
               label={interpolate(t.settlement.grid.workTime.nightAriaLabel, {
                 hours: formatCompactHours(overtime.nightHours),
               })}
+              palette={palette}
             />
           ) : null}
         </Box>
-      ) : null}
+      ) : (
+        <Box component="span" aria-hidden="true" />
+      )}
     </Box>
   );
 }
@@ -663,10 +765,12 @@ function OvertimeIndicator({
   kind,
   hours,
   label,
+  palette,
 }: {
   kind: 'day' | 'night';
   hours: number;
   label: string;
+  palette: CalendarAppearancePalette;
 }) {
   const Icon = kind === 'day' ? WbSunnyRoundedIcon : DarkModeRoundedIcon;
 
@@ -678,7 +782,8 @@ function OvertimeIndicator({
         display: 'inline-flex',
         alignItems: 'center',
         gap: 0.15,
-        color: kind === 'day' ? 'warning.dark' : 'secondary.main',
+        color:
+          kind === 'day' ? palette.overtime50.text : palette.nightHours.text,
       }}
     >
       <Icon sx={{ fontSize: 12 }} />

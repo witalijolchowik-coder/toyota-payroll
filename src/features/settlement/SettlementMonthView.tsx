@@ -1,13 +1,13 @@
 import { useState } from 'react';
 import CalendarMonthOutlined from '@mui/icons-material/CalendarMonthOutlined';
 import GroupsOutlined from '@mui/icons-material/GroupsOutlined';
+import InfoOutlined from '@mui/icons-material/InfoOutlined';
 import {
   Alert,
-  Box,
   Button,
   Card,
   CardContent,
-  Chip,
+  Collapse,
   CircularProgress,
   FormControlLabel,
   MenuItem,
@@ -124,6 +124,7 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
     'hours' | 'shifts'
   >('hours');
   const [focusedEmployee, setFocusedEmployee] = useState<Employee | null>(null);
+  const [legendOpen, setLegendOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -463,7 +464,7 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
   };
 
   return (
-    <Stack spacing={2.5}>
+    <Stack spacing={1.5}>
       {data.month.isSettled ? (
         <Alert severity="info">
           <strong>{t.settlement.settled.title}</strong>
@@ -482,43 +483,6 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
         </Alert>
       ) : null}
 
-      <Card>
-        <CardContent>
-          <Stack
-            direction={{ xs: 'column', md: 'row' }}
-            spacing={2}
-            sx={{
-              justifyContent: 'space-between',
-              alignItems: { xs: 'flex-start', md: 'center' },
-            }}
-          >
-            <div>
-              <Typography
-                variant="overline"
-                color="primary"
-                sx={{ fontWeight: 750 }}
-              >
-                {monthFormatter.format(range.start)}
-              </Typography>
-              <Typography variant="h6">
-                {interpolate(t.settlement.summary.employees, {
-                  count: participatingEmployees.length.toString(),
-                })}
-              </Typography>
-            </div>
-            <Chip
-              variant="outlined"
-              label={interpolate(t.settlement.summary.calculationVersion, {
-                version: data.month.calculationVersion.toString(),
-              })}
-            />
-          </Stack>
-          <Box sx={{ mt: 2.5 }}>
-            <SettlementLegend />
-          </Box>
-        </CardContent>
-      </Card>
-
       {participatingEmployees.length > 0 ? (
         <>
           <MonthlyCalculationStatusPanel
@@ -526,6 +490,8 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
             month={data.month}
             drafts={calculationDrafts}
             inputHash={calculationInputHash}
+            employeeCount={participatingEmployees.length}
+            monthLabel={monthFormatter.format(range.start)}
             onReload={reload}
           />
           <CalendarConstructorToolbar
@@ -547,18 +513,22 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
             isSettled={data.month.isSettled}
           />
           <Card>
-            <CardContent>
+            <CardContent sx={{ p: '12px !important' }}>
               <Stack
                 direction={{ xs: 'column', md: 'row' }}
-                spacing={2}
-                sx={{ alignItems: { xs: 'stretch', md: 'center' } }}
+                useFlexGap
+                spacing={1}
+                sx={{
+                  alignItems: { xs: 'stretch', md: 'center' },
+                  flexWrap: { md: 'wrap', xl: 'nowrap' },
+                }}
               >
                 <TextField
                   label={t.settlement.constructor.filters.employee}
                   value={employeeSearch}
                   onChange={(event) => setEmployeeSearch(event.target.value)}
                   size="small"
-                  sx={{ minWidth: { md: 280 } }}
+                  sx={{ minWidth: { md: 210 } }}
                 />
                 <TextField
                   select
@@ -566,7 +536,7 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
                   value={departmentFilter}
                   onChange={(event) => setDepartmentFilter(event.target.value)}
                   size="small"
-                  sx={{ minWidth: { md: 220 } }}
+                  sx={{ minWidth: { md: 170 } }}
                 >
                   <MenuItem value="all">
                     {t.settlement.constructor.filters.allDepartments}
@@ -591,7 +561,7 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
                     )
                   }
                   size="small"
-                  sx={{ minWidth: { md: 200 } }}
+                  sx={{ minWidth: { md: 160 } }}
                 >
                   <MenuItem value="all">
                     {t.settlement.constructor.filters.allShifts}
@@ -611,7 +581,7 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
                   value={calendarFilter}
                   onChange={(event) => setCalendarFilter(event.target.value)}
                   size="small"
-                  sx={{ minWidth: { md: 260 } }}
+                  sx={{ minWidth: { md: 190 } }}
                 >
                   <MenuItem value="all">
                     {t.settlement.constructor.filters.all}
@@ -660,9 +630,22 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
                     {t.settlement.grid.displayMode.shifts}
                   </ToggleButton>
                 </ToggleButtonGroup>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<InfoOutlined />}
+                  onClick={() => setLegendOpen((current) => !current)}
+                >
+                  {t.settlement.summary.legend}
+                </Button>
               </Stack>
             </CardContent>
           </Card>
+          <Collapse in={legendOpen} unmountOnExit>
+            <Card sx={{ p: 1.5 }}>
+              <SettlementLegend />
+            </Card>
+          </Collapse>
           <SettlementGrid
             employees={filteredEmployees}
             days={days}

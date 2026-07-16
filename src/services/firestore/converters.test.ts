@@ -7,6 +7,7 @@ import type {
 import {
   adjustmentConverter,
   absenceConverter,
+  calendarAppearanceConverter,
   dailyValueConverter,
   departmentConverter,
   employeeConverter,
@@ -43,6 +44,27 @@ function snapshot(
 const now = Timestamp.fromDate(new Date('2026-07-02T08:00:00.000Z'));
 
 describe('Firestore converters', () => {
+  it('validates the narrow global calendar appearance document', () => {
+    const document = calendarAppearanceConverter.fromFirestore(
+      snapshot('appConfig/calendarAppearance', {
+        version: 1,
+        text_colors: { worked: '#475467', warning: '#B54708' },
+        background_colors: { worked: '#FFFFFF', warning: '#FFFAEB' },
+        created_at: now,
+        created_by: 'admin-1',
+        updated_at: now,
+        updated_by: 'admin-1',
+      }),
+    );
+
+    expect(document).toMatchObject({
+      version: 1,
+      text_colors: { worked: '#475467', warning: '#B54708' },
+      background_colors: { worked: '#FFFFFF', warning: '#FFFAEB' },
+      updated_by: 'admin-1',
+    });
+  });
+
   it('validates and maps an employee document', () => {
     const document = employeeConverter.fromFirestore(
       snapshot('employees/employee-1', {

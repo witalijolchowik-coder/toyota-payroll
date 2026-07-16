@@ -39,6 +39,7 @@ export function dailyValueDocumentId(employeeId: string, date: string): string {
 
 export const firestorePaths = {
   appUsers: 'appUsers',
+  calendarAppearance: 'appConfig/calendarAppearance',
   appUser(uid: string) {
     return `appUsers/${assertPathSegment(uid, 'uid')}`;
   },

@@ -32,6 +32,52 @@ function modificationMetadata(uid: string) {
   };
 }
 
+const calendarColorKeys = [
+  'worked',
+  'firstShift',
+  'secondShift',
+  'nightShift',
+  'bhp',
+  'l4Active',
+  'l4Inactive',
+  'l4Reported',
+  'uw',
+  'uz',
+  'nn',
+  'nu',
+  'ni',
+  'opd',
+  'krw',
+  'wzn',
+  'overtime50',
+  'overtime100',
+  'nightHours',
+  'shortage',
+  'privateTime',
+  'manualCorrection',
+  'requiresReview',
+  'blocker',
+  'warning',
+  'dayOff',
+  'weekend',
+  'publicHoliday',
+  'future',
+  'outsideEmployment',
+] as const;
+
+function calendarAppearancePayload(uid: string) {
+  return {
+    version: 1,
+    text_colors: Object.fromEntries(
+      calendarColorKeys.map((key) => [key, '#112233']),
+    ),
+    background_colors: Object.fromEntries(
+      calendarColorKeys.map((key) => [key, '#FFFFFF']),
+    ),
+    ...modificationMetadata(uid),
+  };
+}
+
 async function seedMonth(monthId: string, isSettled: boolean) {
   const year = Number(monthId.slice(0, 4));
   const month = Number(monthId.slice(5, 7));
@@ -191,6 +237,49 @@ describe('Firestore security rules', () => {
       updateDoc(doc(approved, 'appUsers', 'coordinator-1'), {
         role: 'admin',
         updated_at: serverTimestamp(),
+      }),
+    );
+  });
+
+  it('allows approved users to read the global palette and only admins to write it', async () => {
+    await seedAppUser('admin-1', { role: 'admin' });
+    const admin = testEnvironment.authenticatedContext('admin-1').firestore();
+    const coordinator = testEnvironment
+      .authenticatedContext('coordinator-1')
+      .firestore();
+    const palette = doc(admin, 'appConfig', 'calendarAppearance');
+
+    await assertSucceeds(setDoc(palette, calendarAppearancePayload('admin-1')));
+    await assertSucceeds(
+      getDoc(doc(coordinator, 'appConfig', 'calendarAppearance')),
+    );
+    await assertFails(
+      updateDoc(doc(coordinator, 'appConfig', 'calendarAppearance'), {
+        'text_colors.worked': '#000000',
+        updated_at: serverTimestamp(),
+        updated_by: 'coordinator-1',
+      }),
+    );
+  });
+
+  it('denies public and invalid global calendar palette writes', async () => {
+    await seedAppUser('admin-1', { role: 'admin' });
+    const publicDb = testEnvironment.unauthenticatedContext().firestore();
+    const admin = testEnvironment.authenticatedContext('admin-1').firestore();
+
+    await assertFails(getDoc(doc(publicDb, 'appConfig', 'calendarAppearance')));
+    await assertFails(
+      setDoc(doc(publicDb, 'appConfig', 'calendarAppearance'), {
+        ...calendarAppearancePayload('anonymous'),
+      }),
+    );
+    await assertFails(
+      setDoc(doc(admin, 'appConfig', 'calendarAppearance'), {
+        ...calendarAppearancePayload('admin-1'),
+        text_colors: {
+          ...calendarAppearancePayload('admin-1').text_colors,
+          worked: 'red',
+        },
       }),
     );
   });

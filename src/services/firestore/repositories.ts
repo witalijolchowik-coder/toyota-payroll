@@ -11,6 +11,7 @@ import type {
   AbsenceDocument,
   AdjustmentDocument,
   AuditLogDocument,
+  CalendarAppearanceDocument,
   DailyValueDocument,
   DepartmentDocument,
   EmployeeAssignmentDocument,
@@ -44,6 +45,7 @@ import {
   settlementReviewConverter,
   shiftHoursVersionConverter,
   departmentShiftCorrectionConverter,
+  calendarAppearanceConverter,
 } from './converters';
 import { firestorePaths } from './paths';
 
@@ -60,6 +62,7 @@ export interface MonthRepositoryBoundary {
 }
 
 export interface FirestoreRepositoryBoundaries {
+  readonly calendarAppearance: DocumentReference<CalendarAppearanceDocument>;
   readonly payrollSettings: CollectionReference<PayrollSettingDocument>;
   readonly departments: CollectionReference<DepartmentDocument>;
   readonly shiftHoursVersions: CollectionReference<ShiftHoursVersionDocument>;
@@ -87,6 +90,10 @@ export function createFirestoreRepositoryBoundaries(
     firestore,
     firestorePaths.payrollSettings,
   ).withConverter(payrollSettingConverter);
+  const calendarAppearance = doc(
+    firestore,
+    firestorePaths.calendarAppearance,
+  ).withConverter(calendarAppearanceConverter);
   const employees = collection(
     firestore,
     firestorePaths.employees,
@@ -122,6 +129,7 @@ export function createFirestoreRepositoryBoundaries(
   );
 
   return {
+    calendarAppearance,
     payrollSettings,
     departments,
     shiftHoursVersions,

@@ -21,6 +21,7 @@ import type {
   DepartmentUpdateInput,
 } from '../../types/firestore';
 import {
+  CANONICAL_DEPARTMENTS,
   departmentKeyFromName,
   isValidDepartmentName,
   normalizeDepartmentName,
@@ -108,21 +109,32 @@ export function DepartmentFormDialog({
             </Alert>
           ) : null}
           <TextField
+            select
             required
             label={t.organization.departments.form.name}
             value={name}
-            onChange={(event) => setName(event.target.value)}
+            disabled={Boolean(department)}
+            onChange={(event) => {
+              const nextName = event.target.value;
+              setName(nextName);
+              const definition = CANONICAL_DEPARTMENTS.find(
+                (item) => item.name === nextName,
+              );
+              if (definition) setShiftMode(definition.shiftMode);
+            }}
             error={showValidation && !isValidDepartmentName(name)}
             helperText={
               showValidation && !isValidDepartmentName(name)
                 ? t.organization.departments.form.required
-                : department
-                  ? t.organization.departments.form.stableId
-                  : generatedId
-                    ? `${t.organization.departments.form.generatedId}: ${generatedId}`
-                    : t.organization.departments.form.generatedId
+                : t.organization.departments.form.canonicalOnly
             }
-          />
+          >
+            {CANONICAL_DEPARTMENTS.map((item) => (
+              <MenuItem key={item.id} value={item.name}>
+                {item.name}
+              </MenuItem>
+            ))}
+          </TextField>
           <TextField
             select
             label={t.organization.departments.form.shiftMode}

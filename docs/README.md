@@ -96,6 +96,7 @@ documents continue to govern system structure and implementation boundaries.
 - [ADR 0021: Template-based employee import and bulk update](decisions/0021-employee-import-templates.md)
 - [ADR 0022: Department schedule planning foundation](decisions/0022-department-schedule-planning.md)
 - [ADR 0023: Employee register and shared day editor](decisions/0023-employee-register-and-day-editor.md)
+- [ADR 0026: Business settings navigation and shared calendar appearance](decisions/0026-settings-and-calendar-interface.md)
 
 ## Audit and readiness reports
 

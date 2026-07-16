@@ -10,7 +10,10 @@ import {
   Card,
   CardContent,
   Chip,
-  Divider,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Stack,
   Typography,
 } from '@mui/material';
@@ -35,12 +38,16 @@ export function MonthlyCalculationStatusPanel({
   month,
   drafts,
   inputHash,
+  employeeCount,
+  monthLabel,
   onReload,
 }: {
   monthId: MonthId;
   month: PayrollMonth;
   drafts: readonly EmployeeMonthlyCalculationDraft[];
   inputHash: string;
+  employeeCount: number;
+  monthLabel: string;
   onReload: () => Promise<void>;
 }) {
   const t = useTranslations();
@@ -49,6 +56,7 @@ export function MonthlyCalculationStatusPanel({
   const [recoveryPoints, setRecoveryPoints] = useState<MonthlyRecoveryPoint[]>(
     [],
   );
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
   const lastAttempt = useRef<string | null>(null);
 
   const reloadRecoveryPoints = useCallback(async () => {
@@ -184,118 +192,130 @@ export function MonthlyCalculationStatusPanel({
               : t.settlement.calculation.pending;
 
   return (
-    <Card>
-      <CardContent>
-        <Stack spacing={2}>
-          <Stack
-            direction={{ xs: 'column', md: 'row' }}
-            spacing={2}
-            sx={{
-              alignItems: { md: 'center' },
-              justifyContent: 'space-between',
-            }}
-          >
-            <div>
-              <Typography variant="h6">
-                {t.settlement.calculation.title}
-              </Typography>
-              <Typography color="text.secondary">
-                {t.settlement.calculation.description}
-              </Typography>
-            </div>
-            <Chip
-              color={
-                month.calculationBlockerCount > 0 || error
-                  ? 'warning'
-                  : 'success'
-              }
-              label={status}
-            />
-          </Stack>
-          {error ? (
-            <Alert severity="error">
-              {t.settlement.calculation.writeFailed}
-            </Alert>
-          ) : null}
-          <Stack
-            direction="row"
-            useFlexGap
-            spacing={1}
-            sx={{ flexWrap: 'wrap' }}
-          >
-            <Button
-              startIcon={<RefreshOutlined />}
-              disabled={working || month.isSettled}
-              onClick={() => void recalculate()}
-            >
-              {t.settlement.calculation.recalculate}
-            </Button>
-            <Button
-              variant={month.isSettled ? 'outlined' : 'contained'}
-              color={month.isSettled ? 'warning' : 'primary'}
-              startIcon={
-                month.isSettled ? <LockOpenOutlined /> : <LockOutlined />
-              }
-              disabled={
-                working ||
-                (!month.isSettled &&
-                  (month.calculationStatus !== 'completed' ||
-                    month.calculationInputHash !== inputHash ||
-                    month.calculationBlockerCount > 0))
-              }
-              onClick={() => void toggleLock()}
-            >
-              {month.isSettled
-                ? t.settlement.calculation.unlock
-                : t.settlement.calculation.lock}
-            </Button>
-          </Stack>
-          <Divider />
-          <Stack spacing={1.25}>
+    <>
+      <Card>
+        <CardContent sx={{ px: 2, py: '14px !important' }}>
+          <Stack spacing={1}>
             <Stack
-              direction={{ xs: 'column', md: 'row' }}
+              direction={{ xs: 'column', lg: 'row' }}
+              useFlexGap
               spacing={1}
-              sx={{
-                justifyContent: 'space-between',
-                alignItems: { md: 'center' },
-              }}
+              sx={{ alignItems: { lg: 'center' } }}
             >
-              <div>
-                <Typography variant="subtitle2">
-                  {t.settlement.calculation.recovery.title}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  {t.settlement.calculation.recovery.description}
-                </Typography>
-              </div>
-              <Button
-                size="small"
-                startIcon={<SaveOutlined />}
-                disabled={working || month.isSettled}
-                onClick={() => void createRecoveryPoint()}
-              >
-                {t.settlement.calculation.recovery.create}
-              </Button>
-            </Stack>
-            {recoveryPoints.length === 0 ? (
-              <Typography variant="body2" color="text.secondary">
-                {t.settlement.calculation.recovery.empty}
+              <Typography variant="subtitle1" sx={{ fontWeight: 800, mr: 0.5 }}>
+                {monthLabel}
               </Typography>
-            ) : (
+              <Chip
+                size="small"
+                variant="outlined"
+                label={interpolate(t.settlement.summary.employeesCompact, {
+                  count: employeeCount.toString(),
+                })}
+              />
+              <Chip
+                size="small"
+                variant="outlined"
+                label={interpolate(t.settlement.summary.calculationVersion, {
+                  version: month.calculationVersion.toString(),
+                })}
+              />
+              <Chip
+                size="small"
+                color={
+                  month.calculationBlockerCount > 0 || error
+                    ? 'warning'
+                    : 'success'
+                }
+                label={status}
+              />
               <Stack
                 direction="row"
                 useFlexGap
-                spacing={1}
-                sx={{ flexWrap: 'wrap' }}
+                spacing={0.5}
+                sx={{ ml: { lg: 'auto' }, flexWrap: 'wrap' }}
               >
+                <Button
+                  size="small"
+                  startIcon={<RefreshOutlined />}
+                  disabled={working || month.isSettled}
+                  onClick={() => void recalculate()}
+                >
+                  {t.settlement.calculation.recalculate}
+                </Button>
+                <Button
+                  size="small"
+                  variant={month.isSettled ? 'outlined' : 'contained'}
+                  color={month.isSettled ? 'warning' : 'primary'}
+                  startIcon={
+                    month.isSettled ? <LockOpenOutlined /> : <LockOutlined />
+                  }
+                  disabled={
+                    working ||
+                    (!month.isSettled &&
+                      (month.calculationStatus !== 'completed' ||
+                        month.calculationInputHash !== inputHash ||
+                        month.calculationBlockerCount > 0))
+                  }
+                  onClick={() => void toggleLock()}
+                >
+                  {month.isSettled
+                    ? t.settlement.calculation.unlock
+                    : t.settlement.calculation.lock}
+                </Button>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  startIcon={<RestoreOutlined />}
+                  onClick={() => setRecoveryOpen(true)}
+                >
+                  {t.settlement.calculation.recovery.open}
+                </Button>
+              </Stack>
+            </Stack>
+            {error ? (
+              <Alert severity="error" sx={{ py: 0 }}>
+                {t.settlement.calculation.writeFailed}
+              </Alert>
+            ) : null}
+          </Stack>
+        </CardContent>
+      </Card>
+
+      <Dialog
+        open={recoveryOpen}
+        onClose={() => setRecoveryOpen(false)}
+        fullWidth
+        maxWidth="md"
+      >
+        <DialogTitle>{t.settlement.calculation.recovery.title}</DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            <Typography color="text.secondary">
+              {t.settlement.calculation.recovery.description}
+            </Typography>
+            <Button
+              variant="outlined"
+              startIcon={<SaveOutlined />}
+              disabled={working || month.isSettled}
+              onClick={() => void createRecoveryPoint()}
+              sx={{ alignSelf: 'flex-start' }}
+            >
+              {t.settlement.calculation.recovery.create}
+            </Button>
+            {recoveryPoints.length === 0 ? (
+              <Typography color="text.secondary">
+                {t.settlement.calculation.recovery.empty}
+              </Typography>
+            ) : (
+              <Stack spacing={1}>
                 {recoveryPoints.map((recoveryPoint) => (
                   <Button
                     key={recoveryPoint.id}
-                    size="small"
                     variant="outlined"
                     startIcon={<RestoreOutlined />}
                     disabled={working || month.isSettled}
                     onClick={() => void restoreRecoveryPoint(recoveryPoint)}
+                    sx={{ justifyContent: 'flex-start' }}
                   >
                     {recoveryPoint.createdAt.toLocaleString('pl-PL')} ·{' '}
                     {formatRecoveryAge(recoveryPoint.createdAt, {
@@ -313,9 +333,14 @@ export function MonthlyCalculationStatusPanel({
               </Stack>
             )}
           </Stack>
-        </Stack>
-      </CardContent>
-    </Card>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setRecoveryOpen(false)}>
+            {t.settlement.calculation.recovery.close}
+          </Button>
+        </DialogActions>
+      </Dialog>
+    </>
   );
 }
 

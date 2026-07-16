@@ -9,6 +9,7 @@ import {
 } from '../components/navigation/NavigationDrawer';
 import { getNavigationItem } from '../config/navigation';
 import { useNavigationDrawer } from '../hooks/useNavigationDrawer';
+import { routes } from '../utils/routes';
 
 export function AppLayout() {
   const location = useLocation();
@@ -17,6 +18,9 @@ export function AppLayout() {
   const drawerWidth = navigation.desktopCollapsed
     ? collapsedDrawerWidth
     : expandedDrawerWidth;
+  const usesWideWorkspace =
+    location.pathname === routes.settlement ||
+    location.pathname === routes.settings;
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }}>
@@ -47,8 +51,13 @@ export function AppLayout() {
       >
         <Toolbar sx={{ minHeight: { xs: 60, sm: 68 } }} />
         <Container
-          maxWidth="xl"
-          sx={{ px: { xs: 2, sm: 3, lg: 4 }, py: { xs: 3, sm: 4 } }}
+          maxWidth={usesWideWorkspace ? false : 'xl'}
+          sx={{
+            px: usesWideWorkspace
+              ? { xs: 1.5, sm: 2, lg: 2.5 }
+              : { xs: 2, sm: 3, lg: 4 },
+            py: { xs: 2, sm: usesWideWorkspace ? 2.5 : 4 },
+          }}
         >
           <Outlet />
         </Container>

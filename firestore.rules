@@ -52,6 +52,76 @@ service cloud.firestore {
         && value.matches('^\\d{4}-(0[1-9]|1[0-2])$');
     }
 
+    function isHexColor(value) {
+      return value is string
+        && value.matches('^#[0-9A-Fa-f]{6}$');
+    }
+
+    function validCalendarColorMap(colors) {
+      return colors is map
+        && colors.keys().hasAll([
+          'worked', 'firstShift', 'secondShift', 'nightShift', 'bhp',
+          'l4Active', 'l4Inactive', 'l4Reported', 'uw', 'uz', 'nn', 'nu',
+          'ni', 'opd', 'krw', 'wzn', 'overtime50', 'overtime100',
+          'nightHours', 'shortage', 'privateTime', 'manualCorrection',
+          'requiresReview', 'blocker', 'warning', 'dayOff', 'weekend',
+          'publicHoliday', 'future', 'outsideEmployment'
+        ])
+        && colors.keys().hasOnly([
+          'worked', 'firstShift', 'secondShift', 'nightShift', 'bhp',
+          'l4Active', 'l4Inactive', 'l4Reported', 'uw', 'uz', 'nn', 'nu',
+          'ni', 'opd', 'krw', 'wzn', 'overtime50', 'overtime100',
+          'nightHours', 'shortage', 'privateTime', 'manualCorrection',
+          'requiresReview', 'blocker', 'warning', 'dayOff', 'weekend',
+          'publicHoliday', 'future', 'outsideEmployment'
+        ])
+        && isHexColor(colors.worked)
+        && isHexColor(colors.firstShift)
+        && isHexColor(colors.secondShift)
+        && isHexColor(colors.nightShift)
+        && isHexColor(colors.bhp)
+        && isHexColor(colors.l4Active)
+        && isHexColor(colors.l4Inactive)
+        && isHexColor(colors.l4Reported)
+        && isHexColor(colors.uw)
+        && isHexColor(colors.uz)
+        && isHexColor(colors.nn)
+        && isHexColor(colors.nu)
+        && isHexColor(colors.ni)
+        && isHexColor(colors.opd)
+        && isHexColor(colors.krw)
+        && isHexColor(colors.wzn)
+        && isHexColor(colors.overtime50)
+        && isHexColor(colors.overtime100)
+        && isHexColor(colors.nightHours)
+        && isHexColor(colors.shortage)
+        && isHexColor(colors.privateTime)
+        && isHexColor(colors.manualCorrection)
+        && isHexColor(colors.requiresReview)
+        && isHexColor(colors.blocker)
+        && isHexColor(colors.warning)
+        && isHexColor(colors.dayOff)
+        && isHexColor(colors.weekend)
+        && isHexColor(colors.publicHoliday)
+        && isHexColor(colors.future)
+        && isHexColor(colors.outsideEmployment);
+    }
+
+    function validCalendarAppearance(data) {
+      return data.keys().hasAll([
+          'version', 'text_colors', 'background_colors',
+          'created_at', 'created_by', 'updated_at', 'updated_by'
+        ])
+        && data.keys().hasOnly([
+          'version', 'text_colors', 'background_colors',
+          'created_at', 'created_by', 'updated_at', 'updated_by'
+        ])
+        && data.version == 1
+        && validCalendarColorMap(data.text_colors)
+        && validCalendarColorMap(data.background_colors)
+        && hasModificationMetadata(data);
+    }
+
     function hasEmployeeReference(data) {
       return isNonEmptyString(data.employee_id)
         && isNonEmptyString(data.teta_number);
@@ -739,6 +809,21 @@ service cloud.firestore {
       allow read: if hasFirebaseAuth()
         && request.auth.uid == userId;
       allow create, update, delete: if false;
+    }
+
+    match /appConfig/calendarAppearance {
+      allow read: if isAuthenticated();
+      allow create: if isAdmin()
+        && validCalendarAppearance(request.resource.data)
+        && hasCreateMetadata(request.resource.data);
+      allow update: if isAdmin()
+        && validCalendarAppearance(request.resource.data)
+        && hasUpdateMetadata(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'version', 'text_colors', 'background_colors',
+          'updated_at', 'updated_by'
+        ]);
+      allow delete: if false;
     }
 
     match /payrollSettings/{settingId} {

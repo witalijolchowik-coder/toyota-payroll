@@ -33,6 +33,12 @@ export interface ModificationMetadataDocument {
   updated_by: string;
 }
 
+export interface CalendarAppearanceDocument extends ModificationMetadataDocument {
+  version: number;
+  text_colors: Record<string, string>;
+  background_colors: Record<string, string>;
+}
+
 export interface EmployeeDocument extends ModificationMetadataDocument {
   teta_number: TetaNumber;
   first_name: string;

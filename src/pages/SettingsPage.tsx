@@ -1,13 +1,27 @@
 import { useMemo, useState } from 'react';
 import AddOutlined from '@mui/icons-material/AddOutlined';
 import EditOutlined from '@mui/icons-material/EditOutlined';
+import ExpandMoreOutlined from '@mui/icons-material/ExpandMoreOutlined';
+import HotelOutlined from '@mui/icons-material/HotelOutlined';
+import PaletteOutlined from '@mui/icons-material/PaletteOutlined';
+import PaymentsOutlined from '@mui/icons-material/PaymentsOutlined';
+import ScheduleOutlined from '@mui/icons-material/ScheduleOutlined';
 import {
+  Accordion,
+  AccordionDetails,
+  AccordionSummary,
   Alert,
   Box,
   Button,
   Card,
   Chip,
+  Divider,
   IconButton,
+  List,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  MenuItem,
   Skeleton,
   Stack,
   Table,
@@ -16,50 +30,58 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  TextField,
   Typography,
 } from '@mui/material';
+import { useSearchParams } from 'react-router-dom';
 
 import { PageHeader } from '../components/layout/PageHeader';
-import { DepartmentFormDialog } from '../features/settings/DepartmentFormDialog';
-import { PayrollSettingFormDialog } from '../features/settings/PayrollSettingFormDialog';
 import {
   AccommodationCategoryFormDialog,
   type AccommodationCategoryInput,
 } from '../features/settings/AccommodationCategoryFormDialog';
+import { CalendarAppearancePanel } from '../features/settings/CalendarAppearancePanel';
+import { DepartmentFormDialog } from '../features/settings/DepartmentFormDialog';
+import { PayrollSettingFormDialog } from '../features/settings/PayrollSettingFormDialog';
+import { ShiftConfigurationPanel } from '../features/settings/ShiftConfigurationPanel';
 import { useDepartments } from '../features/settings/useDepartments';
 import { usePayrollSettings } from '../features/settings/usePayrollSettings';
-import { ShiftConfigurationPanel } from '../features/settings/ShiftConfigurationPanel';
 import { useNotification } from '../hooks/useNotification';
 import { useTranslations } from '../hooks/useTranslations';
 import type {
   Department,
   DepartmentCreateInput,
   DepartmentUpdateInput,
+  KnownPayrollSettingKey,
   PayrollSetting,
   PayrollSettingCreateInput,
 } from '../types/firestore';
+import {
+  SETTINGS_SECTION_STORAGE_KEY,
+  resolveSettingsSection,
+  type SettingsSection,
+} from './settingsNavigation';
 
 const currency = new Intl.NumberFormat('pl-PL', {
   style: 'currency',
   currency: 'PLN',
 });
 
-const settingLabels: Record<string, string> = {
-  frequency_bonus: 'Premia frekwencyjna',
-  transport_allowance: 'Dodatek transportowy',
-  accommodation_allowance: 'Zakwaterowanie',
-  udt_allowance: 'Dodatek UDT',
-  holiday_work_bonus: 'Dodatek za pracę w święto',
-  laundry_allowance: 'Dodatek za pranie',
-  own_housing_allowance: 'Dodatek za własne mieszkanie',
-  company_housing_media: 'Media w mieszkaniu firmowym',
-};
-
 type DepartmentFormState =
   { mode: 'add' } | { mode: 'edit'; department: Department } | null;
+type SettingFormState =
+  | { section: 'accommodation'; initialKey: 'own_housing_allowance' }
+  | { section: 'allowances'; initialKey?: KnownPayrollSettingKey }
+  | null;
 
 export function SettingsPage() {
   const t = useTranslations();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const querySection = searchParams.get('section');
+  const storedSection = window.localStorage.getItem(
+    SETTINGS_SECTION_STORAGE_KEY,
+  );
+  const section = resolveSettingsSection(querySection ?? storedSection);
   const { settings, isLoading, error, createVersion } = usePayrollSettings();
   const {
     departments,
@@ -69,10 +91,12 @@ export function SettingsPage() {
     editDepartment,
   } = useDepartments();
   const { notify } = useNotification();
-  const [isFormOpen, setIsFormOpen] = useState(false);
   const [departmentFormState, setDepartmentFormState] =
     useState<DepartmentFormState>(null);
+  const [settingFormState, setSettingFormState] =
+    useState<SettingFormState>(null);
   const [isAccommodationFormOpen, setIsAccommodationFormOpen] = useState(false);
+
   const accommodationCategories = useMemo(
     () =>
       settings
@@ -98,10 +122,15 @@ export function SettingsPage() {
     [settings],
   );
 
+  const selectSection = (next: SettingsSection) => {
+    window.localStorage.setItem(SETTINGS_SECTION_STORAGE_KEY, next);
+    setSearchParams({ section: next }, { replace: true });
+  };
+
   const handleCreate = async (input: PayrollSettingCreateInput) => {
     await createVersion(input);
     notify({
-      message: 'Nowa wersja ustawienia została zapisana.',
+      message: t.settings.common.versionSaved,
       severity: 'success',
     });
   };
@@ -117,7 +146,6 @@ export function SettingsPage() {
       });
       return;
     }
-
     await addDepartment(input as DepartmentCreateInput);
     notify({
       message: t.organization.departments.notifications.created,
@@ -153,64 +181,347 @@ export function SettingsPage() {
   };
 
   return (
-    <Stack spacing={3}>
+    <Stack spacing={2.5}>
       <PageHeader
-        eyebrow="Konfiguracja globalna"
-        title="Ustawienia płacowe"
-        description="Wersjonowane stawki wspólne dla całego systemu. Dodanie nowej wersji nie zmienia rozliczonych miesięcy."
-        action={
-          <Button
-            variant="contained"
-            startIcon={<AddOutlined />}
-            onClick={() => setIsFormOpen(true)}
-          >
-            Dodaj wersję
-          </Button>
-        }
+        eyebrow={t.settings.page.eyebrow}
+        title={t.settings.page.title}
+        description={t.settings.page.description}
       />
-
-      <Alert severity="info">
-        Ustawienia są zapisywane historycznie. Payroll Engine będzie wybierał
-        najnowszą wersję obowiązującą w wybranym miesiącu.
-      </Alert>
-
-      {error ? (
-        <Alert severity="error">
-          Nie udało się wczytać ustawień płacowych. Sprawdź konfigurację
-          Firebase i uprawnienia.
-        </Alert>
+      {(error || departmentsError) && section !== 'interface' ? (
+        <Alert severity="error">{t.settings.page.loadError}</Alert>
       ) : null}
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: {
+            xs: 'minmax(0, 1fr)',
+            md: '220px minmax(0, 1fr)',
+          },
+          gap: { xs: 2, md: 3 },
+          alignItems: 'start',
+        }}
+      >
+        <SettingsNavigation section={section} onChange={selectSection} />
+        <Box component="section" aria-live="polite" sx={{ minWidth: 0 }}>
+          {section === 'shifts' ? (
+            <ShiftsSection
+              departments={departments}
+              isLoading={areDepartmentsLoading}
+              onAdd={() => setDepartmentFormState({ mode: 'add' })}
+              onEdit={(department) =>
+                setDepartmentFormState({ mode: 'edit', department })
+              }
+            />
+          ) : null}
+          {section === 'accommodation' ? (
+            <AccommodationSection
+              categories={accommodationCategories}
+              settings={settings}
+              isLoading={isLoading}
+              onAddCategory={() => setIsAccommodationFormOpen(true)}
+              onAddOwnHousing={() =>
+                setSettingFormState({
+                  section: 'accommodation',
+                  initialKey: 'own_housing_allowance',
+                })
+              }
+            />
+          ) : null}
+          {section === 'allowances' ? (
+            <AllowancesSection
+              settings={settings}
+              isLoading={isLoading}
+              onAdd={() => setSettingFormState({ section: 'allowances' })}
+            />
+          ) : null}
+          {section === 'interface' ? <CalendarAppearancePanel /> : null}
+        </Box>
+      </Box>
 
+      {settingFormState ? (
+        <PayrollSettingFormDialog
+          initialKey={settingFormState.initialKey}
+          allowedKeys={
+            settingFormState.section === 'accommodation'
+              ? ['own_housing_allowance']
+              : [
+                  'frequency_bonus',
+                  'transport_allowance',
+                  'udt_allowance',
+                  'holiday_work_bonus',
+                  'laundry_allowance',
+                ]
+          }
+          onClose={() => setSettingFormState(null)}
+          onSubmit={handleCreate}
+        />
+      ) : null}
+      {departmentFormState ? (
+        <DepartmentFormDialog
+          department={
+            departmentFormState.mode === 'edit'
+              ? departmentFormState.department
+              : undefined
+          }
+          onClose={() => setDepartmentFormState(null)}
+          onSubmit={handleDepartmentSubmit}
+        />
+      ) : null}
+      {isAccommodationFormOpen ? (
+        <AccommodationCategoryFormDialog
+          onClose={() => setIsAccommodationFormOpen(false)}
+          onSubmit={handleAccommodationCategory}
+        />
+      ) : null}
+    </Stack>
+  );
+}
+
+export function SettingsNavigation({
+  section,
+  onChange,
+}: {
+  section: SettingsSection;
+  onChange: (section: SettingsSection) => void;
+}) {
+  const t = useTranslations();
+  const items = [
+    {
+      id: 'shifts' as const,
+      label: t.settings.navigation.shifts,
+      icon: <ScheduleOutlined />,
+    },
+    {
+      id: 'accommodation' as const,
+      label: t.settings.navigation.accommodation,
+      icon: <HotelOutlined />,
+    },
+    {
+      id: 'allowances' as const,
+      label: t.settings.navigation.allowances,
+      icon: <PaymentsOutlined />,
+    },
+    {
+      id: 'interface' as const,
+      label: t.settings.navigation.interface,
+      icon: <PaletteOutlined />,
+    },
+  ];
+  return (
+    <Box component="nav" aria-label={t.settings.navigation.label}>
+      <TextField
+        select
+        fullWidth
+        size="small"
+        label={t.settings.navigation.label}
+        value={section}
+        onChange={(event) => onChange(event.target.value as SettingsSection)}
+        sx={{ display: { xs: 'flex', md: 'none' } }}
+      >
+        {items.map((item) => (
+          <MenuItem key={item.id} value={item.id}>
+            {item.label}
+          </MenuItem>
+        ))}
+      </TextField>
+      <Card
+        sx={{
+          display: { xs: 'none', md: 'block' },
+          position: 'sticky',
+          top: 92,
+        }}
+      >
+        <List disablePadding aria-label={t.settings.navigation.label}>
+          {items.map((item) => (
+            <ListItemButton
+              key={item.id}
+              selected={item.id === section}
+              onClick={() => onChange(item.id)}
+              sx={{ py: 1.5 }}
+            >
+              <ListItemIcon sx={{ minWidth: 38 }}>{item.icon}</ListItemIcon>
+              <ListItemText primary={item.label} />
+            </ListItemButton>
+          ))}
+        </List>
+      </Card>
+    </Box>
+  );
+}
+
+function SectionHeading({
+  title,
+  description,
+}: {
+  title: string;
+  description: string;
+}) {
+  return (
+    <Box>
+      <Typography variant="h5">{title}</Typography>
+      <Typography color="text.secondary">{description}</Typography>
+    </Box>
+  );
+}
+
+function ShiftsSection({
+  departments,
+  isLoading,
+  onAdd,
+  onEdit,
+}: {
+  departments: Department[];
+  isLoading: boolean;
+  onAdd: () => void;
+  onEdit: (department: Department) => void;
+}) {
+  const t = useTranslations();
+  return (
+    <Stack spacing={2.5}>
+      <SectionHeading
+        title={t.settings.shiftsAndSchedules.title}
+        description={t.settings.shiftsAndSchedules.description}
+      />
       <Card>
-        <Box
+        <Stack
+          direction="row"
+          spacing={2}
           sx={{
-            px: 3,
+            px: 2.5,
             py: 2,
-            display: 'flex',
-            gap: 2,
-            alignItems: { xs: 'flex-start', sm: 'center' },
-            flexDirection: { xs: 'column', sm: 'row' },
+            alignItems: 'center',
             justifyContent: 'space-between',
           }}
         >
-          <div>
+          <Typography variant="h6">
+            {t.settings.shiftsAndSchedules.departments}
+          </Typography>
+          <Button
+            variant="outlined"
+            startIcon={<AddOutlined />}
+            onClick={onAdd}
+          >
+            {t.organization.departments.add}
+          </Button>
+        </Stack>
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>{t.organization.departments.table.name}</TableCell>
+                <TableCell>
+                  {t.organization.departments.table.shiftMode}
+                </TableCell>
+                <TableCell>{t.organization.departments.table.status}</TableCell>
+                <TableCell align="right">
+                  {t.organization.departments.table.actions}
+                </TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {isLoading ? (
+                <LoadingRows columns={4} />
+              ) : (
+                departments.map((department) => (
+                  <TableRow hover key={department.id}>
+                    <TableCell sx={{ fontWeight: 700 }}>
+                      {department.name}
+                    </TableCell>
+                    <TableCell>
+                      {t.organization.shiftModes[department.shiftMode]}
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        size="small"
+                        variant="outlined"
+                        color={department.active ? 'success' : 'default'}
+                        label={
+                          department.active
+                            ? t.organization.departments.status.active
+                            : t.organization.departments.status.inactive
+                        }
+                      />
+                    </TableCell>
+                    <TableCell align="right">
+                      <IconButton
+                        size="small"
+                        aria-label={t.organization.departments.table.edit}
+                        onClick={() => onEdit(department)}
+                      >
+                        <EditOutlined fontSize="small" />
+                      </IconButton>
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Card>
+      <ShiftConfigurationPanel departments={departments} />
+    </Stack>
+  );
+}
+
+function AccommodationSection({
+  categories,
+  settings,
+  isLoading,
+  onAddCategory,
+  onAddOwnHousing,
+}: {
+  categories: Array<{
+    key: string;
+    name: string;
+    media: number;
+    accommodation: number;
+    validFrom: string;
+    validTo: string | null;
+  }>;
+  settings: PayrollSetting[];
+  isLoading: boolean;
+  onAddCategory: () => void;
+  onAddOwnHousing: () => void;
+}) {
+  const t = useTranslations();
+  const ownHousing = settings.filter(
+    (item) => item.settingKey === 'own_housing_allowance',
+  );
+  return (
+    <Stack spacing={2.5}>
+      <SectionHeading
+        title={t.settings.accommodationSection.title}
+        description={t.settings.accommodationSection.description}
+      />
+      <Card>
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={2}
+          sx={{
+            px: 2.5,
+            py: 2,
+            alignItems: { sm: 'center' },
+            justifyContent: 'space-between',
+          }}
+        >
+          <Box>
             <Typography variant="h6">
               {t.settings.accommodation.title}
             </Typography>
             <Typography color="text.secondary">
               {t.settings.accommodation.description}
             </Typography>
-          </div>
+          </Box>
           <Button
             variant="outlined"
             startIcon={<AddOutlined />}
-            onClick={() => setIsAccommodationFormOpen(true)}
+            onClick={onAddCategory}
           >
             {t.settings.accommodation.add}
           </Button>
-        </Box>
+        </Stack>
         <TableContainer>
-          <Table>
+          <Table size="small">
             <TableHead>
               <TableRow>
                 <TableCell>{t.settings.accommodation.table.name}</TableCell>
@@ -227,261 +538,330 @@ export function SettingsPage() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {accommodationCategories.map((category) => (
-                <TableRow key={`${category.key}:${category.validFrom}`} hover>
-                  <TableCell>
-                    <Typography sx={{ fontWeight: 700 }}>
+              {isLoading ? (
+                <LoadingRows columns={5} />
+              ) : (
+                categories.map((category) => (
+                  <TableRow hover key={`${category.key}:${category.validFrom}`}>
+                    <TableCell sx={{ fontWeight: 700 }}>
                       {category.name}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {category.key}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="right">
-                    {currency.format(category.media)}
-                  </TableCell>
-                  <TableCell align="right">
-                    {currency.format(category.accommodation)}
-                  </TableCell>
-                  <TableCell align="right">
-                    {currency.format(category.media + category.accommodation)}
-                  </TableCell>
-                  <TableCell>
-                    {category.validFrom} –{' '}
-                    {category.validTo ?? t.settings.accommodation.noEnd}
-                  </TableCell>
-                </TableRow>
-              ))}
+                    </TableCell>
+                    <TableCell align="right">
+                      {currency.format(category.media)}
+                    </TableCell>
+                    <TableCell align="right">
+                      {currency.format(category.accommodation)}
+                    </TableCell>
+                    <TableCell align="right">
+                      {currency.format(category.media + category.accommodation)}
+                    </TableCell>
+                    <TableCell>
+                      {category.validFrom} –{' '}
+                      {category.validTo ?? t.settings.common.noEnd}
+                    </TableCell>
+                  </TableRow>
+                ))
+              )}
             </TableBody>
           </Table>
         </TableContainer>
-        {!isLoading && accommodationCategories.length === 0 ? (
-          <Box sx={{ px: 3, py: 4, textAlign: 'center' }}>
-            <Typography color="text.secondary">
-              {t.settings.accommodation.empty}
-            </Typography>
-          </Box>
-        ) : null}
       </Card>
-
-      <ShiftConfigurationPanel departments={departments} />
-
-      <Card>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>Ustawienie</TableCell>
-                <TableCell>Typ</TableCell>
-                <TableCell align="right">Kwota</TableCell>
-                <TableCell>Ważność</TableCell>
-                <TableCell>Opis</TableCell>
-                <TableCell>Status</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {isLoading
-                ? Array.from({ length: 4 }, (_, index) => (
-                    <TableRow key={index}>
-                      {Array.from({ length: 6 }, (__, cellIndex) => (
-                        <TableCell key={cellIndex}>
-                          <Skeleton />
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                : settings.map((setting) => (
-                    <PayrollSettingRow key={setting.id} setting={setting} />
-                  ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        {!isLoading && settings.length === 0 ? (
-          <Box sx={{ px: 3, py: 6, textAlign: 'center' }}>
-            <Typography variant="h6">Brak ustawień płacowych</Typography>
-            <Typography color="text.secondary">
-              Dodaj pierwszą wersję stawki, aby przygotować konfigurację dla
-              przyszłego Payroll Engine.
-            </Typography>
-          </Box>
-        ) : null}
-      </Card>
-
-      {departmentsError ? (
-        <Alert severity="error">
-          <strong>{t.organization.departments.loadTitle}</strong>
-          <br />
-          {t.organization.departments.loadDescription}
-        </Alert>
-      ) : null}
-
-      <Card>
-        <Box
-          sx={{
-            px: 3,
-            py: 2,
-            display: 'flex',
-            gap: 2,
-            alignItems: { xs: 'flex-start', sm: 'center' },
-            flexDirection: { xs: 'column', sm: 'row' },
-            justifyContent: 'space-between',
-          }}
+      <Card sx={{ p: 2.5 }}>
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={2}
+          sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' } }}
         >
-          <div>
+          <Box>
             <Typography variant="h6">
-              {t.organization.departments.settingsTitle}
+              {t.settings.accommodationSection.ownHousing}
             </Typography>
             <Typography color="text.secondary">
-              {t.organization.departments.settingsDescription}
+              {t.settings.accommodationSection.ownHousingDescription}
             </Typography>
-          </div>
+          </Box>
           <Button
             variant="outlined"
             startIcon={<AddOutlined />}
-            onClick={() => setDepartmentFormState({ mode: 'add' })}
+            onClick={onAddOwnHousing}
           >
-            {t.organization.departments.add}
+            {t.settings.common.addVersion}
           </Button>
-        </Box>
-        <TableContainer>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell>{t.organization.departments.table.name}</TableCell>
-                <TableCell>
-                  {t.organization.departments.table.shiftMode}
-                </TableCell>
-                <TableCell>{t.organization.departments.table.status}</TableCell>
-                <TableCell align="right">
-                  {t.organization.departments.table.actions}
-                </TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {areDepartmentsLoading
-                ? Array.from({ length: 4 }, (_, index) => (
-                    <TableRow key={index}>
-                      {Array.from({ length: 4 }, (__, cellIndex) => (
-                        <TableCell key={cellIndex}>
-                          <Skeleton />
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  ))
-                : departments.map((department) => (
-                    <TableRow hover key={department.id}>
-                      <TableCell>
-                        <Typography sx={{ fontWeight: 700 }}>
-                          {department.name}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {department.id}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        {t.organization.shiftModes[department.shiftMode]}
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={
-                            department.active
-                              ? t.organization.departments.status.active
-                              : t.organization.departments.status.inactive
-                          }
-                          color={department.active ? 'success' : 'default'}
-                          size="small"
-                          variant="outlined"
-                        />
-                      </TableCell>
-                      <TableCell align="right">
-                        <IconButton
-                          size="small"
-                          aria-label={t.organization.departments.table.edit}
-                          onClick={() =>
-                            setDepartmentFormState({
-                              mode: 'edit',
-                              department,
-                            })
-                          }
-                        >
-                          <EditOutlined fontSize="small" />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-        {!areDepartmentsLoading && departments.length === 0 ? (
-          <Box sx={{ px: 3, py: 6, textAlign: 'center' }}>
-            <Typography variant="h6">
-              {t.organization.departments.emptyTitle}
-            </Typography>
-            <Typography color="text.secondary">
-              {t.organization.departments.emptyDescription}
-            </Typography>
-          </Box>
-        ) : null}
+        </Stack>
+        <SettingVersionList settings={ownHousing} />
       </Card>
-
-      {isFormOpen ? (
-        <PayrollSettingFormDialog
-          onClose={() => setIsFormOpen(false)}
-          onSubmit={handleCreate}
-        />
-      ) : null}
-
-      {departmentFormState ? (
-        <DepartmentFormDialog
-          department={
-            departmentFormState.mode === 'edit'
-              ? departmentFormState.department
-              : undefined
-          }
-          onClose={() => setDepartmentFormState(null)}
-          onSubmit={handleDepartmentSubmit}
-        />
-      ) : null}
-
-      {isAccommodationFormOpen ? (
-        <AccommodationCategoryFormDialog
-          onClose={() => setIsAccommodationFormOpen(false)}
-          onSubmit={handleAccommodationCategory}
-        />
-      ) : null}
     </Stack>
   );
 }
 
-function PayrollSettingRow({ setting }: { setting: PayrollSetting }) {
+function AllowancesSection({
+  settings,
+  isLoading,
+  onAdd,
+}: {
+  settings: PayrollSetting[];
+  isLoading: boolean;
+  onAdd: () => void;
+}) {
+  const t = useTranslations();
+  const businessSettings = settings.filter(
+    (item) =>
+      ![
+        'accommodation_allowance',
+        'company_housing_media',
+        'own_housing_allowance',
+      ].includes(item.settingKey),
+  );
+  const frequency = businessSettings
+    .filter((item) => item.settingKey === 'frequency_bonus' && item.active)
+    .sort((a, b) => b.validFrom.localeCompare(a.validFrom))[0];
+  const scale = [
+    [t.settings.allowancesSection.scale.zero, 400],
+    [t.settings.allowancesSection.scale.one, 350],
+    [t.settings.allowancesSection.scale.two, 300],
+    [t.settings.allowancesSection.scale.three, 200],
+    [t.settings.allowancesSection.scale.fourPlus, 0],
+  ] as const;
+  return (
+    <Stack spacing={2.5}>
+      <Stack
+        direction={{ xs: 'column', sm: 'row' }}
+        spacing={2}
+        sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' } }}
+      >
+        <SectionHeading
+          title={t.settings.allowancesSection.title}
+          description={t.settings.allowancesSection.description}
+        />
+        <Button variant="contained" startIcon={<AddOutlined />} onClick={onAdd}>
+          {t.settings.common.addVersion}
+        </Button>
+      </Stack>
+      <Card sx={{ p: 2.5 }}>
+        <Stack spacing={1.5}>
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={1}
+            sx={{
+              justifyContent: 'space-between',
+              alignItems: { sm: 'center' },
+            }}
+          >
+            <Box>
+              <Typography variant="h6">
+                {t.settings.allowancesSection.attendanceBonus}
+              </Typography>
+              <Typography color="text.secondary">
+                {t.settings.allowancesSection.attendanceBonusDescription}
+              </Typography>
+            </Box>
+            <Chip
+              color={frequency ? 'success' : 'warning'}
+              label={
+                frequency
+                  ? `${t.settings.allowancesSection.activeConfiguration}: ${frequency.validFrom} – ${frequency.validTo ?? t.settings.common.noEnd}`
+                  : t.settings.allowancesSection.missingConfiguration
+              }
+            />
+          </Stack>
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>
+                    {t.settings.allowancesSection.missedDays}
+                  </TableCell>
+                  <TableCell align="right">
+                    {t.settings.allowancesSection.bonus}
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {scale.map(([days, amount]) => (
+                  <TableRow key={days}>
+                    <TableCell>{days}</TableCell>
+                    <TableCell align="right">
+                      {currency.format(amount)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Stack>
+      </Card>
+      <Card>
+        <TableContainer>
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                <TableCell>{t.settings.common.description}</TableCell>
+                <TableCell align="right">{t.settings.common.amount}</TableCell>
+                <TableCell>{t.settings.common.validity}</TableCell>
+                <TableCell>{t.organization.departments.table.status}</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {isLoading ? (
+                <LoadingRows columns={4} />
+              ) : (
+                businessSettings
+                  .filter((item) => item.settingKey !== 'frequency_bonus')
+                  .map((setting) => (
+                    <BusinessSettingRow key={setting.id} setting={setting} />
+                  ))
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Card>
+      <Accordion disableGutters>
+        <AccordionSummary expandIcon={<ExpandMoreOutlined />}>
+          <Box>
+            <Typography sx={{ fontWeight: 700 }}>
+              {t.settings.allowancesSection.technicalData}
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {t.settings.allowancesSection.technicalDescription}
+            </Typography>
+          </Box>
+        </AccordionSummary>
+        <AccordionDetails>
+          <Divider sx={{ mb: 2 }} />
+          <TableContainer>
+            <Table size="small">
+              <TableHead>
+                <TableRow>
+                  <TableCell>{t.settings.common.description}</TableCell>
+                  <TableCell>{t.settings.common.validity}</TableCell>
+                  <TableCell align="right">
+                    {t.settings.common.amount}
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {settings.map((setting) => (
+                  <TableRow key={setting.id}>
+                    <TableCell>
+                      <Typography variant="body2">
+                        {settingLabel(setting.settingKey, t)}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {setting.settingKey}
+                      </Typography>
+                    </TableCell>
+                    <TableCell>
+                      {setting.validFrom} –{' '}
+                      {setting.validTo ?? t.settings.common.noEnd}
+                    </TableCell>
+                    <TableCell align="right">
+                      {currency.format(setting.amount)}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </AccordionDetails>
+      </Accordion>
+    </Stack>
+  );
+}
+
+function BusinessSettingRow({ setting }: { setting: PayrollSetting }) {
+  const t = useTranslations();
   return (
     <TableRow hover>
       <TableCell>
         <Typography sx={{ fontWeight: 700 }}>
-          {settingLabels[setting.settingKey] ?? setting.settingKey}
+          {settingLabel(setting.settingKey, t)}
         </Typography>
-        <Typography variant="caption" color="text.secondary">
-          {setting.settingKey}
-        </Typography>
+        {setting.description ? (
+          <Typography variant="caption" color="text.secondary">
+            {setting.description}
+          </Typography>
+        ) : null}
       </TableCell>
-      <TableCell>{setting.variantName ?? '—'}</TableCell>
       <TableCell align="right">{currency.format(setting.amount)}</TableCell>
       <TableCell>
-        {setting.validFrom} – {setting.validTo ?? 'bezterminowo'}
-      </TableCell>
-      <TableCell sx={{ maxWidth: 320 }}>
-        <Typography variant="body2" noWrap title={setting.description}>
-          {setting.description || '—'}
-        </Typography>
+        {setting.validFrom} – {setting.validTo ?? t.settings.common.noEnd}
       </TableCell>
       <TableCell>
         <Chip
-          label={setting.active ? 'Aktywna' : 'Nieaktywna'}
-          color={setting.active ? 'success' : 'default'}
           size="small"
           variant="outlined"
+          color={setting.active ? 'success' : 'default'}
+          label={
+            setting.active
+              ? t.settings.common.active
+              : t.settings.common.inactive
+          }
         />
       </TableCell>
     </TableRow>
   );
+}
+
+function SettingVersionList({ settings }: { settings: PayrollSetting[] }) {
+  const t = useTranslations();
+  if (settings.length === 0)
+    return (
+      <Typography color="text.secondary" sx={{ mt: 2 }}>
+        {t.settings.common.empty}
+      </Typography>
+    );
+  return (
+    <Stack spacing={1} sx={{ mt: 2 }}>
+      {[...settings]
+        .sort((a, b) => b.validFrom.localeCompare(a.validFrom))
+        .map((setting) => (
+          <Stack
+            key={setting.id}
+            direction="row"
+            spacing={1.5}
+            sx={{ alignItems: 'center' }}
+          >
+            <Typography sx={{ fontWeight: 700 }}>
+              {currency.format(setting.amount)}
+            </Typography>
+            <Typography color="text.secondary">
+              {setting.validFrom} – {setting.validTo ?? t.settings.common.noEnd}
+            </Typography>
+            {setting.active ? (
+              <Chip
+                size="small"
+                color="success"
+                label={t.settings.common.active}
+              />
+            ) : null}
+          </Stack>
+        ))}
+    </Stack>
+  );
+}
+
+function LoadingRows({ columns }: { columns: number }) {
+  return Array.from({ length: 3 }, (_, row) => (
+    <TableRow key={row}>
+      {Array.from({ length: columns }, (__, column) => (
+        <TableCell key={column}>
+          <Skeleton />
+        </TableCell>
+      ))}
+    </TableRow>
+  ));
+}
+
+function settingLabel(key: string, t: ReturnType<typeof useTranslations>) {
+  const labels: Record<string, string> = {
+    frequency_bonus: t.settings.allowancesSection.attendanceBonus,
+    transport_allowance: t.settings.allowancesSection.labels.transport,
+    udt_allowance: t.settings.allowancesSection.labels.udt,
+    holiday_work_bonus: t.settings.allowancesSection.labels.holidayWork,
+    laundry_allowance: t.settings.allowancesSection.labels.laundry,
+    own_housing_allowance: t.settings.accommodationSection.ownHousing,
+    accommodation_allowance: t.settings.accommodation.table.accommodation,
+    company_housing_media: t.settings.accommodation.table.media,
+  };
+  return labels[key] ?? key;
 }

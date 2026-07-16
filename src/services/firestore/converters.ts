@@ -10,6 +10,7 @@ import type {
   AbsenceDocument,
   AdjustmentDocument,
   AuditLogDocument,
+  CalendarAppearanceDocument,
   DailyValueDocument,
   DepartmentDocument,
   EmployeeDocument,
@@ -45,6 +46,20 @@ import {
   readTimestamp,
 } from './validation';
 
+function readStringRecord(
+  data: DocumentData,
+  key: string,
+  path: string,
+): Record<string, string> {
+  const source = readObject(data, key, path);
+  return Object.fromEntries(
+    Object.keys(source).map((entryKey) => [
+      entryKey,
+      readString(source, entryKey, path),
+    ]),
+  );
+}
+
 function createConverter<T extends DocumentData>(
   parse: (data: DocumentData, path: string) => T,
 ): FirestoreDataConverter<T> {
@@ -69,6 +84,14 @@ function metadata(data: DocumentData, path: string) {
     updated_by: readNonEmptyString(data, 'updated_by', path),
   };
 }
+
+export const calendarAppearanceConverter =
+  createConverter<CalendarAppearanceDocument>((data, path) => ({
+    version: readNumber(data, 'version', path),
+    text_colors: readStringRecord(data, 'text_colors', path),
+    background_colors: readStringRecord(data, 'background_colors', path),
+    ...metadata(data, path),
+  }));
 
 function employeeReference(data: DocumentData, path: string) {
   return {

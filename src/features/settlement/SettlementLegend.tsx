@@ -1,29 +1,31 @@
 import { Box, Stack, Typography } from '@mui/material';
 
 import { useTranslations } from '../../hooks/useTranslations';
+import { useCalendarAppearance } from '../../hooks/useCalendarAppearance';
 
 export function SettlementLegend() {
   const t = useTranslations();
+  const { palette } = useCalendarAppearance();
   const entries = [
     {
       label: t.settlement.legend.workingDay,
-      color: 'background.paper',
-      border: 'divider',
+      color: palette.worked.background,
+      border: palette.worked.text,
     },
     {
       label: t.settlement.legend.weekend,
-      color: 'action.hover',
-      border: 'divider',
+      color: palette.weekend.background,
+      border: palette.weekend.text,
     },
     {
       label: t.settlement.legend.publicHoliday,
-      color: 'error.light',
-      border: 'error.main',
+      color: palette.publicHoliday.background,
+      border: palette.publicHoliday.text,
     },
     {
       label: t.settlement.legend.futureDay,
-      color: 'action.disabledBackground',
-      border: 'divider',
+      color: palette.future.background,
+      border: palette.future.text,
     },
   ] as const;
 
@@ -47,8 +49,7 @@ export function SettlementLegend() {
                 bgcolor: entry.color,
                 border: 1,
                 borderColor: entry.border,
-                opacity:
-                  entry.label === t.settlement.legend.publicHoliday ? 0.4 : 1,
+                opacity: 1,
               }}
             />
             <Typography variant="caption" color="text.secondary">
@@ -70,18 +71,21 @@ export function SettlementLegend() {
         <LegendValue
           value="7,5"
           label={t.settlement.legend.manualValue}
-          sx={{ color: 'primary.main', textDecoration: 'underline' }}
+          sx={{
+            color: palette.manualCorrection.text,
+            textDecoration: 'underline',
+          }}
         />
         <LegendValue
           value="7,5"
           label={t.settlement.legend.importedValue}
-          sx={{ color: 'secondary.main', fontWeight: 700 }}
+          sx={{ color: palette.worked.text, fontWeight: 700 }}
         />
         <LegendValue
           value="7,5"
           label={t.settlement.legend.importedOverride}
           sx={{
-            color: 'warning.dark',
+            color: palette.manualCorrection.text,
             fontWeight: 800,
             textDecoration: 'underline',
           }}
@@ -93,8 +97,7 @@ export function SettlementLegend() {
               width: 16,
               height: 16,
               borderRadius: 0.75,
-              boxShadow: (theme) =>
-                `inset 0 0 0 2px ${theme.palette.warning.main}`,
+              boxShadow: `inset 0 0 0 2px ${palette.warning.text}`,
             }}
           />
           <Typography variant="caption" color="text.secondary">

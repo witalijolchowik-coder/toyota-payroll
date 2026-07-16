@@ -48,7 +48,8 @@ describe('SettlementGrid', () => {
     );
 
     expect(screen.getByText('Jan Kowalski')).toBeInTheDocument();
-    expect(screen.getByText('Montaż · Zmiana Red')).toBeInTheDocument();
+    expect(screen.getByText('Montaż')).toBeInTheDocument();
+    expect(screen.getByText('Zmiana Red')).toBeInTheDocument();
     expect(screen.queryByText('TETA-1001')).not.toBeInTheDocument();
   });
 
@@ -124,5 +125,27 @@ describe('SettlementGrid', () => {
     expect(screen.queryByText('50%')).not.toBeInTheDocument();
     expect(screen.queryByText('100%')).not.toBeInTheDocument();
     expect(screen.queryByText('2 h · noc')).not.toBeInTheDocument();
+    expect(screen.getByText('11 h').parentElement).toHaveStyle({
+      gridTemplateRows: '1.1rem 0.85rem',
+    });
+  });
+
+  it('uses a sticky date header, sticky employee column and compact internal overflow', () => {
+    render(
+      <SettlementGrid
+        employees={[employee]}
+        departments={[department]}
+        days={createCalendarDays('2026-07')}
+        dailyValues={[]}
+      />,
+    );
+
+    const container = screen.getByTestId('settlement-calendar-scroll');
+    expect(container).toHaveStyle({ maxHeight: 'calc(100vh - 92px)' });
+    expect(screen.getByText('Nazwisko i imię').closest('th')).toHaveStyle({
+      position: 'sticky',
+      left: '0px',
+      top: '0px',
+    });
   });
 });
