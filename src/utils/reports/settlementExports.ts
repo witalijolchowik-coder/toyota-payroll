@@ -835,10 +835,11 @@ function renderXlsxWorkbook({
   }
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
-  return XLSX.write(workbook, {
+  const output = XLSX.write(workbook, {
     bookType: 'xlsx',
     type: 'array',
-  }) as Uint8Array;
+  }) as ArrayBuffer;
+  return new Uint8Array(output);
 }
 
 function renderCompensationWorkbook(entries: readonly SozOvertimeNoteEntry[]) {
