@@ -63,20 +63,40 @@ service cloud.firestore {
           'requiresReview', 'blocker', 'warning', 'dayOff', 'weekend',
           'publicHoliday', 'future', 'outsideEmployment'
         ])
-        && (colors.worked + colors.firstShift + colors.secondShift +
-          colors.nightShift + colors.bhp + colors.l4Active +
-          colors.l4Inactive + colors.l4Reported)
-          .matches('^(#[0-9A-Fa-f]{6}){8}$')
-        && (colors.uw + colors.uz + colors.nn + colors.nu + colors.ni +
-          colors.opd + colors.krw + colors.wzn)
-          .matches('^(#[0-9A-Fa-f]{6}){8}$')
-        && (colors.overtime50 + colors.overtime100 + colors.nightHours +
-          colors.shortage + colors.privateTime + colors.manualCorrection +
-          colors.requiresReview + colors.blocker)
-          .matches('^(#[0-9A-Fa-f]{6}){8}$')
-        && (colors.warning + colors.dayOff + colors.weekend +
-          colors.publicHoliday + colors.future + colors.outsideEmployment)
-          .matches('^(#[0-9A-Fa-f]{6}){6}$');
+        && isColorToken(colors.worked)
+        && isColorToken(colors.firstShift)
+        && isColorToken(colors.secondShift)
+        && isColorToken(colors.nightShift)
+        && isColorToken(colors.bhp)
+        && isColorToken(colors.l4Active)
+        && isColorToken(colors.l4Inactive)
+        && isColorToken(colors.l4Reported)
+        && isColorToken(colors.uw)
+        && isColorToken(colors.uz)
+        && isColorToken(colors.nn)
+        && isColorToken(colors.nu)
+        && isColorToken(colors.ni)
+        && isColorToken(colors.opd)
+        && isColorToken(colors.krw)
+        && isColorToken(colors.wzn)
+        && isColorToken(colors.overtime50)
+        && isColorToken(colors.overtime100)
+        && isColorToken(colors.nightHours)
+        && isColorToken(colors.shortage)
+        && isColorToken(colors.privateTime)
+        && isColorToken(colors.manualCorrection)
+        && isColorToken(colors.requiresReview)
+        && isColorToken(colors.blocker)
+        && isColorToken(colors.warning)
+        && isColorToken(colors.dayOff)
+        && isColorToken(colors.weekend)
+        && isColorToken(colors.publicHoliday)
+        && isColorToken(colors.future)
+        && isColorToken(colors.outsideEmployment);
+    }
+
+    function isColorToken(value) {
+      return value is string && value.size() == 7;
     }
 
     function validCalendarAppearance(data) {
