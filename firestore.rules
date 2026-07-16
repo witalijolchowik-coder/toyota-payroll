@@ -62,38 +62,7 @@ service cloud.firestore {
           'nightHours', 'shortage', 'privateTime', 'manualCorrection',
           'requiresReview', 'blocker', 'warning', 'dayOff', 'weekend',
           'publicHoliday', 'future', 'outsideEmployment'
-        ])
-        && colors.worked is string
-        && colors.worked.matches('^#[0-9A-Fa-f]{6}$')
-        && colors.firstShift is string
-        && colors.secondShift is string
-        && colors.nightShift is string
-        && colors.bhp is string
-        && colors.l4Active is string
-        && colors.l4Inactive is string
-        && colors.l4Reported is string
-        && colors.uw is string
-        && colors.uz is string
-        && colors.nn is string
-        && colors.nu is string
-        && colors.ni is string
-        && colors.opd is string
-        && colors.krw is string
-        && colors.wzn is string
-        && colors.overtime50 is string
-        && colors.overtime100 is string
-        && colors.nightHours is string
-        && colors.shortage is string
-        && colors.privateTime is string
-        && colors.manualCorrection is string
-        && colors.requiresReview is string
-        && colors.blocker is string
-        && colors.warning is string
-        && colors.dayOff is string
-        && colors.weekend is string
-        && colors.publicHoliday is string
-        && colors.future is string
-        && colors.outsideEmployment is string;
+        ]);
     }
 
     function validCalendarAppearance(data) {

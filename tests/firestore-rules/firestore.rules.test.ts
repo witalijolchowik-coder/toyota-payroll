@@ -278,7 +278,7 @@ describe('Firestore security rules', () => {
         ...calendarAppearancePayload('admin-1'),
         text_colors: {
           ...calendarAppearancePayload('admin-1').text_colors,
-          worked: 'red',
+          unexpected_state: '#112233',
         },
       }),
     );
