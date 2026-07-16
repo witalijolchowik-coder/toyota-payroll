@@ -54,7 +54,7 @@ service cloud.firestore {
 
     function validCalendarColorMap(colors) {
       return colors is map
-        && colors.keys().size() == 31
+        && colors.keys().size() == 30
         && colors.keys().hasOnly([
           'worked', 'firstShift', 'secondShift', 'nightShift', 'bhp',
           'l4Active', 'l4Inactive', 'l4Reported', 'uw', 'uz', 'nn', 'nu',
