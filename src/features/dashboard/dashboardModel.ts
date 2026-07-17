@@ -11,7 +11,14 @@ import {
   resolveGoverningAbsence,
 } from '../../utils/absences';
 import { aggregateMedicalNotices } from '../../utils/employees';
-import { dateToIsoDate, isEmployeeActiveOnDate } from '../../utils/payroll';
+import {
+  currentPayrollMonthId,
+  dateToIsoDate,
+  formatPayrollMonthId,
+  getPayrollMonthDateRange,
+  isEmployeeActiveOnDate,
+  parsePayrollMonthId,
+} from '../../utils/payroll';
 import type { MonthReadinessSummary } from '../../utils/readiness';
 
 export interface DashboardDeadline {
@@ -48,6 +55,19 @@ export interface DashboardMonthlyRotation {
   hired: number;
   terminated: number;
   averageHeadcount: number;
+}
+
+export interface DashboardRotationOverview {
+  monthId: string;
+  previousMonthId: string;
+  total: DashboardMonthlyRotation;
+  previousTotal: DashboardMonthlyRotation;
+  polish: DashboardMonthlyRotation;
+  previousPolish: DashboardMonthlyRotation;
+  foreign: DashboardMonthlyRotation;
+  previousForeign: DashboardMonthlyRotation;
+  unclassified: DashboardMonthlyRotation;
+  previousUnclassified: DashboardMonthlyRotation;
 }
 
 export interface DashboardSnapshot {
@@ -229,10 +249,51 @@ export function calculateMonthlyRotation(
   employees: readonly Employee[],
   today: Date,
 ): DashboardMonthlyRotation {
-  const year = today.getFullYear();
-  const monthIndex = today.getMonth();
-  const monthStart = new Date(Date.UTC(year, monthIndex, 1));
-  const monthEnd = new Date(Date.UTC(year, monthIndex + 1, 0));
+  return calculateRotationForMonth(employees, currentPayrollMonthId(today));
+}
+
+export function calculateRotationOverview(
+  employees: readonly Employee[],
+  monthId: string,
+): DashboardRotationOverview {
+  const previousMonthId = precedingMonthId(monthId);
+  const polishEmployees = employees.filter(
+    (employee) => employee.citizenship === 'PL',
+  );
+  const foreignEmployees = employees.filter(
+    (employee) =>
+      Boolean(employee.citizenship) && employee.citizenship !== 'PL',
+  );
+  const unclassifiedEmployees = employees.filter(
+    (employee) => !employee.citizenship,
+  );
+
+  return {
+    monthId,
+    previousMonthId,
+    total: calculateRotationForMonth(employees, monthId),
+    previousTotal: calculateRotationForMonth(employees, previousMonthId),
+    polish: calculateRotationForMonth(polishEmployees, monthId),
+    previousPolish: calculateRotationForMonth(polishEmployees, previousMonthId),
+    foreign: calculateRotationForMonth(foreignEmployees, monthId),
+    previousForeign: calculateRotationForMonth(
+      foreignEmployees,
+      previousMonthId,
+    ),
+    unclassified: calculateRotationForMonth(unclassifiedEmployees, monthId),
+    previousUnclassified: calculateRotationForMonth(
+      unclassifiedEmployees,
+      previousMonthId,
+    ),
+  };
+}
+
+export function calculateRotationForMonth(
+  employees: readonly Employee[],
+  monthId: string,
+): DashboardMonthlyRotation {
+  const { start: monthStart, end: monthEnd } =
+    getPayrollMonthDateRange(monthId);
   const startIso = dateToIsoDate(monthStart);
   const endIso = dateToIsoDate(monthEnd);
   const hired = employees.filter(
@@ -262,7 +323,7 @@ export function calculateMonthlyRotation(
   const averageHeadcount = (headcountAtStart + headcountAtEnd) / 2;
 
   return {
-    monthId: `${year}-${String(monthIndex + 1).padStart(2, '0')}`,
+    monthId,
     rate:
       averageHeadcount > 0
         ? Math.round((terminated / averageHeadcount) * 1000) / 10
@@ -271,6 +332,13 @@ export function calculateMonthlyRotation(
     terminated,
     averageHeadcount,
   };
+}
+
+function precedingMonthId(monthId: string): string {
+  const { year, month } = parsePayrollMonthId(monthId);
+  return month === 1
+    ? formatPayrollMonthId(year - 1, 12)
+    : formatPayrollMonthId(year, month - 1);
 }
 
 function isIsoDateInRange(

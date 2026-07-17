@@ -39,10 +39,12 @@ import {
 import { PageHeader } from '../components/layout/PageHeader';
 import {
   buildDashboardSnapshot,
+  calculateRotationOverview,
   type DashboardAbsenceTrendDay,
   type DashboardDeadline,
   type DashboardDepartmentSummary,
 } from '../features/dashboard/dashboardModel';
+import { EmployeeRotationPanel } from '../features/dashboard/EmployeeRotationPanel';
 import { useAbsences } from '../features/absences/useAbsences';
 import { useEmployeeEntitlements } from '../features/employees/useEmployeeEntitlements';
 import { useEmployees } from '../features/employees/useEmployees';
@@ -113,6 +115,10 @@ export function DashboardPage() {
       entitlements,
       readiness,
     ],
+  );
+  const rotationOverview = useMemo(
+    () => calculateRotationOverview(employees, monthId),
+    [employees, monthId],
   );
   const isLoading =
     employeesLoading ||
@@ -292,6 +298,13 @@ export function DashboardPage() {
           loading={isLoading}
         />
       </Box>
+
+      <EmployeeRotationPanel
+        data={rotationOverview}
+        isLoading={employeesLoading}
+        monthId={monthId}
+        onMonthChange={setMonthId}
+      />
 
       <Box
         sx={{

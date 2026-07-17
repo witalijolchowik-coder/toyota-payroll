@@ -9,6 +9,7 @@ import type {
 import {
   buildDashboardSnapshot,
   calculateMonthlyRotation,
+  calculateRotationOverview,
 } from './dashboardModel';
 
 const today = new Date('2026-07-17T12:00:00.000Z');
@@ -250,6 +251,67 @@ describe('dashboardModel', () => {
       averageHeadcount: 0,
       rate: 0,
     });
+  });
+
+  it('builds selected-month and previous-month rotation by citizenship', () => {
+    const employees = [
+      employee('polish-existing', { citizenship: 'PL' }),
+      employee('polish-ended', {
+        citizenship: 'PL',
+        employmentEndDate: new Date('2026-07-15T00:00:00.000Z'),
+      }),
+      employee('foreign-hired', {
+        citizenship: 'UA',
+        employmentStartDate: new Date('2026-07-10T00:00:00.000Z'),
+      }),
+      employee('foreign-ended-before', {
+        citizenship: 'UA',
+        employmentEndDate: new Date('2026-06-20T00:00:00.000Z'),
+      }),
+      employee('unknown-ended', {
+        citizenship: null,
+        employmentEndDate: new Date('2026-07-12T00:00:00.000Z'),
+      }),
+    ];
+
+    const overview = calculateRotationOverview(employees, '2026-07');
+
+    expect(overview.monthId).toBe('2026-07');
+    expect(overview.previousMonthId).toBe('2026-06');
+    expect(overview.total).toMatchObject({
+      hired: 1,
+      terminated: 2,
+      averageHeadcount: 2.5,
+      rate: 80,
+    });
+    expect(overview.previousTotal).toMatchObject({
+      hired: 0,
+      terminated: 1,
+    });
+    expect(overview.polish).toMatchObject({
+      hired: 0,
+      terminated: 1,
+      averageHeadcount: 1.5,
+      rate: 66.7,
+    });
+    expect(overview.foreign).toMatchObject({
+      hired: 1,
+      terminated: 0,
+      averageHeadcount: 0.5,
+      rate: 0,
+    });
+    expect(overview.unclassified).toMatchObject({
+      hired: 0,
+      terminated: 1,
+      averageHeadcount: 0.5,
+      rate: 200,
+    });
+  });
+
+  it('handles January comparison across the year boundary', () => {
+    expect(calculateRotationOverview([], '2026-01').previousMonthId).toBe(
+      '2025-12',
+    );
   });
 });
 

@@ -107,6 +107,28 @@ export const pl = {
         terminated: 'Zwolniono: {{count}}',
       },
     },
+    rotationPanel: {
+      title: 'Rotacja pracowników',
+      description: 'Przegląd rotacji pracowników w projekcie',
+      month: 'Miesiąc',
+      totalRotation: 'Rotacja ogółem',
+      hired: 'Przyjęci',
+      terminated: 'Zwolnieni',
+      inMonth: 'Dane dla: {{month}}',
+      movementShare: 'Udział w zmianach kadrowych miesiąca',
+      polish: 'Polacy',
+      foreign: 'Cudzoziemcy',
+      projectShare: 'Udział w rotacji projektu',
+      groupRotation: 'Rotacja w grupie',
+      groupRateLabel: 'Rotacja w grupie {{group}}',
+      vsMonth: 'w porównaniu z {{month}}',
+      percentagePoints: 'p.p.',
+      formula:
+        'Rotacja = zwolnieni / średni stan zatrudnienia w okresie × 100%',
+      formulaShort: 'Zwolnieni / średni stan zatrudnienia',
+      unclassified:
+        'Brak przypisanego obywatelstwa — średni stan: {{average}}, przyjęci: {{hired}}, zwolnieni: {{terminated}}.',
+    },
     priorities: {
       title: 'Priorytety koordynatora',
       description: 'Sprawy wymagające działania w pierwszej kolejności.',
