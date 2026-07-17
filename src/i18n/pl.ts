@@ -235,6 +235,7 @@ export const pl = {
     },
     table: {
       teta: 'Numer TETA',
+      tetaCompact: 'TETA',
       employee: 'Pracownik',
       identity: 'Dokumenty',
       pesel: 'PESEL',
@@ -246,6 +247,9 @@ export const pl = {
       employmentPeriod: 'Okres zatrudnienia',
       activeEmploymentDates: 'Pierwsze zatrudnienie / aktualna umowa',
       archiveEmploymentDates: 'Pierwsze zatrudnienie / zakończenie',
+      firstEmployment: 'Pierwsze zatrudnienie',
+      currentContract: 'Aktualna umowa',
+      employmentEnd: 'Zakończenie',
       noFirstToyotaDate: 'brak pierwszej daty',
       noFinalEndDate: 'brak daty zakończenia',
       shiftShort: {
@@ -1654,6 +1658,8 @@ export const pl = {
       teta: 'TETA',
       employee: 'Nazwisko i imię',
       unassignedDepartment: 'Brak przypisanego działu',
+      collapseDepartment: 'Zwiń dział: {{department}}',
+      expandDepartment: 'Rozwiń dział: {{department}}',
       empty: '—',
       hours: '{{hours}} h',
       virtualDefault:

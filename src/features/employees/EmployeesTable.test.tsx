@@ -15,8 +15,8 @@ const employee = {
   tetaNumber: 'WT-10',
   firstName: 'Jan',
   lastName: 'Kowalski',
-  pesel: null,
-  passportNumber: null,
+  pesel: '90010112345',
+  passportNumber: 'AB123456',
   foreignDocumentNumber: null,
   firstToyotaEmploymentDate: new Date('2025-01-02T00:00:00.000Z'),
   employmentStartDate: new Date('2026-01-03T00:00:00.000Z'),
@@ -52,13 +52,23 @@ describe('EmployeesTable', () => {
     );
 
     expect(screen.getByText('Jan Kowalski')).toHaveStyle({ fontWeight: '750' });
-    expect(screen.getByText('WT-10')).toHaveStyle({ fontWeight: '400' });
+    expect(screen.getByText('TETA: WT-10')).toHaveStyle({
+      display: 'block',
+    });
+    expect(
+      screen.queryByRole('columnheader', { name: 'Numer TETA' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText('PESEL: 90010112345')).toBeInTheDocument();
+    expect(screen.getByText('Paszport: AB123456')).toBeInTheDocument();
     expect(screen.getByText('Metal')).toBeInTheDocument();
     expect(screen.getByText('Red')).toBeInTheDocument();
     expect(
       screen.queryByRole('columnheader', { name: 'Status' }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText('02.01.2025 / 03.01.2026')).toBeInTheDocument();
+    expect(screen.getByText('Pierwsze zatrudnienie')).toBeInTheDocument();
+    expect(screen.getByText('Aktualna umowa')).toBeInTheDocument();
+    expect(screen.getByText('02.01.2025')).toBeInTheDocument();
+    expect(screen.getByText('03.01.2026')).toBeInTheDocument();
   });
 
   it('exposes keyboard-accessible sortable headers', () => {

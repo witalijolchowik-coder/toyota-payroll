@@ -3,7 +3,12 @@ import PersonOffOutlined from '@mui/icons-material/PersonOffOutlined';
 import HomeWorkOutlined from '@mui/icons-material/HomeWorkOutlined';
 import HouseOutlined from '@mui/icons-material/HouseOutlined';
 import WarningAmberOutlined from '@mui/icons-material/WarningAmberOutlined';
+import BadgeOutlined from '@mui/icons-material/BadgeOutlined';
+import DescriptionOutlined from '@mui/icons-material/DescriptionOutlined';
+import type { ReactNode } from 'react';
 import {
+  Avatar,
+  Box,
   Chip,
   IconButton,
   Skeleton,
@@ -74,15 +79,9 @@ export function EmployeesTable({
 
   return (
     <TableContainer>
-      <Table sx={{ minWidth: 760 }}>
+      <Table sx={{ minWidth: 1120 }}>
         <TableHead>
           <TableRow>
-            <SortableHeader
-              column="teta"
-              sort={sort}
-              onSort={onSort}
-              label={t.employees.table.teta}
-            />
             <SortableHeader
               column="employee"
               sort={sort}
@@ -119,7 +118,7 @@ export function EmployeesTable({
           {isLoading
             ? Array.from({ length: 4 }, (_, index) => (
                 <TableRow key={index}>
-                  {Array.from({ length: 7 }, (__, cellIndex) => (
+                  {Array.from({ length: 6 }, (__, cellIndex) => (
                     <TableCell key={cellIndex}>
                       <Skeleton />
                     </TableCell>
@@ -144,20 +143,45 @@ export function EmployeesTable({
                   ) ?? null;
                 return (
                   <TableRow hover key={employee.id}>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 400 }}>
-                        {employee.tetaNumber}
-                      </Typography>
+                    <TableCell sx={{ minWidth: 235 }}>
+                      <Stack direction="row" spacing={1.5} alignItems="center">
+                        <Avatar
+                          aria-hidden="true"
+                          sx={{
+                            width: 38,
+                            height: 38,
+                            fontSize: '0.78rem',
+                            fontWeight: 750,
+                            ...employeeAvatarColors(
+                              employee.departmentId
+                                ? departmentsById.get(employee.departmentId)
+                                    ?.name
+                                : null,
+                            ),
+                          }}
+                        >
+                          {employeeInitials(employee)}
+                        </Avatar>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography
+                            variant="body2"
+                            sx={{ fontWeight: 750, lineHeight: 1.25 }}
+                          >
+                            {employeeName}
+                          </Typography>
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{ display: 'block', mt: 0.25 }}
+                          >
+                            {t.employees.table.tetaCompact}:{' '}
+                            {employee.tetaNumber}
+                          </Typography>
+                        </Box>
+                      </Stack>
                     </TableCell>
-                    <TableCell>
-                      <Typography variant="body2" sx={{ fontWeight: 750 }}>
-                        {employeeName}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Typography variant="body2">
-                        {formatIdentity(employee, t)}
-                      </Typography>
+                    <TableCell sx={{ minWidth: 205 }}>
+                      <EmployeeDocuments employee={employee} t={t} />
                     </TableCell>
                     <TableCell>
                       {departmentChip(
@@ -167,20 +191,38 @@ export function EmployeesTable({
                           : t.organization.departments.unassigned,
                       )}
                     </TableCell>
-                    <TableCell>
-                      {shiftChip(employee.shiftAssignment, t)}
+                    <TableCell sx={{ minWidth: 110 }}>
+                      <ShiftIndicator shift={employee.shiftAssignment} t={t} />
                     </TableCell>
-                    <TableCell>
-                      {formatEmploymentDates(employee, mode, t)}
-                      {statusConflict ? (
-                        <Tooltip title={t.employees.table.statusConflict}>
-                          <WarningAmberOutlined
-                            color="warning"
-                            fontSize="small"
-                            sx={{ ml: 1 }}
-                          />
-                        </Tooltip>
-                      ) : null}
+                    <TableCell sx={{ minWidth: 260 }}>
+                      <Stack direction="row" spacing={2.5} alignItems="center">
+                        <EmploymentDate
+                          label={t.employees.table.firstEmployment}
+                          value={
+                            employee.firstToyotaEmploymentDate
+                              ? dateFormatter.format(
+                                  employee.firstToyotaEmploymentDate,
+                                )
+                              : t.employees.table.noFirstToyotaDate
+                          }
+                        />
+                        <EmploymentDate
+                          label={
+                            mode === 'active'
+                              ? t.employees.table.currentContract
+                              : t.employees.table.employmentEnd
+                          }
+                          value={formatCurrentEmploymentDate(employee, mode, t)}
+                        />
+                        {statusConflict ? (
+                          <Tooltip title={t.employees.table.statusConflict}>
+                            <WarningAmberOutlined
+                              color="warning"
+                              fontSize="small"
+                            />
+                          </Tooltip>
+                        ) : null}
+                      </Stack>
                     </TableCell>
                     <TableCell align="right">
                       <Stack
@@ -205,6 +247,7 @@ export function EmployeesTable({
                             onClick={() =>
                               onAccommodation(employee, currentAccommodation)
                             }
+                            sx={actionButtonSx}
                           >
                             {currentAccommodation ? (
                               <HomeWorkOutlined
@@ -227,6 +270,7 @@ export function EmployeesTable({
                               name: employeeName,
                             })}
                             onClick={() => onEdit(employee)}
+                            sx={actionButtonSx}
                           >
                             <EditOutlined fontSize="small" />
                           </IconButton>
@@ -245,6 +289,7 @@ export function EmployeesTable({
                                 { name: employeeName },
                               )}
                               onClick={() => onDeactivate(employee)}
+                              sx={actionButtonSx}
                             >
                               <PersonOffOutlined fontSize="small" />
                             </IconButton>
@@ -261,32 +306,12 @@ export function EmployeesTable({
   );
 }
 
-function formatIdentity(
-  employee: Employee,
-  t: ReturnType<typeof useTranslations>,
-): string {
-  const values = [
-    employee.pesel ? `${t.employees.table.pesel}: ${employee.pesel}` : null,
-    employee.passportNumber
-      ? `${t.employees.table.passport}: ${employee.passportNumber}`
-      : null,
-    employee.foreignDocumentNumber
-      ? `${t.employees.table.foreignDocument}: ${employee.foreignDocumentNumber}`
-      : null,
-  ].filter(Boolean);
-
-  return values.length > 0 ? values.join(' · ') : t.employees.table.noIdentity;
-}
-
-function formatEmploymentDates(
+function formatCurrentEmploymentDate(
   employee: Employee,
   mode: EmployeeListMode,
   t: ReturnType<typeof useTranslations>,
 ): string {
-  const first = employee.firstToyotaEmploymentDate
-    ? dateFormatter.format(employee.firstToyotaEmploymentDate)
-    : t.employees.table.noFirstToyotaDate;
-  const second =
+  const date =
     mode === 'active'
       ? employee.employmentStartDate
       : employee.employmentEndDate;
@@ -294,7 +319,7 @@ function formatEmploymentDates(
     mode === 'active'
       ? t.employees.table.noStartDate
       : t.employees.table.noFinalEndDate;
-  return `${first} / ${second ? dateFormatter.format(second) : fallback}`;
+  return date ? dateFormatter.format(date) : fallback;
 }
 
 function SortableHeader({
@@ -343,33 +368,138 @@ function departmentChip(label: string) {
   );
 }
 
-function shiftChip(
-  shift: Employee['shiftAssignment'],
-  t: ReturnType<typeof useTranslations>,
-) {
-  if (!shift)
+function EmployeeDocuments({
+  employee,
+  t,
+}: {
+  employee: Employee;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const documents = [
+    employee.pesel
+      ? {
+          icon: <BadgeOutlined fontSize="inherit" />,
+          label: `${t.employees.table.pesel}: ${employee.pesel}`,
+        }
+      : null,
+    employee.passportNumber
+      ? {
+          icon: <DescriptionOutlined fontSize="inherit" />,
+          label: `${t.employees.table.passport}: ${employee.passportNumber}`,
+        }
+      : null,
+    employee.foreignDocumentNumber
+      ? {
+          icon: <DescriptionOutlined fontSize="inherit" />,
+          label: `${t.employees.table.foreignDocument}: ${employee.foreignDocumentNumber}`,
+        }
+      : null,
+  ].filter(
+    (document): document is { icon: ReactNode; label: string } =>
+      document !== null,
+  );
+
+  if (documents.length === 0) {
     return (
-      <Chip
-        size="small"
-        variant="outlined"
-        label={t.organization.shifts.unassigned}
-      />
+      <Typography variant="body2" color="text.secondary">
+        {t.employees.table.noIdentity}
+      </Typography>
     );
-  const label = t.employees.table.shiftShort[shift];
-  const styles = {
-    RED: { bgcolor: '#fee2e2', color: '#991b1b' },
-    WHITE: {
-      bgcolor: '#ffffff',
-      color: '#374151',
-      border: '1px solid #9ca3af',
-    },
-    BLUE: { bgcolor: '#dbeafe', color: '#1e3a8a' },
-  } as const;
+  }
+
   return (
-    <Chip
-      size="small"
-      label={label}
-      sx={{ ...styles[shift], fontWeight: 700 }}
-    />
+    <Stack spacing={0.35}>
+      {documents.map((document) => (
+        <Stack
+          key={document.label}
+          direction="row"
+          spacing={0.7}
+          alignItems="center"
+        >
+          <Box
+            component="span"
+            sx={{
+              display: 'inline-flex',
+              color: 'text.secondary',
+              fontSize: '1rem',
+            }}
+          >
+            {document.icon}
+          </Box>
+          <Typography variant="body2" color="text.secondary">
+            {document.label}
+          </Typography>
+        </Stack>
+      ))}
+    </Stack>
   );
 }
+
+function ShiftIndicator({
+  shift,
+  t,
+}: {
+  shift: Employee['shiftAssignment'];
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const color = shift
+    ? { RED: '#d2101e', WHITE: '#64748b', BLUE: '#2e90fa' }[shift]
+    : '#98a2b3';
+  const label = shift
+    ? t.employees.table.shiftShort[shift]
+    : t.organization.shifts.unassigned;
+
+  return (
+    <Stack direction="row" spacing={1} alignItems="center">
+      <Box
+        aria-hidden="true"
+        sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: color }}
+      />
+      <Typography variant="body2" color="text.secondary">
+        {label}
+      </Typography>
+    </Stack>
+  );
+}
+
+function EmploymentDate({ label, value }: { label: string; value: string }) {
+  return (
+    <Box>
+      <Typography
+        variant="caption"
+        color="text.secondary"
+        sx={{ display: 'block', whiteSpace: 'nowrap' }}
+      >
+        {label}
+      </Typography>
+      <Typography
+        variant="body2"
+        sx={{ fontWeight: 650, whiteSpace: 'nowrap' }}
+      >
+        {value}
+      </Typography>
+    </Box>
+  );
+}
+
+function employeeInitials(employee: Employee): string {
+  return `${employee.firstName.charAt(0)}${employee.lastName.charAt(0)}`.toUpperCase();
+}
+
+function employeeAvatarColors(departmentName?: string | null) {
+  const style = departmentName ? departmentStyles[departmentName] : undefined;
+  return style
+    ? { bgcolor: style.bg, color: style.color }
+    : { bgcolor: '#f2f4f7', color: '#475467' };
+}
+
+const actionButtonSx = {
+  width: 36,
+  height: 36,
+  border: 1,
+  borderColor: 'divider',
+  borderRadius: 2,
+  '&:hover': {
+    borderColor: 'currentColor',
+  },
+} as const;

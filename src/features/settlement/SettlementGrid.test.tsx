@@ -51,6 +51,46 @@ describe('SettlementGrid', () => {
     expect(screen.getByText('Montaż')).toBeInTheDocument();
     expect(screen.getByText('Zmiana Red')).toBeInTheDocument();
     expect(screen.queryByText('TETA-1001')).not.toBeInTheDocument();
+    expect(
+      screen.getByTestId('settlement-department-group-montaz'),
+    ).toHaveTextContent('1');
+  });
+
+  it('collapses and expands a department group without changing its count', () => {
+    const secondEmployee: Employee = {
+      ...employee,
+      id: 'employee-2',
+      tetaNumber: 'TETA-1002',
+      firstName: 'Anna',
+      lastName: 'Nowak',
+    };
+    render(
+      <SettlementGrid
+        employees={[employee, secondEmployee]}
+        departments={[department]}
+        days={createCalendarDays('2026-06')}
+        dailyValues={[]}
+      />,
+    );
+
+    const toggle = screen.getByRole('button', {
+      name: 'Zwiń dział: Montaż',
+    });
+    expect(
+      screen.getByTestId('settlement-department-group-montaz'),
+    ).toHaveTextContent('2');
+    expect(screen.getByText('Jan Kowalski')).toBeInTheDocument();
+    expect(screen.getByText('Anna Nowak')).toBeInTheDocument();
+
+    fireEvent.click(toggle);
+    expect(screen.queryByText('Jan Kowalski')).not.toBeInTheDocument();
+    expect(screen.queryByText('Anna Nowak')).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Rozwiń dział: Montaż' }),
+    );
+    expect(screen.getByText('Jan Kowalski')).toBeInTheDocument();
+    expect(screen.getByText('Anna Nowak')).toBeInTheDocument();
   });
 
   it('opens the personal calendar from the employee name and the day editor from a cell', () => {

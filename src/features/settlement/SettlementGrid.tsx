@@ -15,6 +15,16 @@ import {
 } from '@mui/material';
 import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded';
 import WbSunnyRoundedIcon from '@mui/icons-material/WbSunnyRounded';
+import BuildOutlined from '@mui/icons-material/BuildOutlined';
+import CheckroomOutlined from '@mui/icons-material/CheckroomOutlined';
+import HelpOutline from '@mui/icons-material/HelpOutline';
+import Inventory2Outlined from '@mui/icons-material/Inventory2Outlined';
+import KeyboardArrowDown from '@mui/icons-material/KeyboardArrowDown';
+import KeyboardArrowUp from '@mui/icons-material/KeyboardArrowUp';
+import LayersOutlined from '@mui/icons-material/LayersOutlined';
+import PrecisionManufacturingOutlined from '@mui/icons-material/PrecisionManufacturingOutlined';
+import ViewStreamOutlined from '@mui/icons-material/ViewStreamOutlined';
+import { Fragment, useState, type ReactNode } from 'react';
 
 import { useTranslations } from '../../hooks/useTranslations';
 import { useCalendarAppearance } from '../../hooks/useCalendarAppearance';
@@ -144,6 +154,24 @@ export function SettlementGrid({
     referenceDate: days[0]?.isoDate ?? ('1970-01-01' as IsoDate),
     unassignedLabel: t.settlement.grid.unassignedDepartment,
   });
+  const [collapsedDepartments, setCollapsedDepartments] = useState<
+    ReadonlySet<string>
+  >(new Set());
+  const departmentCounts = employeeRows.reduce((counts, row) => {
+    const key = departmentGroupKey(row.departmentId);
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+    return counts;
+  }, new Map<string, number>());
+
+  const toggleDepartment = (departmentId: string | null) => {
+    const key = departmentGroupKey(departmentId);
+    setCollapsedDepartments((current) => {
+      const next = new Set(current);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  };
 
   return (
     <Card sx={{ overflow: 'visible' }}>
@@ -239,272 +267,279 @@ export function SettlementGrid({
               const shiftLabel = employee.shiftAssignment
                 ? t.organization.shifts[employee.shiftAssignment]
                 : t.organization.shifts.unassigned;
+              const groupKey = departmentGroupKey(row.departmentId);
+              const isDepartmentCollapsed = collapsedDepartments.has(groupKey);
 
               return (
-                <TableRow hover key={employee.id}>
-                  <TableCell
-                    sx={{
-                      ...leadingCellSx({
-                        left: 0,
-                        width: employeeColumnWidth,
-                        zIndex: 3,
-                      }),
-                      borderTop: row.isFirstInDepartment ? 2 : undefined,
-                      borderTopColor: row.isFirstInDepartment
-                        ? 'primary.light'
-                        : undefined,
-                      boxShadow: row.isFirstInDepartment
-                        ? (theme) =>
-                            `inset 4px 0 0 ${theme.palette.primary.main}`
-                        : undefined,
-                      pl: row.isFirstInDepartment ? 1.75 : 2,
-                    }}
-                  >
-                    {row.isFirstInDepartment ? (
-                      <Typography
-                        variant="overline"
-                        color="primary"
-                        sx={{
-                          display: 'block',
-                          fontSize: '0.58rem',
-                          fontWeight: 800,
-                          lineHeight: 1.1,
-                          letterSpacing: '0.08em',
-                        }}
-                      >
-                        {departmentLabel}
-                      </Typography>
-                    ) : null}
-                    <ButtonBase
-                      onClick={() => onOpenEmployeeCalendar?.(employee)}
-                      aria-label={interpolate(
-                        t.settlement.grid.openEmployeeCalendar,
-                        {
-                          employee: `${employee.firstName} ${employee.lastName}`,
-                        },
+                <Fragment key={employee.id}>
+                  {row.isFirstInDepartment ? (
+                    <DepartmentGroupRow
+                      departmentId={row.departmentId}
+                      label={departmentLabel}
+                      count={departmentCounts.get(groupKey) ?? 0}
+                      isCollapsed={isDepartmentCollapsed}
+                      columnCount={days.length + 1}
+                      collapseLabel={interpolate(
+                        t.settlement.grid.collapseDepartment,
+                        { department: departmentLabel },
                       )}
-                      sx={{
-                        borderRadius: 1,
-                        textAlign: 'left',
-                        '&:hover': { color: 'primary.main' },
-                      }}
-                    >
-                      <Typography
-                        variant="body2"
-                        noWrap
-                        sx={{
-                          fontWeight: 750,
-                          textDecoration: 'underline',
-                          textUnderlineOffset: 3,
-                        }}
-                      >
-                        {employee.firstName} {employee.lastName}
-                      </Typography>
-                    </ButtonBase>
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      noWrap
-                      sx={{ display: 'block' }}
-                    >
-                      {shiftLabel}
-                    </Typography>
-                  </TableCell>
-                  {days.map((day) => {
-                    const persistedValue = dailyValuesByEmployeeAndDate.get(
-                      dailyValueLookupKey(employee.id, day.isoDate),
-                    );
-                    const plannedDay = plannedScheduleByDate.get(day.isoDate);
-                    const value = resolveSettlementCellValue({
-                      employee,
-                      day,
-                      persistedValue,
-                    });
-                    const absenceResolution = resolveGoverningAbsence(
-                      absencesByEmployee.get(employee.id) ?? [],
-                      day.isoDate,
-                    );
-                    const absenceLabel =
-                      absenceResolution.kind === 'governed'
-                        ? absenceResolution.code === 'L4' &&
-                          absenceResolution.confirmation === 'reported'
-                          ? t.settlement.grid.reportedL4Label
-                          : absenceResolution.code
-                        : absenceResolution.kind === 'ambiguous'
-                          ? absenceResolution.codes.join('/')
-                          : null;
-                    const appearanceKey =
-                      absenceResolution.kind === 'governed'
-                        ? appearanceKeyForAbsence(
-                            absenceResolution.code,
-                            absenceResolution.confirmation,
-                          )
-                        : appearanceKeyForPlannedDay(plannedDay);
-                    const hoursLabel =
-                      value.hours === null
-                        ? t.settlement.grid.empty
-                        : interpolate(t.settlement.grid.hours, {
-                            hours: value.hours.toLocaleString('pl-PL'),
-                          });
-                    const displayLabel = cellDisplayLabel({
-                      value,
-                      plannedDay,
-                      hoursLabel,
-                      emptyLabel: t.settlement.grid.empty,
-                      displayMode,
-                    });
-                    const workTimeBreakdown = resolveGridWorkTimeBreakdown({
-                      value,
-                      day,
-                      plannedDay,
-                    });
-                    const hasGoverningAbsence =
-                      absenceResolution.kind !== 'none';
-                    const warnings = resolveAttendanceWarnings({
-                      hasExplicitValue: Boolean(persistedValue),
-                      hasActiveAbsence: hasGoverningAbsence,
-                      isWorkingDay: day.isWorkingDay,
-                      isWithinEmployment:
-                        value.calendarState !== 'outside-employment',
-                    });
-                    const tooltip = buildTooltip({
-                      value,
-                      plannedDay,
-                      absenceResolution,
-                      warnings,
-                      isSettled,
-                      workTimeBreakdown,
-                      t,
-                    });
-                    const canEdit =
-                      !isSettled &&
-                      value.calendarState !== 'future' &&
-                      value.calendarState !== 'outside-employment' &&
-                      Boolean(onSelectCell ?? onEditCell);
-                    const isSelected = isDateInRangeSelection(
-                      selection,
-                      employee.id,
-                      day.isoDate,
-                    );
-                    const employeeName = `${employee.lastName} ${employee.firstName}`;
-                    const editLabel = interpolate(t.settlement.grid.edit, {
-                      employee: employeeName,
-                      date: day.isoDate,
-                    });
-
-                    return (
+                      expandLabel={interpolate(
+                        t.settlement.grid.expandDepartment,
+                        { department: departmentLabel },
+                      )}
+                      onToggle={() => toggleDepartment(row.departmentId)}
+                    />
+                  ) : null}
+                  {isDepartmentCollapsed ? null : (
+                    <TableRow hover>
                       <TableCell
-                        key={day.isoDate}
-                        align="center"
                         sx={{
-                          width:
-                            displayMode === 'hours'
-                              ? detailedHoursColumnMinWidth
-                              : dayColumnMinWidth,
-                          minWidth:
-                            displayMode === 'hours'
-                              ? detailedHoursColumnMinWidth
-                              : dayColumnMinWidth,
-                          px: 0.2,
-                          py: 0.35,
-                          ...cellBackground(
-                            value.calendarState,
-                            day,
-                            palette,
-                            appearanceKey,
-                            Boolean(absenceLabel),
-                          ),
-                          ...(warnings.length > 0
-                            ? {
-                                boxShadow: `inset 0 0 0 2px ${palette.warning.text}`,
-                              }
-                            : {}),
-                          ...(isSelected
-                            ? {
-                                outline: (theme) =>
-                                  `3px solid ${theme.palette.primary.main}`,
-                                outlineOffset: -3,
-                              }
-                            : {}),
+                          ...leadingCellSx({
+                            left: 0,
+                            width: employeeColumnWidth,
+                            zIndex: 3,
+                          }),
+                          pl: 2,
                         }}
                       >
-                        <Tooltip title={tooltip}>
-                          <Box component="span" sx={{ display: 'block' }}>
-                            <ButtonBase
-                              disabled={!canEdit}
-                              aria-label={canEdit ? editLabel : undefined}
-                              onClick={() =>
-                                (onSelectCell ?? onEditCell)?.(
-                                  employee,
-                                  day,
-                                  value,
-                                  hasGoverningAbsence,
-                                  plannedDay,
-                                )
-                              }
-                              sx={{
-                                width: '100%',
-                                minHeight: 28,
-                                borderRadius: 1,
-                                cursor: canEdit ? 'pointer' : 'default',
-                                '&.Mui-disabled': { opacity: 1 },
-                              }}
-                            >
-                              <Box
-                                component="span"
-                                sx={
-                                  absenceLabel
-                                    ? {
-                                        color:
-                                          absenceResolution.kind === 'ambiguous'
-                                            ? palette.warning.text
-                                            : palette[appearanceKey].text,
-                                        fontWeight: 800,
-                                      }
-                                    : {}
-                                }
-                              >
-                                {absenceLabel ? (
-                                  <>
-                                    <Box
-                                      component="span"
-                                      sx={{ display: 'block', lineHeight: 1.1 }}
-                                    >
-                                      {absenceLabel}
-                                    </Box>
-                                    {persistedValue ? (
-                                      <Box
-                                        component="span"
-                                        sx={{
-                                          display: 'block',
-                                          color: palette.warning.text,
-                                          fontSize: '0.65rem',
-                                          lineHeight: 1.1,
-                                        }}
-                                      >
-                                        {hoursLabel}
-                                      </Box>
-                                    ) : null}
-                                  </>
-                                ) : (
-                                  <CellHoursContent
-                                    displayLabel={displayLabel}
-                                    displayMode={displayMode}
-                                    valueKind={value.kind}
-                                    workTimeBreakdown={workTimeBreakdown}
-                                    appearanceKey={appearanceKey}
-                                    palette={palette}
-                                    t={t}
-                                  />
-                                )}
-                              </Box>
-                            </ButtonBase>
-                          </Box>
-                        </Tooltip>
+                        <ButtonBase
+                          onClick={() => onOpenEmployeeCalendar?.(employee)}
+                          aria-label={interpolate(
+                            t.settlement.grid.openEmployeeCalendar,
+                            {
+                              employee: `${employee.firstName} ${employee.lastName}`,
+                            },
+                          )}
+                          sx={{
+                            borderRadius: 1,
+                            textAlign: 'left',
+                            '&:hover': { color: 'primary.main' },
+                          }}
+                        >
+                          <Typography
+                            variant="body2"
+                            noWrap
+                            sx={{
+                              fontWeight: 750,
+                              textDecoration: 'underline',
+                              textUnderlineOffset: 3,
+                            }}
+                          >
+                            {employee.firstName} {employee.lastName}
+                          </Typography>
+                        </ButtonBase>
+                        <Typography
+                          variant="caption"
+                          color="text.secondary"
+                          noWrap
+                          sx={{ display: 'block' }}
+                        >
+                          {shiftLabel}
+                        </Typography>
                       </TableCell>
-                    );
-                  })}
-                </TableRow>
+                      {days.map((day) => {
+                        const persistedValue = dailyValuesByEmployeeAndDate.get(
+                          dailyValueLookupKey(employee.id, day.isoDate),
+                        );
+                        const plannedDay = plannedScheduleByDate.get(
+                          day.isoDate,
+                        );
+                        const value = resolveSettlementCellValue({
+                          employee,
+                          day,
+                          persistedValue,
+                        });
+                        const absenceResolution = resolveGoverningAbsence(
+                          absencesByEmployee.get(employee.id) ?? [],
+                          day.isoDate,
+                        );
+                        const absenceLabel =
+                          absenceResolution.kind === 'governed'
+                            ? absenceResolution.code === 'L4' &&
+                              absenceResolution.confirmation === 'reported'
+                              ? t.settlement.grid.reportedL4Label
+                              : absenceResolution.code
+                            : absenceResolution.kind === 'ambiguous'
+                              ? absenceResolution.codes.join('/')
+                              : null;
+                        const appearanceKey =
+                          absenceResolution.kind === 'governed'
+                            ? appearanceKeyForAbsence(
+                                absenceResolution.code,
+                                absenceResolution.confirmation,
+                              )
+                            : appearanceKeyForPlannedDay(plannedDay);
+                        const hoursLabel =
+                          value.hours === null
+                            ? t.settlement.grid.empty
+                            : interpolate(t.settlement.grid.hours, {
+                                hours: value.hours.toLocaleString('pl-PL'),
+                              });
+                        const displayLabel = cellDisplayLabel({
+                          value,
+                          plannedDay,
+                          hoursLabel,
+                          emptyLabel: t.settlement.grid.empty,
+                          displayMode,
+                        });
+                        const workTimeBreakdown = resolveGridWorkTimeBreakdown({
+                          value,
+                          day,
+                          plannedDay,
+                        });
+                        const hasGoverningAbsence =
+                          absenceResolution.kind !== 'none';
+                        const warnings = resolveAttendanceWarnings({
+                          hasExplicitValue: Boolean(persistedValue),
+                          hasActiveAbsence: hasGoverningAbsence,
+                          isWorkingDay: day.isWorkingDay,
+                          isWithinEmployment:
+                            value.calendarState !== 'outside-employment',
+                        });
+                        const tooltip = buildTooltip({
+                          value,
+                          plannedDay,
+                          absenceResolution,
+                          warnings,
+                          isSettled,
+                          workTimeBreakdown,
+                          t,
+                        });
+                        const canEdit =
+                          !isSettled &&
+                          value.calendarState !== 'future' &&
+                          value.calendarState !== 'outside-employment' &&
+                          Boolean(onSelectCell ?? onEditCell);
+                        const isSelected = isDateInRangeSelection(
+                          selection,
+                          employee.id,
+                          day.isoDate,
+                        );
+                        const employeeName = `${employee.lastName} ${employee.firstName}`;
+                        const editLabel = interpolate(t.settlement.grid.edit, {
+                          employee: employeeName,
+                          date: day.isoDate,
+                        });
+
+                        return (
+                          <TableCell
+                            key={day.isoDate}
+                            align="center"
+                            sx={{
+                              width:
+                                displayMode === 'hours'
+                                  ? detailedHoursColumnMinWidth
+                                  : dayColumnMinWidth,
+                              minWidth:
+                                displayMode === 'hours'
+                                  ? detailedHoursColumnMinWidth
+                                  : dayColumnMinWidth,
+                              px: 0.2,
+                              py: 0.35,
+                              ...cellBackground(
+                                value.calendarState,
+                                day,
+                                palette,
+                                appearanceKey,
+                                Boolean(absenceLabel),
+                              ),
+                              ...(warnings.length > 0
+                                ? {
+                                    boxShadow: `inset 0 0 0 2px ${palette.warning.text}`,
+                                  }
+                                : {}),
+                              ...(isSelected
+                                ? {
+                                    outline: (theme) =>
+                                      `3px solid ${theme.palette.primary.main}`,
+                                    outlineOffset: -3,
+                                  }
+                                : {}),
+                            }}
+                          >
+                            <Tooltip title={tooltip}>
+                              <Box component="span" sx={{ display: 'block' }}>
+                                <ButtonBase
+                                  disabled={!canEdit}
+                                  aria-label={canEdit ? editLabel : undefined}
+                                  onClick={() =>
+                                    (onSelectCell ?? onEditCell)?.(
+                                      employee,
+                                      day,
+                                      value,
+                                      hasGoverningAbsence,
+                                      plannedDay,
+                                    )
+                                  }
+                                  sx={{
+                                    width: '100%',
+                                    minHeight: 28,
+                                    borderRadius: 1,
+                                    cursor: canEdit ? 'pointer' : 'default',
+                                    '&.Mui-disabled': { opacity: 1 },
+                                  }}
+                                >
+                                  <Box
+                                    component="span"
+                                    sx={
+                                      absenceLabel
+                                        ? {
+                                            color:
+                                              absenceResolution.kind ===
+                                              'ambiguous'
+                                                ? palette.warning.text
+                                                : palette[appearanceKey].text,
+                                            fontWeight: 800,
+                                          }
+                                        : {}
+                                    }
+                                  >
+                                    {absenceLabel ? (
+                                      <>
+                                        <Box
+                                          component="span"
+                                          sx={{
+                                            display: 'block',
+                                            lineHeight: 1.1,
+                                          }}
+                                        >
+                                          {absenceLabel}
+                                        </Box>
+                                        {persistedValue ? (
+                                          <Box
+                                            component="span"
+                                            sx={{
+                                              display: 'block',
+                                              color: palette.warning.text,
+                                              fontSize: '0.65rem',
+                                              lineHeight: 1.1,
+                                            }}
+                                          >
+                                            {hoursLabel}
+                                          </Box>
+                                        ) : null}
+                                      </>
+                                    ) : (
+                                      <CellHoursContent
+                                        displayLabel={displayLabel}
+                                        displayMode={displayMode}
+                                        valueKind={value.kind}
+                                        workTimeBreakdown={workTimeBreakdown}
+                                        appearanceKey={appearanceKey}
+                                        palette={palette}
+                                        t={t}
+                                      />
+                                    )}
+                                  </Box>
+                                </ButtonBase>
+                              </Box>
+                            </Tooltip>
+                          </TableCell>
+                        );
+                      })}
+                    </TableRow>
+                  )}
+                </Fragment>
               );
             })}
           </TableBody>
@@ -512,6 +547,142 @@ export function SettlementGrid({
       </TableContainer>
     </Card>
   );
+}
+
+function DepartmentGroupRow({
+  departmentId,
+  label,
+  count,
+  isCollapsed,
+  columnCount,
+  collapseLabel,
+  expandLabel,
+  onToggle,
+}: {
+  departmentId: string | null;
+  label: string;
+  count: number;
+  isCollapsed: boolean;
+  columnCount: number;
+  collapseLabel: string;
+  expandLabel: string;
+  onToggle: () => void;
+}) {
+  const groupKey = departmentGroupKey(departmentId);
+  return (
+    <TableRow
+      data-testid={`settlement-department-group-${groupKey}`}
+      sx={{ bgcolor: '#fffafb' }}
+    >
+      <TableCell
+        colSpan={columnCount}
+        sx={{
+          p: 0,
+          borderTop: 1,
+          borderBottom: 1,
+          borderColor: 'divider',
+        }}
+      >
+        <ButtonBase
+          data-testid={`settlement-department-toggle-${groupKey}`}
+          aria-label={isCollapsed ? expandLabel : collapseLabel}
+          aria-expanded={!isCollapsed}
+          onClick={onToggle}
+          sx={{
+            position: 'sticky',
+            left: 0,
+            width: 'calc(100vw - 120px)',
+            maxWidth: '100%',
+            minHeight: 54,
+            px: 2,
+            display: 'flex',
+            justifyContent: 'flex-start',
+            textAlign: 'left',
+            '&:hover': { bgcolor: 'rgba(210, 16, 30, 0.045)' },
+          }}
+        >
+          <Box
+            aria-hidden="true"
+            sx={{
+              width: 34,
+              height: 34,
+              borderRadius: '50%',
+              bgcolor: 'primary.main',
+              color: 'primary.contrastText',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flex: '0 0 auto',
+              '& svg': { fontSize: 19 },
+            }}
+          >
+            {departmentIcon(departmentId, label)}
+          </Box>
+          <Typography
+            variant="subtitle2"
+            color="primary"
+            sx={{
+              ml: 1.25,
+              fontWeight: 800,
+              letterSpacing: '0.045em',
+              textTransform: 'uppercase',
+            }}
+          >
+            {label}
+          </Typography>
+          <Box
+            component="span"
+            sx={{
+              ml: 1,
+              minWidth: 26,
+              height: 24,
+              px: 0.75,
+              borderRadius: 1.25,
+              bgcolor: 'action.hover',
+              color: 'text.secondary',
+              display: 'inline-flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              fontSize: '0.78rem',
+              fontWeight: 750,
+            }}
+          >
+            {count}
+          </Box>
+          <Box
+            component="span"
+            sx={{
+              ml: 'auto',
+              display: 'inline-flex',
+              color: 'text.primary',
+            }}
+          >
+            {isCollapsed ? <KeyboardArrowDown /> : <KeyboardArrowUp />}
+          </Box>
+        </ButtonBase>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function departmentGroupKey(departmentId: string | null): string {
+  return departmentId ?? 'unassigned';
+}
+
+function departmentIcon(
+  departmentId: string | null,
+  departmentLabel: string,
+): ReactNode {
+  const key = `${departmentId ?? ''} ${departmentLabel}`.toLocaleLowerCase(
+    'pl-PL',
+  );
+  if (key.includes('szwal')) return <CheckroomOutlined />;
+  if (key.includes('monta')) return <BuildOutlined />;
+  if (key.includes('metal')) return <PrecisionManufacturingOutlined />;
+  if (key.includes('magaz')) return <Inventory2Outlined />;
+  if (key.includes('headliner')) return <ViewStreamOutlined />;
+  if (key.includes('pu')) return <LayersOutlined />;
+  return <HelpOutline />;
 }
 
 function leadingCellSx({
