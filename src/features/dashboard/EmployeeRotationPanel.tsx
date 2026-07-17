@@ -55,18 +55,18 @@ export function EmployeeRotationPanel({
     data.unclassified.terminated > 0;
 
   return (
-    <Card>
-      <CardContent sx={{ p: { xs: 2, sm: 2.75 } }}>
+    <Card sx={{ height: '100%' }}>
+      <CardContent sx={{ p: 2 }}>
         <Stack
           direction={{ xs: 'column', sm: 'row' }}
-          spacing={2}
+          spacing={1.5}
           sx={{
             alignItems: { sm: 'center' },
             justifyContent: 'space-between',
           }}
         >
-          <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
-            <IconBadge color={RED}>
+          <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+            <IconBadge color={RED} small>
               <SyncAltOutlined />
             </IconBadge>
             <Box>
@@ -75,7 +75,7 @@ export function EmployeeRotationPanel({
                 spacing={0.75}
                 sx={{ alignItems: 'center' }}
               >
-                <Typography variant="h5">
+                <Typography variant="h6">
                   {t.dashboard.rotationPanel.title}
                 </Typography>
                 <Tooltip title={t.dashboard.rotationPanel.formula}>
@@ -85,7 +85,7 @@ export function EmployeeRotationPanel({
                   />
                 </Tooltip>
               </Stack>
-              <Typography color="text.secondary" variant="body2">
+              <Typography color="text.secondary" variant="caption">
                 {t.dashboard.rotationPanel.description}
               </Typography>
             </Box>
@@ -97,16 +97,16 @@ export function EmployeeRotationPanel({
             value={monthId}
             onChange={(event) => onMonthChange(event.target.value)}
             slotProps={{ inputLabel: { shrink: true } }}
-            sx={{ width: { xs: '100%', sm: 220 } }}
+            sx={{ width: { xs: '100%', sm: 180 } }}
           />
         </Stack>
 
-        <Divider sx={{ mx: { xs: -2, sm: -2.75 }, my: 2.5 }} />
+        <Divider sx={{ mx: -2, my: 1.5 }} />
 
         {isLoading ? (
           <RotationPanelSkeleton />
         ) : (
-          <Stack spacing={2}>
+          <Stack spacing={1.25}>
             <Box
               sx={{
                 display: 'grid',
@@ -114,7 +114,7 @@ export function EmployeeRotationPanel({
                   xs: '1fr',
                   md: 'repeat(3, minmax(0, 1fr))',
                 },
-                gap: 2,
+                gap: 1.25,
               }}
             >
               <RotationSummaryCard
@@ -151,7 +151,7 @@ export function EmployeeRotationPanel({
                   xs: '1fr',
                   lg: 'repeat(2, minmax(0, 1fr))',
                 },
-                gap: 2,
+                gap: 1.25,
               }}
             >
               <GroupRotationCard
@@ -173,8 +173,8 @@ export function EmployeeRotationPanel({
             {hasUnclassified ? (
               <Box
                 sx={{
-                  px: 1.5,
-                  py: 1,
+                  px: 1.25,
+                  py: 0.75,
                   borderRadius: 2,
                   bgcolor: 'warning.50',
                   color: 'warning.dark',
@@ -191,10 +191,14 @@ export function EmployeeRotationPanel({
           </Stack>
         )}
 
-        <Divider sx={{ mx: { xs: -2, sm: -2.75 }, mt: 2.5, mb: 1.5 }} />
+        <Divider sx={{ mx: -2, mt: 1.5, mb: 1 }} />
         <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
           <InfoOutlined sx={{ color: 'text.secondary', fontSize: 18 }} />
-          <Typography color="text.secondary" variant="caption">
+          <Typography
+            color="text.secondary"
+            variant="caption"
+            sx={{ lineHeight: 1.25 }}
+          >
             {t.dashboard.rotationPanel.formula}
           </Typography>
         </Stack>
@@ -218,27 +222,33 @@ function RotationSummaryCard({
     <MetricCard>
       <Stack
         direction="row"
-        spacing={2}
+        spacing={1}
         sx={{ justifyContent: 'space-between' }}
       >
         <Box sx={{ minWidth: 0 }}>
-          <Typography variant="h6">
+          <Typography sx={{ fontSize: '0.95rem', fontWeight: 750 }}>
             {t.dashboard.rotationPanel.totalRotation}
           </Typography>
-          <Typography variant="h2" sx={{ color: RED, mt: 1.5 }}>
+          <Typography
+            sx={{ color: RED, fontSize: '2.1rem', lineHeight: 1.1, mt: 0.75 }}
+          >
             {formatPercent(current.rate)}
           </Typography>
-          <Typography color="text.secondary" variant="body2" sx={{ mt: 0.5 }}>
+          <Typography
+            color="text.secondary"
+            variant="caption"
+            sx={{ display: 'block', mt: 0.35, lineHeight: 1.25 }}
+          >
             {t.dashboard.rotationPanel.formulaShort}
           </Typography>
         </Box>
         <CircularGauge
           value={current.rate}
           color={RED}
-          size={92}
+          size={64}
           ariaLabel={t.dashboard.rotationPanel.totalRotation}
         >
-          <SyncAltOutlined sx={{ color: RED, fontSize: 34 }} />
+          <SyncAltOutlined sx={{ color: RED, fontSize: 26 }} />
         </CircularGauge>
       </Stack>
       <LinearProgressBar value={current.rate} color={RED} />
@@ -246,6 +256,7 @@ function RotationSummaryCard({
         value={delta}
         suffix={t.dashboard.rotationPanel.percentagePoints}
         comparisonMonth={previousMonthId}
+        compact
       />
     </MetricCard>
   );
@@ -275,15 +286,17 @@ function MovementCard({
     <MetricCard>
       <Stack
         direction="row"
-        spacing={2}
+        spacing={1}
         sx={{ justifyContent: 'space-between' }}
       >
         <Box>
-          <Typography variant="h6">{title}</Typography>
-          <Typography variant="h2" sx={{ mt: 1.5 }}>
+          <Typography sx={{ fontSize: '0.95rem', fontWeight: 750 }}>
+            {title}
+          </Typography>
+          <Typography sx={{ fontSize: '2.1rem', lineHeight: 1.1, mt: 0.75 }}>
             {value}
           </Typography>
-          <Typography color="text.secondary" variant="body2">
+          <Typography color="text.secondary" variant="caption">
             {interpolate(t.dashboard.rotationPanel.inMonth, {
               month: formatMonth(monthId),
             })}
@@ -297,8 +310,9 @@ function MovementCard({
         value={value - previousValue}
         comparisonMonth={precedingMonthLabel(monthId)}
         tone={color}
+        compact
       />
-      <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center', mt: 2 }}>
+      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mt: 1 }}>
         <Box sx={{ flex: 1 }}>
           <LinearProgressBar value={share} color={color} compact />
         </Box>
@@ -306,7 +320,11 @@ function MovementCard({
           {formatPercent(share)}
         </Typography>
       </Stack>
-      <Typography color="text.secondary" variant="caption">
+      <Typography
+        color="text.secondary"
+        variant="caption"
+        sx={{ display: 'block', mt: 0.25, lineHeight: 1.2 }}
+      >
         {shareLabel}
       </Typography>
     </MetricCard>
@@ -330,18 +348,20 @@ function GroupRotationCard({
   const projectShare = percentOf(current.terminated, totalTerminated);
   return (
     <MetricCard>
-      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 2 }}>
+      <Stack direction="row" spacing={1} sx={{ alignItems: 'center', mb: 1 }}>
         <IconBadge color={RED} small>
           {icon}
         </IconBadge>
-        <Typography variant="h6">{title}</Typography>
+        <Typography sx={{ fontSize: '0.95rem', fontWeight: 750 }}>
+          {title}
+        </Typography>
       </Stack>
       <Box
         sx={{
           display: 'grid',
           gridTemplateColumns: {
             xs: '1fr 1fr',
-            sm: '1.1fr 1fr 0.75fr 0.75fr',
+            sm: '0.85fr 1fr 0.65fr 0.65fr',
           },
           gap: 0,
           alignItems: 'center',
@@ -352,27 +372,27 @@ function GroupRotationCard({
             gridRow: { xs: 'span 2', sm: 'auto' },
             display: 'grid',
             placeItems: 'center',
-            pr: 2,
+            pr: 1,
           }}
         >
           <CircularGauge
             value={current.rate}
             color={RED}
-            size={118}
+            size={78}
             ariaLabel={interpolate(t.dashboard.rotationPanel.groupRateLabel, {
               group: title,
             })}
           >
             <Box sx={{ textAlign: 'center' }}>
               <Typography
-                sx={{ color: RED, fontSize: '1.55rem', fontWeight: 800 }}
+                sx={{ color: RED, fontSize: '1.05rem', fontWeight: 800 }}
               >
                 {formatPercent(current.rate)}
               </Typography>
               <Typography
                 color="text.secondary"
                 variant="caption"
-                sx={{ display: 'block', lineHeight: 1.15 }}
+                sx={{ display: 'block', fontSize: '0.65rem', lineHeight: 1.05 }}
               >
                 {t.dashboard.rotationPanel.groupRotation}
               </Typography>
@@ -398,11 +418,12 @@ function GroupRotationCard({
           color={RED}
         />
       </Box>
-      <Divider sx={{ my: 1.75 }} />
+      <Divider sx={{ my: 1 }} />
       <DeltaLine
         value={current.rate - previous.rate}
         suffix={t.dashboard.rotationPanel.percentagePoints}
         comparisonMonth={previous.monthId}
+        compact
       />
     </MetricCard>
   );
@@ -424,8 +445,8 @@ function GroupMetric({
   return (
     <Box
       sx={{
-        minHeight: 116,
-        px: { xs: 1.25, sm: 2 },
+        minHeight: 80,
+        px: { xs: 0.75, sm: 1 },
         borderLeft: 1,
         borderColor: 'divider',
       }}
@@ -433,12 +454,16 @@ function GroupMetric({
       <Typography
         color="text.secondary"
         variant="caption"
-        sx={{ display: 'block', minHeight: 34 }}
+        sx={{ display: 'block', minHeight: 28, lineHeight: 1.15 }}
       >
         {label}
       </Typography>
-      {icon ? <Box sx={{ color, mt: 0.75, mb: 0.25 }}>{icon}</Box> : null}
-      <Typography variant="h5" sx={{ color, mt: icon ? 0 : 1 }}>
+      {icon ? (
+        <Box sx={{ color, mt: 0.35, mb: 0.1, '& svg': { fontSize: 18 } }}>
+          {icon}
+        </Box>
+      ) : null}
+      <Typography sx={{ color, fontSize: '1.1rem', fontWeight: 750 }}>
         {value}
       </Typography>
       {progress !== undefined ? (
@@ -453,10 +478,10 @@ function MetricCard({ children }: { children: ReactNode }) {
     <Box
       sx={{
         minWidth: 0,
-        p: { xs: 2, sm: 2.5 },
+        p: 1.5,
         border: 1,
         borderColor: 'divider',
-        borderRadius: 3,
+        borderRadius: 2.5,
         bgcolor: 'background.paper',
       }}
     >
@@ -476,7 +501,7 @@ function IconBadge({
   large?: boolean;
   small?: boolean;
 }) {
-  const size = large ? 70 : small ? 42 : 48;
+  const size = large ? 52 : small ? 34 : 40;
   return (
     <Box
       sx={{
@@ -488,7 +513,7 @@ function IconBadge({
         flex: '0 0 auto',
         bgcolor: color === GREEN ? '#edf7ed' : '#fdecec',
         color,
-        '& svg': { fontSize: large ? 38 : small ? 23 : 28 },
+        '& svg': { fontSize: large ? 28 : small ? 19 : 23 },
       }}
     >
       {children}
@@ -526,7 +551,7 @@ function CircularGauge({
         '&::before': {
           content: '""',
           position: 'absolute',
-          inset: size > 100 ? 10 : 9,
+          inset: size >= 100 ? 10 : 7,
           borderRadius: '50%',
           bgcolor: 'background.paper',
         },
@@ -551,8 +576,8 @@ function LinearProgressBar({
       variant="determinate"
       value={clamp(value, 0, 100)}
       sx={{
-        mt: compact ? 0.75 : 2.25,
-        height: compact ? 7 : 9,
+        mt: compact ? 0.5 : 1,
+        height: compact ? 6 : 7,
         borderRadius: 999,
         bgcolor: '#eaecf0',
         '& .MuiLinearProgress-bar': {
@@ -569,11 +594,13 @@ function DeltaLine({
   suffix,
   comparisonMonth,
   tone: toneOverride,
+  compact = false,
 }: {
   value: number;
   suffix?: string;
   comparisonMonth: string;
   tone?: string;
+  compact?: boolean;
 }) {
   const t = useTranslations();
   const tone =
@@ -588,14 +615,29 @@ function DeltaLine({
     <Stack
       direction="row"
       spacing={0.5}
-      sx={{ alignItems: 'center', mt: 1.75, flexWrap: 'wrap' }}
+      sx={{
+        alignItems: 'center',
+        mt: compact ? 0.75 : 1.5,
+        flexWrap: 'wrap',
+      }}
     >
-      <Icon sx={{ color: tone, fontSize: 18 }} />
-      <Typography sx={{ color: tone, fontWeight: 750 }} variant="body2">
+      <Icon sx={{ color: tone, fontSize: compact ? 16 : 18 }} />
+      <Typography
+        sx={{
+          color: tone,
+          fontWeight: 750,
+          fontSize: compact ? '0.75rem' : undefined,
+        }}
+        variant="body2"
+      >
         {formatSigned(value)}
         {suffix ? ` ${suffix}` : ''}
       </Typography>
-      <Typography color="text.secondary" variant="body2">
+      <Typography
+        color="text.secondary"
+        variant="body2"
+        sx={{ fontSize: compact ? '0.75rem' : undefined }}
+      >
         {interpolate(t.dashboard.rotationPanel.vsMonth, {
           month: formatMonth(comparisonMonth),
         })}
@@ -606,27 +648,27 @@ function DeltaLine({
 
 function RotationPanelSkeleton() {
   return (
-    <Stack spacing={2}>
+    <Stack spacing={1.25}>
       <Box
         sx={{
           display: 'grid',
           gridTemplateColumns: { xs: '1fr', md: 'repeat(3, 1fr)' },
-          gap: 2,
+          gap: 1.25,
         }}
       >
         {Array.from({ length: 3 }, (_, index) => (
-          <Skeleton key={index} variant="rounded" height={250} />
+          <Skeleton key={index} variant="rounded" height={180} />
         ))}
       </Box>
       <Box
         sx={{
           display: 'grid',
           gridTemplateColumns: { xs: '1fr', lg: 'repeat(2, 1fr)' },
-          gap: 2,
+          gap: 1.25,
         }}
       >
         {Array.from({ length: 2 }, (_, index) => (
-          <Skeleton key={index} variant="rounded" height={250} />
+          <Skeleton key={index} variant="rounded" height={170} />
         ))}
       </Box>
     </Stack>

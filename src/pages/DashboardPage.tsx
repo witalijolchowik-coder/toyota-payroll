@@ -5,6 +5,7 @@ import ApartmentOutlined from '@mui/icons-material/ApartmentOutlined';
 import BadgeOutlined from '@mui/icons-material/BadgeOutlined';
 import CalendarMonthOutlined from '@mui/icons-material/CalendarMonthOutlined';
 import ChevronRightOutlined from '@mui/icons-material/ChevronRightOutlined';
+import DescriptionOutlined from '@mui/icons-material/DescriptionOutlined';
 import EventBusyOutlined from '@mui/icons-material/EventBusyOutlined';
 import FactCheckOutlined from '@mui/icons-material/FactCheckOutlined';
 import GroupsOutlined from '@mui/icons-material/GroupsOutlined';
@@ -32,7 +33,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material';
 
@@ -201,17 +201,6 @@ export function DashboardPage() {
         eyebrow={t.dashboard.page.eyebrow}
         title={t.dashboard.page.title}
         description={t.dashboard.page.description}
-        action={
-          <TextField
-            type="month"
-            size="small"
-            label={t.dashboard.monthSelector}
-            value={monthId}
-            onChange={(event) => setMonthId(event.target.value)}
-            slotProps={{ inputLabel: { shrink: true } }}
-            sx={{ minWidth: { xs: '100%', sm: 210 } }}
-          />
-        }
       />
 
       {hasError ? (
@@ -299,12 +288,54 @@ export function DashboardPage() {
         />
       </Box>
 
-      <EmployeeRotationPanel
-        data={rotationOverview}
-        isLoading={employeesLoading}
-        monthId={monthId}
-        onMonthChange={setMonthId}
-      />
+      <Box
+        sx={{
+          display: 'grid',
+          gridTemplateColumns: {
+            xs: '1fr',
+            lg: 'minmax(0, 1.75fr) minmax(320px, 0.75fr)',
+          },
+          gap: 2,
+          alignItems: 'stretch',
+        }}
+      >
+        <EmployeeRotationPanel
+          data={rotationOverview}
+          isLoading={employeesLoading}
+          monthId={monthId}
+          onMonthChange={setMonthId}
+        />
+
+        <DashboardSection
+          title={t.dashboard.deadlines.title}
+          description={t.dashboard.deadlines.description}
+        >
+          {isLoading ? (
+            <SectionSkeleton rows={5} />
+          ) : snapshot.deadlines.length > 0 ? (
+            <>
+              <Stack divider={<Divider flexItem />}>
+                {snapshot.deadlines.map((deadline) => (
+                  <DeadlineRow
+                    key={`${deadline.kind}:${deadline.employee.id}`}
+                    deadline={deadline}
+                  />
+                ))}
+              </Stack>
+              <Button
+                component={RouterLink}
+                to={routes.employees}
+                size="small"
+                sx={{ mt: 1, width: '100%' }}
+              >
+                {t.dashboard.deadlines.open}
+              </Button>
+            </>
+          ) : (
+            <Alert severity="success">{t.dashboard.deadlines.empty}</Alert>
+          )}
+        </DashboardSection>
+      </Box>
 
       <Box
         sx={{
@@ -439,41 +470,11 @@ export function DashboardPage() {
           display: 'grid',
           gridTemplateColumns: {
             xs: '1fr',
-            md: 'repeat(3, minmax(0, 1fr))',
+            md: 'repeat(2, minmax(0, 1fr))',
           },
           gap: 2,
         }}
       >
-        <DashboardSection
-          title={t.dashboard.deadlines.title}
-          description={t.dashboard.deadlines.description}
-        >
-          {isLoading ? (
-            <SectionSkeleton rows={5} />
-          ) : snapshot.deadlines.length > 0 ? (
-            <>
-              <Stack divider={<Divider flexItem />}>
-                {snapshot.deadlines.map((deadline) => (
-                  <DeadlineRow
-                    key={`${deadline.kind}:${deadline.employee.id}`}
-                    deadline={deadline}
-                  />
-                ))}
-              </Stack>
-              <Button
-                component={RouterLink}
-                to={routes.employees}
-                size="small"
-                sx={{ mt: 1, width: '100%' }}
-              >
-                {t.dashboard.deadlines.open}
-              </Button>
-            </>
-          ) : (
-            <Alert severity="success">{t.dashboard.deadlines.empty}</Alert>
-          )}
-        </DashboardSection>
-
         <DashboardSection
           title={t.dashboard.dataQuality.title}
           description={t.dashboard.dataQuality.description}
@@ -1350,6 +1351,7 @@ function ReadinessRow({
 
 function DeadlineRow({ deadline }: { deadline: DashboardDeadline }) {
   const t = useTranslations();
+  const isContract = deadline.kind === 'contract';
   return (
     <Button
       component={RouterLink}
@@ -1366,16 +1368,38 @@ function DeadlineRow({ deadline }: { deadline: DashboardDeadline }) {
         '&:hover': { bgcolor: 'transparent', color: 'primary.main' },
       }}
     >
-      <Box>
-        <Typography variant="body2" sx={{ fontWeight: 750 }}>
-          {deadline.employee.firstName} {deadline.employee.lastName}
-        </Typography>
-        <Typography color="text.secondary" variant="caption">
-          {deadline.kind === 'contract'
-            ? t.dashboard.deadlines.contract
-            : t.dashboard.deadlines.medical}
-        </Typography>
-      </Box>
+      <Stack direction="row" spacing={1.25} sx={{ alignItems: 'center' }}>
+        <Box
+          aria-label={
+            isContract
+              ? t.dashboard.deadlines.contract
+              : t.dashboard.deadlines.medical
+          }
+          sx={{
+            width: 34,
+            height: 34,
+            borderRadius: 2,
+            display: 'grid',
+            placeItems: 'center',
+            flex: '0 0 auto',
+            color: isContract ? 'info.main' : 'error.main',
+            bgcolor: isContract ? 'info.50' : 'error.50',
+            '& svg': { fontSize: 19 },
+          }}
+        >
+          {isContract ? <DescriptionOutlined /> : <MedicalServicesOutlined />}
+        </Box>
+        <Box>
+          <Typography variant="body2" sx={{ fontWeight: 750 }}>
+            {deadline.employee.firstName} {deadline.employee.lastName}
+          </Typography>
+          <Typography color="text.secondary" variant="caption">
+            {isContract
+              ? t.dashboard.deadlines.contract
+              : t.dashboard.deadlines.medical}
+          </Typography>
+        </Box>
+      </Stack>
       <Typography variant="body2" sx={{ fontWeight: 700 }}>
         {formatDate(deadline.date)}
       </Typography>
