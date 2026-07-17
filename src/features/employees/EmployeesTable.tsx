@@ -5,7 +5,6 @@ import HouseOutlined from '@mui/icons-material/HouseOutlined';
 import WarningAmberOutlined from '@mui/icons-material/WarningAmberOutlined';
 import BadgeOutlined from '@mui/icons-material/BadgeOutlined';
 import DescriptionOutlined from '@mui/icons-material/DescriptionOutlined';
-import PhoneOutlined from '@mui/icons-material/PhoneOutlined';
 import {
   Avatar,
   Box,
@@ -79,7 +78,7 @@ export function EmployeesTable({
 
   return (
     <TableContainer>
-      <Table sx={{ minWidth: 1120 }}>
+      <Table sx={{ minWidth: 1240 }}>
         <TableHead>
           <TableRow>
             <SortableHeader
@@ -88,6 +87,7 @@ export function EmployeesTable({
               onSort={onSort}
               label={t.employees.table.employee}
             />
+            <TableCell>{t.employees.table.phone}</TableCell>
             <TableCell>{t.employees.table.identity}</TableCell>
             <SortableHeader
               column="department"
@@ -118,7 +118,7 @@ export function EmployeesTable({
           {isLoading
             ? Array.from({ length: 4 }, (_, index) => (
                 <TableRow key={index}>
-                  {Array.from({ length: 6 }, (__, cellIndex) => (
+                  {Array.from({ length: 7 }, (__, cellIndex) => (
                     <TableCell key={cellIndex}>
                       <Skeleton />
                     </TableCell>
@@ -149,23 +149,56 @@ export function EmployeesTable({
                         spacing={1.5}
                         sx={{ alignItems: 'center' }}
                       >
-                        <Avatar
-                          aria-hidden="true"
+                        <Box
                           sx={{
+                            position: 'relative',
                             width: 38,
                             height: 38,
-                            fontSize: '0.78rem',
-                            fontWeight: 750,
-                            ...employeeAvatarColors(
-                              employee.departmentId
-                                ? departmentsById.get(employee.departmentId)
-                                    ?.name
-                                : null,
-                            ),
+                            flex: '0 0 auto',
                           }}
                         >
-                          {employeeInitials(employee)}
-                        </Avatar>
+                          <Avatar
+                            aria-hidden="true"
+                            sx={{
+                              width: 38,
+                              height: 38,
+                              fontSize: '0.78rem',
+                              fontWeight: 750,
+                              ...employeeAvatarColors(
+                                employee.departmentId
+                                  ? departmentsById.get(employee.departmentId)
+                                      ?.name
+                                  : null,
+                              ),
+                            }}
+                          >
+                            {employeeInitials(employee)}
+                          </Avatar>
+                          {employee.citizenship ? (
+                            <Box
+                              component="span"
+                              aria-hidden="true"
+                              sx={{
+                                position: 'absolute',
+                                right: -4,
+                                bottom: -3,
+                                display: 'grid',
+                                placeItems: 'center',
+                                width: 19,
+                                height: 16,
+                                borderRadius: 1,
+                                bgcolor: 'background.paper',
+                                border: '2px solid',
+                                borderColor: 'background.paper',
+                                fontSize: '0.72rem',
+                                lineHeight: 1,
+                                boxShadow: 1,
+                              }}
+                            >
+                              {employee.citizenship === 'PL' ? '🇵🇱' : '🇺🇦'}
+                            </Box>
+                          ) : null}
+                        </Box>
                         <Box sx={{ minWidth: 0 }}>
                           <Typography
                             variant="body2"
@@ -183,6 +216,19 @@ export function EmployeesTable({
                           </Typography>
                         </Box>
                       </Stack>
+                    </TableCell>
+                    <TableCell sx={{ minWidth: 145 }}>
+                      <Typography
+                        variant="body2"
+                        color={
+                          employee.phoneNumber
+                            ? 'text.primary'
+                            : 'text.secondary'
+                        }
+                        sx={{ whiteSpace: 'nowrap' }}
+                      >
+                        {employee.phoneNumber ?? '—'}
+                      </Typography>
                     </TableCell>
                     <TableCell sx={{ minWidth: 205 }}>
                       <EmployeeDocuments employee={employee} t={t} />
@@ -400,12 +446,6 @@ function EmployeeDocuments({
       ? {
           icon: <DescriptionOutlined fontSize="inherit" />,
           label: `${t.employees.table.foreignDocument}: ${employee.foreignDocumentNumber}`,
-        }
-      : null,
-    employee.phoneNumber
-      ? {
-          icon: <PhoneOutlined fontSize="inherit" />,
-          label: `${t.employees.table.phone}: ${employee.phoneNumber}`,
         }
       : null,
   ].filter((document) => document !== null);

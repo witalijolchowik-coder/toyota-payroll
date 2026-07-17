@@ -13,6 +13,7 @@ import MedicalServicesOutlined from '@mui/icons-material/MedicalServicesOutlined
 import PersonAddAltOutlined from '@mui/icons-material/PersonAddAltOutlined';
 import ReportProblemOutlined from '@mui/icons-material/ReportProblemOutlined';
 import SettingsOutlined from '@mui/icons-material/SettingsOutlined';
+import SyncAltOutlined from '@mui/icons-material/SyncAltOutlined';
 import UploadFileOutlined from '@mui/icons-material/UploadFileOutlined';
 import {
   Alert,
@@ -277,14 +278,17 @@ export function DashboardPage() {
           loading={isLoading}
         />
         <KpiCard
-          title={t.dashboard.kpi.blockers.title}
-          value={readiness?.counters.blocking ?? 0}
-          helper={interpolate(t.dashboard.kpi.blockers.helper, {
-            month: formatMonth(monthId),
-          })}
-          icon={<ReportProblemOutlined />}
-          to={routes.settlement}
-          tone={(readiness?.counters.blocking ?? 0) > 0 ? 'error' : 'success'}
+          title={t.dashboard.kpi.rotation.title}
+          value={`${formatDecimal(snapshot.rotation.rate)}%`}
+          helper={
+            <RotationDetails
+              hired={snapshot.rotation.hired}
+              terminated={snapshot.rotation.terminated}
+            />
+          }
+          icon={<SyncAltOutlined />}
+          to={routes.employees}
+          tone={snapshot.rotation.rate > 10 ? 'warning' : 'neutral'}
           loading={isLoading}
         />
       </Box>
@@ -1100,7 +1104,7 @@ function KpiCard({
   loading,
 }: {
   title: string;
-  value: number;
+  value: number | string;
   helper: ReactNode;
   icon: ReactNode;
   to: string;
@@ -1165,6 +1169,35 @@ function KpiCard({
         </CardContent>
       </CardActionArea>
     </Card>
+  );
+}
+
+function RotationDetails({
+  hired,
+  terminated,
+}: {
+  hired: number;
+  terminated: number;
+}) {
+  const t = useTranslations();
+  return (
+    <Stack
+      direction="row"
+      spacing={0.75}
+      divider={<Box component="span">·</Box>}
+      sx={{ alignItems: 'center', flexWrap: 'wrap' }}
+    >
+      <Box component="span" sx={{ color: 'success.dark' }}>
+        {interpolate(t.dashboard.kpi.rotation.hired, {
+          count: String(hired),
+        })}
+      </Box>
+      <Box component="span" sx={{ color: 'error.main' }}>
+        {interpolate(t.dashboard.kpi.rotation.terminated, {
+          count: String(terminated),
+        })}
+      </Box>
+    </Stack>
   );
 }
 
@@ -1425,6 +1458,13 @@ function formatMonth(monthId: string): string {
     month: 'long',
     year: 'numeric',
   }).format(new Date(Date.UTC(year, month - 1, 1)));
+}
+
+function formatDecimal(value: number): string {
+  return new Intl.NumberFormat('pl-PL', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 1,
+  }).format(value);
 }
 
 function formatDate(date: Date): string {

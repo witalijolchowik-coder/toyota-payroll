@@ -42,6 +42,14 @@ export interface DashboardAbsenceTrendDay {
   total: number;
 }
 
+export interface DashboardMonthlyRotation {
+  monthId: string;
+  rate: number;
+  hired: number;
+  terminated: number;
+  averageHeadcount: number;
+}
+
 export interface DashboardSnapshot {
   activeEmployees: Employee[];
   citizenship: {
@@ -63,6 +71,7 @@ export interface DashboardSnapshot {
   };
   absenceTrend: DashboardAbsenceTrendDay[];
   deadlines: DashboardDeadline[];
+  rotation: DashboardMonthlyRotation;
 }
 
 interface DashboardSnapshotInput {
@@ -212,7 +221,64 @@ export function buildDashboardSnapshot({
     },
     absenceTrend: buildAbsenceTrend(employees, currentAbsences, today),
     deadlines,
+    rotation: calculateMonthlyRotation(employees, today),
   };
+}
+
+export function calculateMonthlyRotation(
+  employees: readonly Employee[],
+  today: Date,
+): DashboardMonthlyRotation {
+  const year = today.getFullYear();
+  const monthIndex = today.getMonth();
+  const monthStart = new Date(Date.UTC(year, monthIndex, 1));
+  const monthEnd = new Date(Date.UTC(year, monthIndex + 1, 0));
+  const startIso = dateToIsoDate(monthStart);
+  const endIso = dateToIsoDate(monthEnd);
+  const hired = employees.filter(
+    (employee) =>
+      employee.employmentStartDate &&
+      isIsoDateInRange(
+        dateToIsoDate(employee.employmentStartDate),
+        startIso,
+        endIso,
+      ),
+  ).length;
+  const terminated = employees.filter(
+    (employee) =>
+      employee.employmentEndDate &&
+      isIsoDateInRange(
+        dateToIsoDate(employee.employmentEndDate),
+        startIso,
+        endIso,
+      ),
+  ).length;
+  const headcountAtStart = employees.filter((employee) =>
+    isEmployeeActiveOnDate(employee, monthStart),
+  ).length;
+  const headcountAtEnd = employees.filter((employee) =>
+    isEmployeeActiveOnDate(employee, monthEnd),
+  ).length;
+  const averageHeadcount = (headcountAtStart + headcountAtEnd) / 2;
+
+  return {
+    monthId: `${year}-${String(monthIndex + 1).padStart(2, '0')}`,
+    rate:
+      averageHeadcount > 0
+        ? Math.round((terminated / averageHeadcount) * 1000) / 10
+        : 0,
+    hired,
+    terminated,
+    averageHeadcount,
+  };
+}
+
+function isIsoDateInRange(
+  value: IsoDate,
+  start: IsoDate,
+  end: IsoDate,
+): boolean {
+  return value >= start && value <= end;
 }
 
 function buildDepartmentSummaries(

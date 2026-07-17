@@ -101,6 +101,11 @@ export const pl = {
         title: 'Blokery rozliczenia',
         helper: 'Dla miesiąca {{month}}',
       },
+      rotation: {
+        title: 'Rotacja w tym miesiącu',
+        hired: 'Zatrudniono: {{count}}',
+        terminated: 'Zakończono: {{count}}',
+      },
     },
     priorities: {
       title: 'Priorytety koordynatora',

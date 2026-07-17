@@ -269,11 +269,11 @@ export function L4ImportDialog({
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {rows.map((row) => {
+                    {rows.map((row, rowIndex) => {
                       const applyResult = rowResultById.get(row.id);
                       return (
                         <TableRow key={row.id} hover>
-                          <TableCell>{row.rowNumber}</TableCell>
+                          <TableCell>{rowIndex + 1}</TableCell>
                           <TableCell>
                             {row.sourceName || t.absences.l4Import.empty}
                           </TableCell>

@@ -6,7 +6,10 @@ import type {
   Employee,
   EmployeeEntitlement,
 } from '../../types/firestore';
-import { buildDashboardSnapshot } from './dashboardModel';
+import {
+  buildDashboardSnapshot,
+  calculateMonthlyRotation,
+} from './dashboardModel';
 
 const today = new Date('2026-07-17T12:00:00.000Z');
 
@@ -204,6 +207,49 @@ describe('dashboardModel', () => {
     expect(snapshot.deadlines).toEqual([
       expect.objectContaining({ kind: 'medical', employee: employees[1] }),
     ]);
+  });
+
+  it('calculates current-month rotation from terminations and average headcount', () => {
+    const employees = [
+      employee('existing'),
+      employee('hired', {
+        employmentStartDate: new Date('2026-07-10T00:00:00.000Z'),
+      }),
+      employee('terminated', {
+        employmentEndDate: new Date('2026-07-15T00:00:00.000Z'),
+      }),
+      employee('historical', {
+        employmentEndDate: new Date('2026-06-30T00:00:00.000Z'),
+      }),
+    ];
+
+    expect(calculateMonthlyRotation(employees, today)).toEqual({
+      monthId: '2026-07',
+      hired: 1,
+      terminated: 1,
+      averageHeadcount: 2,
+      rate: 50,
+    });
+  });
+
+  it('returns zero rotation when the month has no average headcount', () => {
+    expect(
+      calculateMonthlyRotation(
+        [
+          employee('historical', {
+            employmentStartDate: new Date('2026-06-01T00:00:00.000Z'),
+            employmentEndDate: new Date('2026-06-30T00:00:00.000Z'),
+          }),
+        ],
+        today,
+      ),
+    ).toEqual({
+      monthId: '2026-07',
+      hired: 0,
+      terminated: 0,
+      averageHeadcount: 0,
+      rate: 0,
+    });
   });
 });
 
