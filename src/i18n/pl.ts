@@ -104,7 +104,7 @@ export const pl = {
       rotation: {
         title: 'Rotacja w tym miesiącu',
         hired: 'Zatrudniono: {{count}}',
-        terminated: 'Zakończono: {{count}}',
+        terminated: 'Zwolniono: {{count}}',
       },
     },
     priorities: {
