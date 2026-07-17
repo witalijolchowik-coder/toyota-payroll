@@ -296,14 +296,60 @@ describe('Firestore security rules', () => {
         pesel: '87010409887',
         passport_number: null,
         foreign_document_number: null,
+        phone_number: '+48 500 000 000',
         citizenship: 'PL',
+        gender: 'K',
         first_toyota_employment_date: new Date('2025-09-01T00:00:00Z'),
+        medical_examination_date: new Date('2026-01-10T00:00:00Z'),
+        medical_valid_until: new Date('2027-01-10T00:00:00Z'),
+        medical_examination_type: 'PRODUKCJA',
         is_active: true,
         department_id: 'metal',
         shift_assignment: 'RED',
         employment_start_date: null,
         employment_end_date: null,
         ...modificationMetadata(uid),
+      }),
+    );
+  });
+
+  it('rejects invalid employee citizenship and medical fields', async () => {
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const base = {
+      teta_number: 'TETA-1002',
+      first_name: 'Test',
+      last_name: 'Employee',
+      is_active: true,
+      employment_start_date: null,
+      employment_end_date: null,
+      ...modificationMetadata(uid),
+    };
+
+    await assertFails(
+      setDoc(doc(firestore, 'employees', 'invalid-country'), {
+        ...base,
+        citizenship: 'OTHER',
+      }),
+    );
+    await assertFails(
+      setDoc(doc(firestore, 'employees', 'invalid-medical-type'), {
+        ...base,
+        citizenship: 'UA',
+        medical_examination_type: 'BIURO',
+      }),
+    );
+    await assertFails(
+      setDoc(doc(firestore, 'employees', 'invalid-phone'), {
+        ...base,
+        phone_number: 48500000000,
+      }),
+    );
+    await assertFails(
+      setDoc(doc(firestore, 'employees', 'invalid-medical-range'), {
+        ...base,
+        medical_examination_date: new Date('2026-07-20T00:00:00Z'),
+        medical_valid_until: new Date('2026-07-19T00:00:00Z'),
       }),
     );
   });

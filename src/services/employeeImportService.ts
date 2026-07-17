@@ -84,6 +84,7 @@ export async function updateEmployeesFromTemplatePreview(
 
   const updatedEmployeeIds: EmployeeId[] = [];
   const rowResults: EmployeeBulkUpdateRowResult[] = [];
+  const importBatchId = crypto.randomUUID();
   let completed = 0;
   onProgress?.({ completed, total: updateRows.length });
   await runWithConcurrency(
@@ -100,6 +101,7 @@ export async function updateEmployeesFromTemplatePreview(
       } else {
         try {
           await updateEmployee(row.employee.id, row.updateInput);
+          await recordBulkRowAudit(row, importBatchId, 'success');
           updatedEmployeeIds.push(row.employee.id);
           rowResults.push({
             rowId: row.id,
@@ -108,6 +110,12 @@ export async function updateEmployeesFromTemplatePreview(
             reason: null,
           });
         } catch (error) {
+          await recordBulkRowAudit(
+            row,
+            importBatchId,
+            'failure',
+            error instanceof Error ? error.message : String(error),
+          ).catch(() => undefined);
           rowResults.push({
             rowId: row.id,
             employeeId: row.employee.id,
@@ -129,6 +137,7 @@ export async function updateEmployeesFromTemplatePreview(
       actorUid,
       changes: {
         operation: 'bulk-employee-update',
+        import_batch_id: importBatchId,
         total: rows.length,
         updated: rowResults.filter((row) => row.status === 'updated').length,
         skipped: rowResults.filter((row) => row.status === 'skipped').length,
@@ -145,6 +154,36 @@ export async function updateEmployeesFromTemplatePreview(
       left.rowId.localeCompare(right.rowId),
     ),
   };
+}
+
+async function recordBulkRowAudit(
+  row: BulkEmployeeUpdatePreviewRow,
+  importBatchId: string,
+  status: 'success' | 'failure',
+  errorMessage: string | null = null,
+): Promise<void> {
+  const actorUid = auth?.currentUser?.uid;
+  if (!actorUid || !row.employee) return;
+  await recordAuditEntry({
+    entityPath: `employees/${row.employee.id}`,
+    action: 'update',
+    actorUid,
+    changes: {
+      operation: 'bulk-employee-update-row',
+      import_batch_id: importBatchId,
+      employee_id: row.employee.id,
+      teta_number: row.employee.tetaNumber,
+      changed_fields: row.changes.map((change) => change.field),
+      before: Object.fromEntries(
+        row.changes.map((change) => [change.field, change.oldValue]),
+      ),
+      after: Object.fromEntries(
+        row.changes.map((change) => [change.field, change.newValue]),
+      ),
+      status,
+      error: errorMessage,
+    },
+  });
 }
 
 async function runWithConcurrency<T>(

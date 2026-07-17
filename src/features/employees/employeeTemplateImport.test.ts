@@ -7,6 +7,7 @@ import {
   buildNewEmployeeTemplateCsv,
   buildNewEmployeeTemplatePreview,
   EMPLOYEE_TEMPLATE_CLEAR_MARKER,
+  employeeTemplateHeaders,
 } from './employeeTemplateImport';
 
 describe('employee template import', () => {
@@ -210,6 +211,54 @@ describe('employee template import', () => {
     expect(csvText).not.toContain('WT-003');
   });
 
+  it('generates a fresh update template with only reference columns populated', () => {
+    const current = {
+      ...employee('active', 'WT-001'),
+      phoneNumber: '+48 500 600 700',
+      pesel: '81010112345',
+      passportNumber: 'FA123456',
+      citizenship: 'PL',
+      gender: 'K' as const,
+      firstToyotaEmploymentDate: date('2025-01-02'),
+      medicalExaminationDate: date('2026-01-02'),
+      medicalValidUntil: date('2027-01-02'),
+      medicalExaminationType: 'PRODUKCJA' as const,
+      departmentId: 'metal',
+      shiftAssignment: 'RED' as const,
+    };
+
+    const first = buildEmployeeUpdateTemplateCsv(
+      [current],
+      [department('metal', 'Metal')],
+      date('2026-06-10'),
+    );
+    const second = buildEmployeeUpdateTemplateCsv(
+      [current],
+      [department('metal', 'Metal')],
+      date('2026-06-10'),
+    );
+    const rows = first
+      .replace(/^\uFEFF/, '')
+      .trim()
+      .split('\r\n');
+
+    expect(first).toBe(second);
+    expect(rows[0].split(';')).toEqual(employeeTemplateHeaders);
+    expect(rows[1].split(';').slice(0, 3)).toEqual([
+      'WT-001',
+      'Anna',
+      'Kowalska',
+    ]);
+    expect(rows[1].split(';').slice(3)).toEqual(
+      Array.from({ length: employeeTemplateHeaders.length - 3 }, () => ''),
+    );
+    expect(first).not.toContain('Inny dokument');
+    expect(first).not.toContain('+48 500 600 700');
+    expect(first).not.toContain('81010112345');
+    expect(first).not.toContain('FA123456');
+    expect(first).not.toContain('PRODUKCJA');
+  });
+
   it('uses TETA for bulk update matching and detects non-empty changes', () => {
     const preview = buildBulkEmployeeUpdatePreview(
       csv([['WT-001', 'Anna', 'Kowalska', '81010112345']]),
@@ -273,19 +322,107 @@ describe('employee template import', () => {
     expect(preview[0].warnings).toContain('unknown-teta');
   });
 
-  it('warns about name mismatch but allows safe changes', () => {
+  it('blocks a name mismatch and never renames the employee', () => {
     const preview = buildBulkEmployeeUpdatePreview(
       csv([['WT-001', 'Joanna', 'Kowalska', '81010112345']]),
       [employee('employee-1', 'WT-001')],
       [],
     );
 
-    expect(preview[0].status).toBe('warning');
+    expect(preview[0].status).toBe('blocked');
     expect(preview[0].warnings).toContain('name-mismatch');
-    expect(preview[0].changes.map((change) => change.field)).toEqual([
-      'firstName',
-      'pesel',
-    ]);
+    expect(preview[0].changes.map((change) => change.field)).toEqual(['pesel']);
+    expect(preview[0].updateInput).toBeNull();
+  });
+
+  it('rejects ambiguous duplicate TETA matches', () => {
+    const preview = buildBulkEmployeeUpdatePreview(
+      updateCsv({
+        'Numer TETA': 'WT-001',
+        Imię: 'Anna',
+        Nazwisko: 'Kowalska',
+        PESEL: '81010112345',
+      }),
+      [employee('employee-1', 'WT-001'), employee('employee-2', 'WT-001')],
+      [],
+    );
+
+    expect(preview[0].status).toBe('blocked');
+    expect(preview[0].warnings).toContain('ambiguous-teta');
+  });
+
+  it('normalizes phone, citizenship, gender and medical data', () => {
+    const existing = {
+      ...employee('employee-1', 'WT-001'),
+      departmentId: 'metal',
+    };
+    const preview = buildBulkEmployeeUpdatePreview(
+      updateCsv({
+        'Numer TETA': 'WT-001',
+        Imię: 'Anna',
+        Nazwisko: 'Kowalska',
+        'Numer telefonu': '  +48  500 000 000 ',
+        Obywatelstwo: 'pl',
+        Płeć: 'k',
+        'Data pierwszego zatrudnienia w Toyota': '2025-01-02',
+        'Data badania lekarskiego': '2026-01-03',
+        'Badanie ważne do': '2027-01-03',
+        'Typ badania lekarskiego': 'Pracownik produkcji',
+      }),
+      [existing],
+      [department('metal', 'Metal')],
+    );
+
+    expect(preview[0].status).toBe('ready');
+    expect(preview[0].updateInput).toMatchObject({
+      phoneNumber: '+48 500 000 000',
+      citizenship: 'PL',
+      gender: 'K',
+      medicalExaminationType: 'PRODUKCJA',
+    });
+  });
+
+  it('rejects invalid citizenship and an invalid medical date pair', () => {
+    const preview = buildBulkEmployeeUpdatePreview(
+      updateCsv({
+        'Numer TETA': 'WT-001',
+        Imię: 'Anna',
+        Nazwisko: 'Kowalska',
+        Obywatelstwo: 'XX',
+        'Data badania lekarskiego': '2026-07-20',
+        'Badanie ważne do': '2026-07-19',
+      }),
+      [employee('employee-1', 'WT-001')],
+      [],
+    );
+
+    expect(preview[0].status).toBe('blocked');
+    expect(preview[0].warnings).toEqual(
+      expect.arrayContaining([
+        'invalid-citizenship',
+        'invalid-medical-date-range',
+      ]),
+    );
+  });
+
+  it('warns when medical type does not match the resulting department', () => {
+    const existing = {
+      ...employee('employee-1', 'WT-001'),
+      departmentId: 'warehouse',
+    };
+    const preview = buildBulkEmployeeUpdatePreview(
+      updateCsv({
+        'Numer TETA': 'WT-001',
+        Imię: 'Anna',
+        Nazwisko: 'Kowalska',
+        'Typ badania lekarskiego': 'Pracownik produkcji',
+      }),
+      [existing],
+      [department('warehouse', 'Magazyn')],
+    );
+
+    expect(preview[0].status).toBe('warning');
+    expect(preview[0].warnings).toContain('medical-type-department-mismatch');
   });
 
   it('updates department when safely matched and leaves shift optional', () => {
@@ -327,6 +464,15 @@ function csv(rows: readonly (readonly string[])[]): string {
     'Zmiana',
   ];
   return [header, ...rows].map((row) => row.join(';')).join('\n');
+}
+
+function updateCsv(
+  values: Partial<Record<(typeof employeeTemplateHeaders)[number], string>>,
+): string {
+  return [
+    employeeTemplateHeaders.join(';'),
+    employeeTemplateHeaders.map((header) => values[header] ?? '').join(';'),
+  ].join('\n');
 }
 
 function date(value: string): Date {

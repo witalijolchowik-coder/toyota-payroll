@@ -5,6 +5,15 @@ import type {
   EmployeeCreateInput,
 } from '../../types/firestore';
 import {
+  deriveEmployeeMedicalStatus,
+  isValidCitizenship,
+  normalizeCitizenship,
+  normalizeEmployeeGender,
+  normalizeMedicalExaminationType,
+  normalizePhoneNumber,
+  type EmployeeMedicalStatus,
+} from '../../utils/employees';
+import {
   isEmployeeColorShift,
   resolveCanonicalDepartment,
 } from '../../utils/organization';
@@ -31,13 +40,19 @@ export const employeeTemplateHeaders = [
   'Numer TETA',
   'Imię',
   'Nazwisko',
+  'Numer telefonu',
   'PESEL',
   'Paszport',
-  'Inny dokument',
+  'Obywatelstwo',
+  'Płeć',
+  'Data pierwszego zatrudnienia w Toyota',
   'Data rozpoczęcia pracy',
   'Data zakończenia pracy',
   'Dział',
-  'Zmiana',
+  'Grupa zmianowa',
+  'Data badania lekarskiego',
+  'Badanie ważne do',
+  'Typ badania lekarskiego',
 ] as const;
 
 export type EmployeeTemplateColumn = (typeof employeeTemplateHeaders)[number];
@@ -59,11 +74,24 @@ export type EmployeeTemplateWarningCode =
   | 'duplicate-teta-in-file'
   | 'existing-teta'
   | 'unknown-teta'
+  | 'ambiguous-teta'
   | 'name-mismatch'
   | 'identity-conflict'
   | 'department-na0'
   | 'department-unmapped'
-  | 'invalid-shift';
+  | 'invalid-shift'
+  | 'invalid-shift-for-department'
+  | 'invalid-citizenship'
+  | 'invalid-gender'
+  | 'invalid-first-toyota-employment-date'
+  | 'invalid-medical-examination-date'
+  | 'invalid-medical-valid-until'
+  | 'invalid-medical-date-range'
+  | 'invalid-medical-type'
+  | 'medical-type-department-mismatch'
+  | 'medical-expired'
+  | 'medical-expiring-soon'
+  | 'medical-missing-validity';
 
 export interface NewEmployeeTemplatePreviewRow {
   id: string;
@@ -102,6 +130,7 @@ export interface BulkEmployeeUpdatePreviewRow {
   warnings: EmployeeTemplateWarningCode[];
   changes: BulkEmployeeUpdateChange[];
   updateInput: EmployeeCreateInput | null;
+  resultingMedicalStatus?: EmployeeMedicalStatus | null;
 }
 
 interface ParsedTemplateRow {
@@ -124,7 +153,7 @@ export function buildNewEmployeeTemplateCsv(): string {
 
 export function buildEmployeeUpdateTemplateCsv(
   employees: readonly Employee[],
-  departments: readonly Department[],
+  _departments: readonly Department[],
   today = new Date(),
 ): string {
   const rows = employees
@@ -135,7 +164,7 @@ export function buildEmployeeUpdateTemplateCsv(
         'pl-PL',
       ),
     )
-    .map((employee) => employeeToTemplateRow(employee, departments));
+    .map((employee) => employeeToTemplateRow(employee));
 
   return buildCsv([employeeTemplateHeaders, ...rows]);
 }
@@ -197,8 +226,46 @@ export function buildNewEmployeeTemplatePreview(
       warnings.push(department.warning);
     }
 
-    if (row.values['Zmiana'] && !raw.shiftAssignment) {
+    if (row.values['Grupa zmianowa'] && !raw.shiftAssignment) {
       warnings.push('invalid-shift');
+    }
+    if (
+      row.values['Obywatelstwo'] &&
+      !isValidCitizenship(row.values['Obywatelstwo'])
+    ) {
+      warnings.push('invalid-citizenship');
+    }
+    if (row.values['Płeć'] && !raw.gender) {
+      warnings.push('invalid-gender');
+    }
+    if (
+      row.values['Data pierwszego zatrudnienia w Toyota'] &&
+      !raw.firstToyotaEmploymentDate
+    ) {
+      warnings.push('invalid-first-toyota-employment-date');
+    }
+    if (row.values['Data badania lekarskiego'] && !raw.medicalExaminationDate) {
+      warnings.push('invalid-medical-examination-date');
+    }
+    if (row.values['Badanie ważne do'] && !raw.medicalValidUntil) {
+      warnings.push('invalid-medical-valid-until');
+    }
+    if (
+      raw.medicalExaminationDate &&
+      raw.medicalValidUntil &&
+      raw.medicalValidUntil < raw.medicalExaminationDate
+    ) {
+      warnings.push('invalid-medical-date-range');
+    }
+    if (row.values['Typ badania lekarskiego'] && !raw.medicalExaminationType) {
+      warnings.push('invalid-medical-type');
+    }
+    const medicalStatus = deriveEmployeeMedicalStatus(
+      raw,
+      department.departmentName,
+    );
+    if (medicalStatus.issues.includes('department-mismatch')) {
+      warnings.push('medical-type-department-mismatch');
     }
 
     const status = resolveNewEmployeeTemplateStatus(warnings);
@@ -230,19 +297,24 @@ export function buildBulkEmployeeUpdatePreview(
   departments: readonly Department[],
 ): BulkEmployeeUpdatePreviewRow[] {
   const rows = parseEmployeeTemplateCsv(csvText);
-  const employeesByTeta = buildEmployeeByTeta(existingEmployees);
+  const employeesByTeta = buildEmployeesByTeta(existingEmployees);
   const existingByIdentity = buildEmployeeByIdentity(existingEmployees);
 
   return rows.map((row) => {
     const rawTeta = normalizeTetaNumber(row.values['Numer TETA']);
-    const employee = employeesByTeta.get(rawTeta) ?? null;
+    const matchingEmployees = employeesByTeta.get(rawTeta) ?? [];
+    const employee =
+      matchingEmployees.length === 1 ? matchingEmployees[0] : null;
     const warnings: EmployeeTemplateWarningCode[] = [];
 
     if (!rawTeta) {
       warnings.push('missing-teta');
     }
-    if (!employee && rawTeta) {
+    if (rawTeta && matchingEmployees.length === 0) {
       warnings.push('unknown-teta');
+    }
+    if (matchingEmployees.length > 1) {
+      warnings.push('ambiguous-teta');
     }
 
     if (employee && hasNameMismatch(row, employee)) {
@@ -254,15 +326,7 @@ export function buildBulkEmployeeUpdatePreview(
     const changes: BulkEmployeeUpdateChange[] = [];
 
     if (employee && updateInput) {
-      applyTextUpdate(row, employee, updateInput, changes, 'Imię', 'firstName');
-      applyTextUpdate(
-        row,
-        employee,
-        updateInput,
-        changes,
-        'Nazwisko',
-        'lastName',
-      );
+      applyPhoneUpdate(row, employee, updateInput, changes);
       applyNullableTextUpdate(
         row,
         employee,
@@ -279,13 +343,17 @@ export function buildBulkEmployeeUpdatePreview(
         'Paszport',
         'passportNumber',
       );
-      applyNullableTextUpdate(
+      applyCitizenshipUpdate(row, employee, updateInput, changes, warnings);
+      applyGenderUpdate(row, employee, updateInput, changes, warnings);
+      applyDateUpdate(
         row,
         employee,
         updateInput,
         changes,
-        'Inny dokument',
-        'foreignDocumentNumber',
+        warnings,
+        'Data pierwszego zatrudnienia w Toyota',
+        'firstToyotaEmploymentDate',
+        'invalid-first-toyota-employment-date',
       );
       applyDateUpdate(
         row,
@@ -315,7 +383,35 @@ export function buildBulkEmployeeUpdatePreview(
         warnings,
         departments,
       );
-      applyShiftUpdate(row, employee, updateInput, changes, warnings);
+      applyShiftUpdate(
+        row,
+        employee,
+        updateInput,
+        changes,
+        warnings,
+        departments,
+      );
+      applyDateUpdate(
+        row,
+        employee,
+        updateInput,
+        changes,
+        warnings,
+        'Data badania lekarskiego',
+        'medicalExaminationDate',
+        'invalid-medical-examination-date',
+      );
+      applyDateUpdate(
+        row,
+        employee,
+        updateInput,
+        changes,
+        warnings,
+        'Badanie ważne do',
+        'medicalValidUntil',
+        'invalid-medical-valid-until',
+      );
+      applyMedicalTypeUpdate(row, employee, updateInput, changes, warnings);
 
       if (
         updateInput.employmentStartDate &&
@@ -324,8 +420,50 @@ export function buildBulkEmployeeUpdatePreview(
       ) {
         warnings.push('invalid-date-range');
       }
+      if (
+        updateInput.medicalExaminationDate &&
+        updateInput.medicalValidUntil &&
+        updateInput.medicalValidUntil < updateInput.medicalExaminationDate
+      ) {
+        warnings.push('invalid-medical-date-range');
+      }
       if (hasIdentityConflict(existingByIdentity, updateInput, rawTeta)) {
         warnings.push('identity-conflict');
+      }
+    }
+
+    const resultingMedicalStatus =
+      employee && updateInput
+        ? deriveEmployeeMedicalStatus(
+            updateInput,
+            departmentNameForInput(updateInput, departments),
+          )
+        : null;
+    const medicalFieldChange = changes.some((change) =>
+      [
+        'medicalExaminationDate',
+        'medicalValidUntil',
+        'medicalExaminationType',
+      ].includes(change.field),
+    );
+    const compatibilityRelevantChange = changes.some((change) =>
+      ['departmentId', 'medicalExaminationType'].includes(change.field),
+    );
+    if (
+      compatibilityRelevantChange &&
+      resultingMedicalStatus?.issues.includes('department-mismatch')
+    ) {
+      warnings.push('medical-type-department-mismatch');
+    }
+    if (medicalFieldChange) {
+      if (resultingMedicalStatus?.issues.includes('expired')) {
+        warnings.push('medical-expired');
+      }
+      if (resultingMedicalStatus?.issues.includes('expiring-soon')) {
+        warnings.push('medical-expiring-soon');
+      }
+      if (resultingMedicalStatus?.issues.includes('missing-validity')) {
+        warnings.push('medical-missing-validity');
       }
     }
 
@@ -345,6 +483,7 @@ export function buildBulkEmployeeUpdatePreview(
       changes,
       updateInput:
         status === 'ready' || status === 'warning' ? updateInput : null,
+      resultingMedicalStatus,
     };
   });
 }
@@ -402,12 +541,19 @@ function resolveTemplateColumn(value: string): EmployeeTemplateColumn | null {
     firstname: 'Imię',
     nazwisko: 'Nazwisko',
     lastname: 'Nazwisko',
+    numertelefonu: 'Numer telefonu',
+    telefon: 'Numer telefonu',
+    phonenumber: 'Numer telefonu',
     pesel: 'PESEL',
     paszport: 'Paszport',
     passport: 'Paszport',
     passportnumber: 'Paszport',
-    innydokument: 'Inny dokument',
-    foreigndocumentnumber: 'Inny dokument',
+    obywatelstwo: 'Obywatelstwo',
+    citizenship: 'Obywatelstwo',
+    plec: 'Płeć',
+    gender: 'Płeć',
+    datapierwszegozatrudnieniawtoyota: 'Data pierwszego zatrudnienia w Toyota',
+    firsttoyotaemploymentdate: 'Data pierwszego zatrudnienia w Toyota',
     datarozpoczeciapracy: 'Data rozpoczęcia pracy',
     employmentstart: 'Data rozpoczęcia pracy',
     employmentstartdate: 'Data rozpoczęcia pracy',
@@ -416,8 +562,17 @@ function resolveTemplateColumn(value: string): EmployeeTemplateColumn | null {
     employmentenddate: 'Data zakończenia pracy',
     dzial: 'Dział',
     department: 'Dział',
-    zmiana: 'Zmiana',
-    shift: 'Zmiana',
+    grupazmianowa: 'Grupa zmianowa',
+    zmiana: 'Grupa zmianowa',
+    shift: 'Grupa zmianowa',
+    shiftgroup: 'Grupa zmianowa',
+    databadanialekarskiego: 'Data badania lekarskiego',
+    databadania: 'Data badania lekarskiego',
+    medicalexaminationdate: 'Data badania lekarskiego',
+    badaniewaznedo: 'Badanie ważne do',
+    medicalvaliduntil: 'Badanie ważne do',
+    typbadanialekarskiego: 'Typ badania lekarskiego',
+    medicalexaminationtype: 'Typ badania lekarskiego',
   };
   return mapping[key] ?? null;
 }
@@ -428,17 +583,29 @@ function readTemplateEmployeeValues(row: ParsedTemplateRow): Omit<
 > & {
   departmentId?: never;
 } {
-  const shift = normalizeImportText(row.values['Zmiana']).toLocaleUpperCase(
-    'pl-PL',
-  );
+  const shift = normalizeImportText(
+    row.values['Grupa zmianowa'],
+  ).toLocaleUpperCase('pl-PL');
   return {
     tetaNumber: normalizeTetaNumber(row.values['Numer TETA']),
     firstName: normalizeImportText(row.values['Imię']),
     lastName: normalizeImportText(row.values['Nazwisko']),
     pesel: normalizeIdentityNumber(row.values['PESEL']) || null,
     passportNumber: normalizeIdentityNumber(row.values['Paszport']) || null,
-    foreignDocumentNumber:
-      normalizeIdentityNumber(row.values['Inny dokument']) || null,
+    foreignDocumentNumber: null,
+    phoneNumber: normalizePhoneNumber(row.values['Numer telefonu']) || null,
+    citizenship: normalizeCitizenship(row.values['Obywatelstwo']) ?? null,
+    gender: normalizeEmployeeGender(row.values['Płeć']),
+    firstToyotaEmploymentDate: parseImportedDate(
+      row.values['Data pierwszego zatrudnienia w Toyota'],
+    ),
+    medicalExaminationDate: parseImportedDate(
+      row.values['Data badania lekarskiego'],
+    ),
+    medicalValidUntil: parseImportedDate(row.values['Badanie ważne do']),
+    medicalExaminationType: normalizeMedicalExaminationType(
+      row.values['Typ badania lekarskiego'],
+    ),
     shiftAssignment: isEmployeeColorShift(shift) ? shift : null,
     employmentStartDate: parseImportedDate(
       row.values['Data rozpoczęcia pracy'],
@@ -511,6 +678,13 @@ function resolveNewEmployeeTemplateStatus(
     'invalid-employment-end',
     'invalid-date-range',
     'invalid-shift',
+    'invalid-citizenship',
+    'invalid-gender',
+    'invalid-first-toyota-employment-date',
+    'invalid-medical-examination-date',
+    'invalid-medical-valid-until',
+    'invalid-medical-date-range',
+    'invalid-medical-type',
   ];
   return warnings.some((warning) => blockingWarnings.includes(warning))
     ? 'blocked'
@@ -524,11 +698,21 @@ function resolveBulkUpdateStatus(
   const blockingWarnings: EmployeeTemplateWarningCode[] = [
     'missing-teta',
     'unknown-teta',
+    'ambiguous-teta',
+    'name-mismatch',
     'identity-conflict',
+    'invalid-citizenship',
+    'invalid-gender',
+    'invalid-first-toyota-employment-date',
     'invalid-employment-start',
     'invalid-employment-end',
     'invalid-date-range',
     'invalid-shift',
+    'invalid-shift-for-department',
+    'invalid-medical-examination-date',
+    'invalid-medical-valid-until',
+    'invalid-medical-date-range',
+    'invalid-medical-type',
   ];
   if (warnings.some((warning) => blockingWarnings.includes(warning))) {
     return 'blocked';
@@ -539,24 +723,12 @@ function resolveBulkUpdateStatus(
   return warnings.length > 0 ? 'warning' : 'ready';
 }
 
-function employeeToTemplateRow(
-  employee: Employee,
-  departments: readonly Department[],
-): string[] {
-  const department = departments.find(
-    (candidate) => candidate.id === employee.departmentId,
-  );
+function employeeToTemplateRow(employee: Employee): string[] {
   return [
     employee.tetaNumber,
     employee.firstName,
     employee.lastName,
-    employee.pesel ?? '',
-    employee.passportNumber ?? '',
-    employee.foreignDocumentNumber ?? '',
-    formatImportDate(employee.employmentStartDate),
-    formatImportDate(employee.employmentEndDate),
-    department?.name ?? '',
-    employee.shiftAssignment ?? '',
+    ...Array.from({ length: employeeTemplateHeaders.length - 3 }, () => ''),
   ];
 }
 
@@ -568,35 +740,19 @@ function employeeToUpdateInput(employee: Employee): EmployeeCreateInput {
     pesel: employee.pesel,
     passportNumber: employee.passportNumber,
     foreignDocumentNumber: employee.foreignDocumentNumber,
+    phoneNumber: employee.phoneNumber,
     isActive: employee.isActive,
     departmentId: employee.departmentId,
     shiftAssignment: employee.shiftAssignment,
     employmentStartDate: employee.employmentStartDate,
     employmentEndDate: employee.employmentEndDate,
     citizenship: employee.citizenship,
+    gender: employee.gender,
     firstToyotaEmploymentDate: employee.firstToyotaEmploymentDate,
+    medicalExaminationDate: employee.medicalExaminationDate,
+    medicalValidUntil: employee.medicalValidUntil,
+    medicalExaminationType: employee.medicalExaminationType,
   };
-}
-
-function applyTextUpdate(
-  row: ParsedTemplateRow,
-  employee: Employee,
-  updateInput: EmployeeCreateInput,
-  changes: BulkEmployeeUpdateChange[],
-  column: EmployeeTemplateColumn,
-  field: Extract<keyof EmployeeCreateInput, 'firstName' | 'lastName'>,
-) {
-  const value = normalizeImportText(row.values[column]);
-  if (!value || value === employee[field]) {
-    return;
-  }
-  updateInput[field] = value;
-  changes.push({
-    field,
-    label: column,
-    oldValue: employee[field],
-    newValue: value,
-  });
 }
 
 function applyNullableTextUpdate(
@@ -630,6 +786,98 @@ function applyNullableTextUpdate(
   });
 }
 
+function applyPhoneUpdate(
+  row: ParsedTemplateRow,
+  employee: Employee,
+  updateInput: EmployeeCreateInput,
+  changes: BulkEmployeeUpdateChange[],
+) {
+  const raw = normalizeImportText(row.values['Numer telefonu']);
+  if (!raw) return;
+  const value =
+    raw === EMPLOYEE_TEMPLATE_CLEAR_MARKER ? null : normalizePhoneNumber(raw);
+  if (value === (employee.phoneNumber ?? null)) return;
+  updateInput.phoneNumber = value;
+  changes.push({
+    field: 'phoneNumber',
+    label: 'Numer telefonu',
+    oldValue: employee.phoneNumber ?? '',
+    newValue: value ?? EMPLOYEE_TEMPLATE_CLEAR_MARKER,
+  });
+}
+
+function applyCitizenshipUpdate(
+  row: ParsedTemplateRow,
+  employee: Employee,
+  updateInput: EmployeeCreateInput,
+  changes: BulkEmployeeUpdateChange[],
+  warnings: EmployeeTemplateWarningCode[],
+) {
+  const raw = normalizeImportText(row.values['Obywatelstwo']);
+  if (!raw) return;
+  if (raw === EMPLOYEE_TEMPLATE_CLEAR_MARKER) {
+    if (employee.citizenship) {
+      updateInput.citizenship = null;
+      changes.push({
+        field: 'citizenship',
+        label: 'Obywatelstwo',
+        oldValue: employee.citizenship,
+        newValue: EMPLOYEE_TEMPLATE_CLEAR_MARKER,
+      });
+    }
+    return;
+  }
+  if (!isValidCitizenship(raw)) {
+    warnings.push('invalid-citizenship');
+    return;
+  }
+  const value = normalizeCitizenship(raw);
+  if (value === (employee.citizenship ?? null)) return;
+  updateInput.citizenship = value;
+  changes.push({
+    field: 'citizenship',
+    label: 'Obywatelstwo',
+    oldValue: employee.citizenship ?? '',
+    newValue: value ?? '',
+  });
+}
+
+function applyGenderUpdate(
+  row: ParsedTemplateRow,
+  employee: Employee,
+  updateInput: EmployeeCreateInput,
+  changes: BulkEmployeeUpdateChange[],
+  warnings: EmployeeTemplateWarningCode[],
+) {
+  const raw = normalizeImportText(row.values['Płeć']);
+  if (!raw) return;
+  if (raw === EMPLOYEE_TEMPLATE_CLEAR_MARKER) {
+    if (employee.gender) {
+      updateInput.gender = null;
+      changes.push({
+        field: 'gender',
+        label: 'Płeć',
+        oldValue: employee.gender,
+        newValue: EMPLOYEE_TEMPLATE_CLEAR_MARKER,
+      });
+    }
+    return;
+  }
+  const value = normalizeEmployeeGender(raw);
+  if (!value) {
+    warnings.push('invalid-gender');
+    return;
+  }
+  if (value === (employee.gender ?? null)) return;
+  updateInput.gender = value;
+  changes.push({
+    field: 'gender',
+    label: 'Płeć',
+    oldValue: employee.gender ?? '',
+    newValue: value,
+  });
+}
+
 function applyDateUpdate(
   row: ParsedTemplateRow,
   employee: Employee,
@@ -638,15 +886,27 @@ function applyDateUpdate(
   warnings: EmployeeTemplateWarningCode[],
   column: Extract<
     EmployeeTemplateColumn,
-    'Data rozpoczęcia pracy' | 'Data zakończenia pracy'
+    | 'Data pierwszego zatrudnienia w Toyota'
+    | 'Data rozpoczęcia pracy'
+    | 'Data zakończenia pracy'
+    | 'Data badania lekarskiego'
+    | 'Badanie ważne do'
   >,
   field: Extract<
     keyof EmployeeCreateInput,
-    'employmentStartDate' | 'employmentEndDate'
+    | 'firstToyotaEmploymentDate'
+    | 'employmentStartDate'
+    | 'employmentEndDate'
+    | 'medicalExaminationDate'
+    | 'medicalValidUntil'
   >,
   invalidWarning: Extract<
     EmployeeTemplateWarningCode,
-    'invalid-employment-start' | 'invalid-employment-end'
+    | 'invalid-first-toyota-employment-date'
+    | 'invalid-employment-start'
+    | 'invalid-employment-end'
+    | 'invalid-medical-examination-date'
+    | 'invalid-medical-valid-until'
   >,
 ) {
   const raw = normalizeImportText(row.values[column]);
@@ -660,14 +920,14 @@ function applyDateUpdate(
     return;
   }
   const oldValue = employee[field];
-  if (formatImportDate(oldValue) === formatImportDate(value)) {
+  if (formatImportDate(oldValue ?? null) === formatImportDate(value)) {
     return;
   }
   updateInput[field] = value;
   changes.push({
     field,
     label: column,
-    oldValue: formatImportDate(oldValue),
+    oldValue: formatImportDate(oldValue ?? null),
     newValue: value ? formatImportDate(value) : EMPLOYEE_TEMPLATE_CLEAR_MARKER,
   });
 }
@@ -703,6 +963,7 @@ function applyDepartmentUpdate(
   }
   if (department.departmentId !== employee.departmentId) {
     updateInput.departmentId = department.departmentId;
+    updateInput.assignmentEffectiveDate = currentLocalIsoDate();
     changes.push({
       field: 'departmentId',
       label: 'Dział',
@@ -718,8 +979,9 @@ function applyShiftUpdate(
   updateInput: EmployeeCreateInput,
   changes: BulkEmployeeUpdateChange[],
   warnings: EmployeeTemplateWarningCode[],
+  departments: readonly Department[],
 ) {
-  const raw = normalizeImportText(row.values['Zmiana']);
+  const raw = normalizeImportText(row.values['Grupa zmianowa']);
   if (!raw) {
     return;
   }
@@ -728,7 +990,7 @@ function applyShiftUpdate(
       updateInput.shiftAssignment = null;
       changes.push({
         field: 'shiftAssignment',
-        label: 'Zmiana',
+        label: 'Grupa zmianowa',
         oldValue: employee.shiftAssignment,
         newValue: EMPLOYEE_TEMPLATE_CLEAR_MARKER,
       });
@@ -740,23 +1002,102 @@ function applyShiftUpdate(
     warnings.push('invalid-shift');
     return;
   }
+  const department = departments.find(
+    (candidate) => candidate.id === updateInput.departmentId,
+  );
+  if (shift === 'BLUE' && department?.shiftMode === 'TWO_SHIFT') {
+    warnings.push('invalid-shift-for-department');
+    return;
+  }
   if (shift !== employee.shiftAssignment) {
     updateInput.shiftAssignment = shift;
+    updateInput.assignmentEffectiveDate = currentLocalIsoDate();
     changes.push({
       field: 'shiftAssignment',
-      label: 'Zmiana',
+      label: 'Grupa zmianowa',
       oldValue: employee.shiftAssignment ?? '',
       newValue: shift,
     });
   }
 }
 
-function hasNameMismatch(row: ParsedTemplateRow, employee: Employee): boolean {
-  const firstName = normalizeImportText(row.values['Imię']);
-  const lastName = normalizeImportText(row.values['Nazwisko']);
+function applyMedicalTypeUpdate(
+  row: ParsedTemplateRow,
+  employee: Employee,
+  updateInput: EmployeeCreateInput,
+  changes: BulkEmployeeUpdateChange[],
+  warnings: EmployeeTemplateWarningCode[],
+) {
+  const raw = normalizeImportText(row.values['Typ badania lekarskiego']);
+  if (!raw) return;
+  if (raw === EMPLOYEE_TEMPLATE_CLEAR_MARKER) {
+    if (employee.medicalExaminationType) {
+      updateInput.medicalExaminationType = null;
+      changes.push({
+        field: 'medicalExaminationType',
+        label: 'Typ badania lekarskiego',
+        oldValue: medicalTypeTemplateLabel(employee.medicalExaminationType),
+        newValue: EMPLOYEE_TEMPLATE_CLEAR_MARKER,
+      });
+    }
+    return;
+  }
+  const value = normalizeMedicalExaminationType(raw);
+  if (!value) {
+    warnings.push('invalid-medical-type');
+    return;
+  }
+  if (value === (employee.medicalExaminationType ?? null)) return;
+  updateInput.medicalExaminationType = value;
+  changes.push({
+    field: 'medicalExaminationType',
+    label: 'Typ badania lekarskiego',
+    oldValue: employee.medicalExaminationType
+      ? medicalTypeTemplateLabel(employee.medicalExaminationType)
+      : '',
+    newValue: medicalTypeTemplateLabel(value),
+  });
+}
+
+function medicalTypeTemplateLabel(
+  value: NonNullable<Employee['medicalExaminationType']>,
+): string {
+  return {
+    PRODUKCJA: 'Pracownik produkcji',
+    MAGAZYNIER: 'Magazynier',
+    PRODUKCJA_HL_PU: 'Pracownik produkcji HL/PU',
+  }[value];
+}
+
+function departmentNameForInput(
+  input: EmployeeCreateInput,
+  departments: readonly Department[],
+): string | null {
   return (
-    (Boolean(firstName) && firstName !== employee.firstName) ||
-    (Boolean(lastName) && lastName !== employee.lastName)
+    departments.find((department) => department.id === input.departmentId)
+      ?.name ?? null
+  );
+}
+
+function currentLocalIsoDate(today = new Date()): string {
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, '0');
+  const day = String(today.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function hasNameMismatch(row: ParsedTemplateRow, employee: Employee): boolean {
+  const firstName = normalizeImportText(row.values['Imię']).toLocaleUpperCase(
+    'pl-PL',
+  );
+  const lastName = normalizeImportText(
+    row.values['Nazwisko'],
+  ).toLocaleUpperCase('pl-PL');
+  return (
+    !firstName ||
+    !lastName ||
+    firstName !== employee.firstName.toLocaleUpperCase('pl-PL') ||
+    lastName !== employee.lastName.toLocaleUpperCase('pl-PL')
   );
 }
 
@@ -784,6 +1125,18 @@ function buildEmployeeByTeta(
       employee,
     ]),
   );
+}
+
+function buildEmployeesByTeta(
+  employees: readonly Employee[],
+): Map<string, Employee[]> {
+  const result = new Map<string, Employee[]>();
+  employees.forEach((employee) => {
+    const key = normalizeTetaNumber(employee.tetaNumber);
+    if (!key) return;
+    result.set(key, [...(result.get(key) ?? []), employee]);
+  });
+  return result;
 }
 
 function buildEmployeeByIdentity(

@@ -148,16 +148,36 @@ export const employeeConverter = createConverter<EmployeeDocument>(
       readOptionalNullableString(data, 'passport_number', path) ?? null,
     foreign_document_number:
       readOptionalNullableString(data, 'foreign_document_number', path) ?? null,
+    phone_number:
+      readOptionalNullableString(data, 'phone_number', path) ?? null,
     citizenship:
       data.citizenship === undefined || data.citizenship === null
         ? null
-        : readEnum(data, 'citizenship', path, ['PL', 'UA', 'OTHER'] as const),
+        : readString(data, 'citizenship', path),
+    gender:
+      data.gender === undefined || data.gender === null
+        ? null
+        : readEnum(data, 'gender', path, ['K', 'M'] as const),
     first_toyota_employment_date:
       readOptionalNullableTimestamp(
         data,
         'first_toyota_employment_date',
         path,
       ) ?? null,
+    medical_examination_date:
+      readOptionalNullableTimestamp(data, 'medical_examination_date', path) ??
+      null,
+    medical_valid_until:
+      readOptionalNullableTimestamp(data, 'medical_valid_until', path) ?? null,
+    medical_examination_type:
+      data.medical_examination_type === undefined ||
+      data.medical_examination_type === null
+        ? null
+        : readEnum(data, 'medical_examination_type', path, [
+            'PRODUKCJA',
+            'MAGAZYNIER',
+            'PRODUKCJA_HL_PU',
+          ] as const),
     is_active: readBoolean(data, 'is_active', path),
     department_id:
       readOptionalNullableString(data, 'department_id', path) ?? null,

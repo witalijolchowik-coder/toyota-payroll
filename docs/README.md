@@ -50,6 +50,9 @@ The attached design history contains several generations of the architecture. Th
 - [Employee import templates and bulk updates - Block 15](business-rules/employee-import-templates.md)
   - app-owned CSV templates for new employees and bulk employee master-data
     updates
+- [Employee update template and medical examinations](business-rules/employee-update-medical-data.md)
+  - clean update-template columns, contact and ISO citizenship data, medical
+    examination types, statuses, warnings, Dashboard notices and audit rules
 - [Data quality readiness and L4 import - Block 17](business-rules/data-quality-readiness-l4-import.md)
   - employee/month readiness, payroll-setting checks and preview-first L4
     import

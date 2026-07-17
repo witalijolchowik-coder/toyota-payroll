@@ -31,7 +31,9 @@ export interface SettlementExportRecord {
     | 'employmentStartDate'
     | 'employmentEndDate'
   > &
-    Partial<Pick<Employee, 'citizenship' | 'firstToyotaEmploymentDate'>>;
+    Partial<
+      Pick<Employee, 'citizenship' | 'gender' | 'firstToyotaEmploymentDate'>
+    >;
   departmentName?: string | null;
   identity?: ExportEmployeeIdentity | null;
   draft: EmployeeMonthlyCalculationDraft;
@@ -581,7 +583,7 @@ function mapToyotaExportRow(
       formatNullableNumber(draft.components.baseSalaryBrutto),
       formatDate(record.employee.employmentStartDate),
       formatDate(record.employee.employmentEndDate),
-      '',
+      record.employee.gender ?? '',
       record.employee.citizenship ?? '',
       String(year),
       String(month),

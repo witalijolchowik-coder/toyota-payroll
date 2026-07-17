@@ -5,6 +5,7 @@ import HouseOutlined from '@mui/icons-material/HouseOutlined';
 import WarningAmberOutlined from '@mui/icons-material/WarningAmberOutlined';
 import BadgeOutlined from '@mui/icons-material/BadgeOutlined';
 import DescriptionOutlined from '@mui/icons-material/DescriptionOutlined';
+import PhoneOutlined from '@mui/icons-material/PhoneOutlined';
 import {
   Avatar,
   Box,
@@ -399,6 +400,12 @@ function EmployeeDocuments({
       ? {
           icon: <DescriptionOutlined fontSize="inherit" />,
           label: `${t.employees.table.foreignDocument}: ${employee.foreignDocumentNumber}`,
+        }
+      : null,
+    employee.phoneNumber
+      ? {
+          icon: <PhoneOutlined fontSize="inherit" />,
+          label: `${t.employees.table.phone}: ${employee.phoneNumber}`,
         }
       : null,
   ].filter((document) => document !== null);

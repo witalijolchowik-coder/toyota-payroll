@@ -2,11 +2,13 @@ import { useState, type ChangeEvent, type FormEvent } from 'react';
 import {
   Alert,
   Button,
+  Chip,
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  Divider,
   MenuItem,
   Stack,
   TextField,
@@ -24,6 +26,7 @@ import type {
   EmployeeColorShift,
   EmployeeCreateInput,
 } from '../../types/firestore';
+import { deriveEmployeeMedicalStatus } from '../../utils/employees';
 import {
   employeeInputFromForm,
   validateEmployeeInput,
@@ -53,10 +56,17 @@ function initialValues(employee?: Employee): EmployeeFormValues {
     pesel: employee?.pesel ?? '',
     passportNumber: employee?.passportNumber ?? '',
     foreignDocumentNumber: employee?.foreignDocumentNumber ?? '',
+    phoneNumber: employee?.phoneNumber ?? '',
     citizenship: employee?.citizenship ?? '',
+    gender: employee?.gender ?? '',
     firstToyotaEmploymentDate: dateInputValue(
       employee?.firstToyotaEmploymentDate ?? null,
     ),
+    medicalExaminationDate: dateInputValue(
+      employee?.medicalExaminationDate ?? null,
+    ),
+    medicalValidUntil: dateInputValue(employee?.medicalValidUntil ?? null),
+    medicalExaminationType: employee?.medicalExaminationType ?? '',
     departmentId: employee?.departmentId ?? '',
     shiftAssignment: employee?.shiftAssignment ?? '',
     assignmentEffectiveDate: dateInputValue(
@@ -95,6 +105,12 @@ export function EmployeeFormDialog({
     }
     if (code === 'duplicateTeta') {
       return t.employees.errors.duplicateTeta;
+    }
+    if (code === 'invalidCitizenship') {
+      return t.employees.form.invalidCitizenship;
+    }
+    if (code === 'invalidMedicalDateRange') {
+      return t.employees.form.medical.invalidDateRange;
     }
     return undefined;
   };
@@ -137,6 +153,18 @@ export function EmployeeFormDialog({
       setIsSubmitting(false);
     }
   };
+
+  const previewInput = employeeInputFromForm(
+    values,
+    employee?.isActive ?? true,
+  );
+  const departmentName =
+    departments.find((department) => department.id === values.departmentId)
+      ?.name ?? null;
+  const medicalStatus = deriveEmployeeMedicalStatus(
+    previewInput,
+    departmentName,
+  );
 
   return (
     <Dialog
@@ -191,26 +219,46 @@ export function EmployeeFormDialog({
                 slotProps={{ htmlInput: { autoComplete: 'family-name' } }}
               />
             </Stack>
-            <TextField
-              select
-              label={t.employees.form.citizenship}
-              value={values.citizenship}
-              onChange={handleChange('citizenship')}
-              helperText={t.employees.form.citizenshipHelper}
-            >
-              <MenuItem value="">
-                {t.employees.form.citizenshipUnknown}
-              </MenuItem>
-              <MenuItem value="PL">
-                {t.employees.form.citizenshipOptions.PL}
-              </MenuItem>
-              <MenuItem value="UA">
-                {t.employees.form.citizenshipOptions.UA}
-              </MenuItem>
-              <MenuItem value="OTHER">
-                {t.employees.form.citizenshipOptions.OTHER}
-              </MenuItem>
-            </TextField>
+            <Typography variant="subtitle2">
+              {t.employees.form.sections.contact}
+            </Typography>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <TextField
+                fullWidth
+                label={t.employees.form.phoneNumber}
+                value={values.phoneNumber}
+                onChange={handleChange('phoneNumber')}
+                helperText={t.employees.form.phoneHelper}
+                slotProps={{ htmlInput: { autoComplete: 'tel' } }}
+              />
+              <TextField
+                fullWidth
+                label={t.employees.form.citizenship}
+                value={values.citizenship}
+                onChange={handleChange('citizenship')}
+                error={Boolean(errors.citizenship)}
+                helperText={
+                  messageForError(errors.citizenship) ??
+                  t.employees.form.citizenshipHelper
+                }
+                slotProps={{ htmlInput: { maxLength: 2 } }}
+              />
+              <TextField
+                select
+                fullWidth
+                label={t.employees.form.gender}
+                value={values.gender}
+                onChange={handleChange('gender')}
+              >
+                <MenuItem value="">{t.employees.form.genderUnknown}</MenuItem>
+                <MenuItem value="K">
+                  {t.employees.form.genderOptions.K}
+                </MenuItem>
+                <MenuItem value="M">
+                  {t.employees.form.genderOptions.M}
+                </MenuItem>
+              </TextField>
+            </Stack>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <TextField
                 fullWidth
@@ -229,13 +277,6 @@ export function EmployeeFormDialog({
                 slotProps={{ htmlInput: { autoComplete: 'off' } }}
               />
             </Stack>
-            <TextField
-              label={t.employees.form.foreignDocumentNumber}
-              value={values.foreignDocumentNumber}
-              onChange={handleChange('foreignDocumentNumber')}
-              helperText={t.employees.form.foreignDocumentHelper}
-              slotProps={{ htmlInput: { autoComplete: 'off' } }}
-            />
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
               <TextField
                 select
@@ -278,6 +319,78 @@ export function EmployeeFormDialog({
                 <MenuItem value="BLUE">{t.organization.shifts.BLUE}</MenuItem>
               </TextField>
             </Stack>
+
+            <Divider />
+            <Stack spacing={1}>
+              <Typography variant="subtitle2">
+                {t.employees.form.medical.section}
+              </Typography>
+              <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
+                <Chip
+                  size="small"
+                  color={
+                    medicalStatus.primary === 'valid'
+                      ? 'success'
+                      : medicalStatus.primary === 'expired'
+                        ? 'error'
+                        : 'warning'
+                  }
+                  label={t.employees.form.medical.status[medicalStatus.primary]}
+                />
+                {medicalStatus.issues.includes('department-mismatch') ? (
+                  <Chip
+                    size="small"
+                    color="warning"
+                    variant="outlined"
+                    label={t.employees.form.medical.status.departmentMismatch}
+                  />
+                ) : null}
+              </Stack>
+            </Stack>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <TextField
+                fullWidth
+                type="date"
+                label={t.employees.form.medical.examinationDate}
+                value={values.medicalExaminationDate}
+                onChange={handleChange('medicalExaminationDate')}
+                slotProps={{ inputLabel: { shrink: true } }}
+              />
+              <TextField
+                fullWidth
+                type="date"
+                label={t.employees.form.medical.validUntil}
+                value={values.medicalValidUntil}
+                onChange={handleChange('medicalValidUntil')}
+                error={Boolean(errors.medicalValidUntil)}
+                helperText={messageForError(errors.medicalValidUntil)}
+                slotProps={{ inputLabel: { shrink: true } }}
+              />
+            </Stack>
+            <TextField
+              select
+              label={t.employees.form.medical.type}
+              value={values.medicalExaminationType}
+              onChange={handleChange('medicalExaminationType')}
+            >
+              <MenuItem value="">
+                {t.employees.form.medical.typeUnknown}
+              </MenuItem>
+              <MenuItem value="PRODUKCJA">
+                {t.employees.form.medical.types.PRODUKCJA}
+              </MenuItem>
+              <MenuItem value="MAGAZYNIER">
+                {t.employees.form.medical.types.MAGAZYNIER}
+              </MenuItem>
+              <MenuItem value="PRODUKCJA_HL_PU">
+                {t.employees.form.medical.types.PRODUKCJA_HL_PU}
+              </MenuItem>
+            </TextField>
+            {medicalStatus.issues.includes('department-mismatch') ? (
+              <Alert severity="warning">
+                {t.employees.form.medical.departmentMismatch}
+              </Alert>
+            ) : null}
             {assignmentChanged ? (
               <Alert severity="info">
                 <Stack spacing={1.5}>

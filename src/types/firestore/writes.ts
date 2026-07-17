@@ -8,6 +8,8 @@ import type {
   EmployeeId,
   EmployeeColorShift,
   EmployeeCitizenship,
+  EmployeeGender,
+  MedicalExaminationType,
   ScheduleCorrectionKind,
   EmployeeEntitlementType,
   ImportType,
@@ -25,8 +27,13 @@ export interface EmployeeCreateInput {
   pesel: string | null;
   passportNumber: string | null;
   foreignDocumentNumber: string | null;
+  phoneNumber?: string | null;
   citizenship?: EmployeeCitizenship | null;
+  gender?: EmployeeGender | null;
   firstToyotaEmploymentDate?: Date | null;
+  medicalExaminationDate?: Date | null;
+  medicalValidUntil?: Date | null;
+  medicalExaminationType?: MedicalExaminationType | null;
   isActive: boolean;
   departmentId: DepartmentId | null;
   shiftAssignment: EmployeeColorShift | null;

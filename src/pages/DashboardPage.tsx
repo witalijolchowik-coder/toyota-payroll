@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Link as RouterLink } from 'react-router-dom';
 import AssessmentOutlined from '@mui/icons-material/AssessmentOutlined';
 import EventBusyOutlined from '@mui/icons-material/EventBusyOutlined';
+import MedicalServicesOutlined from '@mui/icons-material/MedicalServicesOutlined';
 import GroupsOutlined from '@mui/icons-material/GroupsOutlined';
 import SettingsOutlined from '@mui/icons-material/SettingsOutlined';
 import SummarizeOutlined from '@mui/icons-material/SummarizeOutlined';
@@ -19,7 +20,11 @@ import {
 
 import { PageHeader } from '../components/layout/PageHeader';
 import { MonthReadinessPanel } from '../features/readiness/MonthReadinessPanel';
+import { useEmployees } from '../features/employees/useEmployees';
+import { useDepartments } from '../features/settings/useDepartments';
 import { useTranslations } from '../hooks/useTranslations';
+import { interpolate } from '../i18n/pl';
+import { aggregateMedicalNotices } from '../utils/employees';
 import { previousPayrollMonthId } from '../utils/payroll';
 import { routes } from '../utils/routes';
 
@@ -72,8 +77,40 @@ function ReadinessCard({ title, value, helperText, icon }: ReadinessCardProps) {
 
 export function DashboardPage() {
   const t = useTranslations();
+  const { employees } = useEmployees();
+  const { departments } = useDepartments();
   const [monthId, setMonthId] = useState(() =>
     previousPayrollMonthId(new Date()),
+  );
+  const medicalNotices = aggregateMedicalNotices(employees, departments);
+  const medicalGroups = [
+    {
+      key: 'expired',
+      label: t.dashboard.medical.expired,
+      employees: medicalNotices.expired,
+      color: 'error' as const,
+    },
+    {
+      key: 'expiring',
+      label: t.dashboard.medical.expiringSoon,
+      employees: medicalNotices.expiringSoon,
+      color: 'warning' as const,
+    },
+    {
+      key: 'missing',
+      label: t.dashboard.medical.missingValidity,
+      employees: medicalNotices.missingValidity,
+      color: 'warning' as const,
+    },
+    {
+      key: 'incompatible',
+      label: t.dashboard.medical.incompatible,
+      employees: medicalNotices.incompatible,
+      color: 'warning' as const,
+    },
+  ];
+  const hasMedicalIssues = medicalGroups.some(
+    (group) => group.employees.length > 0,
   );
 
   return (
@@ -128,6 +165,62 @@ export function DashboardPage() {
           icon={<SummarizeOutlined />}
         />
       </Box>
+
+      <Card>
+        <CardContent sx={{ p: 3 }}>
+          <Stack direction="row" spacing={1.5} sx={{ alignItems: 'center' }}>
+            <MedicalServicesOutlined color="primary" />
+            <Box>
+              <Typography variant="h6">{t.dashboard.medical.title}</Typography>
+              <Typography color="text.secondary" variant="body2">
+                {t.dashboard.medical.description}
+              </Typography>
+            </Box>
+          </Stack>
+          {hasMedicalIssues ? (
+            <Stack spacing={2} sx={{ mt: 2.5 }}>
+              <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
+                {medicalGroups.map((group) => (
+                  <Chip
+                    key={group.key}
+                    color={group.color}
+                    variant="outlined"
+                    label={`${group.label}: ${group.employees.length}`}
+                  />
+                ))}
+              </Stack>
+              <Stack spacing={0.5}>
+                {medicalGroups
+                  .flatMap((group) => group.employees)
+                  .filter(
+                    (employee, index, all) =>
+                      all.findIndex((item) => item.id === employee.id) ===
+                      index,
+                  )
+                  .slice(0, 8)
+                  .map((employee) => (
+                    <Button
+                      key={employee.id}
+                      component={RouterLink}
+                      to={`${routes.employees}?editEmployeeId=${employee.id}`}
+                      sx={{ alignSelf: 'flex-start' }}
+                    >
+                      {interpolate(t.dashboard.medical.inspect, {
+                        employee:
+                          `${employee.firstName} ${employee.lastName}`.trim(),
+                        teta: employee.tetaNumber,
+                      })}
+                    </Button>
+                  ))}
+              </Stack>
+            </Stack>
+          ) : (
+            <Typography color="text.secondary" sx={{ mt: 2 }}>
+              {t.dashboard.medical.noIssues}
+            </Typography>
+          )}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardContent sx={{ p: 3 }}>

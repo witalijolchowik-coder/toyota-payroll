@@ -15,6 +15,8 @@ import type {
   EmployeeEntitlementStatus,
   EmployeeEntitlementType,
   EmployeeCitizenship,
+  EmployeeGender,
+  MedicalExaminationType,
   ActualWorkingShift,
   ImportStatus,
   ImportType,
@@ -45,8 +47,13 @@ export interface Employee extends ModificationMetadata {
   pesel: string | null;
   passportNumber: string | null;
   foreignDocumentNumber: string | null;
+  phoneNumber?: string | null;
   citizenship?: EmployeeCitizenship | null;
+  gender?: EmployeeGender | null;
   firstToyotaEmploymentDate?: Date | null;
+  medicalExaminationDate?: Date | null;
+  medicalValidUntil?: Date | null;
+  medicalExaminationType?: MedicalExaminationType | null;
   isActive: boolean;
   departmentId: DepartmentId | null;
   shiftAssignment: EmployeeColorShift | null;

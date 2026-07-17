@@ -1,6 +1,7 @@
 import {
   Timestamp,
   addDoc,
+  doc,
   getDoc,
   getDocs,
   onSnapshot,
@@ -8,6 +9,7 @@ import {
   query,
   serverTimestamp,
   updateDoc,
+  writeBatch,
   where,
   type Unsubscribe,
 } from 'firebase/firestore';
@@ -31,7 +33,7 @@ import {
   mapEmployeeDocument,
 } from './firestore/mappers';
 import { getFirestoreRepositories } from './firestoreService';
-import { recordAuditEntry } from './auditService';
+import { appendAuditEntryToBatch, recordAuditEntry } from './auditService';
 import { preserveFirstToyotaEmploymentDate } from '../utils/payroll';
 
 export type EmployeeServiceErrorCode =
@@ -181,10 +183,17 @@ export async function createEmployee(
     pesel: normalized.pesel,
     passport_number: normalized.passportNumber,
     foreign_document_number: normalized.foreignDocumentNumber,
+    phone_number: normalized.phoneNumber ?? null,
     citizenship: normalized.citizenship ?? null,
+    gender: normalized.gender ?? null,
     first_toyota_employment_date: timestampOrNull(
       normalized.firstToyotaEmploymentDate ?? null,
     ),
+    medical_examination_date: timestampOrNull(
+      normalized.medicalExaminationDate ?? null,
+    ),
+    medical_valid_until: timestampOrNull(normalized.medicalValidUntil ?? null),
+    medical_examination_type: normalized.medicalExaminationType ?? null,
     is_active: true,
     department_id: normalized.departmentId,
     shift_assignment: normalized.shiftAssignment,
@@ -244,17 +253,25 @@ export async function updateEmployee(
     normalized.firstToyotaEmploymentDate,
   );
 
-  await updateDoc(repositories.employee(employeeId), {
+  const batch = writeBatch(repositories.employees.firestore);
+  batch.update(repositories.employee(employeeId), {
     teta_number: normalized.tetaNumber,
     first_name: normalized.firstName,
     last_name: normalized.lastName,
     pesel: normalized.pesel,
     passport_number: normalized.passportNumber,
     foreign_document_number: normalized.foreignDocumentNumber,
+    phone_number: normalized.phoneNumber ?? null,
     citizenship: normalized.citizenship ?? null,
+    gender: normalized.gender ?? null,
     first_toyota_employment_date: timestampOrNull(
       stableFirstToyotaEmploymentDate,
     ),
+    medical_examination_date: timestampOrNull(
+      normalized.medicalExaminationDate ?? null,
+    ),
+    medical_valid_until: timestampOrNull(normalized.medicalValidUntil ?? null),
+    medical_examination_type: normalized.medicalExaminationType ?? null,
     department_id: normalized.departmentId,
     shift_assignment: normalized.shiftAssignment,
     employment_start_date: timestampOrNull(normalized.employmentStartDate),
@@ -263,12 +280,12 @@ export async function updateEmployee(
     updated_by: actorUid,
   });
 
-  if (
+  const assignmentChanged =
     previousEmployee &&
     (previousEmployee.departmentId !== normalized.departmentId ||
-      previousEmployee.shiftAssignment !== normalized.shiftAssignment)
-  ) {
-    await replaceCurrentEmployeeAssignment({
+      previousEmployee.shiftAssignment !== normalized.shiftAssignment);
+  if (assignmentChanged) {
+    await appendEmployeeAssignmentReplacementToBatch(batch, {
       employeeId,
       tetaNumber: normalized.tetaNumber,
       departmentId: normalized.departmentId,
@@ -279,7 +296,7 @@ export async function updateEmployee(
     });
   }
 
-  await recordAuditEntry({
+  appendAuditEntryToBatch(batch, repositories, {
     entityPath: `employees/${employeeId}`,
     action: 'update',
     actorUid,
@@ -294,6 +311,15 @@ export async function updateEmployee(
               previousEmployee.employmentEndDate?.toISOString() ?? null,
             first_toyota_employment_date:
               previousEmployee.firstToyotaEmploymentDate?.toISOString() ?? null,
+            phone_number: previousEmployee.phoneNumber ?? null,
+            citizenship: previousEmployee.citizenship ?? null,
+            gender: previousEmployee.gender ?? null,
+            medical_examination_date:
+              previousEmployee.medicalExaminationDate?.toISOString() ?? null,
+            medical_valid_until:
+              previousEmployee.medicalValidUntil?.toISOString() ?? null,
+            medical_examination_type:
+              previousEmployee.medicalExaminationType ?? null,
             department_id: previousEmployee.departmentId,
             shift_assignment: previousEmployee.shiftAssignment,
           }
@@ -306,11 +332,20 @@ export async function updateEmployee(
           normalized.employmentEndDate?.toISOString() ?? null,
         first_toyota_employment_date:
           stableFirstToyotaEmploymentDate?.toISOString() ?? null,
+        phone_number: normalized.phoneNumber ?? null,
+        citizenship: normalized.citizenship ?? null,
+        gender: normalized.gender ?? null,
+        medical_examination_date:
+          normalized.medicalExaminationDate?.toISOString() ?? null,
+        medical_valid_until:
+          normalized.medicalValidUntil?.toISOString() ?? null,
+        medical_examination_type: normalized.medicalExaminationType ?? null,
         department_id: normalized.departmentId,
         shift_assignment: normalized.shiftAssignment,
       },
     },
   });
+  await batch.commit();
 }
 
 export async function deactivateEmployee(
@@ -354,7 +389,8 @@ async function createEmployeeAssignment(
   });
 }
 
-async function replaceCurrentEmployeeAssignment(
+async function appendEmployeeAssignmentReplacementToBatch(
+  batch: ReturnType<typeof writeBatch>,
   input: EmployeeAssignmentCreateInput,
 ): Promise<void> {
   const actorUid = requireActorUid();
@@ -374,21 +410,32 @@ async function replaceCurrentEmployeeAssignment(
     overlapsAssignment(assignment, input.validFrom),
   );
 
-  await Promise.all(
-    overlappingAssignments.map((assignment) =>
-      updateDoc(repositories.employeeAssignment(assignment.id), {
-        valid_to:
-          assignment.validFrom < input.validFrom
-            ? previousDay
-            : assignment.validTo,
-        status: assignment.validFrom < input.validFrom ? 'ACTIVE' : 'CANCELLED',
-        updated_at: serverTimestamp(),
-        updated_by: actorUid,
-      }),
-    ),
-  );
+  overlappingAssignments.forEach((assignment) => {
+    batch.update(repositories.employeeAssignment(assignment.id), {
+      valid_to:
+        assignment.validFrom < input.validFrom
+          ? previousDay
+          : assignment.validTo,
+      status: assignment.validFrom < input.validFrom ? 'ACTIVE' : 'CANCELLED',
+      updated_at: serverTimestamp(),
+      updated_by: actorUid,
+    });
+  });
 
-  await createEmployeeAssignment(input);
+  batch.set(doc(repositories.employeeAssignments), {
+    employee_id: input.employeeId,
+    teta_number: input.tetaNumber,
+    department_id: input.departmentId,
+    shift_assignment: input.shiftAssignment,
+    valid_from: input.validFrom,
+    valid_to: input.validTo,
+    status: 'ACTIVE',
+    note: input.note,
+    created_at: serverTimestamp(),
+    created_by: actorUid,
+    updated_at: serverTimestamp(),
+    updated_by: actorUid,
+  });
 }
 
 function overlapsAssignment(

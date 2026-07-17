@@ -18,6 +18,7 @@ const employee = {
   pesel: '90010112345',
   passportNumber: 'AB123456',
   foreignDocumentNumber: null,
+  phoneNumber: '+48 500 000 000',
   firstToyotaEmploymentDate: new Date('2025-01-02T00:00:00.000Z'),
   employmentStartDate: new Date('2026-01-03T00:00:00.000Z'),
   employmentEndDate: null,
@@ -60,6 +61,7 @@ describe('EmployeesTable', () => {
     ).not.toBeInTheDocument();
     expect(screen.getByText('PESEL: 90010112345')).toBeInTheDocument();
     expect(screen.getByText('Paszport: AB123456')).toBeInTheDocument();
+    expect(screen.getByText('Telefon: +48 500 000 000')).toBeInTheDocument();
     expect(screen.getByText('Metal')).toBeInTheDocument();
     expect(screen.getByText('Red')).toBeInTheDocument();
     expect(

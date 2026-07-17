@@ -1,5 +1,10 @@
 # Employee import templates and bulk updates — Block 15
 
+> The bulk-update column list and employee medical/contact extensions are
+> superseded by
+> [Employee update template and medical examinations](employee-update-medical-data.md).
+> The preview-first workflow and non-payroll scope below remain applicable.
+
 This block replaces the normal coordinator-facing employee import workflow with
 application-owned CSV templates.
 

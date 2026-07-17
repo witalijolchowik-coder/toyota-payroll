@@ -2,6 +2,8 @@ import type {
   DepartmentId,
   EmployeeColorShift,
   EmployeeCreateInput,
+  EmployeeGender,
+  MedicalExaminationType,
 } from '../../types/firestore';
 
 export interface EmployeeFormValues {
@@ -11,8 +13,13 @@ export interface EmployeeFormValues {
   pesel: string;
   passportNumber: string;
   foreignDocumentNumber: string;
-  citizenship: '' | 'PL' | 'UA' | 'OTHER';
+  phoneNumber: string;
+  citizenship: string;
+  gender: '' | EmployeeGender;
   firstToyotaEmploymentDate: string;
+  medicalExaminationDate: string;
+  medicalValidUntil: string;
+  medicalExaminationType: '' | MedicalExaminationType;
   departmentId: DepartmentId | '';
   shiftAssignment: EmployeeColorShift | '';
   assignmentEffectiveDate: string;
@@ -27,14 +34,23 @@ export type EmployeeFieldName =
   | 'pesel'
   | 'passportNumber'
   | 'foreignDocumentNumber'
+  | 'phoneNumber'
   | 'citizenship'
+  | 'gender'
   | 'firstToyotaEmploymentDate'
+  | 'medicalExaminationDate'
+  | 'medicalValidUntil'
+  | 'medicalExaminationType'
   | 'assignmentEffectiveDate'
   | 'employmentStartDate'
   | 'employmentEndDate';
 
 export type EmployeeValidationCode =
-  'required' | 'invalidDateRange' | 'duplicateTeta';
+  | 'required'
+  | 'invalidDateRange'
+  | 'duplicateTeta'
+  | 'invalidCitizenship'
+  | 'invalidMedicalDateRange';
 
 export type EmployeeValidationErrors = Partial<
   Record<EmployeeFieldName, EmployeeValidationCode>

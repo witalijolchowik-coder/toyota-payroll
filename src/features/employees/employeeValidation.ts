@@ -4,6 +4,10 @@ import type {
   EmployeeId,
 } from '../../types/firestore';
 import { isEmployeeColorShift } from '../../utils/organization';
+import {
+  isValidCitizenship,
+  normalizePhoneNumber,
+} from '../../utils/employees';
 import type { EmployeeFormValues, EmployeeValidationErrors } from './types';
 
 function dateFromInput(value: string): Date | null {
@@ -30,8 +34,15 @@ export function normalizeEmployeeInput(
     pesel: input.pesel?.trim() || null,
     passportNumber: input.passportNumber?.trim() || null,
     foreignDocumentNumber: input.foreignDocumentNumber?.trim() || null,
-    citizenship: input.citizenship ?? null,
+    phoneNumber: input.phoneNumber
+      ? normalizePhoneNumber(input.phoneNumber) || null
+      : null,
+    citizenship: input.citizenship?.trim().toUpperCase() || null,
+    gender: input.gender ?? null,
     firstToyotaEmploymentDate: input.firstToyotaEmploymentDate ?? null,
+    medicalExaminationDate: input.medicalExaminationDate ?? null,
+    medicalValidUntil: input.medicalValidUntil ?? null,
+    medicalExaminationType: input.medicalExaminationType ?? null,
     departmentId: input.departmentId?.trim() || null,
     shiftAssignment: input.shiftAssignment ?? null,
   };
@@ -48,8 +59,13 @@ export function employeeInputFromForm(
     pesel: values.pesel,
     passportNumber: values.passportNumber,
     foreignDocumentNumber: values.foreignDocumentNumber,
+    phoneNumber: values.phoneNumber,
     citizenship: values.citizenship || null,
+    gender: values.gender || null,
     firstToyotaEmploymentDate: dateFromInput(values.firstToyotaEmploymentDate),
+    medicalExaminationDate: dateFromInput(values.medicalExaminationDate),
+    medicalValidUntil: dateFromInput(values.medicalValidUntil),
+    medicalExaminationType: values.medicalExaminationType || null,
     isActive,
     departmentId: values.departmentId || null,
     shiftAssignment: isEmployeeColorShift(values.shiftAssignment)
@@ -88,6 +104,16 @@ export function validateEmployeeInput(
     normalized.employmentEndDate < normalized.employmentStartDate
   ) {
     errors.employmentEndDate = 'invalidDateRange';
+  }
+  if (normalized.citizenship && !isValidCitizenship(normalized.citizenship)) {
+    errors.citizenship = 'invalidCitizenship';
+  }
+  if (
+    normalized.medicalExaminationDate &&
+    normalized.medicalValidUntil &&
+    normalized.medicalValidUntil < normalized.medicalExaminationDate
+  ) {
+    errors.medicalValidUntil = 'invalidMedicalDateRange';
   }
 
   return errors;

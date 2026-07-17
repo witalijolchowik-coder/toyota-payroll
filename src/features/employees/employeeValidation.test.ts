@@ -115,6 +115,35 @@ describe('employee validation', () => {
       shiftAssignment: 'RED',
     });
   });
+
+  it('normalizes phone and citizenship without losing prefixes or zeroes', () => {
+    expect(
+      normalizeEmployeeInput(
+        validInput({
+          phoneNumber: '  +380  050 123 4567 ',
+          citizenship: 'ua',
+        }),
+      ),
+    ).toMatchObject({
+      phoneNumber: '+380 050 123 4567',
+      citizenship: 'UA',
+    });
+  });
+
+  it('rejects unknown citizenship and invalid medical date range', () => {
+    expect(
+      validateEmployeeInput(
+        validInput({
+          citizenship: 'XX',
+          medicalExaminationDate: new Date('2026-07-20T00:00:00.000Z'),
+          medicalValidUntil: new Date('2026-07-19T00:00:00.000Z'),
+        }),
+      ),
+    ).toMatchObject({
+      citizenship: 'invalidCitizenship',
+      medicalValidUntil: 'invalidMedicalDateRange',
+    });
+  });
 });
 
 describe('active employee TETA uniqueness', () => {

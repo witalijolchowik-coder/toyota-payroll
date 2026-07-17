@@ -31,7 +31,7 @@ export const pl = {
   },
   navigation: {
     dashboard: {
-      label: 'Pulpit',
+      label: 'Dashboard',
       description: 'Krótki przegląd stanu konfiguracji i najbliższych kroków.',
     },
     employees: {
@@ -66,7 +66,7 @@ export const pl = {
   dashboard: {
     page: {
       eyebrow: 'Obszar koordynatora',
-      title: 'Pulpit',
+      title: 'Dashboard',
       description:
         'Najważniejsze kroki przygotowania systemu do kontrolowanej pracy operacyjnej.',
       status: 'Tryb pilotażowy',
@@ -110,6 +110,18 @@ export const pl = {
       settings: 'Przejdź do ustawień',
       settlement: 'Otwórz rozliczenie',
       absences: 'Otwórz nieobecności',
+    },
+    medical: {
+      title: 'Badania lekarskie',
+      description:
+        'Aktualne ostrzeżenia operacyjne. Nie blokują rozliczenia płacowego.',
+      expired: 'Wygasłe',
+      expiringSoon: 'Wygasają w ciągu 10 dni',
+      missingValidity: 'Brak daty ważności',
+      incompatible: 'Niezgodne z działem',
+      noIssues: 'Brak pilnych ostrzeżeń dotyczących badań lekarskich.',
+      inspect: 'Sprawdź pracownika {{employee}}, TETA {{teta}}',
+      more: 'Pokaż pracowników',
     },
     readiness: {
       title: 'Gotowość miesiąca',
@@ -241,6 +253,7 @@ export const pl = {
       pesel: 'PESEL',
       passport: 'Paszport',
       foreignDocument: 'Dokument',
+      phone: 'Telefon',
       noIdentity: 'Brak PESEL / paszportu',
       department: 'Dział',
       shiftAssignment: 'Zmiana',
@@ -305,14 +318,26 @@ export const pl = {
       pesel: 'PESEL',
       passportNumber: 'Paszport',
       foreignDocumentNumber: 'Inny dokument cudzoziemca',
+      phoneNumber: 'Numer telefonu',
+      phoneHelper:
+        'Zachowujemy prefiks międzynarodowy, zera początkowe i typowe separatory.',
       citizenship: 'Obywatelstwo',
-      citizenshipHelper:
-        'Obywatelstwo określa wymagane dokumenty do finalizacji.',
+      citizenshipHelper: 'Dwuliterowy kod kraju ISO, np. PL, UA albo BY.',
+      invalidCitizenship: 'Wpisz prawidłowy dwuliterowy kod kraju ISO 3166-1.',
       citizenshipUnknown: 'Nie określono',
       citizenshipOptions: {
         PL: 'Polska',
         UA: 'Ukraina',
         OTHER: 'Inne',
+      },
+      gender: 'Płeć',
+      genderUnknown: 'Nie określono',
+      genderOptions: {
+        K: 'Kobieta',
+        M: 'Mężczyzna',
+      },
+      sections: {
+        contact: 'Kontakt i dane osobowe',
       },
       firstToyotaEmploymentDate: 'Data pierwszego zatrudnienia w Toyota',
       firstToyotaEmploymentDateHelper:
@@ -337,6 +362,30 @@ export const pl = {
       required: 'To pole jest wymagane.',
       invalidDateRange:
         'Data zakończenia nie może być wcześniejsza niż data rozpoczęcia.',
+      medical: {
+        section: 'Badania lekarskie',
+        examinationDate: 'Data badania lekarskiego',
+        validUntil: 'Badanie ważne do',
+        type: 'Typ badania lekarskiego',
+        typeUnknown: 'Nie określono',
+        invalidDateRange:
+          'Data ważności nie może być wcześniejsza niż data badania.',
+        departmentMismatch:
+          'Typ badania lekarskiego nie odpowiada aktualnemu działowi.',
+        types: {
+          PRODUKCJA: 'Pracownik produkcji',
+          MAGAZYNIER: 'Magazynier',
+          PRODUKCJA_HL_PU: 'Pracownik produkcji HL/PU',
+        },
+        status: {
+          valid: 'Ważne',
+          'expiring-soon': 'Wygasa w ciągu 10 dni',
+          expired: 'Wygasło',
+          'missing-validity': 'Brak daty ważności',
+          'missing-data': 'Brak danych badania',
+          departmentMismatch: 'Niezgodne z działem',
+        },
+      },
     },
     deactivate: {
       title: 'Dezaktywować pracownika?',
@@ -534,8 +583,10 @@ export const pl = {
           'Pracownik z tym numerem TETA już istnieje — import go nie nadpisze.',
         'unknown-teta':
           'Nie znaleziono istniejącego pracownika z tym numerem TETA.',
+        'ambiguous-teta':
+          'Numer TETA nie wskazuje jednoznacznie jednego pracownika.',
         'name-mismatch':
-          'Imię lub nazwisko w pliku różni się od danych w aplikacji.',
+          'Imię lub nazwisko nie odpowiada danym pracownika. Wiersz nie zostanie zastosowany.',
         'identity-conflict':
           'PESEL, paszport lub dokument pasuje do innego pracownika.',
         'department-na0':
@@ -543,7 +594,26 @@ export const pl = {
         'department-unmapped':
           'Dział nie został bezpiecznie rozpoznany i pozostanie bez zmian lub pusty.',
         'invalid-shift':
-          'Zmiana musi być pusta albo mieć wartość RED, WHITE lub BLUE.',
+          'Grupa zmianowa musi być pusta albo mieć wartość Red, White lub Blue.',
+        'invalid-shift-for-department':
+          'Wybrana grupa zmianowa nie jest dostępna dla tego działu.',
+        'invalid-citizenship':
+          'Obywatelstwo musi być prawidłowym dwuliterowym kodem ISO.',
+        'invalid-gender': 'Płeć musi mieć wartość K albo M.',
+        'invalid-first-toyota-employment-date':
+          'Data pierwszego zatrudnienia w Toyota jest nieprawidłowa.',
+        'invalid-medical-examination-date':
+          'Data badania lekarskiego jest nieprawidłowa.',
+        'invalid-medical-valid-until':
+          'Data ważności badania jest nieprawidłowa.',
+        'invalid-medical-date-range':
+          'Data ważności badania nie może być wcześniejsza niż data badania.',
+        'invalid-medical-type': 'Typ badania lekarskiego nie jest obsługiwany.',
+        'medical-type-department-mismatch':
+          'Typ badania lekarskiego nie odpowiada aktualnemu działowi.',
+        'medical-expired': 'Badanie lekarskie wygasło.',
+        'medical-expiring-soon': 'Badanie lekarskie wygasa w ciągu 10 dni.',
+        'medical-missing-validity': 'Brakuje daty ważności badania.',
       },
       notifications: {
         created: 'Utworzono pracowników: {{count}}.',

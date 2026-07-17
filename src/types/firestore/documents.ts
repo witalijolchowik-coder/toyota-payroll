@@ -5,7 +5,10 @@ export type EmployeeId = string;
 export type DepartmentId = string;
 export type MonthId = string;
 export type IsoDate = string;
-export type EmployeeCitizenship = 'PL' | 'UA' | 'OTHER';
+export type EmployeeCitizenship = string;
+export type EmployeeGender = 'K' | 'M';
+export type MedicalExaminationType =
+  'PRODUKCJA' | 'MAGAZYNIER' | 'PRODUKCJA_HL_PU';
 
 export type EmployeeColorShift = 'RED' | 'WHITE' | 'BLUE';
 export type ActualWorkingShift = 'FIRST' | 'SECOND' | 'NIGHT';
@@ -46,8 +49,13 @@ export interface EmployeeDocument extends ModificationMetadataDocument {
   pesel?: string | null;
   passport_number?: string | null;
   foreign_document_number?: string | null;
+  phone_number?: string | null;
   citizenship?: EmployeeCitizenship | null;
+  gender?: EmployeeGender | null;
   first_toyota_employment_date?: Timestamp | null;
+  medical_examination_date?: Timestamp | null;
+  medical_valid_until?: Timestamp | null;
+  medical_examination_type?: MedicalExaminationType | null;
   is_active: boolean;
   department_id?: DepartmentId | null;
   shift_assignment?: EmployeeColorShift | null;

@@ -133,8 +133,13 @@ service cloud.firestore {
           'pesel',
           'passport_number',
           'foreign_document_number',
+          'phone_number',
           'citizenship',
+          'gender',
           'first_toyota_employment_date',
+          'medical_examination_date',
+          'medical_valid_until',
+          'medical_examination_type',
           'is_active',
           'department_id',
           'shift_assignment',
@@ -153,11 +158,32 @@ service cloud.firestore {
           || isNullableString(data.passport_number))
         && (!data.keys().hasAny(['foreign_document_number'])
           || isNullableString(data.foreign_document_number))
+        && (!data.keys().hasAny(['phone_number'])
+          || isNullableString(data.phone_number))
         && (!data.keys().hasAny(['citizenship'])
           || data.citizenship == null
-          || data.citizenship in ['PL', 'UA', 'OTHER'])
+          || (data.citizenship is string
+            && data.citizenship.matches('^[A-Z]{2}$')))
+        && (!data.keys().hasAny(['gender'])
+          || data.gender == null
+          || data.gender in ['K', 'M'])
         && (!data.keys().hasAny(['first_toyota_employment_date'])
           || isNullableTimestamp(data.first_toyota_employment_date))
+        && (!data.keys().hasAny(['medical_examination_date'])
+          || isNullableTimestamp(data.medical_examination_date))
+        && (!data.keys().hasAny(['medical_valid_until'])
+          || isNullableTimestamp(data.medical_valid_until))
+        && (!data.keys().hasAny(['medical_examination_type'])
+          || data.medical_examination_type == null
+          || data.medical_examination_type in [
+            'PRODUKCJA', 'MAGAZYNIER', 'PRODUKCJA_HL_PU'
+          ])
+        && (!data.keys().hasAny([
+            'medical_examination_date', 'medical_valid_until'
+          ])
+          || data.medical_examination_date == null
+          || data.medical_valid_until == null
+          || data.medical_valid_until >= data.medical_examination_date)
         && data.is_active is bool
         && (!data.keys().hasAny(['department_id'])
           || isNullableString(data.department_id))
@@ -855,8 +881,13 @@ service cloud.firestore {
           'pesel',
           'passport_number',
           'foreign_document_number',
+          'phone_number',
           'citizenship',
+          'gender',
           'first_toyota_employment_date',
+          'medical_examination_date',
+          'medical_valid_until',
+          'medical_examination_type',
           'is_active',
           'department_id',
           'shift_assignment',
