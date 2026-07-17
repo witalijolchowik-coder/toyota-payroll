@@ -177,7 +177,11 @@ export function SettlementGrid({
     <Card sx={{ overflow: 'visible' }}>
       <TableContainer
         data-testid="settlement-calendar-scroll"
-        sx={{ maxHeight: 'calc(100vh - 92px)', overflow: 'auto' }}
+        sx={{
+          maxHeight: 'calc(100vh - 92px)',
+          overflow: 'auto',
+          containerType: 'inline-size',
+        }}
       >
         <Table
           stickyHeader
@@ -591,8 +595,7 @@ function DepartmentGroupRow({
           sx={{
             position: 'sticky',
             left: 0,
-            width: 'calc(100vw - 120px)',
-            maxWidth: '100%',
+            width: '100cqw',
             minHeight: 54,
             px: 2,
             display: 'flex',
