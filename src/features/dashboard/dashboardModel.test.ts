@@ -13,10 +13,16 @@ const today = new Date('2026-07-17T12:00:00.000Z');
 describe('dashboardModel', () => {
   it('uses current employment, confirmed L4 and selected-month reported L4', () => {
     const employees = [
-      employee('active', { departmentId: 'metal' }),
+      employee('active', {
+        citizenship: 'PL',
+        departmentId: 'metal',
+        shiftAssignment: 'RED',
+      }),
       employee('ending', {
+        citizenship: 'UA',
         departmentId: 'metal',
         employmentEndDate: new Date('2026-07-25T00:00:00.000Z'),
+        shiftAssignment: 'WHITE',
       }),
       employee('historical', {
         employmentEndDate: new Date('2026-06-30T00:00:00.000Z'),
@@ -49,14 +55,85 @@ describe('dashboardModel', () => {
     ]);
     expect(snapshot.confirmedL4Today).toBe(1);
     expect(snapshot.unconfirmedL4).toBe(1);
+    expect(snapshot.citizenship).toEqual({
+      polish: 1,
+      foreign: 1,
+      missing: 0,
+    });
     expect(snapshot.expiringContracts.map(({ id }) => id)).toEqual(['ending']);
     expect(snapshot.departmentSummaries).toEqual([
       {
         id: 'metal',
         name: 'Metal',
         activeEmployees: 2,
+        presentEmployees: 1,
         employeesOnL4Today: 1,
+        otherAbsentEmployees: 0,
+        shiftGroups: { red: 1, white: 1, blue: 0, unassigned: 0 },
       },
+    ]);
+  });
+
+  it('builds a seven-day L4 and vacation trend without double-counting governed absences', () => {
+    const employees = [
+      employee('l4', { citizenship: 'UA' }),
+      employee('leave', { citizenship: null }),
+      employee('overlap', { citizenship: 'PL' }),
+    ];
+
+    const snapshot = buildDashboardSnapshot({
+      employees,
+      departments: [],
+      entitlements: [],
+      currentAbsences: [
+        absence('l4-import', 'l4', {
+          startDate: '2026-07-15',
+          endDate: '2026-07-17',
+          source: 'absence_import',
+          importId: 'report',
+        }),
+        absence('leave', 'leave', {
+          absenceCode: 'UW',
+          startDate: '2026-07-16',
+          endDate: '2026-07-17',
+        }),
+        absence('overlap-leave', 'overlap', {
+          absenceCode: 'UZ',
+          startDate: '2026-07-17',
+          endDate: '2026-07-17',
+        }),
+        absence('overlap-l4', 'overlap', {
+          startDate: '2026-07-17',
+          endDate: '2026-07-17',
+          source: 'absence_import',
+          importId: 'report-2',
+        }),
+      ],
+      selectedMonthAbsences: [],
+      readiness: null,
+      today,
+    });
+
+    expect(snapshot.citizenship).toEqual({
+      polish: 1,
+      foreign: 1,
+      missing: 1,
+    });
+    expect(
+      snapshot.absenceTrend.map(({ date, l4, vacation, total }) => ({
+        date: date.toISOString().slice(0, 10),
+        l4,
+        vacation,
+        total,
+      })),
+    ).toEqual([
+      { date: '2026-07-11', l4: 0, vacation: 0, total: 0 },
+      { date: '2026-07-12', l4: 0, vacation: 0, total: 0 },
+      { date: '2026-07-13', l4: 0, vacation: 0, total: 0 },
+      { date: '2026-07-14', l4: 0, vacation: 0, total: 0 },
+      { date: '2026-07-15', l4: 1, vacation: 0, total: 1 },
+      { date: '2026-07-16', l4: 1, vacation: 1, total: 2 },
+      { date: '2026-07-17', l4: 2, vacation: 1, total: 3 },
     ]);
   });
 

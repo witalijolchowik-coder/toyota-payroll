@@ -23,9 +23,14 @@ import {
   CardContent,
   Chip,
   Divider,
-  LinearProgress,
   Skeleton,
   Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   TextField,
   Typography,
 } from '@mui/material';
@@ -33,7 +38,9 @@ import {
 import { PageHeader } from '../components/layout/PageHeader';
 import {
   buildDashboardSnapshot,
+  type DashboardAbsenceTrendDay,
   type DashboardDeadline,
+  type DashboardDepartmentSummary,
 } from '../features/dashboard/dashboardModel';
 import { useAbsences } from '../features/absences/useAbsences';
 import { useEmployeeEntitlements } from '../features/employees/useEmployeeEntitlements';
@@ -127,10 +134,6 @@ export function DashboardPage() {
     0,
     snapshot.medicalRenewals.length - medicalExpired,
   );
-  const maxDepartmentSize = Math.max(
-    1,
-    ...snapshot.departmentSummaries.map((item) => item.activeEmployees),
-  );
 
   const priorities = [
     {
@@ -223,7 +226,13 @@ export function DashboardPage() {
         <KpiCard
           title={t.dashboard.kpi.activeEmployees.title}
           value={snapshot.activeEmployees.length}
-          helper={t.dashboard.kpi.activeEmployees.helper}
+          helper={
+            <CitizenshipSplit
+              polish={snapshot.citizenship.polish}
+              foreign={snapshot.citizenship.foreign}
+              missing={snapshot.citizenship.missing}
+            />
+          }
           icon={<GroupsOutlined />}
           to={routes.employees}
           tone="neutral"
@@ -382,51 +391,13 @@ export function DashboardPage() {
         <DashboardSection
           title={t.dashboard.operations.title}
           description={t.dashboard.operations.description}
-          action={
-            <Button component={RouterLink} to={routes.employees} size="small">
-              {t.dashboard.operations.openEmployees}
-            </Button>
-          }
         >
           {isLoading ? (
             <SectionSkeleton rows={6} />
           ) : snapshot.departmentSummaries.length > 0 ? (
-            <Stack spacing={1.5}>
-              {snapshot.departmentSummaries.map((department) => (
-                <Box key={department.id}>
-                  <Stack
-                    direction="row"
-                    spacing={1}
-                    sx={{ justifyContent: 'space-between', mb: 0.75 }}
-                  >
-                    <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                      {department.name || t.dashboard.operations.unassigned}
-                    </Typography>
-                    <Typography color="text.secondary" variant="body2">
-                      {interpolate(t.dashboard.operations.people, {
-                        count: String(department.activeEmployees),
-                      })}
-                      {department.employeesOnL4Today > 0
-                        ? ` · ${interpolate(t.dashboard.operations.l4, {
-                            count: String(department.employeesOnL4Today),
-                          })}`
-                        : ''}
-                    </Typography>
-                  </Stack>
-                  <LinearProgress
-                    variant="determinate"
-                    value={
-                      (department.activeEmployees / maxDepartmentSize) * 100
-                    }
-                    sx={{
-                      height: 7,
-                      borderRadius: 999,
-                      bgcolor: 'action.hover',
-                    }}
-                  />
-                </Box>
-              ))}
-            </Stack>
+            <DepartmentOperationsTable
+              departments={snapshot.departmentSummaries}
+            />
           ) : (
             <Typography color="text.secondary">
               {t.dashboard.operations.empty}
@@ -435,22 +406,13 @@ export function DashboardPage() {
         </DashboardSection>
 
         <DashboardSection
-          title={t.dashboard.deadlines.title}
-          description={t.dashboard.deadlines.description}
+          title={t.dashboard.absenceTrend.title}
+          description={t.dashboard.absenceTrend.description}
         >
           {isLoading ? (
             <SectionSkeleton rows={5} />
-          ) : snapshot.deadlines.length > 0 ? (
-            <Stack divider={<Divider flexItem />}>
-              {snapshot.deadlines.map((deadline) => (
-                <DeadlineRow
-                  key={`${deadline.kind}:${deadline.employee.id}`}
-                  deadline={deadline}
-                />
-              ))}
-            </Stack>
           ) : (
-            <Alert severity="success">{t.dashboard.deadlines.empty}</Alert>
+            <AbsenceTrendChart days={snapshot.absenceTrend} />
           )}
         </DashboardSection>
       </Box>
@@ -465,6 +427,36 @@ export function DashboardPage() {
           gap: 2,
         }}
       >
+        <DashboardSection
+          title={t.dashboard.deadlines.title}
+          description={t.dashboard.deadlines.description}
+        >
+          {isLoading ? (
+            <SectionSkeleton rows={5} />
+          ) : snapshot.deadlines.length > 0 ? (
+            <>
+              <Stack divider={<Divider flexItem />}>
+                {snapshot.deadlines.map((deadline) => (
+                  <DeadlineRow
+                    key={`${deadline.kind}:${deadline.employee.id}`}
+                    deadline={deadline}
+                  />
+                ))}
+              </Stack>
+              <Button
+                component={RouterLink}
+                to={routes.employees}
+                size="small"
+                sx={{ mt: 1, width: '100%' }}
+              >
+                {t.dashboard.deadlines.open}
+              </Button>
+            </>
+          ) : (
+            <Alert severity="success">{t.dashboard.deadlines.empty}</Alert>
+          )}
+        </DashboardSection>
+
         <DashboardSection
           title={t.dashboard.dataQuality.title}
           description={t.dashboard.dataQuality.description}
@@ -540,41 +532,560 @@ export function DashboardPage() {
             {t.dashboard.accommodation.open}
           </Button>
         </DashboardSection>
+      </Box>
 
-        <DashboardSection
-          title={t.dashboard.quickActions.title}
-          description={t.dashboard.quickActions.description}
+      <DashboardSection
+        title={t.dashboard.quickActions.title}
+        description={t.dashboard.quickActions.description}
+      >
+        <Box
+          sx={{
+            display: 'grid',
+            gridTemplateColumns: {
+              xs: '1fr',
+              sm: 'repeat(2, minmax(0, 1fr))',
+              lg: 'repeat(4, minmax(0, 1fr))',
+            },
+            gap: 1,
+          }}
         >
+          <QuickAction
+            icon={<PersonAddAltOutlined />}
+            label={t.dashboard.quickActions.employees}
+            to={routes.employees}
+          />
+          <QuickAction
+            icon={<UploadFileOutlined />}
+            label={t.dashboard.quickActions.absences}
+            to={routes.absences}
+          />
+          <QuickAction
+            icon={<CalendarMonthOutlined />}
+            label={t.dashboard.quickActions.settlement}
+            to={routes.settlement}
+          />
+          <QuickAction
+            icon={<SettingsOutlined />}
+            label={t.dashboard.quickActions.settings}
+            to={routes.settings}
+          />
+        </Box>
+      </DashboardSection>
+    </Stack>
+  );
+}
+
+function CitizenshipSplit({
+  polish,
+  foreign,
+  missing,
+}: {
+  polish: number;
+  foreign: number;
+  missing: number;
+}) {
+  const t = useTranslations();
+  return (
+    <Stack
+      direction="row"
+      spacing={0.75}
+      sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 0.25 }}
+    >
+      <Box
+        component="span"
+        aria-label={t.dashboard.kpi.activeEmployees.polish}
+        sx={{ fontWeight: 750 }}
+      >
+        🇵🇱 {polish}
+      </Box>
+      <Box component="span" sx={{ color: 'text.disabled' }}>
+        /
+      </Box>
+      <Box
+        component="span"
+        aria-label={t.dashboard.kpi.activeEmployees.foreign}
+        sx={{ fontWeight: 750 }}
+      >
+        🇺🇦 {foreign}
+      </Box>
+      {missing > 0 ? (
+        <Box
+          component="span"
+          sx={{ color: 'warning.dark', whiteSpace: 'nowrap' }}
+        >
+          · ? {missing}
+        </Box>
+      ) : null}
+    </Stack>
+  );
+}
+
+function DepartmentOperationsTable({
+  departments,
+}: {
+  departments: readonly DashboardDepartmentSummary[];
+}) {
+  const t = useTranslations();
+  const totals = departments.reduce(
+    (result, department) => ({
+      activeEmployees: result.activeEmployees + department.activeEmployees,
+      presentEmployees: result.presentEmployees + department.presentEmployees,
+      employeesOnL4Today:
+        result.employeesOnL4Today + department.employeesOnL4Today,
+      otherAbsentEmployees:
+        result.otherAbsentEmployees + department.otherAbsentEmployees,
+      shiftGroups: {
+        red: result.shiftGroups.red + department.shiftGroups.red,
+        white: result.shiftGroups.white + department.shiftGroups.white,
+        blue: result.shiftGroups.blue + department.shiftGroups.blue,
+        unassigned:
+          result.shiftGroups.unassigned + department.shiftGroups.unassigned,
+      },
+    }),
+    {
+      activeEmployees: 0,
+      presentEmployees: 0,
+      employeesOnL4Today: 0,
+      otherAbsentEmployees: 0,
+      shiftGroups: { red: 0, white: 0, blue: 0, unassigned: 0 },
+    },
+  );
+
+  return (
+    <>
+      <TableContainer sx={{ display: { xs: 'none', md: 'block' } }}>
+        <Table size="small" aria-label={t.dashboard.operations.title}>
+          <TableHead>
+            <TableRow>
+              <TableCell>{t.dashboard.operations.department}</TableCell>
+              <TableCell align="right">
+                {t.dashboard.operations.active}
+              </TableCell>
+              <TableCell align="right">
+                {t.dashboard.operations.present}
+              </TableCell>
+              <TableCell align="right">{t.dashboard.operations.l4}</TableCell>
+              <TableCell align="right">
+                {t.dashboard.operations.otherAbsences}
+              </TableCell>
+              <TableCell>{t.dashboard.operations.shifts}</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {departments.map((department) => (
+              <DepartmentTableRow key={department.id} department={department} />
+            ))}
+            <TableRow
+              sx={{
+                '& td': {
+                  bgcolor: 'action.hover',
+                  borderBottom: 0,
+                  fontWeight: 800,
+                },
+              }}
+            >
+              <TableCell>{t.dashboard.operations.total}</TableCell>
+              <TableCell align="right">{totals.activeEmployees}</TableCell>
+              <TableCell align="right">
+                <CountWithPercent
+                  count={totals.presentEmployees}
+                  total={totals.activeEmployees}
+                  color="success.main"
+                />
+              </TableCell>
+              <TableCell align="right">
+                <CountWithPercent
+                  count={totals.employeesOnL4Today}
+                  total={totals.activeEmployees}
+                  color="error.main"
+                />
+              </TableCell>
+              <TableCell align="right">
+                <CountWithPercent
+                  count={totals.otherAbsentEmployees}
+                  total={totals.activeEmployees}
+                  color="text.secondary"
+                />
+              </TableCell>
+              <TableCell>
+                <ShiftGroupSummary groups={totals.shiftGroups} />
+              </TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      <Stack spacing={1} sx={{ display: { xs: 'flex', md: 'none' } }}>
+        {departments.map((department) => (
           <Box
+            key={department.id}
             sx={{
-              display: 'grid',
-              gridTemplateColumns: { xs: '1fr', sm: 'repeat(2, 1fr)' },
-              gap: 1,
+              p: 1.5,
+              border: 1,
+              borderColor: 'divider',
+              borderRadius: 2,
+              bgcolor: 'background.default',
             }}
           >
-            <QuickAction
-              icon={<PersonAddAltOutlined />}
-              label={t.dashboard.quickActions.employees}
-              to={routes.employees}
-            />
-            <QuickAction
-              icon={<UploadFileOutlined />}
-              label={t.dashboard.quickActions.absences}
-              to={routes.absences}
-            />
-            <QuickAction
-              icon={<CalendarMonthOutlined />}
-              label={t.dashboard.quickActions.settlement}
-              to={routes.settlement}
-            />
-            <QuickAction
-              icon={<SettingsOutlined />}
-              label={t.dashboard.quickActions.settings}
-              to={routes.settings}
-            />
+            <Stack
+              direction="row"
+              sx={{ justifyContent: 'space-between', alignItems: 'center' }}
+            >
+              <Typography variant="body2" sx={{ fontWeight: 800 }}>
+                {department.name || t.dashboard.operations.unassigned}
+              </Typography>
+              <Chip
+                size="small"
+                label={interpolate(t.dashboard.operations.people, {
+                  count: String(department.activeEmployees),
+                })}
+              />
+            </Stack>
+            <Box
+              sx={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                gap: 1,
+                my: 1.25,
+              }}
+            >
+              <MobileDepartmentMetric
+                label={t.dashboard.operations.present}
+                count={department.presentEmployees}
+                total={department.activeEmployees}
+                color="success.main"
+              />
+              <MobileDepartmentMetric
+                label={t.dashboard.operations.l4}
+                count={department.employeesOnL4Today}
+                total={department.activeEmployees}
+                color="error.main"
+              />
+              <MobileDepartmentMetric
+                label={t.dashboard.operations.otherAbsences}
+                count={department.otherAbsentEmployees}
+                total={department.activeEmployees}
+                color="text.secondary"
+              />
+            </Box>
+            <ShiftGroupSummary groups={department.shiftGroups} />
           </Box>
-        </DashboardSection>
+        ))}
+      </Stack>
+    </>
+  );
+}
+
+function DepartmentTableRow({
+  department,
+}: {
+  department: DashboardDepartmentSummary;
+}) {
+  const t = useTranslations();
+  return (
+    <TableRow hover>
+      <TableCell sx={{ fontWeight: 750 }}>
+        {department.name || t.dashboard.operations.unassigned}
+      </TableCell>
+      <TableCell align="right" sx={{ fontWeight: 700 }}>
+        {department.activeEmployees}
+      </TableCell>
+      <TableCell align="right">
+        <CountWithPercent
+          count={department.presentEmployees}
+          total={department.activeEmployees}
+          color="success.main"
+        />
+      </TableCell>
+      <TableCell align="right">
+        <CountWithPercent
+          count={department.employeesOnL4Today}
+          total={department.activeEmployees}
+          color="error.main"
+        />
+      </TableCell>
+      <TableCell align="right">
+        <CountWithPercent
+          count={department.otherAbsentEmployees}
+          total={department.activeEmployees}
+          color="text.secondary"
+        />
+      </TableCell>
+      <TableCell>
+        <ShiftGroupSummary groups={department.shiftGroups} />
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function CountWithPercent({
+  count,
+  total,
+  color,
+}: {
+  count: number;
+  total: number;
+  color: string;
+}) {
+  return (
+    <Stack
+      component="span"
+      direction="row"
+      spacing={0.5}
+      sx={{ justifyContent: 'flex-end', alignItems: 'baseline' }}
+    >
+      <Box component="span" sx={{ color, fontWeight: 800 }}>
+        {count}
       </Box>
+      <Box component="span" sx={{ color: 'text.secondary', fontSize: 12 }}>
+        {formatPercent(count, total)}
+      </Box>
+    </Stack>
+  );
+}
+
+function MobileDepartmentMetric({
+  label,
+  count,
+  total,
+  color,
+}: {
+  label: string;
+  count: number;
+  total: number;
+  color: string;
+}) {
+  return (
+    <Box>
+      <Typography color="text.secondary" variant="caption">
+        {label}
+      </Typography>
+      <Typography variant="body2" sx={{ color, fontWeight: 800 }}>
+        {count}{' '}
+        <Box component="span" sx={{ fontSize: 11, fontWeight: 600 }}>
+          {formatPercent(count, total)}
+        </Box>
+      </Typography>
+    </Box>
+  );
+}
+
+function ShiftGroupSummary({
+  groups,
+}: {
+  groups: DashboardDepartmentSummary['shiftGroups'];
+}) {
+  const t = useTranslations();
+  const entries = [
+    { key: 'red', label: 'R', value: groups.red, color: '#d71920' },
+    { key: 'white', label: 'W', value: groups.white, color: '#98a2b3' },
+    { key: 'blue', label: 'B', value: groups.blue, color: '#2878d0' },
+    {
+      key: 'unassigned',
+      label: '–',
+      value: groups.unassigned,
+      color: '#667085',
+    },
+  ].filter((entry) => entry.value > 0);
+
+  return entries.length > 0 ? (
+    <Stack
+      direction="row"
+      spacing={1}
+      aria-label={t.dashboard.operations.shifts}
+      sx={{ alignItems: 'center', flexWrap: 'wrap', rowGap: 0.5 }}
+    >
+      {entries.map((entry) => (
+        <Stack
+          key={entry.key}
+          component="span"
+          direction="row"
+          spacing={0.4}
+          sx={{ alignItems: 'center' }}
+        >
+          <Box
+            component="span"
+            sx={{
+              width: 7,
+              height: 7,
+              borderRadius: '50%',
+              bgcolor: entry.color,
+            }}
+          />
+          <Typography component="span" variant="caption">
+            {entry.label} {entry.value}
+          </Typography>
+        </Stack>
+      ))}
+    </Stack>
+  ) : (
+    <Typography color="text.disabled" variant="body2">
+      —
+    </Typography>
+  );
+}
+
+function AbsenceTrendChart({
+  days,
+}: {
+  days: readonly DashboardAbsenceTrendDay[];
+}) {
+  const t = useTranslations();
+  const chartWidth = 560;
+  const chartHeight = 230;
+  const plot = { left: 34, top: 30, width: 500, height: 145 };
+  const maxValue = Math.max(1, ...days.map((day) => day.total));
+  const step = plot.width / days.length;
+  const barWidth = Math.min(28, step * 0.42);
+  const pointFor = (day: DashboardAbsenceTrendDay, index: number) => ({
+    x: plot.left + step * index + step / 2,
+    y: plot.top + plot.height - (day.total / maxValue) * plot.height,
+  });
+  const points = days.map(pointFor);
+  const line = points.map((point) => `${point.x},${point.y}`).join(' ');
+
+  return (
+    <Stack spacing={1.25}>
+      <Stack
+        direction="row"
+        spacing={2}
+        sx={{ alignItems: 'center', justifyContent: 'center' }}
+      >
+        <ChartLegend color="#d71920" label={t.dashboard.absenceTrend.l4} />
+        <ChartLegend
+          color="#4f86df"
+          label={t.dashboard.absenceTrend.vacation}
+        />
+        <ChartLegend
+          color="#344054"
+          label={t.dashboard.absenceTrend.total}
+          line
+        />
+      </Stack>
+      <Box
+        component="svg"
+        viewBox={`0 0 ${chartWidth} ${chartHeight}`}
+        role="img"
+        aria-label={t.dashboard.absenceTrend.ariaLabel}
+        sx={{ width: '100%', height: 'auto', overflow: 'visible' }}
+      >
+        {[0, 0.5, 1].map((ratio) => {
+          const y = plot.top + plot.height - plot.height * ratio;
+          return (
+            <g key={ratio}>
+              <line
+                x1={plot.left}
+                x2={plot.left + plot.width}
+                y1={y}
+                y2={y}
+                stroke="#e4e7ec"
+                strokeWidth="1"
+              />
+              <text
+                x={plot.left - 8}
+                y={y + 4}
+                textAnchor="end"
+                fontSize="11"
+                fill="#667085"
+              >
+                {Math.round(maxValue * ratio)}
+              </text>
+            </g>
+          );
+        })}
+        {days.map((day, index) => {
+          const x = plot.left + step * index + (step - barWidth) / 2;
+          const vacationHeight = (day.vacation / maxValue) * plot.height;
+          const l4Height = (day.l4 / maxValue) * plot.height;
+          const bottom = plot.top + plot.height;
+          return (
+            <g key={day.date.toISOString()}>
+              <rect
+                x={x}
+                y={bottom - vacationHeight}
+                width={barWidth}
+                height={vacationHeight}
+                rx="3"
+                fill="#4f86df"
+              />
+              <rect
+                x={x}
+                y={bottom - vacationHeight - l4Height}
+                width={barWidth}
+                height={l4Height}
+                rx="3"
+                fill="#d71920"
+              />
+              <text
+                x={x + barWidth / 2}
+                y={plot.top + plot.height + 24}
+                textAnchor="middle"
+                fontSize="11"
+                fill="#667085"
+              >
+                {formatChartDate(day.date)}
+              </text>
+            </g>
+          );
+        })}
+        <polyline
+          points={line}
+          fill="none"
+          stroke="#344054"
+          strokeWidth="2"
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+        {points.map((point, index) => (
+          <g key={`${point.x}:${point.y}`}>
+            <circle cx={point.x} cy={point.y} r="3.5" fill="#344054" />
+            <text
+              x={point.x}
+              y={Math.max(14, point.y - 9)}
+              textAnchor="middle"
+              fontSize="11"
+              fontWeight="700"
+              fill="#344054"
+            >
+              {days[index]?.total}
+            </text>
+          </g>
+        ))}
+      </Box>
+      <Button
+        component={RouterLink}
+        to={routes.absences}
+        size="small"
+        sx={{ alignSelf: 'center' }}
+      >
+        {t.dashboard.absenceTrend.open}
+      </Button>
+    </Stack>
+  );
+}
+
+function ChartLegend({
+  color,
+  label,
+  line = false,
+}: {
+  color: string;
+  label: string;
+  line?: boolean;
+}) {
+  return (
+    <Stack direction="row" spacing={0.6} sx={{ alignItems: 'center' }}>
+      <Box
+        sx={{
+          width: line ? 18 : 9,
+          height: line ? 2 : 9,
+          borderRadius: line ? 0 : 0.75,
+          bgcolor: color,
+        }}
+      />
+      <Typography color="text.secondary" variant="caption">
+        {label}
+      </Typography>
     </Stack>
   );
 }
@@ -590,7 +1101,7 @@ function KpiCard({
 }: {
   title: string;
   value: number;
-  helper: string;
+  helper: ReactNode;
   icon: ReactNode;
   to: string;
   tone: DashboardTone;
@@ -637,13 +1148,18 @@ function KpiCard({
                   {value}
                 </Typography>
               )}
-              <Typography
+              <Box
                 color="text.secondary"
-                variant="caption"
-                sx={{ display: 'block', mt: 0.5, lineHeight: 1.35 }}
+                sx={{
+                  display: 'block',
+                  mt: 0.5,
+                  color: 'text.secondary',
+                  fontSize: '0.75rem',
+                  lineHeight: 1.35,
+                }}
               >
                 {helper}
-              </Typography>
+              </Box>
             </Box>
           </Stack>
         </CardContent>
@@ -917,4 +1433,16 @@ function formatDate(date: Date): string {
     month: '2-digit',
     year: 'numeric',
   }).format(date);
+}
+
+function formatChartDate(date: Date): string {
+  return new Intl.DateTimeFormat('pl-PL', {
+    day: '2-digit',
+    month: '2-digit',
+  }).format(date);
+}
+
+function formatPercent(count: number, total: number): string {
+  if (total === 0) return '0%';
+  return `${Math.round((count / total) * 100)}%`;
 }

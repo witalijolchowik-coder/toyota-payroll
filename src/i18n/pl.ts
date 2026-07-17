@@ -78,6 +78,8 @@ export const pl = {
       activeEmployees: {
         title: 'Pracownicy aktywni',
         helper: 'Aktualnie zatrudnieni',
+        polish: 'Pracownicy z obywatelstwem polskim',
+        foreign: 'Pracownicy zagraniczni',
       },
       l4Today: {
         title: 'Na L4 dzisiaj',
@@ -145,12 +147,27 @@ export const pl = {
     operations: {
       title: 'Sytuacja operacyjna dzisiaj',
       description:
-        'Aktywni pracownicy i potwierdzone L4 według aktualnego działu.',
-      openEmployees: 'Otwórz pracowników',
+        'Obecność, nieobecności i grupy zmianowe według aktualnego działu.',
+      department: 'Dział',
+      active: 'Aktywni',
+      present: 'Obecni',
+      otherAbsences: 'Inne nieobecności',
+      shifts: 'Grupy zmianowe',
+      total: 'Razem',
       people: '{{count}} osób',
-      l4: 'L4: {{count}}',
+      l4: 'L4',
       unassigned: 'Bez przypisanego działu',
       empty: 'Brak aktywnych pracowników do pokazania.',
+    },
+    absenceTrend: {
+      title: 'L4 i urlopy — ostatnie 7 dni',
+      description:
+        'Liczba pracowników na potwierdzonym L4 oraz urlopach UW i UŻ.',
+      l4: 'L4',
+      vacation: 'Urlopy',
+      total: 'Razem',
+      ariaLabel: 'Wykres L4 i urlopów z ostatnich siedmiu dni',
+      open: 'Zobacz szczegóły nieobecności',
     },
     deadlines: {
       title: 'Nadchodzące terminy',
@@ -158,6 +175,7 @@ export const pl = {
       contract: 'Koniec zatrudnienia',
       medical: 'Ważność badania lekarskiego',
       empty: 'Brak terminów w ciągu najbliższych 30 dni.',
+      open: 'Zobacz wszystkie terminy',
     },
     dataQuality: {
       title: 'Dokumenty i dane pracowników',
