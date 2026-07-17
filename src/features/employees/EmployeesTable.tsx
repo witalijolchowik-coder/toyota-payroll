@@ -5,7 +5,6 @@ import HouseOutlined from '@mui/icons-material/HouseOutlined';
 import WarningAmberOutlined from '@mui/icons-material/WarningAmberOutlined';
 import BadgeOutlined from '@mui/icons-material/BadgeOutlined';
 import DescriptionOutlined from '@mui/icons-material/DescriptionOutlined';
-import type { ReactNode } from 'react';
 import {
   Avatar,
   Box,
@@ -144,7 +143,11 @@ export function EmployeesTable({
                 return (
                   <TableRow hover key={employee.id}>
                     <TableCell sx={{ minWidth: 235 }}>
-                      <Stack direction="row" spacing={1.5} alignItems="center">
+                      <Stack
+                        direction="row"
+                        spacing={1.5}
+                        sx={{ alignItems: 'center' }}
+                      >
                         <Avatar
                           aria-hidden="true"
                           sx={{
@@ -195,7 +198,11 @@ export function EmployeesTable({
                       <ShiftIndicator shift={employee.shiftAssignment} t={t} />
                     </TableCell>
                     <TableCell sx={{ minWidth: 260 }}>
-                      <Stack direction="row" spacing={2.5} alignItems="center">
+                      <Stack
+                        direction="row"
+                        spacing={2.5}
+                        sx={{ alignItems: 'center' }}
+                      >
                         <EmploymentDate
                           label={t.employees.table.firstEmployment}
                           value={
@@ -394,10 +401,7 @@ function EmployeeDocuments({
           label: `${t.employees.table.foreignDocument}: ${employee.foreignDocumentNumber}`,
         }
       : null,
-  ].filter(
-    (document): document is { icon: ReactNode; label: string } =>
-      document !== null,
-  );
+  ].filter((document) => document !== null);
 
   if (documents.length === 0) {
     return (
@@ -414,7 +418,7 @@ function EmployeeDocuments({
           key={document.label}
           direction="row"
           spacing={0.7}
-          alignItems="center"
+          sx={{ alignItems: 'center' }}
         >
           <Box
             component="span"
@@ -450,7 +454,7 @@ function ShiftIndicator({
     : t.organization.shifts.unassigned;
 
   return (
-    <Stack direction="row" spacing={1} alignItems="center">
+    <Stack direction="row" spacing={1} sx={{ alignItems: 'center' }}>
       <Box
         aria-hidden="true"
         sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: color }}

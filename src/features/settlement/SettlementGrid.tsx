@@ -17,7 +17,7 @@ import DarkModeRoundedIcon from '@mui/icons-material/DarkModeRounded';
 import WbSunnyRoundedIcon from '@mui/icons-material/WbSunnyRounded';
 import BuildOutlined from '@mui/icons-material/BuildOutlined';
 import CheckroomOutlined from '@mui/icons-material/CheckroomOutlined';
-import HelpOutline from '@mui/icons-material/HelpOutline';
+import HelpOutlineOutlined from '@mui/icons-material/HelpOutlineOutlined';
 import Inventory2Outlined from '@mui/icons-material/Inventory2Outlined';
 import KeyboardArrowDown from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUp from '@mui/icons-material/KeyboardArrowUp';
@@ -682,7 +682,7 @@ function departmentIcon(
   if (key.includes('magaz')) return <Inventory2Outlined />;
   if (key.includes('headliner')) return <ViewStreamOutlined />;
   if (key.includes('pu')) return <LayersOutlined />;
-  return <HelpOutline />;
+  return <HelpOutlineOutlined />;
 }
 
 function leadingCellSx({
