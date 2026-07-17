@@ -19,6 +19,7 @@ const employee = {
   passportNumber: 'AB123456',
   foreignDocumentNumber: null,
   phoneNumber: '+48 500 000 000',
+  citizenship: 'PL',
   firstToyotaEmploymentDate: new Date('2025-01-02T00:00:00.000Z'),
   employmentStartDate: new Date('2026-01-03T00:00:00.000Z'),
   employmentEndDate: null,
@@ -36,7 +37,7 @@ const department = {
 } as Department;
 
 describe('EmployeesTable', () => {
-  it('prioritizes employee name and removes the redundant status column', () => {
+  it('prioritizes employee name, phone and nationality without a redundant status column', () => {
     render(
       <EmployeesTable
         employees={[employee]}
@@ -61,7 +62,9 @@ describe('EmployeesTable', () => {
     ).not.toBeInTheDocument();
     expect(screen.getByText('PESEL: 90010112345')).toBeInTheDocument();
     expect(screen.getByText('Paszport: AB123456')).toBeInTheDocument();
-    expect(screen.getByText('Telefon: +48 500 000 000')).toBeInTheDocument();
+    expect(screen.getAllByRole('columnheader')[1]).toHaveTextContent('Telefon');
+    expect(screen.getByText('+48 500 000 000')).toBeInTheDocument();
+    expect(screen.getByText('🇵🇱')).toBeInTheDocument();
     expect(screen.getByText('Metal')).toBeInTheDocument();
     expect(screen.getByText('Red')).toBeInTheDocument();
     expect(
