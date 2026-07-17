@@ -68,8 +68,121 @@ export const pl = {
       eyebrow: 'Obszar koordynatora',
       title: 'Dashboard',
       description:
-        'Najważniejsze kroki przygotowania systemu do kontrolowanej pracy operacyjnej.',
+        'Operacyjne podsumowanie pracowników, nieobecności i gotowości rozliczenia.',
       status: 'Tryb pilotażowy',
+    },
+    monthSelector: 'Miesiąc rozliczeniowy',
+    loadError:
+      'Nie udało się wczytać części danych Dashboardu. Odśwież stronę lub sprawdź połączenie.',
+    kpi: {
+      activeEmployees: {
+        title: 'Pracownicy aktywni',
+        helper: 'Aktualnie zatrudnieni',
+      },
+      l4Today: {
+        title: 'Na L4 dzisiaj',
+        helper: 'Potwierdzone raportem ZUS',
+      },
+      unconfirmedL4: {
+        title: 'Niepotwierdzone L4',
+        helper: 'Oczekują na potwierdzenie',
+      },
+      contracts: {
+        title: 'Kończące się umowy',
+        helper: 'W ciągu najbliższych 30 dni',
+      },
+      medical: {
+        title: 'Badania do odnowienia',
+        helper: 'W tym wygasłe: {{expired}}',
+      },
+      blockers: {
+        title: 'Blokery rozliczenia',
+        helper: 'Dla miesiąca {{month}}',
+      },
+    },
+    priorities: {
+      title: 'Priorytety koordynatora',
+      description: 'Sprawy wymagające działania w pierwszej kolejności.',
+      open: 'Przejdź',
+      noIssues: 'Brak pilnych spraw wymagających działania.',
+      blockers: {
+        title: 'Blokery rozliczenia miesięcznego',
+        description: 'Sprawdź gotowość i popraw dane dla {{month}}.',
+      },
+      unconfirmedL4: {
+        title: 'L4 oczekujące na potwierdzenie',
+        description: 'Zweryfikuj zgłoszenia z raportem ZUS.',
+      },
+      medical: {
+        title: 'Badania lekarskie wymagają działania',
+        description:
+          'Wygasłe: {{expired}}, wygasające w ciągu 10 dni: {{expiring}}.',
+      },
+      contracts: {
+        title: 'Kończące się okresy zatrudnienia',
+        description: 'Sprawdź przedłużenie lub zakończenie współpracy.',
+      },
+      employeeData: {
+        title: 'Niekompletne dane pracowników',
+        description: 'Uzupełnij dane wymagane do rozliczenia i eksportów.',
+      },
+    },
+    monthReadiness: {
+      title: 'Gotowość miesiąca',
+      description: 'Kontrola przygotowania rozliczenia za {{month}}.',
+      ready: 'Rozliczenie gotowe',
+      notReady: 'Rozliczenie niegotowe',
+      employeeData: 'Dane pracowników',
+      absences: 'Nieobecności',
+      organization: 'Działy, zmiany i kalendarz',
+      finalization: 'Finalizacja miesiąca',
+      noIssues: 'Bez problemów',
+      issues: 'Problemy: {{count}}',
+      available: 'Możliwa',
+      blocked: 'Zablokowana',
+      open: 'Otwórz rozliczenie',
+    },
+    operations: {
+      title: 'Sytuacja operacyjna dzisiaj',
+      description:
+        'Aktywni pracownicy i potwierdzone L4 według aktualnego działu.',
+      openEmployees: 'Otwórz pracowników',
+      people: '{{count}} osób',
+      l4: 'L4: {{count}}',
+      unassigned: 'Bez przypisanego działu',
+      empty: 'Brak aktywnych pracowników do pokazania.',
+    },
+    deadlines: {
+      title: 'Nadchodzące terminy',
+      description: 'Najbliższe umowy i badania w ciągu 30 dni.',
+      contract: 'Koniec zatrudnienia',
+      medical: 'Ważność badania lekarskiego',
+      empty: 'Brak terminów w ciągu najbliższych 30 dni.',
+    },
+    dataQuality: {
+      title: 'Dokumenty i dane pracowników',
+      description: 'Braki wśród aktualnie zatrudnionych osób.',
+      pesel: 'Brak numeru PESEL',
+      passport: 'Brak PESEL i paszportu',
+      citizenship: 'Brak obywatelstwa',
+      firstToyotaDate: 'Brak pierwszej daty Toyota',
+      open: 'Przejdź do rejestru',
+    },
+    accommodation: {
+      title: 'Zakwaterowanie',
+      description: 'Aktywne uprawnienia zakwaterowania na dzisiaj.',
+      company: 'Zakwaterowanie firmowe',
+      own: 'Dodatek za własne mieszkanie',
+      without: 'Bez aktywnego uprawnienia',
+      open: 'Zobacz pracowników',
+    },
+    quickActions: {
+      title: 'Szybkie działania',
+      description: 'Najczęściej używane obszary systemu.',
+      employees: 'Rejestr pracowników',
+      absences: 'Importuj lub dodaj L4',
+      settlement: 'Otwórz rozliczenie',
+      settings: 'Ustawienia',
     },
     cards: {
       employees: {

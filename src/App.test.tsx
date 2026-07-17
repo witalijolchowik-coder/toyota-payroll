@@ -61,7 +61,7 @@ describe('App', () => {
       }).length,
     ).toBeGreaterThan(0);
     expect(
-      screen.getAllByText(pl.dashboard.cards.absences.title).length,
+      screen.getAllByText(pl.dashboard.kpi.l4Today.title).length,
     ).toBeGreaterThan(0);
     expect(screen.getByText(pl.auth.signOut)).toBeInTheDocument();
   });
