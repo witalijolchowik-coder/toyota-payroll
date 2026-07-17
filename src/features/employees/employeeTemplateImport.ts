@@ -1094,10 +1094,10 @@ function hasNameMismatch(row: ParsedTemplateRow, employee: Employee): boolean {
     row.values['Nazwisko'],
   ).toLocaleUpperCase('pl-PL');
   return (
-    !firstName ||
-    !lastName ||
-    firstName !== employee.firstName.toLocaleUpperCase('pl-PL') ||
-    lastName !== employee.lastName.toLocaleUpperCase('pl-PL')
+    (Boolean(firstName) &&
+      firstName !== employee.firstName.toLocaleUpperCase('pl-PL')) ||
+    (Boolean(lastName) &&
+      lastName !== employee.lastName.toLocaleUpperCase('pl-PL'))
   );
 }
 
