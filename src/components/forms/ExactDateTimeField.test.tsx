@@ -90,6 +90,22 @@ describe('ExactDateTimeField', () => {
     expect(screen.getByTestId('time-value')).toHaveTextContent('22:15');
   });
 
+  it('falls back to the native input click when showPicker is rejected', () => {
+    const { container } = render(<DateHarness />);
+    const datePicker = container.querySelector(
+      'input[type="date"]',
+    ) as HTMLInputElement & { showPicker?: () => void };
+    const click = vi.spyOn(datePicker, 'click');
+    datePicker.showPicker = vi.fn(() => {
+      throw new DOMException('User activation required', 'NotAllowedError');
+    });
+
+    fireEvent.click(screen.getByRole('button', { name: 'OtwĂłrz kalendarz' }));
+
+    expect(datePicker.showPicker).toHaveBeenCalledOnce();
+    expect(click).toHaveBeenCalledOnce();
+  });
+
   it('does not replace the month-only selector', () => {
     const onChange = vi.fn();
     const { container } = render(

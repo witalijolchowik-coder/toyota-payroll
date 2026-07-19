@@ -32,10 +32,15 @@ type NativePickerInput = HTMLInputElement & {
 function openNativePicker(input: NativePickerInput | null) {
   if (!input) return;
   if (typeof input.showPicker === 'function') {
-    input.showPicker();
-  } else {
-    input.click();
+    try {
+      input.showPicker();
+      return;
+    } catch {
+      // Some browsers require a stricter user-activation context for showPicker.
+      // Keep the native input click as a safe fallback without surfacing an error.
+    }
   }
+  input.click();
 }
 
 export function ExactDateField({
