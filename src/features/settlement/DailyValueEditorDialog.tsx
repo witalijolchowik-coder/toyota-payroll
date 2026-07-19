@@ -17,6 +17,7 @@ import {
   Typography,
 } from '@mui/material';
 
+import { ExactTimeField } from '../../components/forms/ExactDateTimeField';
 import { useTranslations } from '../../hooks/useTranslations';
 import { interpolate } from '../../i18n/pl';
 import {
@@ -376,12 +377,10 @@ export function DailyValueEditorDialog({
                     </Alert>
                   ) : null}
                   <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
-                    <TextField
+                    <ExactTimeField
                       label={t.settlement.editor.workTime.actualStart}
                       value={actualStartTime}
-                      onChange={(event) =>
-                        setActualStartTime(event.target.value)
-                      }
+                      onValueChange={setActualStartTime}
                       placeholder={plannedInterval?.startTime ?? ''}
                       error={timeValidationError}
                       helperText={
@@ -389,14 +388,18 @@ export function DailyValueEditorDialog({
                           ? t.settlement.editor.workTime.invalidTime
                           : t.settlement.editor.workTime.optional
                       }
+                      invalidMessage={t.input.exactTimeInvalid}
+                      pickerLabel={t.input.openTimePicker}
                     />
-                    <TextField
+                    <ExactTimeField
                       label={t.settlement.editor.workTime.actualEnd}
                       value={actualEndTime}
-                      onChange={(event) => setActualEndTime(event.target.value)}
+                      onValueChange={setActualEndTime}
                       placeholder={plannedInterval?.endTime ?? ''}
                       error={timeValidationError}
                       helperText={t.settlement.editor.workTime.optional}
+                      invalidMessage={t.input.exactTimeInvalid}
+                      pickerLabel={t.input.openTimePicker}
                     />
                   </Stack>
                   {workTimePreview ? (

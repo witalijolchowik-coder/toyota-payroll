@@ -11,6 +11,7 @@ import {
   TextField,
 } from '@mui/material';
 
+import { ExactDateField } from '../../components/forms/ExactDateTimeField';
 import { useTranslations } from '../../hooks/useTranslations';
 import type {
   Employee,
@@ -171,28 +172,28 @@ export function EmployeeEntitlementFormDialog({
             </TextField>
           ) : null}
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-            <TextField
-              type="date"
+            <ExactDateField
               label={t.employees.entitlements.form.validFrom}
               value={validFrom}
-              onChange={(event) => setValidFrom(event.target.value)}
+              onValueChange={setValidFrom}
               disabled={Boolean(entitlement)}
               error={Boolean(validationMessage('date-required'))}
               helperText={validationMessage('date-required')}
-              slotProps={{ inputLabel: { shrink: true } }}
+              invalidMessage={t.input.exactDateInvalid}
+              pickerLabel={t.input.openDatePicker}
               fullWidth
             />
-            <TextField
-              type="date"
+            <ExactDateField
               label={t.employees.entitlements.form.validTo}
               value={validTo}
-              onChange={(event) => setValidTo(event.target.value)}
+              onValueChange={setValidTo}
               error={Boolean(validationMessage('invalid-date-range'))}
               helperText={
                 validationMessage('invalid-date-range') ??
                 t.employees.entitlements.form.optionalEnd
               }
-              slotProps={{ inputLabel: { shrink: true } }}
+              invalidMessage={t.input.exactDateInvalid}
+              pickerLabel={t.input.openDatePicker}
               fullWidth
             />
           </Stack>

@@ -15,6 +15,7 @@ import {
   Typography,
 } from '@mui/material';
 
+import { ExactDateField } from '../../components/forms/ExactDateTimeField';
 import { useTranslations } from '../../hooks/useTranslations';
 import {
   EmployeeServiceError,
@@ -27,6 +28,7 @@ import type {
   EmployeeCreateInput,
 } from '../../types/firestore';
 import { deriveEmployeeMedicalStatus } from '../../utils/employees';
+import { isCanonicalExactDate } from '../../utils/forms/exactDateTimeInput';
 import {
   employeeInputFromForm,
   validateEmployeeInput,
@@ -123,8 +125,30 @@ export function EmployeeFormDialog({
       setSubmitError(null);
     };
 
+  const handleValueChange =
+    (field: keyof EmployeeFormValues) => (value: string) => {
+      setValues((current) => ({ ...current, [field]: value }));
+      setErrors((current) => ({ ...current, [field]: undefined }));
+      setSubmitError(null);
+    };
+
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
+    const exactDateValues = [
+      values.firstToyotaEmploymentDate,
+      values.medicalExaminationDate,
+      values.medicalValidUntil,
+      values.assignmentEffectiveDate,
+      values.employmentStartDate,
+      values.employmentEndDate,
+    ];
+    if (
+      exactDateValues.some(
+        (value) => value.length > 0 && !isCanonicalExactDate(value),
+      )
+    ) {
+      return;
+    }
     const input = employeeInputFromForm(values, employee?.isActive ?? true);
     if (!assignmentChanged) {
       input.assignmentEffectiveDate = null;
@@ -348,23 +372,23 @@ export function EmployeeFormDialog({
               </Stack>
             </Stack>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-              <TextField
+              <ExactDateField
                 fullWidth
-                type="date"
                 label={t.employees.form.medical.examinationDate}
                 value={values.medicalExaminationDate}
-                onChange={handleChange('medicalExaminationDate')}
-                slotProps={{ inputLabel: { shrink: true } }}
+                onValueChange={handleValueChange('medicalExaminationDate')}
+                invalidMessage={t.input.exactDateInvalid}
+                pickerLabel={t.input.openDatePicker}
               />
-              <TextField
+              <ExactDateField
                 fullWidth
-                type="date"
                 label={t.employees.form.medical.validUntil}
                 value={values.medicalValidUntil}
-                onChange={handleChange('medicalValidUntil')}
+                onValueChange={handleValueChange('medicalValidUntil')}
                 error={Boolean(errors.medicalValidUntil)}
                 helperText={messageForError(errors.medicalValidUntil)}
-                slotProps={{ inputLabel: { shrink: true } }}
+                invalidMessage={t.input.exactDateInvalid}
+                pickerLabel={t.input.openDatePicker}
               />
             </Stack>
             <TextField
@@ -397,56 +421,56 @@ export function EmployeeFormDialog({
                   <Typography>
                     {t.employees.form.assignmentEffectivePrompt}
                   </Typography>
-                  <TextField
+                  <ExactDateField
                     required
                     fullWidth
-                    type="date"
                     label={t.employees.form.assignmentEffectiveDate}
                     value={values.assignmentEffectiveDate}
-                    onChange={handleChange('assignmentEffectiveDate')}
+                    onValueChange={handleValueChange('assignmentEffectiveDate')}
                     error={Boolean(errors.assignmentEffectiveDate)}
                     helperText={
                       messageForError(errors.assignmentEffectiveDate) ??
                       t.employees.form.assignmentEffectiveHelper
                     }
-                    slotProps={{ inputLabel: { shrink: true } }}
+                    invalidMessage={t.input.exactDateInvalid}
+                    pickerLabel={t.input.openDatePicker}
                   />
                 </Stack>
               </Alert>
             ) : null}
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-              <TextField
+              <ExactDateField
                 fullWidth
-                type="date"
                 label={t.employees.form.firstToyotaEmploymentDate}
                 value={values.firstToyotaEmploymentDate}
-                onChange={handleChange('firstToyotaEmploymentDate')}
+                onValueChange={handleValueChange('firstToyotaEmploymentDate')}
                 helperText={t.employees.form.firstToyotaEmploymentDateHelper}
-                slotProps={{ inputLabel: { shrink: true } }}
+                invalidMessage={t.input.exactDateInvalid}
+                pickerLabel={t.input.openDatePicker}
               />
-              <TextField
+              <ExactDateField
                 required
                 fullWidth
-                type="date"
                 label={t.employees.form.employmentStartDate}
                 value={values.employmentStartDate}
-                onChange={handleChange('employmentStartDate')}
+                onValueChange={handleValueChange('employmentStartDate')}
                 error={Boolean(errors.employmentStartDate)}
                 helperText={
                   messageForError(errors.employmentStartDate) ??
                   t.employees.form.employmentStartRequired
                 }
-                slotProps={{ inputLabel: { shrink: true } }}
+                invalidMessage={t.input.exactDateInvalid}
+                pickerLabel={t.input.openDatePicker}
               />
-              <TextField
+              <ExactDateField
                 fullWidth
-                type="date"
                 label={t.employees.form.employmentEndDate}
                 value={values.employmentEndDate}
-                onChange={handleChange('employmentEndDate')}
+                onValueChange={handleValueChange('employmentEndDate')}
                 error={Boolean(errors.employmentEndDate)}
                 helperText={messageForError(errors.employmentEndDate)}
-                slotProps={{ inputLabel: { shrink: true } }}
+                invalidMessage={t.input.exactDateInvalid}
+                pickerLabel={t.input.openDatePicker}
               />
             </Stack>
           </Stack>

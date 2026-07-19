@@ -1,4 +1,11 @@
 export const pl = {
+  input: {
+    exactDateInvalid: 'Wpisz poprawną datę, np. 25.07.2026, albo skrót DDMM.',
+    exactTimeInvalid:
+      'Wpisz poprawną godzinę, np. 14:08, albo skrót 14 lub 1408.',
+    openDatePicker: 'Otwórz kalendarz',
+    openTimePicker: 'Otwórz wybór godziny',
+  },
   auth: {
     loading: 'Sprawdzanie dostępu',
     signOut: 'Wyloguj',

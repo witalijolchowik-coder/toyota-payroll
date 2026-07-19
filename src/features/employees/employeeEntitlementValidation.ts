@@ -2,6 +2,7 @@ import type {
   EmployeeEntitlement,
   EmployeeEntitlementCreateInput,
 } from '../../types/firestore';
+import { isCanonicalExactDate } from '../../utils/forms/exactDateTimeInput';
 import { employeeEntitlementsOverlap } from '../../utils/payroll';
 
 export type EmployeeEntitlementValidationError =
@@ -19,10 +20,13 @@ export function validateEmployeeEntitlementInput(
   if (!input.employeeId || !input.tetaNumber.trim()) {
     errors.add('employee-required');
   }
-  if (!input.validFrom.trim()) {
+  if (!isCanonicalExactDate(input.validFrom)) {
     errors.add('date-required');
   }
-  if (input.validTo && input.validTo < input.validFrom) {
+  if (
+    input.validTo &&
+    (!isCanonicalExactDate(input.validTo) || input.validTo < input.validFrom)
+  ) {
     errors.add('invalid-date-range');
   }
   if (

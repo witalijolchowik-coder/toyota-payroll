@@ -18,6 +18,10 @@ import {
   Typography,
 } from '@mui/material';
 
+import {
+  ExactDateField,
+  ExactTimeField,
+} from '../../components/forms/ExactDateTimeField';
 import { useTranslations } from '../../hooks/useTranslations';
 import type {
   ActualWorkingShift,
@@ -33,6 +37,7 @@ import {
   validateShiftHours,
   type ShiftCorrectionImpactSummary,
 } from '../../utils/schedule';
+import { isCanonicalExactDate } from '../../utils/forms/exactDateTimeInput';
 import { previewShiftCorrectionImpact } from '../../services/shiftCorrectionImpactService';
 import { ShiftCorrectionImpactDialog } from './ShiftCorrectionImpactDialog';
 import { useShiftConfiguration } from './useShiftConfiguration';
@@ -95,7 +100,7 @@ export function ShiftConfigurationPanel({
   const saveHours = async (event: FormEvent) => {
     event.preventDefault();
     setSubmitError(null);
-    if (!validateShiftHours(intervals))
+    if (!isCanonicalExactDate(validFrom) || !validateShiftHours(intervals))
       return setSubmitError(t.settings.shiftConfiguration.invalidHours);
     try {
       await config.createHours({ validFrom, intervals, note: null });
@@ -107,7 +112,12 @@ export function ShiftConfigurationPanel({
   const saveCorrection = async (event: FormEvent) => {
     event.preventDefault();
     setSubmitError(null);
-    if (!departmentId || !correctionValidation.valid) return;
+    if (
+      !departmentId ||
+      !isCanonicalExactDate(effectiveDate) ||
+      !correctionValidation.valid
+    )
+      return;
     setImpactOpen(true);
     setImpactLoading(true);
     setImpact(null);
@@ -217,51 +227,49 @@ export function ShiftConfigurationPanel({
                       {t.organization.actualWorkingShifts[shift]}
                     </Typography>
                     <Stack direction="row" spacing={1} sx={{ mt: 1 }}>
-                      <TextField
+                      <ExactTimeField
                         size="small"
-                        type="time"
                         label={t.settings.shiftConfiguration.startTime}
                         value={intervals[shift].startTime}
-                        onChange={(event) =>
+                        onValueChange={(value) =>
                           setIntervals((current) => ({
                             ...current,
                             [shift]: {
                               ...current[shift],
-                              startTime: event.target.value,
+                              startTime: value,
                             },
                           }))
                         }
-                        slotProps={{ inputLabel: { shrink: true } }}
+                        invalidMessage={t.input.exactTimeInvalid}
+                        pickerLabel={t.input.openTimePicker}
                       />
-                      <TextField
+                      <ExactTimeField
                         size="small"
-                        type="time"
                         label={t.settings.shiftConfiguration.endTime}
                         value={intervals[shift].endTime}
-                        onChange={(event) =>
+                        onValueChange={(value) =>
                           setIntervals((current) => ({
                             ...current,
                             [shift]: {
                               ...current[shift],
-                              endTime: event.target.value,
+                              endTime: value,
                             },
                           }))
                         }
-                        slotProps={{ inputLabel: { shrink: true } }}
+                        invalidMessage={t.input.exactTimeInvalid}
+                        pickerLabel={t.input.openTimePicker}
                       />
                     </Stack>
                   </Box>
                 ))}
               </Stack>
-              <TextField
+              <ExactDateField
                 size="small"
-                type="date"
                 label={t.settings.shiftConfiguration.validFrom}
                 value={validFrom}
-                onChange={(event) =>
-                  setValidFrom(event.target.value as IsoDate)
-                }
-                slotProps={{ inputLabel: { shrink: true } }}
+                onValueChange={(value) => setValidFrom(value as IsoDate)}
+                invalidMessage={t.input.exactDateInvalid}
+                pickerLabel={t.input.openDatePicker}
                 sx={{ maxWidth: 240 }}
               />
               <Button
@@ -293,14 +301,12 @@ export function ShiftConfigurationPanel({
                     </MenuItem>
                   ))}
                 </TextField>
-                <TextField
-                  type="date"
+                <ExactDateField
                   label={t.settings.shiftConfiguration.correctionDate}
                   value={effectiveDate}
-                  onChange={(event) =>
-                    setEffectiveDate(event.target.value as IsoDate)
-                  }
-                  slotProps={{ inputLabel: { shrink: true } }}
+                  onValueChange={(value) => setEffectiveDate(value as IsoDate)}
+                  invalidMessage={t.input.exactDateInvalid}
+                  pickerLabel={t.input.openDatePicker}
                 />
                 <TextField
                   select

@@ -13,6 +13,7 @@ import {
   Typography,
 } from '@mui/material';
 
+import { ExactDateField } from '../../components/forms/ExactDateTimeField';
 import { useTranslations } from '../../hooks/useTranslations';
 import {
   AbsenceServiceError,
@@ -71,6 +72,13 @@ export function AbsenceFormDialog({
   const handleChange =
     (field: keyof FormValues) => (event: ChangeEvent<HTMLInputElement>) => {
       setValues((current) => ({ ...current, [field]: event.target.value }));
+      setErrors((current) => ({ ...current, [field]: undefined }));
+      setSubmitError(null);
+    };
+
+  const handleDateChange =
+    (field: 'startDate' | 'endDate' | 'linkedWorkDate') => (value: string) => {
+      setValues((current) => ({ ...current, [field]: value }));
       setErrors((current) => ({ ...current, [field]: undefined }));
       setSubmitError(null);
     };
@@ -177,37 +185,37 @@ export function AbsenceFormDialog({
               ))}
             </TextField>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-              <TextField
+              <ExactDateField
                 required
                 fullWidth
-                type="date"
                 label={t.absences.form.startDate}
                 value={values.startDate}
-                onChange={handleChange('startDate')}
+                onValueChange={handleDateChange('startDate')}
                 error={Boolean(errors.startDate)}
                 helperText={messageFor(errors.startDate)}
-                slotProps={{ inputLabel: { shrink: true } }}
+                invalidMessage={t.input.exactDateInvalid}
+                pickerLabel={t.input.openDatePicker}
               />
-              <TextField
+              <ExactDateField
                 required
                 fullWidth
-                type="date"
                 label={t.absences.form.endDate}
                 value={values.endDate}
-                onChange={handleChange('endDate')}
+                onValueChange={handleDateChange('endDate')}
                 error={Boolean(errors.endDate)}
                 helperText={messageFor(errors.endDate)}
-                slotProps={{ inputLabel: { shrink: true } }}
+                invalidMessage={t.input.exactDateInvalid}
+                pickerLabel={t.input.openDatePicker}
               />
             </Stack>
             {normalizeAbsenceCode(values.absenceCode) === 'WZN' ? (
-              <TextField
-                type="date"
+              <ExactDateField
                 label={t.absences.form.linkedWorkDate}
                 value={values.linkedWorkDate}
-                onChange={handleChange('linkedWorkDate')}
+                onValueChange={handleDateChange('linkedWorkDate')}
                 helperText={t.absences.form.linkedWorkDateHelper}
-                slotProps={{ inputLabel: { shrink: true } }}
+                invalidMessage={t.input.exactDateInvalid}
+                pickerLabel={t.input.openDatePicker}
               />
             ) : null}
             <TextField

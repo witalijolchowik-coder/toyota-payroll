@@ -12,6 +12,7 @@ import {
   Typography,
 } from '@mui/material';
 
+import { ExactDateField } from '../../components/forms/ExactDateTimeField';
 import { useTranslations } from '../../hooks/useTranslations';
 import type {
   Employee,
@@ -19,6 +20,7 @@ import type {
   EmployeeEntitlementCreateInput,
   PayrollSetting,
 } from '../../types/firestore';
+import { isCanonicalExactDate } from '../../utils/forms/exactDateTimeInput';
 
 interface EmployeeAccommodationDialogProps {
   employee: Employee;
@@ -73,7 +75,10 @@ export function EmployeeAccommodationDialog({
     currentAccommodation && effectiveDate <= currentAccommodation.validFrom,
   );
   const invalid =
-    !effectiveDate || (!isMoveOut && !variantKey) || overlaps || invalidMoveOut;
+    !isCanonicalExactDate(effectiveDate) ||
+    (!isMoveOut && !variantKey) ||
+    overlaps ||
+    invalidMoveOut;
 
   const submit = async () => {
     setShowValidation(true);
@@ -128,23 +133,23 @@ export function EmployeeAccommodationDialog({
           {showValidation && overlaps ? (
             <Alert severity="error">{t.employees.accommodation.overlap}</Alert>
           ) : null}
-          <TextField
+          <ExactDateField
             required
-            type="date"
             label={
               isMoveOut
                 ? t.employees.accommodation.moveOutDate
                 : t.employees.accommodation.moveInDate
             }
             value={effectiveDate}
-            onChange={(event) => setEffectiveDate(event.target.value)}
+            onValueChange={setEffectiveDate}
             error={showValidation && (!effectiveDate || invalidMoveOut)}
             helperText={
               isMoveOut
                 ? t.employees.accommodation.moveOutDateHelper
                 : t.employees.accommodation.moveInDateHelper
             }
-            slotProps={{ inputLabel: { shrink: true } }}
+            invalidMessage={t.input.exactDateInvalid}
+            pickerLabel={t.input.openDatePicker}
           />
           {!isMoveOut ? (
             <TextField
