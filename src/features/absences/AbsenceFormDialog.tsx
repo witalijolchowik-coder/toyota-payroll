@@ -13,7 +13,10 @@ import {
   Typography,
 } from '@mui/material';
 
-import { AbsenceMenuItem } from '../../components/absences/AbsenceOptionContent';
+import {
+  AbsenceMenuItem,
+  AbsenceOptionContent,
+} from '../../components/absences/AbsenceOptionContent';
 import { ABSENCE_SELECT_MENU_PROPS } from '../../components/absences/absenceSelect';
 import { ExactDateField } from '../../components/forms/ExactDateTimeField';
 import { useTranslations } from '../../hooks/useTranslations';
@@ -180,7 +183,18 @@ export function AbsenceFormDialog({
               error={Boolean(errors.absenceCode)}
               helperText={messageFor(errors.absenceCode)}
               slotProps={{
-                select: { MenuProps: ABSENCE_SELECT_MENU_PROPS },
+                select: {
+                  MenuProps: ABSENCE_SELECT_MENU_PROPS,
+                  renderValue: (selected) => {
+                    const code = selected as (typeof ABSENCE_CODES)[number];
+                    return (
+                      <AbsenceOptionContent
+                        code={code}
+                        description={t.absences.typeDescriptions[code]}
+                      />
+                    );
+                  },
+                },
               }}
             >
               {ABSENCE_CODES.map((code) => (

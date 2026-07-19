@@ -20,7 +20,10 @@ import {
   Typography,
 } from '@mui/material';
 
-import { AbsenceMenuItem } from '../../components/absences/AbsenceOptionContent';
+import {
+  AbsenceMenuItem,
+  AbsenceOptionContent,
+} from '../../components/absences/AbsenceOptionContent';
 import { ABSENCE_SELECT_MENU_PROPS } from '../../components/absences/absenceSelect';
 import { useTranslations } from '../../hooks/useTranslations';
 import { useNotification } from '../../hooks/useNotification';
@@ -585,7 +588,24 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
                   size="small"
                   sx={{ minWidth: { md: 190 } }}
                   slotProps={{
-                    select: { MenuProps: ABSENCE_SELECT_MENU_PROPS },
+                    select: {
+                      MenuProps: ABSENCE_SELECT_MENU_PROPS,
+                      renderValue: (selected) => {
+                        if (selected === 'all')
+                          return t.settlement.constructor.filters.all;
+                        if (selected === 'conflicts')
+                          return t.settlement.constructor.filters.conflicts;
+                        if (selected === 'warnings')
+                          return t.settlement.constructor.filters.warnings;
+                        const code = selected as AbsenceCode;
+                        return (
+                          <AbsenceOptionContent
+                            code={code}
+                            description={t.absences.typeDescriptions[code]}
+                          />
+                        );
+                      },
+                    },
                   }}
                 >
                   <MenuItem value="all">

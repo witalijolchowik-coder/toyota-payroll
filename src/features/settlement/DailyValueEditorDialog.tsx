@@ -18,7 +18,10 @@ import {
   Typography,
 } from '@mui/material';
 
-import { AbsenceMenuItem } from '../../components/absences/AbsenceOptionContent';
+import {
+  AbsenceMenuItem,
+  AbsenceOptionContent,
+} from '../../components/absences/AbsenceOptionContent';
 import { ABSENCE_SELECT_MENU_PROPS } from '../../components/absences/absenceSelect';
 import { ExactTimeField } from '../../components/forms/ExactDateTimeField';
 import { useCalendarAppearance } from '../../hooks/useCalendarAppearance';
@@ -175,9 +178,7 @@ export function DailyValueEditorDialog({
         })
       : [];
   const interpretation =
-    workTimePreview?.unresolved ||
-    outcomes.includes('REQUIRES_REVIEW') ||
-    outcomes.includes('DIFFERENT_INTERVAL')
+    workTimePreview?.unresolved || outcomes.includes('REQUIRES_REVIEW')
       ? {
           label: t.settlement.editor.workTime.interpretation.review,
           colors: palette.requiresReview,
@@ -192,10 +193,15 @@ export function DailyValueEditorDialog({
               label: t.settlement.editor.workTime.interpretation.shortage,
               colors: palette.shortage,
             }
-          : {
-              label: t.settlement.editor.workTime.interpretation.matches,
-              colors: palette.worked,
-            };
+          : outcomes.includes('DIFFERENT_INTERVAL')
+            ? {
+                label: t.settlement.editor.workTime.interpretation.review,
+                colors: palette.requiresReview,
+              }
+            : {
+                label: t.settlement.editor.workTime.interpretation.matches,
+                colors: palette.worked,
+              };
   const hasExplicitHours =
     value.kind === 'manual' ||
     value.kind === 'imported' ||
@@ -560,7 +566,18 @@ export function DailyValueEditorDialog({
                       setAbsenceCode(event.target.value as AbsenceCode)
                     }
                     slotProps={{
-                      select: { MenuProps: ABSENCE_SELECT_MENU_PROPS },
+                      select: {
+                        MenuProps: ABSENCE_SELECT_MENU_PROPS,
+                        renderValue: (selected) => {
+                          const code = selected as AbsenceCode;
+                          return (
+                            <AbsenceOptionContent
+                              code={code}
+                              description={t.absences.typeDescriptions[code]}
+                            />
+                          );
+                        },
+                      },
                     }}
                   >
                     {ABSENCE_CODES.map((code) => (

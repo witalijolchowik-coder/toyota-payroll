@@ -95,8 +95,9 @@ export function ExactDateField({
   const normalizeOnEnter = (event: KeyboardEvent<HTMLInputElement>) => {
     onKeyDown?.(event);
     if (event.defaultPrevented || event.key !== 'Enter') return;
+    const rawValue = (event.target as HTMLInputElement).value;
     event.preventDefault();
-    commitValue(event.currentTarget.value);
+    commitValue(rawValue);
   };
 
   const selectDate = (event: ChangeEvent<HTMLInputElement>) => {
@@ -208,8 +209,9 @@ export function ExactTimeField({
   const normalizeOnEnter = (event: KeyboardEvent<HTMLInputElement>) => {
     onKeyDown?.(event);
     if (event.defaultPrevented || event.key !== 'Enter') return;
+    const rawValue = (event.target as HTMLInputElement).value;
     event.preventDefault();
-    commitValue(event.currentTarget.value);
+    commitValue(rawValue);
   };
 
   const selectTime = (event: ChangeEvent<HTMLInputElement>) => {
