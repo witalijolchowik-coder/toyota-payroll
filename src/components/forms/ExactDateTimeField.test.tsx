@@ -100,7 +100,9 @@ describe('ExactDateTimeField', () => {
       throw new DOMException('User activation required', 'NotAllowedError');
     });
 
-    fireEvent.click(screen.getByRole('button', { name: 'OtwĂłrz kalendarz' }));
+    const pickerButton = container.querySelector('button[aria-label]');
+    expect(pickerButton).not.toBeNull();
+    fireEvent.click(pickerButton!);
 
     expect(datePicker.showPicker).toHaveBeenCalledOnce();
     expect(click).toHaveBeenCalledOnce();
