@@ -99,6 +99,8 @@ and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   calendar corrections instead of adding a separate calendar status model.
 - Extended existing DailyValue documents for work-time corrections instead of
   introducing a parallel attendance collection.
+- Split employee-register employment data into sortable first-employment and
+  current-contract columns, with a derived 18-calendar-month operational limit.
 
 ### Security
 

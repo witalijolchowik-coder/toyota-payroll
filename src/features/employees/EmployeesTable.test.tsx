@@ -70,13 +70,28 @@ describe('EmployeesTable', () => {
     expect(
       screen.queryByRole('columnheader', { name: 'Status' }),
     ).not.toBeInTheDocument();
-    expect(screen.getByText('Pierwsze zatrudnienie')).toBeInTheDocument();
-    expect(screen.getByText('Aktualna umowa')).toBeInTheDocument();
+    expect(
+      screen.getByRole('columnheader', { name: 'Pierwsze zatrudnienie' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole('columnheader', { name: 'Aktualna umowa' }),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByText('Pierwsze zatrudnienie / aktualna umowa'),
+    ).not.toBeInTheDocument();
     expect(screen.getByText('02.01.2025')).toBeInTheDocument();
+    expect(screen.getByText('Limit: 02.07.2026')).toHaveStyle({
+      color: '#8f2d3f',
+    });
+    expect(screen.getByText('Od:')).toBeInTheDocument();
     expect(screen.getByText('03.01.2026')).toBeInTheDocument();
+    expect(screen.getByText('Do:')).toBeInTheDocument();
+    expect(screen.getByText('bezterminowo')).toBeInTheDocument();
+    expect(screen.getAllByText('Pierwsze zatrudnienie')).toHaveLength(1);
+    expect(screen.getAllByText('Aktualna umowa')).toHaveLength(1);
   });
 
-  it('exposes keyboard-accessible sortable headers', () => {
+  it('exposes independent keyboard-accessible date sorting headers', () => {
     const onSort = vi.fn();
     render(
       <EmployeesTable
@@ -84,7 +99,7 @@ describe('EmployeesTable', () => {
         departments={[department]}
         isLoading={false}
         mode="archive"
-        sort={{ key: 'shift', direction: 'desc' }}
+        sort={{ key: 'firstEmployment', direction: 'desc' }}
         onSort={onSort}
         onEdit={vi.fn()}
         onDeactivate={vi.fn()}
@@ -92,7 +107,109 @@ describe('EmployeesTable', () => {
         onAccommodation={vi.fn()}
       />,
     );
-    fireEvent.click(screen.getByRole('button', { name: 'Dział' }));
-    expect(onSort).toHaveBeenCalledWith('department');
+    expect(
+      screen.getByRole('columnheader', { name: 'Pierwsze zatrudnienie' }),
+    ).toHaveAttribute('aria-sort', 'descending');
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Pierwsze zatrudnienie' }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Aktualna umowa' }));
+
+    expect(onSort).toHaveBeenNthCalledWith(1, 'firstEmployment');
+    expect(onSort).toHaveBeenNthCalledWith(2, 'currentContract');
+  });
+
+  it('shows a dated current contract in two concise lines for archived employees', () => {
+    render(
+      <EmployeesTable
+        employees={[
+          {
+            ...employee,
+            isActive: false,
+            employmentEndDate: new Date('2026-08-31T00:00:00.000Z'),
+          },
+        ]}
+        departments={[department]}
+        isLoading={false}
+        mode="archive"
+        sort={{ key: 'currentContract', direction: 'asc' }}
+        onSort={vi.fn()}
+        onEdit={vi.fn()}
+        onDeactivate={vi.fn()}
+        entitlements={[]}
+        onAccommodation={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('Od:')).toBeInTheDocument();
+    expect(screen.getByText('03.01.2026')).toBeInTheDocument();
+    expect(screen.getByText('Do:')).toBeInTheDocument();
+    expect(screen.getByText('31.08.2026')).toBeInTheDocument();
+    expect(screen.queryByText('Zakończenie')).not.toBeInTheDocument();
+  });
+
+  it('handles missing dates without inventing a limit or contract', () => {
+    render(
+      <EmployeesTable
+        employees={[
+          {
+            ...employee,
+            firstToyotaEmploymentDate: null,
+            employmentStartDate: null,
+            employmentEndDate: null,
+          },
+        ]}
+        departments={[department]}
+        isLoading={false}
+        mode="active"
+        sort={{ key: 'employee', direction: 'asc' }}
+        onSort={vi.fn()}
+        onEdit={vi.fn()}
+        onDeactivate={vi.fn()}
+        entitlements={[]}
+        onAccommodation={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText('brak pierwszej daty')).toBeInTheDocument();
+    expect(screen.getByText('brak aktualnej umowy')).toBeInTheDocument();
+    expect(screen.queryByText(/^Limit:/)).not.toBeInTheDocument();
+  });
+
+  it('keeps accommodation, edit and deactivate actions working', () => {
+    const onAccommodation = vi.fn();
+    const onEdit = vi.fn();
+    const onDeactivate = vi.fn();
+    render(
+      <EmployeesTable
+        employees={[employee]}
+        departments={[department]}
+        isLoading={false}
+        mode="active"
+        sort={{ key: 'employee', direction: 'asc' }}
+        onSort={vi.fn()}
+        onEdit={onEdit}
+        onDeactivate={onDeactivate}
+        entitlements={[]}
+        onAccommodation={onAccommodation}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Brak zakwaterowania firmowego' }),
+    );
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Edytuj pracownika: Jan Kowalski' }),
+    );
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Dezaktywuj pracownika: Jan Kowalski',
+      }),
+    );
+
+    expect(onAccommodation).toHaveBeenCalledWith(employee, null);
+    expect(onEdit).toHaveBeenCalledWith(employee);
+    expect(onDeactivate).toHaveBeenCalledWith(employee);
   });
 });

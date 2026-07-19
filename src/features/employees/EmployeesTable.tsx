@@ -30,6 +30,11 @@ import type {
   Employee,
   EmployeeEntitlement,
 } from '../../types/firestore';
+import {
+  calculateFirstEmploymentLimit,
+  formatPolishDate,
+  resolveCurrentEmploymentPeriod,
+} from '../../utils/employees';
 import { hasCurrentStatusConflict } from '../../utils/payroll';
 import type {
   EmployeeListMode,
@@ -53,12 +58,6 @@ interface EmployeesTableProps {
   onSort: (key: EmployeeSortKey) => void;
 }
 
-const dateFormatter = new Intl.DateTimeFormat('pl-PL', {
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-});
-
 export function EmployeesTable({
   employees,
   departments,
@@ -78,7 +77,7 @@ export function EmployeesTable({
 
   return (
     <TableContainer>
-      <Table sx={{ minWidth: 1240 }}>
+      <Table sx={{ minWidth: 1380 }}>
         <TableHead>
           <TableRow>
             <SortableHeader
@@ -102,14 +101,16 @@ export function EmployeesTable({
               label={t.employees.table.shiftAssignment}
             />
             <SortableHeader
-              column="employment"
+              column="firstEmployment"
               sort={sort}
               onSort={onSort}
-              label={
-                mode === 'active'
-                  ? t.employees.table.activeEmploymentDates
-                  : t.employees.table.archiveEmploymentDates
-              }
+              label={t.employees.table.firstEmployment}
+            />
+            <SortableHeader
+              column="currentContract"
+              sort={sort}
+              onSort={onSort}
+              label={t.employees.table.currentContract}
             />
             <TableCell align="right">{t.employees.table.actions}</TableCell>
           </TableRow>
@@ -118,7 +119,7 @@ export function EmployeesTable({
           {isLoading
             ? Array.from({ length: 4 }, (_, index) => (
                 <TableRow key={index}>
-                  {Array.from({ length: 7 }, (__, cellIndex) => (
+                  {Array.from({ length: 8 }, (__, cellIndex) => (
                     <TableCell key={cellIndex}>
                       <Skeleton />
                     </TableCell>
@@ -244,29 +245,19 @@ export function EmployeesTable({
                     <TableCell sx={{ minWidth: 110 }}>
                       <ShiftIndicator shift={employee.shiftAssignment} t={t} />
                     </TableCell>
-                    <TableCell sx={{ minWidth: 260 }}>
+                    <TableCell sx={{ minWidth: 170 }}>
+                      <FirstEmploymentCell employee={employee} t={t} />
+                    </TableCell>
+                    <TableCell sx={{ minWidth: 190 }}>
                       <Stack
                         direction="row"
-                        spacing={2.5}
+                        spacing={1}
                         sx={{ alignItems: 'center' }}
                       >
-                        <EmploymentDate
-                          label={t.employees.table.firstEmployment}
-                          value={
-                            employee.firstToyotaEmploymentDate
-                              ? dateFormatter.format(
-                                  employee.firstToyotaEmploymentDate,
-                                )
-                              : t.employees.table.noFirstToyotaDate
-                          }
-                        />
-                        <EmploymentDate
-                          label={
-                            mode === 'active'
-                              ? t.employees.table.currentContract
-                              : t.employees.table.employmentEnd
-                          }
-                          value={formatCurrentEmploymentDate(employee, mode, t)}
+                        <CurrentContractCell
+                          employee={employee}
+                          mode={mode}
+                          t={t}
                         />
                         {statusConflict ? (
                           <Tooltip title={t.employees.table.statusConflict}>
@@ -358,22 +349,6 @@ export function EmployeesTable({
       </Table>
     </TableContainer>
   );
-}
-
-function formatCurrentEmploymentDate(
-  employee: Employee,
-  mode: EmployeeListMode,
-  t: ReturnType<typeof useTranslations>,
-): string {
-  const date =
-    mode === 'active'
-      ? employee.employmentStartDate
-      : employee.employmentEndDate;
-  const fallback =
-    mode === 'active'
-      ? t.employees.table.noStartDate
-      : t.employees.table.noFinalEndDate;
-  return date ? dateFormatter.format(date) : fallback;
 }
 
 function SortableHeader({
@@ -513,23 +488,97 @@ function ShiftIndicator({
   );
 }
 
-function EmploymentDate({ label, value }: { label: string; value: string }) {
-  return (
-    <Box>
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{ display: 'block', whiteSpace: 'nowrap' }}
-      >
-        {label}
+function FirstEmploymentCell({
+  employee,
+  t,
+}: {
+  employee: Employee;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const sourceDate = employee.firstToyotaEmploymentDate;
+  const limit = calculateFirstEmploymentLimit(sourceDate);
+
+  if (!sourceDate || !limit) {
+    return (
+      <Typography variant="body2" color="text.secondary">
+        {t.employees.table.noFirstToyotaDate}
       </Typography>
+    );
+  }
+
+  return (
+    <Stack spacing={0.25}>
       <Typography
         variant="body2"
         sx={{ fontWeight: 650, whiteSpace: 'nowrap' }}
       >
-        {value}
+        {formatPolishDate(sourceDate)}
       </Typography>
-    </Box>
+      <Typography
+        variant="caption"
+        data-testid={`first-employment-limit-${employee.id}`}
+        sx={{
+          color: (theme) =>
+            theme.palette.mode === 'light' ? '#8f2d3f' : '#f3a6b5',
+          fontWeight: 650,
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {t.employees.table.limit}: {formatPolishDate(limit)}
+      </Typography>
+    </Stack>
+  );
+}
+
+function CurrentContractCell({
+  employee,
+  mode,
+  t,
+}: {
+  employee: Employee;
+  mode: EmployeeListMode;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const period = resolveCurrentEmploymentPeriod(employee);
+
+  if (!period) {
+    return (
+      <Typography variant="body2" color="text.secondary">
+        {mode === 'active'
+          ? t.employees.table.noCurrentContract
+          : t.employees.table.noArchivedContract}
+      </Typography>
+    );
+  }
+
+  return (
+    <Stack spacing={0.25}>
+      <ContractDateLine
+        label={t.employees.table.contractFrom}
+        value={formatPolishDate(period.startDate)}
+      />
+      <ContractDateLine
+        label={t.employees.table.contractTo}
+        value={
+          period.endDate
+            ? formatPolishDate(period.endDate)
+            : t.employees.table.openEndedContract
+        }
+      />
+    </Stack>
+  );
+}
+
+function ContractDateLine({ label, value }: { label: string; value: string }) {
+  return (
+    <Typography variant="body2" sx={{ whiteSpace: 'nowrap' }}>
+      <Box component="span" color="text.secondary">
+        {label}:{' '}
+      </Box>
+      <Box component="span" sx={{ fontWeight: 650 }}>
+        {value}
+      </Box>
+    </Typography>
   );
 }
 

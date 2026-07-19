@@ -1,9 +1,15 @@
 import type { Department, Employee } from '../../types/firestore';
+import { resolveCurrentEmploymentPeriod } from '../../utils/employees';
 import { dateToIsoDate, isEmployeeActiveOnDate } from '../../utils/payroll';
 
 export type EmployeeListMode = 'active' | 'archive';
 export type EmployeeSortKey =
-  'teta' | 'employee' | 'department' | 'shift' | 'employment';
+  | 'teta'
+  | 'employee'
+  | 'department'
+  | 'shift'
+  | 'firstEmployment'
+  | 'currentContract';
 export type SortDirection = 'asc' | 'desc';
 
 export interface EmployeeSortState {
@@ -54,6 +60,21 @@ export function sortEmployees(
   const names = new Map(departments.map((item) => [item.id, item.name]));
   const multiplier = sort.direction === 'asc' ? 1 : -1;
   return [...employees].sort((first, second) => {
+    if (sort.key === 'firstEmployment') {
+      return (
+        compareOptionalDates(
+          first.firstToyotaEmploymentDate,
+          second.firstToyotaEmploymentDate,
+          sort.direction,
+        ) || compareEmployeeName(first, second)
+      );
+    }
+    if (sort.key === 'currentContract') {
+      return (
+        compareCurrentContracts(first, second, sort.direction) ||
+        compareEmployeeName(first, second)
+      );
+    }
     if (sort.key === 'shift') {
       return (
         compareDepartment(first, second, names) ||
@@ -70,12 +91,7 @@ export function sortEmployees(
         ? logicalTeta(first.tetaNumber, second.tetaNumber)
         : sort.key === 'employee'
           ? compareEmployeeName(first, second)
-          : sort.key === 'department'
-            ? compareDepartment(first, second, names)
-            : compareDates(
-                first.firstToyotaEmploymentDate,
-                second.firstToyotaEmploymentDate,
-              );
+          : compareDepartment(first, second, names);
     return comparison * multiplier || compareEmployeeName(first, second);
   });
 }
@@ -129,9 +145,50 @@ function logicalTeta(first: string, second: string): number {
   });
 }
 
-function compareDates(first?: Date | null, second?: Date | null): number {
-  return (
-    (first?.getTime() ?? Number.MAX_SAFE_INTEGER) -
-    (second?.getTime() ?? Number.MAX_SAFE_INTEGER)
+function compareOptionalDates(
+  first: Date | null | undefined,
+  second: Date | null | undefined,
+  direction: SortDirection,
+): number {
+  if (!first && !second) return 0;
+  if (!first) return 1;
+  if (!second) return -1;
+  return (first.getTime() - second.getTime()) * (direction === 'asc' ? 1 : -1);
+}
+
+function compareCurrentContracts(
+  first: Employee,
+  second: Employee,
+  direction: SortDirection,
+): number {
+  const firstPeriod = resolveCurrentEmploymentPeriod(first);
+  const secondPeriod = resolveCurrentEmploymentPeriod(second);
+  const firstRank = contractSortRank(firstPeriod);
+  const secondRank = contractSortRank(secondPeriod);
+
+  if (firstRank !== secondRank) {
+    return firstRank - secondRank;
+  }
+  if (!firstPeriod || !secondPeriod) {
+    return 0;
+  }
+  if (firstPeriod.endDate && secondPeriod.endDate) {
+    return compareOptionalDates(
+      firstPeriod.endDate,
+      secondPeriod.endDate,
+      direction,
+    );
+  }
+  return compareOptionalDates(
+    firstPeriod.startDate,
+    secondPeriod.startDate,
+    direction,
   );
+}
+
+function contractSortRank(
+  period: ReturnType<typeof resolveCurrentEmploymentPeriod>,
+): number {
+  if (!period) return 2;
+  return period.endDate ? 0 : 1;
 }
