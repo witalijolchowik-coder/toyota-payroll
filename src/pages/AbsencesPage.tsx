@@ -31,6 +31,8 @@ import {
   Typography,
 } from '@mui/material';
 
+import { AbsenceMenuItem } from '../components/absences/AbsenceOptionContent';
+import { ABSENCE_SELECT_MENU_PROPS } from '../components/absences/absenceSelect';
 import { PageHeader } from '../components/layout/PageHeader';
 import { AbsenceFormDialog } from '../features/absences/AbsenceFormDialog';
 import { L4ImportDialog } from '../features/absences/L4ImportDialog';
@@ -277,12 +279,17 @@ export function AbsencesPage() {
               setStatusFilter('all');
             }}
             sx={{ minWidth: 140 }}
+            slotProps={{
+              select: { MenuProps: ABSENCE_SELECT_MENU_PROPS },
+            }}
           >
             <MenuItem value="all">{t.absences.filters.allTypes}</MenuItem>
             {ABSENCE_CODES.map((code) => (
-              <MenuItem key={code} value={code}>
-                {code === 'UZ' ? t.absences.types.UZ : code}
-              </MenuItem>
+              <AbsenceMenuItem
+                key={code}
+                code={code}
+                description={t.absences.typeDescriptions[code]}
+              />
             ))}
           </TextField>
           <TextField

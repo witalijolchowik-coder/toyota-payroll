@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react';
 import {
   Alert,
+  Box,
   Button,
   Checkbox,
   CircularProgress,
@@ -17,7 +18,10 @@ import {
   Typography,
 } from '@mui/material';
 
+import { AbsenceMenuItem } from '../../components/absences/AbsenceOptionContent';
+import { ABSENCE_SELECT_MENU_PROPS } from '../../components/absences/absenceSelect';
 import { ExactTimeField } from '../../components/forms/ExactDateTimeField';
+import { useCalendarAppearance } from '../../hooks/useCalendarAppearance';
 import { useTranslations } from '../../hooks/useTranslations';
 import { interpolate } from '../../i18n/pl';
 import {
@@ -39,6 +43,7 @@ import {
   resolvePlanToFactOutcomes,
 } from '../../utils/payroll';
 import type { PlannedScheduleDay } from '../../utils/schedule';
+import type { CalendarAppearanceColors } from '../../utils/calendarAppearance';
 import {
   decideDailyValueMutation,
   parseDailyHoursInput,
@@ -83,6 +88,7 @@ export function DailyValueEditorDialog({
   onSaveAbsence,
 }: DailyValueEditorDialogProps) {
   const t = useTranslations();
+  const { palette } = useCalendarAppearance();
   const plannedHours = plannedDay?.hours ?? (day.isWorkingDay ? 8 : 0);
   const defaultHours =
     value.kind === 'empty' ? plannedHours : (value.hours ?? plannedHours);
@@ -168,6 +174,28 @@ export function DailyValueEditorDialog({
           isPublicHoliday: day.isHoliday,
         })
       : [];
+  const interpretation =
+    workTimePreview?.unresolved ||
+    outcomes.includes('REQUIRES_REVIEW') ||
+    outcomes.includes('DIFFERENT_INTERVAL')
+      ? {
+          label: t.settlement.editor.workTime.interpretation.review,
+          colors: palette.requiresReview,
+        }
+      : outcomes.includes('WORKED_MORE')
+        ? {
+            label: t.settlement.editor.workTime.interpretation.overtime,
+            colors: palette.overtime50,
+          }
+        : outcomes.includes('WORKED_LESS')
+          ? {
+              label: t.settlement.editor.workTime.interpretation.shortage,
+              colors: palette.shortage,
+            }
+          : {
+              label: t.settlement.editor.workTime.interpretation.matches,
+              colors: palette.worked,
+            };
   const hasExplicitHours =
     value.kind === 'manual' ||
     value.kind === 'imported' ||
@@ -272,26 +300,26 @@ export function DailyValueEditorDialog({
       open
       onClose={isSubmitting ? undefined : onClose}
       fullWidth
-      maxWidth="sm"
+      maxWidth="md"
+      slotProps={{
+        paper: {
+          sx: {
+            maxHeight: '92dvh',
+            width: { xs: 'calc(100% - 24px)', sm: 760 },
+          },
+        },
+      }}
     >
       <form onSubmit={handleSubmit} noValidate>
-        <DialogTitle>{t.settlement.editor.title}</DialogTitle>
+        <DialogTitle sx={{ pb: 0.5 }}>{t.settlement.editor.title}</DialogTitle>
         <DialogContent>
-          <Stack spacing={2} sx={{ pt: 0.5 }}>
-            <Typography color="text.secondary">
+          <Stack spacing={1.75} sx={{ pt: 0.5 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
               {interpolate(t.settlement.editor.description, {
                 employee: employeeName,
                 date: dateFormatter.format(day.date),
               })}
             </Typography>
-            {plannedDay ? (
-              <Typography variant="body2" color="text.secondary">
-                {interpolate(t.settlement.editor.planContext, {
-                  hours: String(plannedHours),
-                  shift: plannedDay.label,
-                })}
-              </Typography>
-            ) : null}
             <Tabs
               value={tab}
               onChange={(_, value: 'hours' | 'absence') => setTab(value)}
@@ -327,55 +355,72 @@ export function DailyValueEditorDialog({
                     ) : null}
                   </>
                 ) : null}
-                <TextField
-                  label={t.settlement.editor.actualHours}
-                  value={formatHours(actualTotal)}
-                  disabled
-                  error={Boolean(validationError)}
-                  helperText={
-                    validationError
-                      ? validationMessage(validationError, t)
-                      : t.settlement.editor.helper
-                  }
-                />
-                <Stack spacing={1.25}>
+                <Stack spacing={1.5}>
                   {!plannedShift ? (
                     <Alert severity="warning">
                       {t.settlement.editor.workTime.unresolvedShift}
                     </Alert>
                   ) : null}
-                  <TextField
-                    select
-                    label={t.settlement.editor.workTime.plannedShift}
-                    value={plannedShift}
-                    onChange={(event) => {
-                      const next = event.target.value as ActualWorkingShift;
-                      const interval = DEFAULT_SHIFT_INTERVALS[next];
-                      setPlannedShift(next);
-                      if (!actualStartTime)
-                        setActualStartTime(interval.startTime);
-                      if (!actualEndTime) setActualEndTime(interval.endTime);
+                  <Box
+                    sx={{
+                      bgcolor: 'grey.50',
+                      border: 1,
+                      borderColor: 'divider',
+                      borderRadius: 2,
+                      display: 'grid',
+                      gap: 1.25,
+                      gridTemplateColumns: {
+                        xs: '1fr',
+                        sm: 'minmax(220px, 0.8fr) minmax(0, 1fr)',
+                      },
+                      p: 1.5,
                     }}
                   >
-                    <MenuItem value="FIRST">
-                      {t.organization.actualWorkingShifts.FIRST}
-                    </MenuItem>
-                    <MenuItem value="SECOND">
-                      {t.organization.actualWorkingShifts.SECOND}
-                    </MenuItem>
-                    <MenuItem value="NIGHT">
-                      {t.organization.actualWorkingShifts.NIGHT}
-                    </MenuItem>
-                  </TextField>
-                  {plannedInterval ? (
-                    <Alert severity="info">
-                      {interpolate(t.settlement.editor.workTime.planDetails, {
-                        start: plannedInterval.startTime,
-                        end: plannedInterval.endTime,
-                        hours: formatHours(plannedHours),
-                      })}
-                    </Alert>
-                  ) : null}
+                    <TextField
+                      select
+                      size="small"
+                      label={t.settlement.editor.workTime.plannedShift}
+                      value={plannedShift}
+                      onChange={(event) => {
+                        const next = event.target.value as ActualWorkingShift;
+                        const interval = DEFAULT_SHIFT_INTERVALS[next];
+                        setPlannedShift(next);
+                        if (!actualStartTime)
+                          setActualStartTime(interval.startTime);
+                        if (!actualEndTime) setActualEndTime(interval.endTime);
+                      }}
+                    >
+                      <MenuItem value="FIRST">
+                        {t.organization.actualWorkingShifts.FIRST}
+                      </MenuItem>
+                      <MenuItem value="SECOND">
+                        {t.organization.actualWorkingShifts.SECOND}
+                      </MenuItem>
+                      <MenuItem value="NIGHT">
+                        {t.organization.actualWorkingShifts.NIGHT}
+                      </MenuItem>
+                    </TextField>
+                    <Box
+                      sx={{
+                        alignSelf: 'center',
+                        minWidth: 0,
+                        px: { xs: 0.25, sm: 1 },
+                      }}
+                    >
+                      <Typography
+                        variant="overline"
+                        color="text.secondary"
+                        sx={{ fontWeight: 700 }}
+                      >
+                        {t.settlement.editor.workTime.planSummary}
+                      </Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                        {plannedInterval
+                          ? `${plannedInterval.startTime}–${plannedInterval.endTime} · ${formatHours(plannedHours)} h`
+                          : '—'}
+                      </Typography>
+                    </Box>
+                  </Box>
                   <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
                     <ExactTimeField
                       label={t.settlement.editor.workTime.actualStart}
@@ -403,44 +448,91 @@ export function DailyValueEditorDialog({
                     />
                   </Stack>
                   {workTimePreview ? (
-                    <Stack spacing={1}>
-                      <Alert
-                        severity={
-                          workTimePreview.unresolved ? 'warning' : 'info'
-                        }
+                    <Box
+                      sx={{
+                        border: 1,
+                        borderColor: 'divider',
+                        borderRadius: 2,
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <Typography
+                        variant="subtitle2"
+                        sx={{ fontWeight: 800, px: 1.5, pt: 1.25 }}
                       >
-                        {interpolate(
-                          t.settlement.editor.workTime.previewExtended,
-                          {
-                            planned: formatHours(plannedHours),
-                            actual:
-                              effectiveParsedHours.kind === 'value'
-                                ? formatHours(effectiveParsedHours.hours)
-                                : '—',
-                            private: formatHours(
-                              workTimePreview.privateTimeHours,
-                            ),
-                            overtime50: formatHours(
-                              workTimePreview.overtime50Hours,
-                            ),
-                            overtime100: formatHours(
-                              workTimePreview.overtime100Hours,
-                            ),
-                            night: formatHours(
-                              workTimePreview.nightAllowanceHours,
-                            ),
-                          },
-                        )}
-                      </Alert>
-                      <Typography variant="caption" color="text.secondary">
-                        {outcomes
-                          .map(
-                            (outcome) =>
-                              t.settlement.editor.workTime.outcomes[outcome],
-                          )
-                          .join(' · ')}
+                        {t.settlement.editor.workTime.resultSummary}
                       </Typography>
-                    </Stack>
+                      <Box
+                        sx={{
+                          display: 'grid',
+                          gap: 1,
+                          gridTemplateColumns: {
+                            xs: 'repeat(2, minmax(0, 1fr))',
+                            sm: 'repeat(5, minmax(0, 1fr))',
+                          },
+                          p: 1.5,
+                        }}
+                      >
+                        <WorkTimeMetric
+                          testId="worked-hours"
+                          label={t.settlement.editor.workTime.metrics.worked}
+                          hours={actualTotal}
+                          colors={palette.worked}
+                        />
+                        <WorkTimeMetric
+                          testId="shortage-hours"
+                          label={t.settlement.editor.workTime.metrics.shortage}
+                          hours={workTimePreview.privateTimeHours}
+                          colors={palette.shortage}
+                        />
+                        <WorkTimeMetric
+                          testId="overtime-50-hours"
+                          label={
+                            t.settlement.editor.workTime.metrics.overtime50
+                          }
+                          hours={workTimePreview.overtime50Hours}
+                          colors={palette.overtime50}
+                        />
+                        <WorkTimeMetric
+                          testId="overtime-100-hours"
+                          label={
+                            t.settlement.editor.workTime.metrics.overtime100
+                          }
+                          hours={workTimePreview.overtime100Hours}
+                          colors={palette.overtime100}
+                        />
+                        <WorkTimeMetric
+                          testId="night-hours"
+                          label={t.settlement.editor.workTime.metrics.night}
+                          hours={workTimePreview.nightAllowanceHours}
+                          colors={palette.nightHours}
+                        />
+                      </Box>
+                      <Box
+                        sx={{
+                          alignItems: 'center',
+                          bgcolor: interpretation.colors.background,
+                          color: interpretation.colors.text,
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: 0.75,
+                          px: 1.5,
+                          py: 1,
+                        }}
+                      >
+                        <Typography variant="caption" sx={{ fontWeight: 700 }}>
+                          {t.settlement.editor.workTime.interpretationLabel}:
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 800 }}>
+                          {interpretation.label}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  ) : null}
+                  {validationError ? (
+                    <Alert severity="error">
+                      {validationMessage(validationError, t)}
+                    </Alert>
                   ) : null}
                 </Stack>
               </>
@@ -467,11 +559,16 @@ export function DailyValueEditorDialog({
                     onChange={(event) =>
                       setAbsenceCode(event.target.value as AbsenceCode)
                     }
+                    slotProps={{
+                      select: { MenuProps: ABSENCE_SELECT_MENU_PROPS },
+                    }}
                   >
                     {ABSENCE_CODES.map((code) => (
-                      <MenuItem key={code} value={code}>
-                        {t.absences.types[code]}
-                      </MenuItem>
+                      <AbsenceMenuItem
+                        key={code}
+                        code={code}
+                        description={t.absences.typeDescriptions[code]}
+                      />
                     ))}
                   </TextField>
                 )}
@@ -503,7 +600,9 @@ export function DailyValueEditorDialog({
               value={note}
               onChange={(event) => setNote(event.target.value)}
               multiline
-              minRows={2}
+              minRows={1}
+              maxRows={3}
+              helperText={t.settlement.editor.noteHelper}
             />
           </Stack>
         </DialogContent>
@@ -583,6 +682,47 @@ function serviceCodeMessage(
   return operation === 'save'
     ? t.settlement.editor.errors.save
     : t.settlement.editor.errors.clear;
+}
+
+function WorkTimeMetric({
+  testId,
+  label,
+  hours,
+  colors,
+}: {
+  testId: string;
+  label: string;
+  hours: number;
+  colors: CalendarAppearanceColors;
+}) {
+  return (
+    <Box
+      data-testid={testId}
+      sx={{
+        bgcolor: colors.background,
+        borderRadius: 1.5,
+        color: colors.text,
+        minWidth: 0,
+        px: 1.25,
+        py: 1,
+      }}
+    >
+      <Typography
+        variant="caption"
+        color="inherit"
+        sx={{ display: 'block', lineHeight: 1.2 }}
+      >
+        {label}
+      </Typography>
+      <Typography
+        variant="h6"
+        color="inherit"
+        sx={{ fontWeight: 800, lineHeight: 1.25 }}
+      >
+        {formatHours(hours)} h
+      </Typography>
+    </Box>
+  );
 }
 
 function formatHours(hours: number): string {

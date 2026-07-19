@@ -1,4 +1,10 @@
-import { useRef, useState, type ChangeEvent, type FocusEvent } from 'react';
+import {
+  useRef,
+  useState,
+  type ChangeEvent,
+  type FocusEvent,
+  type KeyboardEvent,
+} from 'react';
 import AccessTimeOutlinedIcon from '@mui/icons-material/AccessTimeOutlined';
 import CalendarMonthOutlinedIcon from '@mui/icons-material/CalendarMonthOutlined';
 import {
@@ -23,6 +29,7 @@ type SharedFieldProps = Omit<
   invalidMessage: string;
   pickerLabel: string;
   onBlur?: (event: FocusEvent<HTMLInputElement>) => void;
+  onKeyDown?: (event: KeyboardEvent<HTMLInputElement>) => void;
 };
 
 type NativePickerInput = HTMLInputElement & {
@@ -52,6 +59,7 @@ export function ExactDateField({
   helperText,
   disabled,
   onBlur,
+  onKeyDown,
   slotProps,
   ...props
 }: SharedFieldProps) {
@@ -63,8 +71,8 @@ export function ExactDateField({
     onValueChange(event.target.value);
   };
 
-  const normalizeOnBlur = (event: FocusEvent<HTMLInputElement>) => {
-    const trimmed = value.trim();
+  const commitValue = (rawValue: string) => {
+    const trimmed = rawValue.trim();
     if (!trimmed) {
       setInvalid(false);
       onValueChange('');
@@ -77,7 +85,18 @@ export function ExactDateField({
         setInvalid(true);
       }
     }
+  };
+
+  const normalizeOnBlur = (event: FocusEvent<HTMLInputElement>) => {
+    commitValue(event.currentTarget.value);
     onBlur?.(event);
+  };
+
+  const normalizeOnEnter = (event: KeyboardEvent<HTMLInputElement>) => {
+    onKeyDown?.(event);
+    if (event.defaultPrevented || event.key !== 'Enter') return;
+    event.preventDefault();
+    commitValue(event.currentTarget.value);
   };
 
   const selectDate = (event: ChangeEvent<HTMLInputElement>) => {
@@ -93,6 +112,7 @@ export function ExactDateField({
       value={formatExactDateForDisplay(value)}
       onChange={updateDraft}
       onBlur={normalizeOnBlur}
+      onKeyDown={normalizeOnEnter}
       disabled={disabled}
       error={Boolean(error) || invalid}
       helperText={invalid && !error ? invalidMessage : helperText}
@@ -152,6 +172,7 @@ export function ExactTimeField({
   helperText,
   disabled,
   onBlur,
+  onKeyDown,
   slotProps,
   ...props
 }: SharedFieldProps) {
@@ -163,8 +184,8 @@ export function ExactTimeField({
     onValueChange(event.target.value);
   };
 
-  const normalizeOnBlur = (event: FocusEvent<HTMLInputElement>) => {
-    const trimmed = value.trim();
+  const commitValue = (rawValue: string) => {
+    const trimmed = rawValue.trim();
     if (!trimmed) {
       setInvalid(false);
       onValueChange('');
@@ -177,7 +198,18 @@ export function ExactTimeField({
         setInvalid(true);
       }
     }
+  };
+
+  const normalizeOnBlur = (event: FocusEvent<HTMLInputElement>) => {
+    commitValue(event.currentTarget.value);
     onBlur?.(event);
+  };
+
+  const normalizeOnEnter = (event: KeyboardEvent<HTMLInputElement>) => {
+    onKeyDown?.(event);
+    if (event.defaultPrevented || event.key !== 'Enter') return;
+    event.preventDefault();
+    commitValue(event.currentTarget.value);
   };
 
   const selectTime = (event: ChangeEvent<HTMLInputElement>) => {
@@ -193,6 +225,7 @@ export function ExactTimeField({
       value={value}
       onChange={updateDraft}
       onBlur={normalizeOnBlur}
+      onKeyDown={normalizeOnEnter}
       disabled={disabled}
       error={Boolean(error) || invalid}
       helperText={invalid && !error ? invalidMessage : helperText}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type FormEvent } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import { MonthSelector } from '../../features/settlement/MonthSelector';
@@ -59,6 +59,52 @@ describe('ExactDateTimeField', () => {
 
     expect(input).toHaveValue('2365');
     expect(screen.getByText('Nieprawidłowa godzina')).toBeInTheDocument();
+  });
+
+  it.each([
+    ['1408', '14:08'],
+    ['20', '20:00'],
+    ['1501', '15:01'],
+  ])('normalizes time shorthand %s on Enter', (shorthand, expected) => {
+    render(<TimeHarness />);
+    const input = screen.getByLabelText('Godzina');
+
+    fireEvent.change(input, { target: { value: shorthand } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(input).toHaveValue(expected);
+    expect(screen.getByTestId('time-value')).toHaveTextContent(expected);
+  });
+
+  it('normalizes date shorthand on Enter', () => {
+    render(<DateHarness />);
+    const input = screen.getByLabelText('Data');
+
+    fireEvent.change(input, { target: { value: '2507' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    const expectedYear = new Date().getFullYear();
+    expect(input).toHaveValue(`25.07.${expectedYear}`);
+    expect(screen.getByTestId('date-value')).toHaveTextContent(
+      `${expectedYear}-07-25`,
+    );
+  });
+
+  it('keeps an invalid value visible and prevents form submission on Enter', () => {
+    const onSubmit = vi.fn((event: FormEvent) => event.preventDefault());
+    render(
+      <form onSubmit={onSubmit}>
+        <TimeHarness />
+      </form>,
+    );
+    const input = screen.getByLabelText('Godzina');
+
+    fireEvent.change(input, { target: { value: '2365' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+
+    expect(input).toHaveValue('2365');
+    expect(screen.getByText('Nieprawidłowa godzina')).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
   });
 
   it('normalizes date shorthand and keeps full dates in localized display', () => {

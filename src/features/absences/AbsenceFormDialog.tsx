@@ -13,6 +13,8 @@ import {
   Typography,
 } from '@mui/material';
 
+import { AbsenceMenuItem } from '../../components/absences/AbsenceOptionContent';
+import { ABSENCE_SELECT_MENU_PROPS } from '../../components/absences/absenceSelect';
 import { ExactDateField } from '../../components/forms/ExactDateTimeField';
 import { useTranslations } from '../../hooks/useTranslations';
 import {
@@ -177,11 +179,16 @@ export function AbsenceFormDialog({
               onChange={handleChange('absenceCode')}
               error={Boolean(errors.absenceCode)}
               helperText={messageFor(errors.absenceCode)}
+              slotProps={{
+                select: { MenuProps: ABSENCE_SELECT_MENU_PROPS },
+              }}
             >
               {ABSENCE_CODES.map((code) => (
-                <MenuItem key={code} value={code}>
-                  {code === 'UZ' ? t.absences.types.UZ : code}
-                </MenuItem>
+                <AbsenceMenuItem
+                  key={code}
+                  code={code}
+                  description={t.absences.typeDescriptions[code]}
+                />
               ))}
             </TextField>
             <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>

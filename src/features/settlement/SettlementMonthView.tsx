@@ -20,6 +20,8 @@ import {
   Typography,
 } from '@mui/material';
 
+import { AbsenceMenuItem } from '../../components/absences/AbsenceOptionContent';
+import { ABSENCE_SELECT_MENU_PROPS } from '../../components/absences/absenceSelect';
 import { useTranslations } from '../../hooks/useTranslations';
 import { useNotification } from '../../hooks/useNotification';
 import { interpolate } from '../../i18n/pl';
@@ -582,14 +584,20 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
                   onChange={(event) => setCalendarFilter(event.target.value)}
                   size="small"
                   sx={{ minWidth: { md: 190 } }}
+                  slotProps={{
+                    select: { MenuProps: ABSENCE_SELECT_MENU_PROPS },
+                  }}
                 >
                   <MenuItem value="all">
                     {t.settlement.constructor.filters.all}
                   </MenuItem>
-                  <MenuItem value="L4">L4</MenuItem>
-                  <MenuItem value="UW">UW</MenuItem>
-                  <MenuItem value="UZ">{t.absences.types.UZ}</MenuItem>
-                  <MenuItem value="NN">NN</MenuItem>
+                  {(['L4', 'UW', 'UZ', 'NN'] as const).map((code) => (
+                    <AbsenceMenuItem
+                      key={code}
+                      code={code}
+                      description={t.absences.typeDescriptions[code]}
+                    />
+                  ))}
                   <MenuItem value="conflicts">
                     {t.settlement.constructor.filters.conflicts}
                   </MenuItem>

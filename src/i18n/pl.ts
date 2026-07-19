@@ -956,6 +956,17 @@ export const pl = {
       KRW: 'Krwiodawstwo',
       WZN: 'Wezwanie / zwolnienie',
     },
+    typeDescriptions: {
+      L4: 'Zwolnienie lekarskie',
+      UW: 'Urlop wypoczynkowy',
+      UZ: 'Urlop na żądanie',
+      NN: 'Nieobecność nieusprawiedliwiona',
+      NU: 'Nieobecność usprawiedliwiona',
+      NI: 'Nieobecność do wyjaśnienia',
+      OPD: 'Opieka nad dzieckiem',
+      KRW: 'Krwiodawstwo',
+      WZN: 'Wezwanie / zwolnienie',
+    },
     status: {
       ACTIVE: 'Aktywna',
       CANCELLED: 'Anulowana',
@@ -2001,6 +2012,8 @@ export const pl = {
         'Ręczne L4 zostanie zapisane jako „Zgłoszone” i będzie wymagało potwierdzenia importem ZUS.',
       workTime: {
         title: 'Korekta czasu pracy',
+        planSummary: 'Plan dnia',
+        resultSummary: 'Podsumowanie czasu pracy',
         plannedShift: 'Planowana zmiana',
         planDetails: 'Planowane: {{start}}–{{end}}, {{hours}} h.',
         plannedInterval: 'Plan: {{start}}–{{end}}',
@@ -2010,6 +2023,20 @@ export const pl = {
         invalidTime: 'Wprowadź godzinę w formacie GG:MM.',
         unresolvedShift:
           'Nie udało się ustalić zmiany dla tego dnia. Wybierz zmianę przed zapisem; system nie zgaduje jej automatycznie.',
+        metrics: {
+          worked: 'Przepracowane',
+          shortage: 'Czas prywatny / niedoczas',
+          overtime50: 'Nadgodziny 50%',
+          overtime100: 'Nadgodziny 100%',
+          night: 'Godziny nocne',
+        },
+        interpretationLabel: 'Interpretacja',
+        interpretation: {
+          matches: 'Zgodne z planem',
+          overtime: 'Praca dłuższa niż plan',
+          shortage: 'Praca krótsza niż plan',
+          review: 'Wymaga weryfikacji',
+        },
         preview:
           'Rozbicie: praca normalna {{normal}} h, czas prywatny {{private}} h, nadgodziny 50% {{overtime50}} h, nadgodziny 100% {{overtime100}} h.',
         previewExtended:
