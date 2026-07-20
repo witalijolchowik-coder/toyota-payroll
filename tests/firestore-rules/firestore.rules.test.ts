@@ -567,6 +567,7 @@ describe('Firestore security rules', () => {
   });
 
   it('allows employee assignment history create and safe closure', async () => {
+    await seedEmployee('employee-1');
     const uid = 'coordinator-1';
     const firestore = testEnvironment.authenticatedContext(uid).firestore();
     const assignment = doc(firestore, 'employeeAssignments/assignment-1');
@@ -603,6 +604,7 @@ describe('Firestore security rules', () => {
   });
 
   it('rejects invalid employee assignment edits', async () => {
+    await seedEmployee('employee-1');
     const uid = 'coordinator-1';
     const firestore = testEnvironment.authenticatedContext(uid).firestore();
     const assignment = doc(firestore, 'employeeAssignments/assignment-invalid');
