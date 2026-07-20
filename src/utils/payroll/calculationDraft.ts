@@ -26,12 +26,6 @@ import {
   type PayrollCalendarOptions,
 } from './calendar';
 import type { EmployeeSettlementEntitlements } from './employeeEntitlements';
-import {
-  calculateEmployeeNominalHours,
-  employeeParticipatesInPayrollMonth,
-  isDateWithinEmploymentPeriod,
-  type EmploymentPeriod,
-} from './employment';
 import { dateToIsoDate, getPayrollMonthDateRange } from './month';
 import { baseSalaryForFirstToyotaEmploymentDate } from './employeeReadiness';
 import { resolveEffectivePayrollSetting } from './settings';
@@ -44,6 +38,12 @@ import {
 } from './workTimeDeviations';
 import type { PlannedScheduleDay } from '../schedule';
 import { calculateHousingDeposit } from './allowances';
+import {
+  activeContracts,
+  employeeContractsOverlapRange,
+  isDateCoveredByContracts,
+  latestEmploymentEnd,
+} from '../employees';
 
 export type PayrollDraftWarningCode =
   | 'employee-not-participating'
@@ -235,10 +235,22 @@ export interface MonthlyCalculationDraftsInput extends Omit<
 const APPROVED_ABSENCE_CODES = new Set(['UW', 'UZ', 'OPD', 'KRW', 'WZN']);
 const VACATION_ABSENCE_CODES = new Set(['UW', 'UZ']);
 
-function employmentPeriod(employee: Employee): EmploymentPeriod {
+function contractEmploymentForMonth(employee: Employee, monthId: MonthId) {
+  const range = getPayrollMonthDateRange(monthId);
+  const start = dateToIsoDate(range.start);
+  const end = dateToIsoDate(range.end);
+  const overlapping = activeContracts(employee).filter(
+    (contract) =>
+      contract.startDate <= end &&
+      (!contract.endDate || contract.endDate >= start),
+  );
   return {
-    employmentStart: employee.employmentStartDate,
-    employmentEnd: employee.employmentEndDate,
+    employmentStart: overlapping.length
+      ? new Date(`${overlapping[0]!.startDate}T00:00:00.000Z`)
+      : null,
+    employmentEnd: overlapping.at(-1)?.endDate
+      ? new Date(`${overlapping.at(-1)!.endDate}T00:00:00.000Z`)
+      : null,
   };
 }
 
@@ -357,27 +369,27 @@ function countCalendarDaysInclusive(startDate: IsoDate, endDate: IsoDate) {
 
 function countEligibleWorkingDays({
   monthId,
-  employment,
+  employee,
   calendarOptions,
 }: {
   monthId: MonthId;
-  employment: EmploymentPeriod;
+  employee: Employee;
   calendarOptions: PayrollCalendarOptions;
 }) {
   return createPayrollMonthCalendar(monthId, calendarOptions).filter(
     (day) =>
-      day.isWorkingDay && isDateWithinEmploymentPeriod(day.isoDate, employment),
+      day.isWorkingDay && isDateCoveredByContracts(employee, day.isoDate),
   ).length;
 }
 
 function calculateAbsencePeriods({
   monthId,
-  employment,
+  employee,
   absences,
   calendarOptions,
 }: {
   monthId: MonthId;
-  employment: EmploymentPeriod;
+  employee: Employee;
   absences: readonly Absence[];
   calendarOptions: PayrollCalendarOptions;
 }): PayrollDraftAbsencePeriod[] {
@@ -402,7 +414,7 @@ function calculateAbsencePeriods({
           day.isoDate >= overlap.start &&
           day.isoDate <= overlap.end &&
           day.isWorkingDay &&
-          isDateWithinEmploymentPeriod(day.isoDate, employment),
+          isDateCoveredByContracts(employee, day.isoDate),
       ).length;
 
       return {
@@ -451,13 +463,16 @@ function calculateCompanyAccommodationDeduction({
   const range = getPayrollMonthDateRange(monthId);
   const monthStart = dateToIsoDate(range.start);
   const monthEnd = dateToIsoDate(range.end);
+  const monthEmployment = contractEmploymentForMonth(employee, monthId);
   const contractStart = dateToIsoDate(
-    assignment.contractStartDate ?? employee.employmentStartDate ?? range.start,
+    assignment.contractStartDate ??
+      monthEmployment.employmentStart ??
+      range.start,
   );
   const contractEnd = assignment.contractEndDate
     ? dateToIsoDate(assignment.contractEndDate)
-    : employee.employmentEndDate
-      ? dateToIsoDate(employee.employmentEndDate)
+    : monthEmployment.employmentEnd
+      ? dateToIsoDate(monthEmployment.employmentEnd)
       : monthEnd;
   const overlap = overlapIsoRange(
     contractStart,
@@ -521,10 +536,13 @@ export function calculateEmployeeMonthlyDraft({
   depositReturnOverride = null,
 }: MonthlyCalculationDraftInput): EmployeeMonthlyCalculationDraft {
   const range = getPayrollMonthDateRange(monthId);
-  const employment = employmentPeriod(employee);
-  const participatesInMonth = employeeParticipatesInPayrollMonth(
-    employment,
-    range,
+  const employment = contractEmploymentForMonth(employee, monthId);
+  const monthStart = dateToIsoDate(range.start);
+  const monthEnd = dateToIsoDate(range.end);
+  const participatesInMonth = employeeContractsOverlapRange(
+    employee,
+    monthStart,
+    monthEnd,
   );
   const individualNominalHours = plannedSchedule
     ? plannedSchedule.reduce(
@@ -535,16 +553,21 @@ export function calculateEmployeeMonthlyDraft({
             : 0),
         0,
       )
-    : calculateEmployeeNominalHours(monthId, employment, calendarOptions);
+    : createPayrollMonthCalendar(monthId, calendarOptions)
+        .filter(
+          (day) =>
+            day.isWorkingDay && isDateCoveredByContracts(employee, day.isoDate),
+        )
+        .reduce((total) => total + STANDARD_WORKING_DAY_HOURS, 0);
   const fullCalendarMonth =
     participatesInMonth &&
     individualNominalHours > 0 &&
-    employee.employmentStartDate !== null &&
-    employee.employmentStartDate <= range.start &&
-    (!employee.employmentEndDate || employee.employmentEndDate >= range.end);
+    createPayrollMonthCalendar(monthId, calendarOptions).every((day) =>
+      isDateCoveredByContracts(employee, day.isoDate),
+    );
 
   const warnings: PayrollDraftWarning[] = [];
-  if (!employee.employmentStartDate) {
+  if (activeContracts(employee).length === 0) {
     warnings.push(warning('missing-employment-start'));
   }
   if (!employee.tetaNumber.trim()) {
@@ -625,9 +648,9 @@ export function calculateEmployeeMonthlyDraft({
         : day.isWorkingDay
           ? STANDARD_WORKING_DAY_HOURS
           : 0;
-      const isWithinEmployment = isDateWithinEmploymentPeriod(
+      const isWithinEmployment = isDateCoveredByContracts(
+        employee,
         day.isoDate,
-        employment,
       );
       const persistedValue = dailyValuesByDate.get(day.isoDate);
       const absenceResolution = resolveGoverningAbsence(
@@ -783,10 +806,11 @@ export function calculateEmployeeMonthlyDraft({
           'status' in day
             ? day.status === 'WORKING' || day.status === 'BHP'
             : day.isWorkingDay &&
-              isDateWithinEmploymentPeriod(day.isoDate, employment),
+              isDateCoveredByContracts(employee, day.isoDate),
         )
         .map((day) => ('isoDate' in day ? day.isoDate : day.date)),
     ),
+    thresholdScale: frequencySetting?.thresholdScale,
   });
   if (!frequencySetting) {
     warnings.push(warning('unresolved-frequency-bonus-setting'));
@@ -794,13 +818,13 @@ export function calculateEmployeeMonthlyDraft({
   const frequencyAmount = frequencySetting ? frequencyRule.amount : null;
   const absencePeriods = calculateAbsencePeriods({
     monthId,
-    employment,
+    employee,
     absences: payrollEffectiveAbsences,
     calendarOptions,
   });
   const eligibleWorkingDays = countEligibleWorkingDays({
     monthId,
-    employment,
+    employee,
     calendarOptions,
   });
   const monthWorkingDays = createPayrollMonthCalendar(
@@ -980,9 +1004,7 @@ export function calculateEmployeeMonthlyDraft({
     episodeEnd: entitlements?.companyAccommodation?.contractEndDate
       ? dateToIsoDate(entitlements.companyAccommodation.contractEndDate)
       : null,
-    employmentEnd: employee.employmentEndDate
-      ? dateToIsoDate(employee.employmentEndDate)
-      : null,
+    employmentEnd: latestEmploymentEnd(employee)?.endDate ?? null,
     configuredAmount: depositSetting?.amount ?? null,
     returnOverride: depositReturnOverride,
   });
@@ -1014,8 +1036,8 @@ export function calculateEmployeeMonthlyDraft({
     tetaNumber: employee.tetaNumber,
     monthId,
     employment: {
-      employmentStart: employee.employmentStartDate,
-      employmentEnd: employee.employmentEndDate,
+      employmentStart: employment.employmentStart,
+      employmentEnd: employment.employmentEnd,
       participatesInMonth,
       fullCalendarMonth,
       individualNominalHours,

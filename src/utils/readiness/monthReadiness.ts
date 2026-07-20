@@ -15,14 +15,21 @@ import type {
 import { PAYROLL_SETTING_KEYS } from '../../types/firestore';
 import {
   employeeEntitlementsOverlap,
-  employeeParticipatesInPayrollMonth,
   createPayrollMonthCalendar,
   getPayrollMonthDateRange,
+  dateToIsoDate,
   resolveEffectivePayrollSetting,
   hasCurrentStatusConflict,
   requiredEmployeeDocumentIssues,
   resolveDailyWorkTimeDeviation,
 } from '../payroll';
+import {
+  activeContracts,
+  calculateEmploymentLimit,
+  contractBreakDays,
+  employeeContractsOverlapRange,
+  requiresContractDecision,
+} from '../employees';
 import { generateEmployeeMonthlySchedule } from '../schedule';
 
 export type ReadinessSeverity = 'blocking' | 'warning' | 'optional' | 'info';
@@ -38,6 +45,11 @@ export type ReadinessIssueCode =
   | 'employee-missing-passport'
   | 'employee-missing-first-toyota-employment-date'
   | 'employee-current-status-conflict'
+  | 'employee-contract-invalid'
+  | 'employee-contract-overlap'
+  | 'employee-contract-decision-required'
+  | 'employee-contract-gap'
+  | 'employee-employment-limit-approaching'
   | 'unconfirmed-reported-l4'
   | 'employee-missing-department'
   | 'employee-missing-shift'
@@ -111,12 +123,11 @@ function employeeName(employee: Employee): string {
 }
 
 function employeeParticipates(employee: Employee, monthId: MonthId): boolean {
-  return employeeParticipatesInPayrollMonth(
-    {
-      employmentStart: employee.employmentStartDate,
-      employmentEnd: employee.employmentEndDate,
-    },
-    getPayrollMonthDateRange(monthId),
+  const range = getPayrollMonthDateRange(monthId);
+  return employeeContractsOverlapRange(
+    employee,
+    dateToIsoDate(range.start),
+    dateToIsoDate(range.end),
   );
 }
 
@@ -211,7 +222,8 @@ export function assessMonthReadiness({
       employeeName: employeeName(employee),
     };
 
-    if (!employee.employmentStartDate) {
+    const contracts = activeContracts(employee);
+    if (contracts.length === 0) {
       addIssue(summary, {
         ...baseIssue,
         code: 'employee-missing-employment-start',
@@ -221,10 +233,69 @@ export function assessMonthReadiness({
       return;
     }
 
+    const invalidContract = contracts.find(
+      (contract) =>
+        Boolean(contract.endDate) && contract.endDate! < contract.startDate,
+    );
+    if (invalidContract) {
+      addIssue(summary, {
+        ...baseIssue,
+        code: 'employee-contract-invalid',
+        severity: 'blocking',
+        target: 'employees',
+        context: invalidContract.id,
+      });
+    }
+    contracts.slice(1).forEach((contract, index) => {
+      const previous = contracts[index]!;
+      if (!previous.endDate || contract.startDate <= previous.endDate) {
+        addIssue(summary, {
+          ...baseIssue,
+          code: 'employee-contract-overlap',
+          severity: 'blocking',
+          target: 'employees',
+          context: `${previous.id}:${contract.id}`,
+        });
+      } else {
+        const breakDays = contractBreakDays(previous, contract);
+        if (breakDays > 0) {
+          addIssue(summary, {
+            ...baseIssue,
+            code: 'employee-contract-gap',
+            severity: 'warning',
+            target: 'employees',
+            context: String(breakDays),
+          });
+        }
+      }
+    });
+    if (requiresContractDecision(employee, today)) {
+      addIssue(summary, {
+        ...baseIssue,
+        code: 'employee-contract-decision-required',
+        severity: 'warning',
+        target: 'employees',
+      });
+    }
+
     if (!employeeParticipates(employee, monthId)) {
       return;
     }
     summary.participants += 1;
+
+    const employmentLimit = calculateEmploymentLimit(employee, today);
+    if (
+      employmentLimit.remainingDays > 0 &&
+      employmentLimit.remainingDays <= 31
+    ) {
+      addIssue(summary, {
+        ...baseIssue,
+        code: 'employee-employment-limit-approaching',
+        severity: 'warning',
+        target: 'employees',
+        context: String(employmentLimit.remainingDays),
+      });
+    }
 
     if (!employee.tetaNumber.trim()) {
       addIssue(summary, {

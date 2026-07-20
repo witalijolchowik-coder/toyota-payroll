@@ -207,6 +207,9 @@ export const pl = {
       title: 'Nadchodzące terminy',
       description: 'Najbliższe umowy i badania w ciągu 30 dni.',
       contract: 'Koniec zatrudnienia',
+      decisionRequired: 'Umowa zakończona — brak decyzji',
+      oneDay: 'Pozostał 1 dzień',
+      daysLeft: 'Pozostały {{count}} dni',
       medical: 'Ważność badania lekarskiego',
       empty: 'Brak terminów w ciągu najbliższych 30 dni.',
       open: 'Zobacz wszystkie terminy',
@@ -335,6 +338,14 @@ export const pl = {
           'Brakuje daty pierwszego zatrudnienia w Toyota.',
         'employee-current-status-conflict':
           'Aktualny status techniczny jest sprzeczny z okresem zatrudnienia.',
+        'employee-contract-invalid': 'Umowa ma nieprawidłowy zakres dat.',
+        'employee-contract-overlap': 'Okresy umów pracownika nakładają się.',
+        'employee-contract-decision-required':
+          'Umowa zakończyła się — dodaj kolejną umowę albo zakończ zatrudnienie.',
+        'employee-contract-gap':
+          'Historia umów zawiera rzeczywistą przerwę w zatrudnieniu.',
+        'employee-employment-limit-approaching':
+          'Zbliża się koniec bieżącego 18-miesięcznego limitu zatrudnienia.',
         'unconfirmed-reported-l4':
           'Zgłoszone L4 nie zostało jeszcze potwierdzone raportem ZUS.',
         'employee-missing-department': 'Pracownik nie ma przypisanego działu.',
@@ -566,6 +577,52 @@ export const pl = {
       updated: 'Dane pracownika zostały zapisane.',
       deactivated: 'Pracownik został dezaktywowany.',
     },
+    contracts: {
+      title: 'Umowy',
+      add: 'Dodaj umowę',
+      addNext: 'Dodaj kolejną umowę',
+      edit: 'Edytuj umowę',
+      remove: 'Usuń błędną umowę',
+      from: 'Data od',
+      to: 'Data do',
+      status: 'Status',
+      continuity: 'Ciągłość',
+      actions: 'Działania',
+      note: 'Powód lub notatka',
+      reason: 'Powód zakończenia zatrudnienia',
+      save: 'Zapisz umowę',
+      cancel: 'Anuluj',
+      close: 'Zamknij',
+      openEnded: 'bezterminowo',
+      continuous: 'Ciągłość zatrudnienia',
+      break: 'Przerwa w zatrudnieniu',
+      days: 'dni',
+      decisionRequired: 'Umowa zakończona — brak decyzji.',
+      legacyInfo:
+        'Daty zatrudnienia pochodzą ze starszego rekordu. Przenieś je jednorazowo do historii umów.',
+      migrate: 'Utwórz historię umów',
+      endEmployment: 'Zakończ zatrudnienie',
+      endEmploymentDate: 'Ostatni dzień zatrudnienia',
+      validation:
+        'Popraw zakres umowy. Umowy nie mogą się pokrywać ani powtarzać.',
+      error: 'Nie udało się zapisać historii umów.',
+      editImpact: 'Wpływ korekty umowy',
+      cancellationImpact: 'Wpływ anulowania błędnej umowy',
+      openMonths: 'Otwarte miesiące do ponownego przeliczenia',
+      lockedMonths: 'Zablokowane miesiące',
+      none: 'brak',
+      unlockRequired:
+        'Zmiana jest zablokowana. Najpierw odblokuj wskazane miesiące.',
+      recalculationQueued:
+        'Po zapisie otwarte miesiące zostaną automatycznie skierowane do ponownego przeliczenia.',
+      confirmCancellation: 'Potwierdź anulowanie umowy',
+      statuses: {
+        FUTURE: 'Przyszła',
+        CURRENT: 'Aktualna',
+        ENDED: 'Zakończona',
+        CANCELLED: 'Anulowana',
+      },
+    },
     accommodation: {
       companyActive: 'Zakwaterowanie firmowe aktywne',
       companyInactive: 'Brak zakwaterowania firmowego',
@@ -745,6 +802,8 @@ export const pl = {
           'Data zakończenia zatrudnienia jest nieprawidłowa.',
         'invalid-date-range':
           'Data zakończenia nie może być wcześniejsza niż data rozpoczęcia.',
+        'contract-history-update-required':
+          'Daty umowy zmieniaj w historii umów pracownika. Import zbiorczy nie może nadpisać historii zatrudnienia.',
         'duplicate-teta-in-file': 'Ten numer TETA powtarza się w pliku.',
         'existing-teta':
           'Pracownik z tym numerem TETA już istnieje — import go nie nadpisze.',
@@ -1259,6 +1318,7 @@ export const pl = {
     },
     settingForm: {
       title: 'Dodaj wersję ustawienia',
+      editTitle: 'Edytuj wersję ustawienia',
       versionInfo:
         'Nowa wersja nie zmienia wcześniejszych okresów. Dla miesiąca zostanie użyta najnowsza obowiązująca wersja.',
       saveFailed:
@@ -1274,6 +1334,10 @@ export const pl = {
       net: 'Netto',
       invalidAmount: 'Wprowadź nieujemną kwotę.',
       amountHelper: 'Wartość może zawierać część dziesiętną.',
+      frequencyScale: 'Skala premii według dni L4',
+      frequencyFourOrMore: '4+ L4',
+      frequencyScaleHelper:
+        'Podaj kwotę premii dla 0, 1, 2, 3 oraz 4 lub więcej dni L4.',
       validFrom: 'Obowiązuje od',
       validTo: 'Obowiązuje do',
       invalidRange: 'Koniec nie może poprzedzać początku.',
@@ -1281,12 +1345,20 @@ export const pl = {
       description: 'Opis',
       cancel: 'Anuluj',
       save: 'Dodaj wersję',
+      saveEdit: 'Zapisz wersję',
       preview: 'Sprawdź wpływ',
       impactTitle: 'Wpływ na istniejące wersje',
       impactDescription:
         'Po potwierdzeniu poprzednia wersja zostanie zakończona w ostatnim dniu poprzedniego miesiąca.',
       complexOverlap:
         'Zmiana dotyka kilku wersji. Najpierw uporządkuj zakresy lub zakończ kolidujące wersje.',
+      editImpactTitle: 'Wpływ edycji wersji',
+      currentValues: 'Obecne wartości',
+      proposedValues: 'Proponowane wartości',
+      openMonths: 'Otwarte miesiące do automatycznego przeliczenia',
+      lockedMonths: 'Zablokowane miesiące',
+      overlappingVersions: 'Kolidujące wersje',
+      none: 'brak',
       options: {
         frequencyBonus: 'Premia frekwencyjna',
         transport: 'Dodatek transportowy',
@@ -1307,6 +1379,7 @@ export const pl = {
     },
     versionActions: {
       actions: 'Działania',
+      edit: 'Edytuj',
       end: 'Zakończ obowiązywanie',
       cancel: 'Anuluj wersję',
       endPrompt: 'Podaj ostatni miesiąc obowiązywania w formacie RRRR-MM.',
@@ -1314,6 +1387,8 @@ export const pl = {
         'Anulować tę przyszłą wersję? Dokument pozostanie w historii.',
       ended: 'Okres obowiązywania wersji został zakończony.',
       cancelled: 'Przyszła wersja została anulowana.',
+      edited:
+        'Wersja została zaktualizowana. Otwarte miesiące zostały oznaczone do automatycznego przeliczenia.',
     },
     shiftsAndSchedules: {
       title: 'Zmiany i grafiki',

@@ -1,4 +1,9 @@
 import type { Employee } from '../../types/firestore';
+import {
+  calculateEmploymentLimit,
+  resolveCurrentContract,
+  resolveLatestContract,
+} from './employeeContracts';
 
 const FIRST_EMPLOYMENT_LIMIT_MONTHS = 18;
 
@@ -30,8 +35,21 @@ export function calculateFirstEmploymentLimit(
 }
 
 export function resolveCurrentEmploymentPeriod(
-  employee: Pick<Employee, 'employmentStartDate' | 'employmentEndDate'>,
+  employee: Pick<
+    Employee,
+    'contracts' | 'employmentStartDate' | 'employmentEndDate'
+  >,
 ): ResolvedEmploymentPeriod | null {
+  const contract =
+    resolveCurrentContract(employee) ?? resolveLatestContract(employee);
+  if (contract) {
+    return {
+      startDate: new Date(`${contract.startDate}T00:00:00.000Z`),
+      endDate: contract.endDate
+        ? new Date(`${contract.endDate}T00:00:00.000Z`)
+        : null,
+    };
+  }
   if (!employee.employmentStartDate) {
     return null;
   }
@@ -39,6 +57,19 @@ export function resolveCurrentEmploymentPeriod(
     startDate: employee.employmentStartDate,
     endDate: employee.employmentEndDate,
   };
+}
+
+export function calculateProjectedEmploymentLimit(
+  employee: Pick<
+    Employee,
+    'contracts' | 'employmentStartDate' | 'employmentEndDate'
+  >,
+  today = new Date(),
+): Date | null {
+  const result = calculateEmploymentLimit(employee, today);
+  return result.projectedLimitDate
+    ? new Date(`${result.projectedLimitDate}T00:00:00.000Z`)
+    : null;
 }
 
 export function formatPolishDate(value: Date): string {

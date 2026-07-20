@@ -45,6 +45,24 @@ export interface EmployeeCreateInput {
 
 export type EmployeeUpdateInput = Partial<EmployeeCreateInput>;
 
+export interface EmployeeContractCreateInput extends EmployeeReferenceInput {
+  sequenceId: string;
+  startDate: IsoDate;
+  endDate: IsoDate | null;
+  note: string | null;
+}
+
+export type EmployeeContractUpdateInput = Pick<
+  EmployeeContractCreateInput,
+  'startDate' | 'endDate' | 'note'
+>;
+
+export interface EmploymentEndCreateInput extends EmployeeReferenceInput {
+  sequenceId: string;
+  endDate: IsoDate;
+  reason: string | null;
+}
+
 export interface MonthCreateInput {
   year: number;
   month: number;
@@ -165,11 +183,20 @@ export interface PayrollSettingCreateInput {
   variantKey: string | null;
   variantName: string | null;
   amount: number;
+  thresholdScale?: {
+    0: number;
+    1: number;
+    2: number;
+    3: number;
+    4: number;
+  } | null;
   taxType?: PayrollSettingTaxType;
   validFrom: MonthId;
   validTo: MonthId | null;
   description: string;
 }
+
+export type PayrollSettingUpdateInput = PayrollSettingCreateInput;
 
 export interface AdjustmentCreateInput extends EmployeeReferenceInput {
   category: AdjustmentCategory;

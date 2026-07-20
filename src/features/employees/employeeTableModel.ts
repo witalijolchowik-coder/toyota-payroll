@@ -1,6 +1,8 @@
 import type { Department, Employee } from '../../types/firestore';
-import { resolveCurrentEmploymentPeriod } from '../../utils/employees';
-import { dateToIsoDate, isEmployeeActiveOnDate } from '../../utils/payroll';
+import {
+  isEmployeeArchived,
+  resolveCurrentEmploymentPeriod,
+} from '../../utils/employees';
 
 export type EmployeeListMode = 'active' | 'archive';
 export type EmployeeSortKey =
@@ -33,12 +35,9 @@ export function employeeMatchesListMode(
   today: Date,
 ): boolean {
   if (mode === 'active') {
-    return isEmployeeActiveOnDate(employee, today);
+    return !isEmployeeArchived(employee, today);
   }
-  return Boolean(
-    employee.employmentEndDate &&
-    dateToIsoDate(employee.employmentEndDate) < dateToIsoDate(today),
-  );
+  return isEmployeeArchived(employee, today);
 }
 
 export function nextEmployeeSort(

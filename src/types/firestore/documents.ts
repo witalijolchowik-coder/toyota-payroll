@@ -14,6 +14,8 @@ export type EmployeeColorShift = 'RED' | 'WHITE' | 'BLUE';
 export type ActualWorkingShift = 'FIRST' | 'SECOND' | 'NIGHT';
 export type DepartmentShiftMode = 'UNKNOWN' | 'TWO_SHIFT' | 'THREE_SHIFT';
 export type EmployeeAssignmentStatus = 'ACTIVE' | 'CANCELLED';
+export type EmployeeContractStatus = 'ACTIVE' | 'CANCELLED';
+export type EmploymentEndEventStatus = 'ACTIVE' | 'CANCELLED';
 export type ScheduleCorrectionStatus = 'ACTIVE' | 'CANCELLED';
 export type ShiftConfigurationStatus = 'ACTIVE' | 'CANCELLED';
 export type ScheduleCorrectionKind =
@@ -61,6 +63,23 @@ export interface EmployeeDocument extends ModificationMetadataDocument {
   shift_assignment?: EmployeeColorShift | null;
   employment_start_date: Timestamp | null;
   employment_end_date: Timestamp | null;
+}
+
+export interface EmployeeContractDocument
+  extends EmployeeReferenceDocument, ModificationMetadataDocument {
+  sequence_id: string;
+  start_date: IsoDate;
+  end_date: IsoDate | null;
+  status: EmployeeContractStatus;
+  note: string | null;
+}
+
+export interface EmploymentEndEventDocument
+  extends EmployeeReferenceDocument, ModificationMetadataDocument {
+  sequence_id: string;
+  end_date: IsoDate;
+  status: EmploymentEndEventStatus;
+  reason: string | null;
 }
 
 export interface DepartmentDocument extends ModificationMetadataDocument {
@@ -274,6 +293,13 @@ export interface PayrollSettingDocument extends ModificationMetadataDocument {
   variant_key: string | null;
   variant_name: string | null;
   amount: number;
+  threshold_scale: {
+    0: number;
+    1: number;
+    2: number;
+    3: number;
+    4: number;
+  } | null;
   tax_type: PayrollSettingTaxType;
   valid_from: MonthId;
   valid_to: MonthId | null;

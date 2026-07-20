@@ -1,6 +1,5 @@
 import {
   Timestamp,
-  addDoc,
   doc,
   getDoc,
   getDocs,
@@ -30,7 +29,9 @@ import type {
 } from '../types/firestore';
 import {
   mapEmployeeAssignmentDocument,
+  mapEmployeeContractDocument,
   mapEmployeeDocument,
+  mapEmploymentEndEventDocument,
 } from './firestore/mappers';
 import { getFirestoreRepositories } from './firestoreService';
 import { appendAuditEntryToBatch, recordAuditEntry } from './auditService';
@@ -131,25 +132,65 @@ export function subscribeToEmployees(
       repositories.employees,
       orderBy('teta_number'),
     );
-    let unsubscribeSnapshot: Unsubscribe = () => undefined;
+    let unsubscribeEmployees: Unsubscribe = () => undefined;
+    let unsubscribeContracts: Unsubscribe = () => undefined;
+    let unsubscribeEnds: Unsubscribe = () => undefined;
+    let employeeDocuments: Employee[] = [];
+    let contracts = [] as ReturnType<typeof mapEmployeeContractDocument>[];
+    let endEvents = [] as ReturnType<typeof mapEmploymentEndEventDocument>[];
+
+    const emit = () => {
+      onEmployees(
+        employeeDocuments.map((employee) => ({
+          ...employee,
+          contracts: contracts.filter(
+            (contract) => contract.employeeId === employee.id,
+          ),
+          employmentEndEvents: endEvents.filter(
+            (event) => event.employeeId === employee.id,
+          ),
+        })),
+      );
+    };
 
     const unsubscribeAuth = onAuthStateChanged(
       auth,
       (user) => {
-        unsubscribeSnapshot();
+        unsubscribeEmployees();
+        unsubscribeContracts();
+        unsubscribeEnds();
         if (!user) {
           onError(new EmployeeServiceError('authentication-required'));
           return;
         }
 
-        unsubscribeSnapshot = onSnapshot(
+        unsubscribeEmployees = onSnapshot(
           employeesQuery,
           (snapshot) => {
-            onEmployees(
-              snapshot.docs.map((document) =>
-                mapEmployeeDocument(document.id, document.data()),
-              ),
+            employeeDocuments = snapshot.docs.map((document) =>
+              mapEmployeeDocument(document.id, document.data()),
             );
+            emit();
+          },
+          onError,
+        );
+        unsubscribeContracts = onSnapshot(
+          repositories.employeeContracts,
+          (snapshot) => {
+            contracts = snapshot.docs.map((document) =>
+              mapEmployeeContractDocument(document.id, document.data()),
+            );
+            emit();
+          },
+          onError,
+        );
+        unsubscribeEnds = onSnapshot(
+          repositories.employmentEndEvents,
+          (snapshot) => {
+            endEvents = snapshot.docs.map((document) =>
+              mapEmploymentEndEventDocument(document.id, document.data()),
+            );
+            emit();
           },
           onError,
         );
@@ -158,7 +199,9 @@ export function subscribeToEmployees(
     );
 
     return () => {
-      unsubscribeSnapshot();
+      unsubscribeEmployees();
+      unsubscribeContracts();
+      unsubscribeEnds();
       unsubscribeAuth();
     };
   } catch (error) {
@@ -176,7 +219,13 @@ export async function createEmployee(
 
   await assertUniqueActiveTeta(normalized);
 
-  const employee = await addDoc(repositories.employees, {
+  const employee = doc(repositories.employees);
+  const contract = normalized.employmentStartDate
+    ? doc(repositories.employeeContracts)
+    : null;
+  const assignment = doc(repositories.employeeAssignments);
+  const batch = writeBatch(repositories.employees.firestore);
+  batch.set(employee, {
     teta_number: normalized.tetaNumber,
     first_name: normalized.firstName,
     last_name: normalized.lastName,
@@ -205,17 +254,40 @@ export async function createEmployee(
     updated_by: actorUid,
   });
 
-  await createEmployeeAssignment({
-    employeeId: employee.id,
-    tetaNumber: normalized.tetaNumber,
-    departmentId: normalized.departmentId,
-    shiftAssignment: normalized.shiftAssignment,
-    validFrom: assignmentEffectiveDate(normalized),
-    validTo: null,
+  if (contract && normalized.employmentStartDate) {
+    batch.set(contract, {
+      employee_id: employee.id,
+      teta_number: normalized.tetaNumber,
+      sequence_id: `initial-${employee.id}`,
+      start_date: dateToIsoDate(normalized.employmentStartDate),
+      end_date: normalized.employmentEndDate
+        ? dateToIsoDate(normalized.employmentEndDate)
+        : null,
+      status: 'ACTIVE',
+      note: null,
+      created_at: serverTimestamp(),
+      created_by: actorUid,
+      updated_at: serverTimestamp(),
+      updated_by: actorUid,
+    });
+  }
+
+  batch.set(assignment, {
+    employee_id: employee.id,
+    teta_number: normalized.tetaNumber,
+    department_id: normalized.departmentId,
+    shift_assignment: normalized.shiftAssignment,
+    valid_from: assignmentEffectiveDate(normalized),
+    valid_to: null,
+    status: 'ACTIVE',
     note: null,
+    created_at: serverTimestamp(),
+    created_by: actorUid,
+    updated_at: serverTimestamp(),
+    updated_by: actorUid,
   });
 
-  await recordAuditEntry({
+  appendAuditEntryToBatch(batch, repositories, {
     entityPath: `employees/${employee.id}`,
     action: 'create',
     actorUid,
@@ -229,6 +301,7 @@ export async function createEmployee(
       shift_assignment: normalized.shiftAssignment,
     },
   });
+  await batch.commit();
 
   return employee.id;
 }
@@ -274,8 +347,8 @@ export async function updateEmployee(
     medical_examination_type: normalized.medicalExaminationType ?? null,
     department_id: normalized.departmentId,
     shift_assignment: normalized.shiftAssignment,
-    employment_start_date: timestampOrNull(normalized.employmentStartDate),
-    employment_end_date: timestampOrNull(normalized.employmentEndDate),
+    // Contract dates are managed in employeeContracts. Legacy fields are a
+    // derived compatibility snapshot and are not overwritten by profile edits.
     updated_at: serverTimestamp(),
     updated_by: actorUid,
   });
@@ -364,28 +437,6 @@ export async function deactivateEmployee(
     action: 'update',
     actorUid,
     changes: { operation: 'employee-deactivated', is_active: false },
-  });
-}
-
-async function createEmployeeAssignment(
-  input: EmployeeAssignmentCreateInput,
-): Promise<void> {
-  const actorUid = requireActorUid();
-  const repositories = requireRepositories();
-
-  await addDoc(repositories.employeeAssignments, {
-    employee_id: input.employeeId,
-    teta_number: input.tetaNumber,
-    department_id: input.departmentId,
-    shift_assignment: input.shiftAssignment,
-    valid_from: input.validFrom,
-    valid_to: input.validTo,
-    status: 'ACTIVE',
-    note: input.note,
-    created_at: serverTimestamp(),
-    created_by: actorUid,
-    updated_at: serverTimestamp(),
-    updated_by: actorUid,
   });
 }
 

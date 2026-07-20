@@ -448,30 +448,34 @@ export function EmployeeFormDialog({
                 invalidMessage={t.input.exactDateInvalid}
                 pickerLabel={t.input.openDatePicker}
               />
-              <ExactDateField
-                required
-                fullWidth
-                label={t.employees.form.employmentStartDate}
-                value={values.employmentStartDate}
-                onValueChange={handleValueChange('employmentStartDate')}
-                error={Boolean(errors.employmentStartDate)}
-                helperText={
-                  messageForError(errors.employmentStartDate) ??
-                  t.employees.form.employmentStartRequired
-                }
-                invalidMessage={t.input.exactDateInvalid}
-                pickerLabel={t.input.openDatePicker}
-              />
-              <ExactDateField
-                fullWidth
-                label={t.employees.form.employmentEndDate}
-                value={values.employmentEndDate}
-                onValueChange={handleValueChange('employmentEndDate')}
-                error={Boolean(errors.employmentEndDate)}
-                helperText={messageForError(errors.employmentEndDate)}
-                invalidMessage={t.input.exactDateInvalid}
-                pickerLabel={t.input.openDatePicker}
-              />
+              {!employee ? (
+                <>
+                  <ExactDateField
+                    required
+                    fullWidth
+                    label={t.employees.form.employmentStartDate}
+                    value={values.employmentStartDate}
+                    onValueChange={handleValueChange('employmentStartDate')}
+                    error={Boolean(errors.employmentStartDate)}
+                    helperText={
+                      messageForError(errors.employmentStartDate) ??
+                      t.employees.form.employmentStartRequired
+                    }
+                    invalidMessage={t.input.exactDateInvalid}
+                    pickerLabel={t.input.openDatePicker}
+                  />
+                  <ExactDateField
+                    fullWidth
+                    label={t.employees.form.employmentEndDate}
+                    value={values.employmentEndDate}
+                    onValueChange={handleValueChange('employmentEndDate')}
+                    error={Boolean(errors.employmentEndDate)}
+                    helperText={messageForError(errors.employmentEndDate)}
+                    invalidMessage={t.input.exactDateInvalid}
+                    pickerLabel={t.input.openDatePicker}
+                  />
+                </>
+              ) : null}
             </Stack>
           </Stack>
         </DialogContent>

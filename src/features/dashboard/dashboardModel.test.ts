@@ -233,6 +233,67 @@ describe('dashboardModel', () => {
     });
   });
 
+  it('shows the final-day countdown and one unresolved expired-contract decision', () => {
+    const endingTomorrow = employee('tomorrow', {
+      contracts: [
+        {
+          id: 'contract-tomorrow',
+          employeeId: 'tomorrow',
+          tetaNumber: 'WT-tomorrow',
+          sequenceId: 'sequence-tomorrow',
+          startDate: '2026-01-01',
+          endDate: '2026-07-18',
+          status: 'ACTIVE',
+          note: null,
+          createdAt: today,
+          createdBy: 'test',
+          updatedAt: today,
+          updatedBy: 'test',
+        },
+      ],
+    });
+    const unresolved = employee('unresolved', {
+      contracts: [
+        {
+          id: 'contract-unresolved',
+          employeeId: 'unresolved',
+          tetaNumber: 'WT-unresolved',
+          sequenceId: 'sequence-unresolved',
+          startDate: '2026-01-01',
+          endDate: '2026-07-16',
+          status: 'ACTIVE',
+          note: null,
+          createdAt: today,
+          createdBy: 'test',
+          updatedAt: today,
+          updatedBy: 'test',
+        },
+      ],
+    });
+    const snapshot = buildDashboardSnapshot({
+      employees: [endingTomorrow, unresolved],
+      departments: [],
+      entitlements: [],
+      currentAbsences: [],
+      selectedMonthAbsences: [],
+      readiness: null,
+      today,
+    });
+
+    expect(snapshot.deadlines).toEqual([
+      expect.objectContaining({
+        employee: unresolved,
+        remainingDays: -1,
+        decisionRequired: true,
+      }),
+      expect.objectContaining({
+        employee: endingTomorrow,
+        remainingDays: 1,
+        decisionRequired: false,
+      }),
+    ]);
+  });
+
   it('returns zero rotation when the month has no average headcount', () => {
     expect(
       calculateMonthlyRotation(

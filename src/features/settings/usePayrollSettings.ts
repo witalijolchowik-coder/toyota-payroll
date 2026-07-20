@@ -6,6 +6,8 @@ import {
   endPayrollSettingVersion,
   cancelFuturePayrollSettingVersion,
   loadPayrollSettings,
+  previewPayrollSettingVersionEdit,
+  updatePayrollSettingVersion,
 } from '../../services/payrollSettingsService';
 import type {
   PayrollSetting,
@@ -87,5 +89,31 @@ export function usePayrollSettings() {
     }
   };
 
-  return { ...state, createVersion, endVersion, cancelVersion, reload };
+  const updateVersion = async (
+    setting: PayrollSetting,
+    input: PayrollSettingCreateInput,
+  ) => {
+    showLoading();
+    try {
+      const impact = await updatePayrollSettingVersion(setting, input);
+      await reload();
+      return impact;
+    } finally {
+      hideLoading();
+    }
+  };
+  const previewVersion = (
+    setting: PayrollSetting,
+    input: PayrollSettingCreateInput,
+  ) => previewPayrollSettingVersionEdit(setting, input);
+
+  return {
+    ...state,
+    createVersion,
+    updateVersion,
+    previewVersion,
+    endVersion,
+    cancelVersion,
+    reload,
+  };
 }

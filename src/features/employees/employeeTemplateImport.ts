@@ -71,6 +71,7 @@ export type EmployeeTemplateWarningCode =
   | 'invalid-employment-start'
   | 'invalid-employment-end'
   | 'invalid-date-range'
+  | 'contract-history-update-required'
   | 'duplicate-teta-in-file'
   | 'existing-teta'
   | 'unknown-teta'
@@ -375,6 +376,13 @@ export function buildBulkEmployeeUpdatePreview(
         'employmentEndDate',
         'invalid-employment-end',
       );
+      if (
+        changes.some((change) =>
+          ['employmentStartDate', 'employmentEndDate'].includes(change.field),
+        )
+      ) {
+        warnings.push('contract-history-update-required');
+      }
       applyDepartmentUpdate(
         row,
         employee,
@@ -677,6 +685,7 @@ function resolveNewEmployeeTemplateStatus(
     'invalid-employment-start',
     'invalid-employment-end',
     'invalid-date-range',
+    'contract-history-update-required',
     'invalid-shift',
     'invalid-citizenship',
     'invalid-gender',

@@ -16,6 +16,7 @@ import {
   isPayrollWorkingDay,
 } from '../payroll';
 import { dateToIsoDate } from '../payroll/month';
+import { activeContracts, isDateCoveredByContracts } from '../employees';
 import {
   resolveDepartmentRotationShift,
   resolveShiftInterval,
@@ -173,14 +174,15 @@ export function getBhpIsoDates(
     overrides?: PayrollCalendarOverrideMap;
   } = {},
 ): Set<IsoDate> {
-  if (!employee.employmentStartDate || days.length === 0) {
+  const firstContract = activeContracts(employee)[0];
+  if (!firstContract || days.length === 0) {
     return new Set();
   }
 
   const result = new Set<IsoDate>();
   const firstDay = days[0].isoDate;
   const lastDay = days[days.length - 1].isoDate;
-  let cursor = dateToIsoDate(employee.employmentStartDate);
+  let cursor = firstContract.startDate;
   let safety = 0;
 
   while (cursor <= lastDay && result.size < 2 && safety < 90) {
@@ -462,14 +464,7 @@ function isDateWithinEmployeePeriod(
   employee: Employee,
   isoDate: IsoDate,
 ): boolean {
-  if (!employee.employmentStartDate) {
-    return false;
-  }
-  const start = dateToIsoDate(employee.employmentStartDate);
-  const end = employee.employmentEndDate
-    ? dateToIsoDate(employee.employmentEndDate)
-    : null;
-  return start <= isoDate && (!end || end >= isoDate);
+  return isDateCoveredByContracts(employee, isoDate);
 }
 
 function isoDateToDate(isoDate: IsoDate): Date {

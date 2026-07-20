@@ -4,8 +4,12 @@ This specification defines the employee data gate used before a payroll month ca
 
 ## Employment and current status
 
-- Payroll participation continues to use employment-period overlap with the selected month. `is_active` never determines historical participation.
-- The employee list may show the current state, derived from `employment_start` and `employment_end` for today. A conflicting stored `is_active` value is a data-quality warning.
+- Payroll participation uses the union of non-cancelled contract days that
+  overlap the selected month. `is_active` never determines historical
+  participation.
+- The employee list derives the current contract from contract history.
+  Contract expiry alone creates a decision-required state; only explicit
+  employment ending moves the employee to the archive after the final day.
 - TETA may be temporarily empty while a coordinator prepares the register, but it blocks month finalization and export readiness.
 - Department is mandatory for readiness and must be one of the canonical departments. Shift/color assignment remains optional; an unresolved generated schedule day blocks finalization.
 

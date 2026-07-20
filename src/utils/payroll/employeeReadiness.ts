@@ -3,6 +3,7 @@ import type {
   EmployeeCitizenship,
   IsoDate,
 } from '../../types/firestore';
+import { isDateCoveredByContracts } from '../employees';
 
 export const BASE_SALARY_TIERS = {
   throughSeptember2025: 5464,
@@ -18,24 +19,19 @@ function isoDate(value: Date): IsoDate {
 }
 
 export function isEmployeeActiveOnDate(
-  employee: Pick<Employee, 'employmentStartDate' | 'employmentEndDate'>,
+  employee: Pick<
+    Employee,
+    'contracts' | 'employmentStartDate' | 'employmentEndDate'
+  >,
   date: Date,
 ): boolean {
-  if (!employee.employmentStartDate) {
-    return false;
-  }
-  const candidate = isoDate(date);
-  return (
-    isoDate(employee.employmentStartDate) <= candidate &&
-    (!employee.employmentEndDate ||
-      isoDate(employee.employmentEndDate) >= candidate)
-  );
+  return isDateCoveredByContracts(employee, isoDate(date));
 }
 
 export function hasCurrentStatusConflict(
   employee: Pick<
     Employee,
-    'employmentStartDate' | 'employmentEndDate' | 'isActive'
+    'contracts' | 'employmentStartDate' | 'employmentEndDate' | 'isActive'
   >,
   today: Date,
 ): boolean {

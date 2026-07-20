@@ -85,6 +85,13 @@ service cloud.firestore {
         && isNonEmptyString(data.teta_number);
     }
 
+    function employeeReferenceExists(data) {
+      return hasEmployeeReference(data)
+        && existsAfter(/databases/$(database)/documents/employees/$(data.employee_id))
+        && getAfter(/databases/$(database)/documents/employees/$(data.employee_id)).data.teta_number
+          == data.teta_number;
+    }
+
     function hasModificationMetadata(data) {
       return data.created_at is timestamp
         && isNonEmptyString(data.created_by)
@@ -334,7 +341,7 @@ service cloud.firestore {
           'updated_at',
           'updated_by'
         ])
-        && hasEmployeeReference(data)
+        && employeeReferenceExists(data)
         && isNullableString(data.department_id)
         && (data.shift_assignment == null
           || data.shift_assignment in ['RED', 'WHITE', 'BLUE'])
@@ -343,6 +350,46 @@ service cloud.firestore {
         && (data.valid_to == null || data.valid_to >= data.valid_from)
         && data.status in ['ACTIVE', 'CANCELLED']
         && isNullableString(data.note)
+        && hasModificationMetadata(data);
+    }
+
+    function validEmployeeContract(data) {
+      return data.keys().hasAll([
+          'employee_id', 'teta_number', 'sequence_id',
+          'start_date', 'end_date', 'status', 'note',
+          'created_at', 'created_by', 'updated_at', 'updated_by'
+        ])
+        && data.keys().hasOnly([
+          'employee_id', 'teta_number', 'sequence_id',
+          'start_date', 'end_date', 'status', 'note',
+          'created_at', 'created_by', 'updated_at', 'updated_by'
+        ])
+        && employeeReferenceExists(data)
+        && isNonEmptyString(data.sequence_id)
+        && isIsoDate(data.start_date)
+        && (data.end_date == null || isIsoDate(data.end_date))
+        && (data.end_date == null || data.end_date >= data.start_date)
+        && data.status in ['ACTIVE', 'CANCELLED']
+        && isNullableString(data.note)
+        && hasModificationMetadata(data);
+    }
+
+    function validEmploymentEndEvent(data) {
+      return data.keys().hasAll([
+          'employee_id', 'teta_number', 'sequence_id', 'end_date',
+          'status', 'reason',
+          'created_at', 'created_by', 'updated_at', 'updated_by'
+        ])
+        && data.keys().hasOnly([
+          'employee_id', 'teta_number', 'sequence_id', 'end_date',
+          'status', 'reason',
+          'created_at', 'created_by', 'updated_at', 'updated_by'
+        ])
+        && employeeReferenceExists(data)
+        && isNonEmptyString(data.sequence_id)
+        && isIsoDate(data.end_date)
+        && data.status in ['ACTIVE', 'CANCELLED']
+        && isNullableString(data.reason)
         && hasModificationMetadata(data);
     }
 
@@ -752,6 +799,17 @@ service cloud.firestore {
         && hasModificationMetadata(data);
     }
 
+    function validFrequencyBonusThresholdScale(value) {
+      return value is map
+        && value.keys().hasAll(['0', '1', '2', '3', '4'])
+        && value.keys().hasOnly(['0', '1', '2', '3', '4'])
+        && value['0'] is number && value['0'] >= 0
+        && value['1'] is number && value['1'] >= 0
+        && value['2'] is number && value['2'] >= 0
+        && value['3'] is number && value['3'] >= 0
+        && value['4'] is number && value['4'] >= 0;
+    }
+
     function validPayrollSetting(data) {
       return data.keys().hasAll([
           'setting_key',
@@ -773,6 +831,7 @@ service cloud.firestore {
           'variant_key',
           'variant_name',
           'amount',
+          'threshold_scale',
           'tax_type',
           'valid_from',
           'valid_to',
@@ -795,6 +854,22 @@ service cloud.firestore {
         )
         && data.amount is number
         && data.amount >= 0
+        && (
+          (
+            data.setting_key == 'frequency_bonus'
+            && (
+              !data.keys().hasAny(['threshold_scale'])
+              || validFrequencyBonusThresholdScale(data.threshold_scale)
+            )
+          )
+          || (
+            data.setting_key != 'frequency_bonus'
+            && (
+              !data.keys().hasAny(['threshold_scale'])
+              || data.threshold_scale == null
+            )
+          )
+        )
         && data.tax_type in ['GROSS', 'NET']
         && isMonthId(data.valid_from)
         && (data.valid_to == null || isMonthId(data.valid_to))
@@ -829,18 +904,22 @@ service cloud.firestore {
       allow read: if isAuthenticated();
       allow create: if isAdmin()
         && validPayrollSetting(request.resource.data)
+        && (
+          request.resource.data.setting_key != 'frequency_bonus'
+          || request.resource.data.keys().hasAny(['threshold_scale'])
+        )
         && request.resource.data.active == true
         && hasCreateMetadata(request.resource.data);
       allow update: if isAdmin()
         && validPayrollSetting(request.resource.data)
         && hasUpdateMetadata(request.resource.data)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
-          'valid_to', 'active', 'tax_type', 'updated_at', 'updated_by'
+          'variant_name', 'amount', 'valid_from', 'valid_to', 'active',
+          'threshold_scale', 'tax_type', 'description',
+          'updated_at', 'updated_by'
         ])
-        && (
-          !resource.data.keys().hasAll(['tax_type'])
-          || request.resource.data.tax_type == resource.data.tax_type
-        )
+        && request.resource.data.setting_key == resource.data.setting_key
+        && request.resource.data.variant_key == resource.data.variant_key
         && (
           request.resource.data.active == resource.data.active
           || (
@@ -928,6 +1007,49 @@ service cloud.firestore {
           'updated_at',
           'updated_by'
         ]);
+      allow delete: if false;
+    }
+
+    match /employeeContracts/{contractId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated()
+        && validEmployeeContract(request.resource.data)
+        && request.resource.data.status == 'ACTIVE'
+        && hasCreateMetadata(request.resource.data);
+      allow update: if isAuthenticated()
+        && validEmployeeContract(request.resource.data)
+        && hasUpdateMetadata(request.resource.data)
+        && request.resource.data.employee_id == resource.data.employee_id
+        && request.resource.data.teta_number == resource.data.teta_number
+        && request.resource.data.sequence_id == resource.data.sequence_id
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'start_date', 'end_date', 'status', 'note',
+          'updated_at', 'updated_by'
+        ])
+        && (
+          request.resource.data.status == resource.data.status
+          || (
+            resource.data.status == 'ACTIVE'
+            && request.resource.data.status == 'CANCELLED'
+          )
+        );
+      allow delete: if false;
+    }
+
+    match /employmentEndEvents/{eventId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated()
+        && validEmploymentEndEvent(request.resource.data)
+        && request.resource.data.status == 'ACTIVE'
+        && hasCreateMetadata(request.resource.data);
+      allow update: if isAuthenticated()
+        && validEmploymentEndEvent(request.resource.data)
+        && hasUpdateMetadata(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'reason', 'updated_at', 'updated_by'
+        ])
+        && resource.data.status == 'ACTIVE'
+        && request.resource.data.status in ['ACTIVE', 'CANCELLED'];
       allow delete: if false;
     }
 

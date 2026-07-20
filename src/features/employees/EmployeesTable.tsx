@@ -5,6 +5,7 @@ import HouseOutlined from '@mui/icons-material/HouseOutlined';
 import WarningAmberOutlined from '@mui/icons-material/WarningAmberOutlined';
 import BadgeOutlined from '@mui/icons-material/BadgeOutlined';
 import DescriptionOutlined from '@mui/icons-material/DescriptionOutlined';
+import WorkHistoryOutlined from '@mui/icons-material/WorkHistoryOutlined';
 import {
   Avatar,
   Box,
@@ -32,6 +33,7 @@ import type {
 } from '../../types/firestore';
 import {
   calculateFirstEmploymentLimit,
+  calculateProjectedEmploymentLimit,
   formatPolishDate,
   resolveCurrentEmploymentPeriod,
 } from '../../utils/employees';
@@ -48,6 +50,7 @@ interface EmployeesTableProps {
   isLoading: boolean;
   onEdit: (employee: Employee) => void;
   onDeactivate: (employee: Employee) => void;
+  onContracts?: (employee: Employee) => void;
   entitlements: EmployeeEntitlement[];
   onAccommodation: (
     employee: Employee,
@@ -64,6 +67,7 @@ export function EmployeesTable({
   isLoading,
   onEdit,
   onDeactivate,
+  onContracts,
   entitlements,
   onAccommodation,
   mode,
@@ -275,6 +279,16 @@ export function EmployeesTable({
                         spacing={0.5}
                         sx={{ justifyContent: 'flex-end' }}
                       >
+                        <Tooltip title={t.employees.contracts.title}>
+                          <IconButton
+                            size="small"
+                            aria-label={t.employees.contracts.title}
+                            onClick={() => onContracts?.(employee)}
+                            sx={actionButtonSx}
+                          >
+                            <WorkHistoryOutlined fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
                         <Tooltip
                           title={
                             currentAccommodation
@@ -496,7 +510,9 @@ function FirstEmploymentCell({
   t: ReturnType<typeof useTranslations>;
 }) {
   const sourceDate = employee.firstToyotaEmploymentDate;
-  const limit = calculateFirstEmploymentLimit(sourceDate);
+  const limit =
+    calculateProjectedEmploymentLimit(employee) ??
+    calculateFirstEmploymentLimit(sourceDate);
 
   if (!sourceDate || !limit) {
     return (

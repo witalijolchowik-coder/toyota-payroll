@@ -79,6 +79,7 @@ type SettingFormState =
       initialKey: 'own_housing_allowance' | 'housing_deposit';
     }
   | { section: 'allowances'; initialKey?: KnownPayrollSettingKey }
+  | { section: 'edit'; setting: PayrollSetting }
   | null;
 
 export function SettingsPage() {
@@ -94,6 +95,8 @@ export function SettingsPage() {
     isLoading,
     error,
     createVersion,
+    updateVersion,
+    previewVersion,
     endVersion,
     cancelVersion,
   } = usePayrollSettings();
@@ -142,6 +145,14 @@ export function SettingsPage() {
   };
 
   const handleCreate = async (input: PayrollSettingCreateInput) => {
+    if (settingFormState?.section === 'edit') {
+      await updateVersion(settingFormState.setting, input);
+      notify({
+        message: t.settings.versionActions.edited,
+        severity: 'success',
+      });
+      return;
+    }
     await createVersion(input);
     notify({
       message: t.settings.common.versionSaved,
@@ -266,6 +277,9 @@ export function SettingsPage() {
               }
               onEndVersion={handleEndVersion}
               onCancelVersion={handleCancelVersion}
+              onEditVersion={(setting) =>
+                setSettingFormState({ section: 'edit', setting })
+              }
             />
           ) : null}
           {section === 'allowances' ? (
@@ -275,6 +289,9 @@ export function SettingsPage() {
               onAdd={() => setSettingFormState({ section: 'allowances' })}
               onEndVersion={handleEndVersion}
               onCancelVersion={handleCancelVersion}
+              onEditVersion={(setting) =>
+                setSettingFormState({ section: 'edit', setting })
+              }
             />
           ) : null}
           {section === 'interface' ? <CalendarAppearancePanel /> : null}
@@ -284,21 +301,37 @@ export function SettingsPage() {
       {settingFormState ? (
         <PayrollSettingFormDialog
           settings={settings}
-          initialKey={settingFormState.initialKey}
+          existingSetting={
+            settingFormState.section === 'edit'
+              ? settingFormState.setting
+              : undefined
+          }
+          initialKey={
+            settingFormState.section === 'edit'
+              ? undefined
+              : settingFormState.initialKey
+          }
           allowedKeys={
-            settingFormState.section === 'accommodation'
-              ? ['own_housing_allowance', 'housing_deposit']
-              : [
-                  'frequency_bonus',
-                  'transport_allowance',
-                  'udt_allowance',
-                  'holiday_work_bonus',
-                  'laundry_allowance',
-                  'own_housing_allowance',
-                ]
+            settingFormState.section === 'edit'
+              ? undefined
+              : settingFormState.section === 'accommodation'
+                ? ['own_housing_allowance', 'housing_deposit']
+                : [
+                    'frequency_bonus',
+                    'transport_allowance',
+                    'udt_allowance',
+                    'holiday_work_bonus',
+                    'laundry_allowance',
+                    'own_housing_allowance',
+                  ]
           }
           onClose={() => setSettingFormState(null)}
           onSubmit={handleCreate}
+          onPreview={
+            settingFormState.section === 'edit'
+              ? (input) => previewVersion(settingFormState.setting, input)
+              : undefined
+          }
         />
       ) : null}
       {departmentFormState ? (
@@ -520,6 +553,7 @@ function AccommodationSection({
   onAddDeposit,
   onEndVersion,
   onCancelVersion,
+  onEditVersion,
 }: {
   categories: Array<{
     key: string;
@@ -536,6 +570,7 @@ function AccommodationSection({
   onAddDeposit: () => void;
   onEndVersion: (setting: PayrollSetting) => Promise<void>;
   onCancelVersion: (setting: PayrollSetting) => Promise<void>;
+  onEditVersion: (setting: PayrollSetting) => void;
 }) {
   const t = useTranslations();
   const ownHousing = settings.filter(
@@ -649,6 +684,7 @@ function AccommodationSection({
           settings={ownHousing}
           onEnd={onEndVersion}
           onCancel={onCancelVersion}
+          onEdit={onEditVersion}
         />
       </Card>
       <Card sx={{ p: 2.5 }}>
@@ -677,6 +713,7 @@ function AccommodationSection({
           settings={deposits}
           onEnd={onEndVersion}
           onCancel={onCancelVersion}
+          onEdit={onEditVersion}
         />
       </Card>
     </Stack>
@@ -689,12 +726,14 @@ function AllowancesSection({
   onAdd,
   onEndVersion,
   onCancelVersion,
+  onEditVersion,
 }: {
   settings: PayrollSetting[];
   isLoading: boolean;
   onAdd: () => void;
   onEndVersion: (setting: PayrollSetting) => Promise<void>;
   onCancelVersion: (setting: PayrollSetting) => Promise<void>;
+  onEditVersion: (setting: PayrollSetting) => void;
 }) {
   const t = useTranslations();
   const businessSettings = settings.filter(
@@ -808,6 +847,7 @@ function AllowancesSection({
                       setting={setting}
                       onEnd={onEndVersion}
                       onCancel={onCancelVersion}
+                      onEdit={onEditVersion}
                     />
                   ))
               )}
@@ -872,10 +912,12 @@ function BusinessSettingRow({
   setting,
   onEnd,
   onCancel,
+  onEdit,
 }: {
   setting: PayrollSetting;
   onEnd: (setting: PayrollSetting) => Promise<void>;
   onCancel: (setting: PayrollSetting) => Promise<void>;
+  onEdit: (setting: PayrollSetting) => void;
 }) {
   const t = useTranslations();
   return (
@@ -908,7 +950,12 @@ function BusinessSettingRow({
         />
       </TableCell>
       <TableCell align="right">
-        <VersionActions setting={setting} onEnd={onEnd} onCancel={onCancel} />
+        <VersionActions
+          setting={setting}
+          onEnd={onEnd}
+          onCancel={onCancel}
+          onEdit={onEdit}
+        />
       </TableCell>
     </TableRow>
   );
@@ -918,10 +965,12 @@ function SettingVersionList({
   settings,
   onEnd,
   onCancel,
+  onEdit,
 }: {
   settings: PayrollSetting[];
   onEnd: (setting: PayrollSetting) => Promise<void>;
   onCancel: (setting: PayrollSetting) => Promise<void>;
+  onEdit: (setting: PayrollSetting) => void;
 }) {
   const t = useTranslations();
   const currentMonth = currentPayrollMonthId(new Date());
@@ -954,6 +1003,7 @@ function SettingVersionList({
               setting={setting}
               onEnd={onEnd}
               onCancel={onCancel}
+              onEdit={onEdit}
             />
             <Typography color="text.secondary">
               {setting.validFrom} – {setting.validTo ?? t.settings.common.noEnd}
@@ -982,10 +1032,12 @@ function VersionActions({
   setting,
   onEnd,
   onCancel,
+  onEdit,
 }: {
   setting: PayrollSetting;
   onEnd: (setting: PayrollSetting) => Promise<void>;
   onCancel: (setting: PayrollSetting) => Promise<void>;
+  onEdit: (setting: PayrollSetting) => void;
 }) {
   const t = useTranslations();
   const status = payrollSettingLifecycleStatus(
@@ -994,6 +1046,11 @@ function VersionActions({
   );
   return (
     <Stack direction="row" spacing={0.5}>
+      {status !== 'CANCELLED' ? (
+        <Button size="small" onClick={() => onEdit(setting)}>
+          {t.settings.versionActions.edit}
+        </Button>
+      ) : null}
       {status === 'ACTIVE' ? (
         <Button size="small" onClick={() => void onEnd(setting)}>
           {t.settings.versionActions.end}

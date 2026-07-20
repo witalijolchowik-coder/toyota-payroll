@@ -1355,7 +1355,7 @@ function DeadlineRow({ deadline }: { deadline: DashboardDeadline }) {
   return (
     <Button
       component={RouterLink}
-      to={`${routes.employees}?editEmployeeId=${encodeURIComponent(
+      to={`${routes.employees}?contractsEmployeeId=${encodeURIComponent(
         deadline.employee.id,
       )}`}
       color="inherit"
@@ -1400,9 +1400,26 @@ function DeadlineRow({ deadline }: { deadline: DashboardDeadline }) {
           </Typography>
         </Box>
       </Stack>
-      <Typography variant="body2" sx={{ fontWeight: 700 }}>
-        {formatDate(deadline.date)}
-      </Typography>
+      <Stack sx={{ alignItems: 'flex-end' }}>
+        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+          {formatDate(deadline.date)}
+        </Typography>
+        {deadline.decisionRequired ? (
+          <Typography variant="caption" color="error" sx={{ fontWeight: 800 }}>
+            {t.dashboard.deadlines.decisionRequired}
+          </Typography>
+        ) : deadline.remainingDays !== undefined &&
+          deadline.remainingDays >= 1 &&
+          deadline.remainingDays <= 5 ? (
+          <Typography variant="caption" color="error" sx={{ fontWeight: 800 }}>
+            {deadline.remainingDays === 1
+              ? t.dashboard.deadlines.oneDay
+              : interpolate(t.dashboard.deadlines.daysLeft, {
+                  count: String(deadline.remainingDays),
+                })}
+          </Typography>
+        ) : null}
+      </Stack>
     </Button>
   );
 }

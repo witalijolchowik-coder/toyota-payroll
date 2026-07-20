@@ -16,6 +16,8 @@ import type {
   DepartmentDocument,
   EmployeeAssignmentDocument,
   EmployeeDocument,
+  EmployeeContractDocument,
+  EmploymentEndEventDocument,
   EmployeeEntitlementDocument,
   EmployeeSettlementDocument,
   ImportDocument,
@@ -34,6 +36,8 @@ import {
   dailyValueConverter,
   departmentConverter,
   employeeConverter,
+  employeeContractConverter,
+  employmentEndEventConverter,
   employeeAssignmentConverter,
   employeeEntitlementConverter,
   employeeSettlementConverter,
@@ -69,6 +73,14 @@ export interface FirestoreRepositoryBoundaries {
   readonly departmentShiftCorrections: CollectionReference<DepartmentShiftCorrectionDocument>;
   readonly employees: CollectionReference<EmployeeDocument>;
   employee(employeeId: string): DocumentReference<EmployeeDocument>;
+  readonly employeeContracts: CollectionReference<EmployeeContractDocument>;
+  employeeContract(
+    contractId: string,
+  ): DocumentReference<EmployeeContractDocument>;
+  readonly employmentEndEvents: CollectionReference<EmploymentEndEventDocument>;
+  employmentEndEvent(
+    eventId: string,
+  ): DocumentReference<EmploymentEndEventDocument>;
   readonly employeeAssignments: CollectionReference<EmployeeAssignmentDocument>;
   employeeAssignment(
     assignmentId: string,
@@ -98,6 +110,14 @@ export function createFirestoreRepositoryBoundaries(
     firestore,
     firestorePaths.employees,
   ).withConverter(employeeConverter);
+  const employeeContracts = collection(
+    firestore,
+    firestorePaths.employeeContracts,
+  ).withConverter(employeeContractConverter);
+  const employmentEndEvents = collection(
+    firestore,
+    firestorePaths.employmentEndEvents,
+  ).withConverter(employmentEndEventConverter);
   const departments = collection(
     firestore,
     firestorePaths.departments,
@@ -139,6 +159,20 @@ export function createFirestoreRepositoryBoundaries(
       return doc(firestore, firestorePaths.employee(employeeId)).withConverter(
         employeeConverter,
       );
+    },
+    employeeContracts,
+    employeeContract(contractId) {
+      return doc(
+        firestore,
+        firestorePaths.employeeContract(contractId),
+      ).withConverter(employeeContractConverter);
+    },
+    employmentEndEvents,
+    employmentEndEvent(eventId) {
+      return doc(
+        firestore,
+        firestorePaths.employmentEndEvent(eventId),
+      ).withConverter(employmentEndEventConverter);
     },
     employeeAssignments,
     employeeAssignment(assignmentId) {

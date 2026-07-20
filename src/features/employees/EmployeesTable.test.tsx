@@ -80,7 +80,7 @@ describe('EmployeesTable', () => {
       screen.queryByText('Pierwsze zatrudnienie / aktualna umowa'),
     ).not.toBeInTheDocument();
     expect(screen.getByText('02.01.2025')).toBeInTheDocument();
-    expect(screen.getByText('Limit: 02.07.2026')).toHaveStyle({
+    expect(screen.getByText('Limit: 03.07.2027')).toHaveStyle({
       color: '#8f2d3f',
     });
     expect(screen.getByText('Od:')).toBeInTheDocument();

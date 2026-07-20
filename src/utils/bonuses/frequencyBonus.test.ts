@@ -104,6 +104,23 @@ describe('frequency bonus', () => {
     ).toMatchObject({ amount: 400, l4RecordCount: 0, reason: 'ELIGIBLE' });
   });
 
+  it('uses the threshold scale from the effective setting version', () => {
+    const result = calculateFrequencyBonus({
+      monthId: '2026-07',
+      employment: fullMonthEmployment,
+      absences: [
+        absence('l4', 'L4', {
+          startDate: '2026-07-06',
+          endDate: '2026-07-07',
+        }),
+      ],
+      plannedWorkingDates: new Set(['2026-07-06', '2026-07-07']),
+      thresholdScale: { 0: 500, 1: 425, 2: 325, 3: 225, 4: 25 },
+    });
+
+    expect(result.amount).toBe(325);
+  });
+
   it('ignores cancelled and non-overlapping L4 records', () => {
     expect(
       calculateFrequencyBonus({

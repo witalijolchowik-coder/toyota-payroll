@@ -1,16 +1,14 @@
 import type { AbsenceRuleRecord } from '../absences';
 import { absenceRangesOverlap, normalizeAbsenceCode } from '../absences';
-import type { MonthId } from '../../types/firestore';
-import type { EmploymentPeriod } from '../payroll';
-import { dateToIsoDate, getPayrollMonthDateRange } from '../payroll';
+import type {
+  FrequencyBonusThresholdScale,
+  MonthId,
+} from '../../types/firestore';
+import type { EmploymentPeriod } from '../payroll/employment';
+import { dateToIsoDate, getPayrollMonthDateRange } from '../payroll/month';
+import { DEFAULT_FREQUENCY_BONUS_THRESHOLD_SCALE } from '../payroll/settings';
 
-export const FREQUENCY_BONUS_AMOUNTS = {
-  0: 400,
-  1: 350,
-  2: 300,
-  3: 200,
-  4: 0,
-} as const;
+export const FREQUENCY_BONUS_AMOUNTS = DEFAULT_FREQUENCY_BONUS_THRESHOLD_SCALE;
 
 export type FrequencyBonusReason =
   'ELIGIBLE' | 'PARTIAL_EMPLOYMENT' | 'FOUR_OR_MORE_L4_DAYS';
@@ -28,6 +26,7 @@ export interface FrequencyBonusInput {
   employment: EmploymentPeriod;
   absences: readonly AbsenceRuleRecord[];
   plannedWorkingDates?: ReadonlySet<string>;
+  thresholdScale?: FrequencyBonusThresholdScale | null;
 }
 
 export function isEmployedForFullPayrollMonth(
@@ -55,6 +54,7 @@ export function calculateFrequencyBonus({
   employment,
   absences,
   plannedWorkingDates,
+  thresholdScale = DEFAULT_FREQUENCY_BONUS_THRESHOLD_SCALE,
 }: FrequencyBonusInput): FrequencyBonusResult {
   if (!isEmployedForFullPayrollMonth(monthId, employment)) {
     return {
@@ -86,9 +86,11 @@ export function calculateFrequencyBonus({
     plannedWorkingDates,
   });
 
+  const effectiveScale =
+    thresholdScale ?? DEFAULT_FREQUENCY_BONUS_THRESHOLD_SCALE;
   if (l4MissedWorkingDayCount >= 4) {
     return {
-      amount: 0,
+      amount: effectiveScale[4],
       l4RecordCount,
       l4MissedWorkingDayCount,
       hasNnAbsence: false,
@@ -98,8 +100,8 @@ export function calculateFrequencyBonus({
 
   return {
     amount:
-      FREQUENCY_BONUS_AMOUNTS[
-        l4MissedWorkingDayCount as keyof typeof FREQUENCY_BONUS_AMOUNTS
+      effectiveScale[
+        l4MissedWorkingDayCount as keyof FrequencyBonusThresholdScale
       ],
     l4RecordCount,
     l4MissedWorkingDayCount,

@@ -64,3 +64,29 @@ by recalculation, and protected by settled-month rules.
 
 Unknown configuration remains distinguishable from a legitimate zero through
 calculation blockers and warnings.
+
+## Editing an existing version
+
+`Edytuj wersję` changes the existing version identity rather than creating a
+parallel record. The form exposes the fields belonging to the setting type:
+period, amount or threshold structure, tax classification, description and
+setting-specific values.
+
+For `frequency_bonus`, `threshold_scale` stores the versioned amounts for
+`0`, `1`, `2`, `3` and `4+` missed L4 working days. Legacy versions without
+the map use the approved `400 / 350 / 300 / 200 / 0` scale until they are
+edited. The monthly calculation resolves the scale from the effective version;
+it is not independently duplicated in the UI.
+
+Before save, the application compares current and proposed values and shows:
+
+- the affected period;
+- overlapping neighboring versions;
+- affected open and locked months;
+- whether automatic recalculation will run.
+
+A complex overlap is blocked instead of silently changing another version.
+Any affected locked month blocks saving and names the months that must be
+unlocked. A safe edit affecting open months is audited with old/new values and
+periods and queues the existing automatic month recalculation. Manual
+settlement adjustments remain independent and are preserved.

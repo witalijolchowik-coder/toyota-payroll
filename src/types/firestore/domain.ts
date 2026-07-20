@@ -11,11 +11,13 @@ import type {
   DepartmentShiftMode,
   EmployeeId,
   EmployeeAssignmentStatus,
+  EmployeeContractStatus,
   EmployeeColorShift,
   EmployeeEntitlementStatus,
   EmployeeEntitlementType,
   EmployeeCitizenship,
   EmployeeGender,
+  EmploymentEndEventStatus,
   MedicalExaminationType,
   ActualWorkingShift,
   ImportStatus,
@@ -60,6 +62,29 @@ export interface Employee extends ModificationMetadata {
   shiftAssignment: EmployeeColorShift | null;
   employmentStartDate: Date | null;
   employmentEndDate: Date | null;
+  contracts?: EmployeeContract[];
+  employmentEndEvents?: EmploymentEndEvent[];
+}
+
+export interface EmployeeContract extends ModificationMetadata {
+  id: string;
+  employeeId: EmployeeId;
+  tetaNumber: TetaNumber;
+  sequenceId: string;
+  startDate: IsoDate;
+  endDate: IsoDate | null;
+  status: EmployeeContractStatus;
+  note: string | null;
+}
+
+export interface EmploymentEndEvent extends ModificationMetadata {
+  id: string;
+  employeeId: EmployeeId;
+  tetaNumber: TetaNumber;
+  sequenceId: string;
+  endDate: IsoDate;
+  status: EmploymentEndEventStatus;
+  reason: string | null;
 }
 
 export interface Department extends ModificationMetadata {
@@ -239,11 +264,20 @@ export interface PayrollSetting extends ModificationMetadata {
   variantKey: string | null;
   variantName: string | null;
   amount: number;
+  thresholdScale?: FrequencyBonusThresholdScale | null;
   taxType: PayrollSettingTaxType;
   validFrom: MonthId;
   validTo: MonthId | null;
   active: boolean;
   description: string;
+}
+
+export interface FrequencyBonusThresholdScale {
+  0: number;
+  1: number;
+  2: number;
+  3: number;
+  4: number;
 }
 
 export interface Adjustment extends ModificationMetadata {

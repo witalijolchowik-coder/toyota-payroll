@@ -13,6 +13,10 @@ import type {
   EmployeeAssignment,
   EmployeeAssignmentDocument,
   EmployeeDocument,
+  EmployeeContract,
+  EmployeeContractDocument,
+  EmploymentEndEvent,
+  EmploymentEndEventDocument,
   EmployeeEntitlement,
   EmployeeEntitlementDocument,
   EmployeeSettlement,
@@ -75,6 +79,39 @@ export function mapEmployeeDocument(
     shiftAssignment: document.shift_assignment ?? null,
     employmentStartDate: document.employment_start_date?.toDate() ?? null,
     employmentEndDate: document.employment_end_date?.toDate() ?? null,
+    ...modificationMetadata(document),
+  };
+}
+
+export function mapEmployeeContractDocument(
+  id: string,
+  document: EmployeeContractDocument,
+): EmployeeContract {
+  return {
+    id,
+    employeeId: document.employee_id,
+    tetaNumber: document.teta_number,
+    sequenceId: document.sequence_id,
+    startDate: document.start_date,
+    endDate: document.end_date,
+    status: document.status,
+    note: document.note,
+    ...modificationMetadata(document),
+  };
+}
+
+export function mapEmploymentEndEventDocument(
+  id: string,
+  document: EmploymentEndEventDocument,
+): EmploymentEndEvent {
+  return {
+    id,
+    employeeId: document.employee_id,
+    tetaNumber: document.teta_number,
+    sequenceId: document.sequence_id,
+    endDate: document.end_date,
+    status: document.status,
+    reason: document.reason,
     ...modificationMetadata(document),
   };
 }
@@ -347,6 +384,7 @@ export function mapPayrollSettingDocument(
     variantKey: document.variant_key,
     variantName: document.variant_name,
     amount: document.amount,
+    thresholdScale: document.threshold_scale,
     taxType: document.tax_type,
     validFrom: document.valid_from,
     validTo: document.valid_to,

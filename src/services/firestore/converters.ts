@@ -14,6 +14,8 @@ import type {
   DailyValueDocument,
   DepartmentDocument,
   EmployeeDocument,
+  EmployeeContractDocument,
+  EmploymentEndEventDocument,
   EmployeeAssignmentDocument,
   EmployeeEntitlementDocument,
   EmployeeSettlementDocument,
@@ -58,6 +60,23 @@ function readStringRecord(
       readString(source, entryKey, path),
     ]),
   );
+}
+
+function readFrequencyBonusThresholdScale(
+  data: DocumentData,
+  path: string,
+): PayrollSettingDocument['threshold_scale'] {
+  if (data.threshold_scale === undefined || data.threshold_scale === null) {
+    return null;
+  }
+  const scale = readObject(data, 'threshold_scale', path);
+  return {
+    0: readNumber(scale, '0', path),
+    1: readNumber(scale, '1', path),
+    2: readNumber(scale, '2', path),
+    3: readNumber(scale, '3', path),
+    4: readNumber(scale, '4', path),
+  };
 }
 
 function createConverter<T extends DocumentData>(
@@ -202,6 +221,27 @@ export const employeeConverter = createConverter<EmployeeDocument>(
     ...metadata(data, path),
   }),
 );
+
+export const employeeContractConverter =
+  createConverter<EmployeeContractDocument>((data, path) => ({
+    ...employeeReference(data, path),
+    sequence_id: readNonEmptyString(data, 'sequence_id', path),
+    start_date: readNonEmptyString(data, 'start_date', path),
+    end_date: readNullableString(data, 'end_date', path),
+    status: readEnum(data, 'status', path, ['ACTIVE', 'CANCELLED'] as const),
+    note: readNullableString(data, 'note', path),
+    ...metadata(data, path),
+  }));
+
+export const employmentEndEventConverter =
+  createConverter<EmploymentEndEventDocument>((data, path) => ({
+    ...employeeReference(data, path),
+    sequence_id: readNonEmptyString(data, 'sequence_id', path),
+    end_date: readNonEmptyString(data, 'end_date', path),
+    status: readEnum(data, 'status', path, ['ACTIVE', 'CANCELLED'] as const),
+    reason: readNullableString(data, 'reason', path),
+    ...metadata(data, path),
+  }));
 
 export const departmentConverter = createConverter<DepartmentDocument>(
   (data, path) => ({
@@ -574,6 +614,7 @@ export const payrollSettingConverter = createConverter<PayrollSettingDocument>(
     variant_key: readNullableString(data, 'variant_key', path),
     variant_name: readNullableString(data, 'variant_name', path),
     amount: readNumber(data, 'amount', path),
+    threshold_scale: readFrequencyBonusThresholdScale(data, path),
     tax_type:
       readOptionalEnum(data, 'tax_type', path, ['GROSS', 'NET'] as const) ??
       (data.setting_key === 'transport_allowance' ||

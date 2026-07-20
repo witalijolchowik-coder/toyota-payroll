@@ -1,4 +1,5 @@
 import type {
+  FrequencyBonusThresholdScale,
   MonthId,
   PayrollSetting,
   PayrollSettingCreateInput,
@@ -18,10 +19,20 @@ export interface PayrollSettingValidationErrors {
   variantKey?: PayrollSettingValidationCode;
   variantName?: PayrollSettingValidationCode;
   amount?: PayrollSettingValidationCode;
+  thresholdScale?: PayrollSettingValidationCode;
   validFrom?: PayrollSettingValidationCode;
   validTo?: PayrollSettingValidationCode;
   taxType?: PayrollSettingValidationCode;
 }
+
+export const DEFAULT_FREQUENCY_BONUS_THRESHOLD_SCALE: FrequencyBonusThresholdScale =
+  {
+    0: 400,
+    1: 350,
+    2: 300,
+    3: 200,
+    4: 0,
+  };
 
 export class PayrollSettingResolutionError extends Error {
   constructor(
@@ -54,6 +65,10 @@ export function normalizePayrollSettingInput(
       : null,
     variantName: input.variantName?.trim() || null,
     description: input.description.trim(),
+    thresholdScale:
+      input.settingKey.trim() === 'frequency_bonus'
+        ? (input.thresholdScale ?? DEFAULT_FREQUENCY_BONUS_THRESHOLD_SCALE)
+        : null,
     taxType:
       input.taxType ?? defaultPayrollSettingTaxType(input.settingKey.trim()),
   };
@@ -79,6 +94,17 @@ export function validatePayrollSettingInput(
   }
   if (!Number.isFinite(normalized.amount) || normalized.amount < 0) {
     errors.amount = 'invalid-amount';
+  }
+  if (
+    normalized.settingKey === 'frequency_bonus' &&
+    (!normalized.thresholdScale ||
+      ([0, 1, 2, 3, 4] as const).some(
+        (threshold) =>
+          !Number.isFinite(normalized.thresholdScale?.[threshold]) ||
+          (normalized.thresholdScale?.[threshold] ?? -1) < 0,
+      ))
+  ) {
+    errors.thresholdScale = 'invalid-amount';
   }
   if (!normalized.taxType || !['GROSS', 'NET'].includes(normalized.taxType)) {
     errors.taxType = 'required';

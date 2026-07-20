@@ -10,6 +10,7 @@ import { EmployeeEntitlementFormDialog } from '../features/employees/EmployeeEnt
 import { EmployeeAccommodationDialog } from '../features/employees/EmployeeAccommodationDialog';
 import { EmployeeEntitlementsPanel } from '../features/employees/EmployeeEntitlementsPanel';
 import { EmployeeFormDialog } from '../features/employees/EmployeeFormDialog';
+import { EmployeeContractsDialog } from '../features/employees/EmployeeContractsDialog';
 import { EmployeeTemplateImportDialog } from '../features/employees/EmployeeTemplateImportDialog';
 import { EmployeesEmptyState } from '../features/employees/EmployeesEmptyState';
 import { EmployeesTable } from '../features/employees/EmployeesTable';
@@ -64,6 +65,13 @@ export function EmployeesPage() {
     addEmployee,
     editEmployee,
     setEmployeeInactive,
+    addContract,
+    editContract,
+    cancelContract,
+    previewContractEdit,
+    previewContractCancellation,
+    endEmployment,
+    migrateLegacyContract,
   } = useEmployees();
   const {
     departments,
@@ -98,6 +106,9 @@ export function EmployeesPage() {
     employee: Employee;
     currentAccommodation: EmployeeEntitlement | null;
   } | null>(null);
+  const [contractsEmployee, setContractsEmployee] = useState<Employee | null>(
+    null,
+  );
 
   const filteredEmployees = useMemo(() => {
     const normalizedSearch = search.trim().toLocaleLowerCase('pl-PL');
@@ -236,6 +247,21 @@ export function EmployeesPage() {
   const hasFilters = Boolean(search.trim()) || status !== 'active';
 
   useEffect(() => {
+    const contractsEmployeeId = searchParams.get('contractsEmployeeId');
+    if (contractsEmployeeId && employees.length > 0 && !contractsEmployee) {
+      const employee = employees.find(
+        (candidate) => candidate.id === contractsEmployeeId,
+      );
+      if (employee) {
+        queueMicrotask(() => {
+          setContractsEmployee(employee);
+          const next = new URLSearchParams(searchParams);
+          next.delete('contractsEmployeeId');
+          setSearchParams(next, { replace: true });
+        });
+        return;
+      }
+    }
     const editEmployeeId = searchParams.get('editEmployeeId');
     if (!editEmployeeId || employees.length === 0 || formState) {
       return;
@@ -252,7 +278,7 @@ export function EmployeesPage() {
       next.delete('editEmployeeId');
       setSearchParams(next, { replace: true });
     });
-  }, [employees, formState, searchParams, setSearchParams]);
+  }, [contractsEmployee, employees, formState, searchParams, setSearchParams]);
 
   return (
     <Stack spacing={3}>
@@ -316,6 +342,7 @@ export function EmployeesPage() {
             }
             onEdit={(employee) => setFormState({ mode: 'edit', employee })}
             onDeactivate={setDeactivationTarget}
+            onContracts={setContractsEmployee}
             entitlements={entitlements}
             onAccommodation={(employee, currentAccommodation) =>
               setAccommodationState({ employee, currentAccommodation })
@@ -345,6 +372,34 @@ export function EmployeesPage() {
           departments={departments}
           onClose={() => setFormState(null)}
           onSubmit={handleFormSubmit}
+        />
+      ) : null}
+
+      {contractsEmployee ? (
+        <EmployeeContractsDialog
+          employee={
+            employees.find(
+              (employee) => employee.id === contractsEmployee.id,
+            ) ?? contractsEmployee
+          }
+          onClose={() => setContractsEmployee(null)}
+          onCreate={async (input) => {
+            await addContract(contractsEmployee, input);
+          }}
+          onUpdate={async (contract, input) => {
+            await editContract(contractsEmployee, contract, input);
+          }}
+          onCancelContract={(contract) =>
+            cancelContract(contractsEmployee, contract)
+          }
+          onPreviewUpdate={previewContractEdit}
+          onPreviewCancellation={previewContractCancellation}
+          onEndEmployment={async (input) => {
+            await endEmployment(contractsEmployee, input);
+          }}
+          onBootstrapLegacy={async () => {
+            await migrateLegacyContract(contractsEmployee);
+          }}
         />
       ) : null}
 

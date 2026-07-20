@@ -17,6 +17,7 @@ import {
   setDoc,
   updateDoc,
   where,
+  writeBatch,
 } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
 
@@ -1715,7 +1716,7 @@ describe('Firestore security rules', () => {
     );
   });
 
-  it('allows append-only global payroll setting versions', async () => {
+  it('allows audited admin edits while preserving payroll setting identity', async () => {
     const uid = 'coordinator-1';
     await seedAppUser(uid, { role: 'admin' });
     const firestore = testEnvironment.authenticatedContext(uid).firestore();
@@ -1727,6 +1728,7 @@ describe('Firestore security rules', () => {
         variant_key: null,
         variant_name: null,
         amount: 400,
+        threshold_scale: { 0: 400, 1: 350, 2: 300, 3: 200, 4: 0 },
         tax_type: 'GROSS',
         valid_from: '2026-08',
         valid_to: null,
@@ -1735,9 +1737,26 @@ describe('Firestore security rules', () => {
         ...modificationMetadata(uid),
       }),
     );
-    await assertFails(
+    await assertSucceeds(
       updateDoc(setting, {
         amount: 450,
+        threshold_scale: { 0: 450, 1: 375, 2: 300, 3: 200, 4: 0 },
+        tax_type: 'NET',
+        description: 'Skorygowana wersja',
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertFails(
+      updateDoc(setting, {
+        setting_key: 'transport_allowance',
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertFails(
+      updateDoc(setting, {
+        threshold_scale: { 0: 450, 1: -1, 2: 300, 3: 200, 4: 0 },
         updated_at: serverTimestamp(),
         updated_by: uid,
       }),
@@ -1757,6 +1776,153 @@ describe('Firestore security rules', () => {
       }),
     );
     await assertFails(deleteDoc(setting));
+  });
+
+  it('allows live-shaped contract history and soft cancellation for an approved user', async () => {
+    await seedEmployee('employee-1');
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const reference = doc(firestore, 'employeeContracts/contract-1');
+
+    await assertSucceeds(
+      setDoc(reference, {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        sequence_id: 'sequence-1',
+        start_date: '2026-06-02',
+        end_date: '2026-07-02',
+        status: 'ACTIVE',
+        note: null,
+        ...modificationMetadata(uid),
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(reference, {
+        end_date: '2026-07-03',
+        note: 'Korekta dokumentu',
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(reference, {
+        status: 'CANCELLED',
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertFails(deleteDoc(reference));
+  });
+
+  it('allows atomic creation of an employee with the initial contract and assignment', async () => {
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const batch = writeBatch(firestore);
+    const employee = doc(firestore, 'employees/employee-atomic');
+    batch.set(employee, {
+      teta_number: 'TETA-ATOMIC',
+      first_name: 'Anna',
+      last_name: 'Nowak',
+      is_active: true,
+      department_id: null,
+      shift_assignment: null,
+      employment_start_date: new Date('2026-07-01T00:00:00.000Z'),
+      employment_end_date: new Date('2026-09-30T00:00:00.000Z'),
+      ...modificationMetadata(uid),
+    });
+    batch.set(doc(firestore, 'employeeContracts/contract-atomic'), {
+      employee_id: employee.id,
+      teta_number: 'TETA-ATOMIC',
+      sequence_id: 'initial-employee-atomic',
+      start_date: '2026-07-01',
+      end_date: '2026-09-30',
+      status: 'ACTIVE',
+      note: null,
+      ...modificationMetadata(uid),
+    });
+    batch.set(doc(firestore, 'employeeAssignments/assignment-atomic'), {
+      employee_id: employee.id,
+      teta_number: 'TETA-ATOMIC',
+      department_id: null,
+      shift_assignment: null,
+      valid_from: '2026-07-01',
+      valid_to: null,
+      status: 'ACTIVE',
+      note: null,
+      ...modificationMetadata(uid),
+    });
+
+    await assertSucceeds(batch.commit());
+  });
+
+  it('rejects invalid or foreign employee contract payloads', async () => {
+    await seedEmployee('employee-1');
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const base = {
+      employee_id: 'employee-1',
+      teta_number: 'TETA-1001',
+      sequence_id: 'sequence-1',
+      start_date: '2026-07-10',
+      end_date: '2026-07-01',
+      status: 'ACTIVE',
+      note: null,
+      ...modificationMetadata(uid),
+    };
+
+    await assertFails(
+      setDoc(doc(firestore, 'employeeContracts/invalid-range'), base),
+    );
+    await assertFails(
+      setDoc(doc(firestore, 'employeeContracts/wrong-teta'), {
+        ...base,
+        end_date: '2026-07-31',
+        teta_number: 'OTHER',
+      }),
+    );
+    const unapproved = testEnvironment
+      .authenticatedContext('unapproved-user')
+      .firestore();
+    await assertFails(
+      setDoc(doc(unapproved, 'employeeContracts/not-approved'), {
+        ...base,
+        end_date: '2026-07-31',
+      }),
+    );
+  });
+
+  it('allows an immutable live-shaped explicit employment-end event', async () => {
+    await seedEmployee('employee-1');
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const reference = doc(firestore, 'employmentEndEvents/end-1');
+
+    await assertSucceeds(
+      setDoc(reference, {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        sequence_id: 'sequence-1',
+        end_date: '2026-07-31',
+        status: 'ACTIVE',
+        reason: 'Brak kolejnej umowy',
+        ...modificationMetadata(uid),
+      }),
+    );
+    await assertFails(
+      updateDoc(reference, {
+        end_date: '2026-08-01',
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(reference, {
+        status: 'CANCELLED',
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertFails(deleteDoc(reference));
   });
 
   it('denies payroll setting writes to a non-admin approved user', async () => {

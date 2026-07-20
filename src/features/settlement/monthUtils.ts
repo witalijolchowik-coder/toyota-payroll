@@ -2,11 +2,9 @@ import type { DailyValue, Employee, IsoDate } from '../../types/firestore';
 import {
   createPayrollMonthCalendar,
   currentPayrollMonthId,
-  employeeParticipatesInPayrollMonth,
   formatPayrollMonthId,
   getPayrollMonthDateRange,
   getUiVirtualDefaultHours,
-  isDateWithinEmploymentPeriod,
   parsePayrollMonthId,
   previousPayrollMonthId,
   type PayrollCalendarOverrideMap,
@@ -14,6 +12,10 @@ import {
   type ParsedPayrollMonth,
 } from '../../utils/payroll';
 import { resolveEffectiveAttendanceValue } from '../../utils/attendance';
+import {
+  employeeContractsOverlapRange,
+  isDateCoveredByContracts,
+} from '../../utils/employees';
 
 export type ParsedMonthId = ParsedPayrollMonth;
 export type MonthDateRange = PayrollMonthDateRange;
@@ -63,6 +65,14 @@ function localDateToIsoDate(date: Date): IsoDate {
     .padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
 }
 
+function utcDateToIsoDate(date: Date): IsoDate {
+  return `${date.getUTCFullYear().toString().padStart(4, '0')}-${(
+    date.getUTCMonth() + 1
+  )
+    .toString()
+    .padStart(2, '0')}-${date.getUTCDate().toString().padStart(2, '0')}`;
+}
+
 export function createCalendarDays(
   monthId: string,
   options: {
@@ -87,12 +97,10 @@ export function employeeParticipatesInMonth(
   employee: Employee,
   range: MonthDateRange,
 ): boolean {
-  return employeeParticipatesInPayrollMonth(
-    {
-      employmentStart: employee.employmentStartDate,
-      employmentEnd: employee.employmentEndDate,
-    },
-    range,
+  return employeeContractsOverlapRange(
+    employee,
+    utcDateToIsoDate(range.start),
+    utcDateToIsoDate(range.end),
   );
 }
 
@@ -100,10 +108,7 @@ export function isDayWithinEmployment(
   employee: Employee,
   day: CalendarDay,
 ): boolean {
-  return isDateWithinEmploymentPeriod(day.isoDate, {
-    employmentStart: employee.employmentStartDate,
-    employmentEnd: employee.employmentEndDate,
-  });
+  return isDateCoveredByContracts(employee, day.isoDate);
 }
 
 export function resolveSettlementCellValue({

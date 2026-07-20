@@ -71,6 +71,9 @@ The attached design history contains several generations of the architecture. Th
 - [Versioned payroll settings and refundable housing deposit](business-rules/versioned-payroll-settings-lifecycle.md)
   - non-overlapping configuration lifecycle, tax classification, canonical
     settlement components, and idempotent deposit withholding/return
+- [Employment contract history and explicit employment ending](business-rules/employment-contract-history.md)
+  - canonical contract coverage, continuation and gaps, explicit ending,
+    legacy migration, returning employees and the cumulative 18-month limit
 
 Approved business-rules specifications govern payroll semantics. Architecture
 documents continue to govern system structure and implementation boundaries.
@@ -103,6 +106,7 @@ documents continue to govern system structure and implementation boundaries.
 - [ADR 0022: Department schedule planning foundation](decisions/0022-department-schedule-planning.md)
 - [ADR 0023: Employee register and shared day editor](decisions/0023-employee-register-and-day-editor.md)
 - [ADR 0026: Business settings navigation and shared calendar appearance](decisions/0026-settings-and-calendar-interface.md)
+- [ADR 0027: Employment-contract history is the source of coverage](decisions/0027-employment-contract-history.md)
 
 ## Audit and readiness reports
 

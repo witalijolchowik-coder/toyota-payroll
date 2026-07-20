@@ -1,5 +1,11 @@
 # General payroll rules
 
+> Contract-history amendment: references below to one employee employment
+> period mean the union of days covered by non-cancelled records in
+> `/employeeContracts`. Legacy `employment_start` / `employment_end` are a
+> migration fallback, not a competing source of truth. See
+> [Employment contract history](employment-contract-history.md).
+
 - Specification block: 1
 - Status: Approved
 - Scope: calendar, nominal hours, employment-period participation, and virtual

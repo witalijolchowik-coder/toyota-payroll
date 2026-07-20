@@ -5,6 +5,7 @@ import {
   planPayrollSettingVersion,
   payrollSettingLifecycleStatus,
   defaultPayrollSettingTaxType,
+  normalizePayrollSettingInput,
   validatePayrollSettingInput,
 } from './settings';
 
@@ -118,6 +119,31 @@ describe('effective payroll setting resolution', () => {
       variantKey: 'variant-required',
       variantName: 'variant-required',
     });
+  });
+
+  it('versions and validates the complete frequency-bonus threshold scale', () => {
+    const input = {
+      settingKey: 'frequency_bonus',
+      variantKey: null,
+      variantName: null,
+      amount: 400,
+      validFrom: '2026-08' as const,
+      validTo: null,
+      description: '',
+    };
+    expect(normalizePayrollSettingInput(input).thresholdScale).toEqual({
+      0: 400,
+      1: 350,
+      2: 300,
+      3: 200,
+      4: 0,
+    });
+    expect(
+      validatePayrollSettingInput({
+        ...input,
+        thresholdScale: { 0: 450, 1: 350, 2: -1, 3: 200, 4: 0 },
+      }),
+    ).toMatchObject({ thresholdScale: 'invalid-amount' });
   });
 
   it('plans an atomic split of one open version without overlapping dates', () => {

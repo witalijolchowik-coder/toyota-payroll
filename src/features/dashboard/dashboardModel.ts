@@ -10,7 +10,15 @@ import {
   deriveL4BusinessStatus,
   resolveGoverningAbsence,
 } from '../../utils/absences';
-import { aggregateMedicalNotices } from '../../utils/employees';
+import {
+  activeContracts,
+  aggregateMedicalNotices,
+  isEmployeeArchived,
+  isDateCoveredByContracts,
+  latestEmploymentEnd,
+  requiresContractDecision,
+  resolveLatestContract,
+} from '../../utils/employees';
 import {
   currentPayrollMonthId,
   dateToIsoDate,
@@ -25,6 +33,8 @@ export interface DashboardDeadline {
   employee: Employee;
   date: Date;
   kind: 'contract' | 'medical';
+  remainingDays?: number;
+  decisionRequired?: boolean;
 }
 
 export interface DashboardDepartmentSummary {
@@ -151,13 +161,26 @@ export function buildDashboardSnapshot({
       )
       .map((absence) => absence.employeeId),
   ).size;
-  const expiringContracts = activeEmployees
+  const contractDeadlines = employees
+    .filter((employee) => !isEmployeeArchived(employee, today))
+    .map((employee) => ({
+      employee,
+      contract: resolveLatestContract(employee),
+      decisionRequired: requiresContractDecision(employee, today),
+    }))
     .filter(
-      (employee) =>
-        employee.employmentEndDate &&
-        isDateInRange(employee.employmentEndDate, today, deadlineEnd),
-    )
-    .sort(compareEmploymentEnd);
+      (item) =>
+        item.contract?.endDate &&
+        (item.decisionRequired ||
+          isDateInRange(
+            new Date(`${item.contract.endDate}T00:00:00.000Z`),
+            today,
+            deadlineEnd,
+          )),
+    );
+  const expiringContracts = contractDeadlines
+    .filter((item) => !item.decisionRequired)
+    .map((item) => item.employee);
   const medical = aggregateMedicalNotices(activeEmployees, departments, today);
   const medicalRenewals = uniqueEmployees([
     ...medical.expired,
@@ -201,10 +224,15 @@ export function buildDashboardSnapshot({
       kind: 'medical',
     }));
   const deadlines = [
-    ...expiringContracts.map((employee): DashboardDeadline => ({
-      employee,
-      date: employee.employmentEndDate!,
+    ...contractDeadlines.map((item): DashboardDeadline => ({
+      employee: item.employee,
+      date: new Date(`${item.contract!.endDate}T00:00:00.000Z`),
       kind: 'contract',
+      remainingDays: calendarDaysBetween(
+        today,
+        new Date(`${item.contract!.endDate}T00:00:00.000Z`),
+      ),
+      decisionRequired: item.decisionRequired,
     })),
     ...upcomingMedical,
   ]
@@ -296,29 +324,41 @@ export function calculateRotationForMonth(
     getPayrollMonthDateRange(monthId);
   const startIso = dateToIsoDate(monthStart);
   const endIso = dateToIsoDate(monthEnd);
-  const hired = employees.filter(
-    (employee) =>
-      employee.employmentStartDate &&
-      isIsoDateInRange(
-        dateToIsoDate(employee.employmentStartDate),
-        startIso,
-        endIso,
-      ),
-  ).length;
-  const terminated = employees.filter(
-    (employee) =>
+  const hired = employees.reduce((total, employee) => {
+    const sequenceStarts = new Map<string, string>();
+    activeContracts(employee).forEach((contract) => {
+      const current = sequenceStarts.get(contract.sequenceId);
+      if (!current || contract.startDate < current) {
+        sequenceStarts.set(contract.sequenceId, contract.startDate);
+      }
+    });
+    return (
+      total +
+      [...sequenceStarts.values()].filter((date) =>
+        isIsoDateInRange(date, startIso, endIso),
+      ).length
+    );
+  }, 0);
+  const terminated = employees.filter((employee) => {
+    const ending = latestEmploymentEnd(employee);
+    if (ending) {
+      return isIsoDateInRange(ending.endDate, startIso, endIso);
+    }
+    return (
+      (employee.contracts?.length ?? 0) === 0 &&
       employee.employmentEndDate &&
       isIsoDateInRange(
         dateToIsoDate(employee.employmentEndDate),
         startIso,
         endIso,
-      ),
-  ).length;
+      )
+    );
+  }).length;
   const headcountAtStart = employees.filter((employee) =>
-    isEmployeeActiveOnDate(employee, monthStart),
+    isDateCoveredByContracts(employee, startIso),
   ).length;
   const headcountAtEnd = employees.filter((employee) =>
-    isEmployeeActiveOnDate(employee, monthEnd),
+    isDateCoveredByContracts(employee, endIso),
   ).length;
   const averageHeadcount = (headcountAtStart + headcountAtEnd) / 2;
 
@@ -472,13 +512,6 @@ function uniqueEmployees(employees: readonly Employee[]): Employee[] {
   );
 }
 
-function compareEmploymentEnd(first: Employee, second: Employee) {
-  return (
-    (first.employmentEndDate?.getTime() ?? Number.MAX_SAFE_INTEGER) -
-    (second.employmentEndDate?.getTime() ?? Number.MAX_SAFE_INTEGER)
-  );
-}
-
 function isDateInRange(value: Date, start: Date, end: Date): boolean {
   const day = dateAtUtcMidnight(value);
   return day >= dateAtUtcMidnight(start) && day <= dateAtUtcMidnight(end);
@@ -488,6 +521,16 @@ function addCalendarDays(value: Date, days: number): Date {
   return new Date(
     Date.UTC(value.getFullYear(), value.getMonth(), value.getDate() + days),
   );
+}
+
+function calendarDaysBetween(start: Date, end: Date): number {
+  const startUtc = Date.UTC(
+    start.getFullYear(),
+    start.getMonth(),
+    start.getDate(),
+  );
+  const endUtc = Date.UTC(end.getFullYear(), end.getMonth(), end.getDate());
+  return Math.ceil((endUtc - startUtc) / 86_400_000);
 }
 
 function dateAtUtcMidnight(value: Date): number {

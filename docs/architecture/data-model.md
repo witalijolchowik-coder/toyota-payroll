@@ -11,6 +11,10 @@ This is the final MVP shape. It supersedes the earlier enterprise collection hie
 
 /employees/{employeeId}
 
+/employeeContracts/{contractId}
+
+/employmentEndEvents/{eventId}
+
 /employeeAssignments/{assignmentId}
 
 /employeeEntitlements/{entitlementId}
@@ -64,6 +68,23 @@ Names are resolved from `/employees` in the UI and are not duplicated into opera
 TETA is the only import-matching and external-report identifier. Firestore IDs must never be used for business matching or shown as coordinator-facing identity.
 
 During employee-data preparation TETA may be blank, but finalization and report readiness must reject that employee. Employee identity also stores optional `phone_number`, ISO 3166-1 alpha-2 `citizenship`, `gender` (`K` or `M`) and the stable `first_toyota_employment_date`; the latter is the salary-tier basis and must survive re-employment updates.
+
+## Employee contracts and employment ending
+
+`/employeeContracts` is the authoritative employment-coverage history. Each
+document stores `employee_id`, `teta_number`, inclusive `start_date` and
+`end_date`, `sequence_number`, `ACTIVE`/`CANCELLED` lifecycle state, optional
+note and modification/cancellation metadata. Employee names are not copied.
+
+`/employmentEndEvents` records the explicit decision to close an employment
+sequence. A contract end date alone does not archive an employee. End events
+are immutable except for lifecycle cancellation; physical deletion is denied.
+
+The current contract, monthly participation, planned-day coverage, archive
+state and the cumulative 18-month limit are derived from all non-cancelled
+contracts. Legacy `employment_start` and `employment_end` employee fields are
+derived compatibility fields only. See
+[Employment contract history](../business-rules/employment-contract-history.md).
 
 Optional medical-examination facts are kept on the employee document:
 
@@ -199,22 +220,23 @@ day-to-day coordination. It may be used by current-workforce views and
 workflows, but it is not historical evidence that the employee did or did not
 participate in an earlier payroll month.
 
-Monthly participation is determined only by overlap between the employment
-period and the selected payroll month:
+Monthly participation is determined by overlap between at least one
+non-cancelled employee contract and the selected payroll month:
 
 ```text
-employment_start <= month_end
+contract.start_date <= month_end
 AND
-(employment_end is null OR employment_end >= month_start)
+contract.end_date >= month_start
 ```
 
 For example, an employee whose employment ended on 15 June is inactive in
 July, but must still be included when June payroll is calculated in July.
 
-Future month initialization and payroll calculation must not filter employees
-by their current `is_active` value. If `employment_start` is missing, the
-future monthly workflow must surface the incomplete employment data for
-resolution rather than using current status as a fallback.
+All covered days are combined as a set, so continuous contracts do not double
+count days and gaps remain outside employment. Future month initialization
+and payroll calculation must not filter employees by `is_active`, current
+contract or archive state. During migration only, an employee without any
+contract history may fall back to one valid legacy employment period.
 
 ## Virtual daily defaults
 
