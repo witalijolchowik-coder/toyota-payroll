@@ -438,9 +438,33 @@ describe('Firestore converters', () => {
     ).toMatchObject({
       settingKey: 'frequency_bonus',
       amount: 400,
+      taxType: 'GROSS',
       validFrom: '2026-07',
       validTo: null,
     });
+  });
+
+  it('keeps deliberate legacy tax defaults without changing the amount', () => {
+    const document = payrollSettingConverter.fromFirestore(
+      snapshot('payrollSettings/legacy-transport', {
+        setting_key: 'transport_allowance',
+        variant_key: null,
+        variant_name: null,
+        amount: 275,
+        valid_from: '2026-01',
+        valid_to: null,
+        active: true,
+        description: '',
+        created_at: now,
+        created_by: 'test-user',
+        updated_at: now,
+        updated_by: 'test-user',
+      }),
+      {},
+    );
+    expect(
+      mapPayrollSettingDocument('legacy-transport', document),
+    ).toMatchObject({ amount: 275, taxType: 'NET' });
   });
 
   it('validates and maps an active employee adjustment', () => {

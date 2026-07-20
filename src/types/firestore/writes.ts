@@ -16,6 +16,7 @@ import type {
   IsoDate,
   MonthId,
   PayrollSettingKey,
+  PayrollSettingTaxType,
   SettlementReviewStatus,
   TetaNumber,
 } from './documents';
@@ -155,6 +156,8 @@ export type EmployeeEntitlementUpdateInput = Pick<
 export interface SettlementReviewUpdateInput extends EmployeeReferenceInput {
   reviewStatus: SettlementReviewStatus;
   reviewNote: string;
+  depositReturnOverride?: number | null;
+  depositReturnNote?: string;
 }
 
 export interface PayrollSettingCreateInput {
@@ -162,6 +165,7 @@ export interface PayrollSettingCreateInput {
   variantKey: string | null;
   variantName: string | null;
   amount: number;
+  taxType?: PayrollSettingTaxType;
   validFrom: MonthId;
   validTo: MonthId | null;
   description: string;

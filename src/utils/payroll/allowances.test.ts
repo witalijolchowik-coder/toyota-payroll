@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   calculateCompanyAccommodationCharge,
+  calculateHousingDeposit,
   calculateLaundryAllowance,
   calculateTransportAllowance,
   isQualifyingAllowancePresence,
@@ -41,5 +42,54 @@ describe('allowance helpers', () => {
       accommodation: 177.42,
       total: 230.65,
     });
+  });
+});
+
+describe('refundable housing deposit', () => {
+  const episode = {
+    episodeId: 'housing-episode-1',
+    episodeStart: '2026-06-10',
+    episodeEnd: '2026-08-20',
+    employmentEnd: null,
+    configuredAmount: 99,
+  } as const;
+
+  it('withholds once in the move-in month and remains held in between', () => {
+    expect(
+      calculateHousingDeposit({ monthId: '2026-06', ...episode }),
+    ).toMatchObject({ held: 99, withheld: 99, automaticReturn: 0 });
+    expect(
+      calculateHousingDeposit({ monthId: '2026-07', ...episode }),
+    ).toMatchObject({ held: 99, withheld: 0, automaticReturn: 0 });
+  });
+
+  it('returns once in the move-out month and supports a bounded override', () => {
+    expect(
+      calculateHousingDeposit({ monthId: '2026-08', ...episode }),
+    ).toMatchObject({ automaticReturn: 99, finalReturn: 99 });
+    expect(
+      calculateHousingDeposit({
+        monthId: '2026-08',
+        ...episode,
+        returnOverride: 60,
+      }),
+    ).toMatchObject({ automaticReturn: 99, finalReturn: 60 });
+  });
+
+  it('returns in the final employment month when employment ends first', () => {
+    expect(
+      calculateHousingDeposit({
+        monthId: '2026-07',
+        ...episode,
+        employmentEnd: '2026-07-31',
+      }),
+    ).toMatchObject({ automaticReturn: 99, finalReturn: 99 });
+  });
+
+  it('is idempotent for the same episode input', () => {
+    const first = calculateHousingDeposit({ monthId: '2026-06', ...episode });
+    expect(calculateHousingDeposit({ monthId: '2026-06', ...episode })).toEqual(
+      first,
+    );
   });
 });

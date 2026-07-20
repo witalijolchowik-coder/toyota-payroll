@@ -261,6 +261,12 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
     payrollSettings: data.payrollSettings,
     adjustments: data.adjustments,
     entitlementsByEmployeeId,
+    depositReturnOverridesByEmployeeId: new Map(
+      data.reviewStates.map((state) => [
+        state.employeeId,
+        state.depositReturnOverride,
+      ]),
+    ),
     plannedSchedulesByEmployeeId,
     calendarOptions: { publicHolidays },
   });

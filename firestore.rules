@@ -652,6 +652,8 @@ service cloud.firestore {
           'review_note',
           'reviewed_at',
           'reviewed_by',
+          'deposit_return_override',
+          'deposit_return_note',
           'created_at',
           'created_by',
           'updated_at',
@@ -665,6 +667,8 @@ service cloud.firestore {
           'review_note',
           'reviewed_at',
           'reviewed_by',
+          'deposit_return_override',
+          'deposit_return_note',
           'created_at',
           'created_by',
           'updated_at',
@@ -679,6 +683,14 @@ service cloud.firestore {
           'CHECKED'
         ]
         && data.review_note is string
+        && (
+          data.deposit_return_override == null
+          || (
+            data.deposit_return_override is number
+            && data.deposit_return_override >= 0
+          )
+        )
+        && data.deposit_return_note is string
         && data.reviewed_at is timestamp
         && data.reviewed_by == request.auth.uid
         && hasModificationMetadata(data);
@@ -746,6 +758,7 @@ service cloud.firestore {
           'variant_key',
           'variant_name',
           'amount',
+          'tax_type',
           'valid_from',
           'valid_to',
           'active',
@@ -760,6 +773,7 @@ service cloud.firestore {
           'variant_key',
           'variant_name',
           'amount',
+          'tax_type',
           'valid_from',
           'valid_to',
           'active',
@@ -781,6 +795,7 @@ service cloud.firestore {
         )
         && data.amount is number
         && data.amount >= 0
+        && data.tax_type in ['GROSS', 'NET']
         && isMonthId(data.valid_from)
         && (data.valid_to == null || isMonthId(data.valid_to))
         && (data.valid_to == null || data.valid_to >= data.valid_from)
@@ -812,11 +827,28 @@ service cloud.firestore {
 
     match /payrollSettings/{settingId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated()
+      allow create: if isAdmin()
         && validPayrollSetting(request.resource.data)
         && request.resource.data.active == true
         && hasCreateMetadata(request.resource.data);
-      allow update, delete: if false;
+      allow update: if isAdmin()
+        && validPayrollSetting(request.resource.data)
+        && hasUpdateMetadata(request.resource.data)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'valid_to', 'active', 'tax_type', 'updated_at', 'updated_by'
+        ])
+        && (
+          !resource.data.keys().hasAll(['tax_type'])
+          || request.resource.data.tax_type == resource.data.tax_type
+        )
+        && (
+          request.resource.data.active == resource.data.active
+          || (
+            resource.data.active == true
+            && request.resource.data.active == false
+          )
+        );
+      allow delete: if false;
     }
 
     match /shiftHoursVersions/{versionId} {
@@ -1177,6 +1209,8 @@ service cloud.firestore {
             'review_note',
             'reviewed_at',
             'reviewed_by',
+            'deposit_return_override',
+            'deposit_return_note',
             'updated_at',
             'updated_by'
           ]);

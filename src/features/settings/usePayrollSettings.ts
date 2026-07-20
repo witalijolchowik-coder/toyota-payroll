@@ -3,11 +3,14 @@ import { useCallback, useEffect, useState } from 'react';
 import { useGlobalLoading } from '../../hooks/useGlobalLoading';
 import {
   createPayrollSettingVersion,
+  endPayrollSettingVersion,
+  cancelFuturePayrollSettingVersion,
   loadPayrollSettings,
 } from '../../services/payrollSettingsService';
 import type {
   PayrollSetting,
   PayrollSettingCreateInput,
+  MonthId,
 } from '../../types/firestore';
 
 interface PayrollSettingsState {
@@ -61,5 +64,28 @@ export function usePayrollSettings() {
     }
   };
 
-  return { ...state, createVersion, reload };
+  const endVersion = async (setting: PayrollSetting, validTo: string) => {
+    showLoading();
+    try {
+      await endPayrollSettingVersion(setting, validTo as MonthId);
+      await reload();
+    } finally {
+      hideLoading();
+    }
+  };
+
+  const cancelVersion = async (
+    setting: PayrollSetting,
+    currentMonth: string,
+  ) => {
+    showLoading();
+    try {
+      await cancelFuturePayrollSettingVersion(setting, currentMonth as MonthId);
+      await reload();
+    } finally {
+      hideLoading();
+    }
+  };
+
+  return { ...state, createVersion, endVersion, cancelVersion, reload };
 }

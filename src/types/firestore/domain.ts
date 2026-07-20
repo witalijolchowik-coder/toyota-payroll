@@ -23,6 +23,7 @@ import type {
   IsoDate,
   MonthId,
   PayrollSettingKey,
+  PayrollSettingTaxType,
   ReportStatus,
   ScheduleCorrectionKind,
   ScheduleCorrectionStatus,
@@ -166,6 +167,8 @@ export interface SettlementReviewState extends ModificationMetadata {
   reviewNote: string;
   reviewedAt: Date | null;
   reviewedBy: string | null;
+  depositReturnOverride: number | null;
+  depositReturnNote: string;
 }
 
 export interface DailyValue extends ModificationMetadata {
@@ -236,6 +239,7 @@ export interface PayrollSetting extends ModificationMetadata {
   variantKey: string | null;
   variantName: string | null;
   amount: number;
+  taxType: PayrollSettingTaxType;
   validFrom: MonthId;
   validTo: MonthId | null;
   active: boolean;

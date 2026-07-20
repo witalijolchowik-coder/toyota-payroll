@@ -389,6 +389,10 @@ export const settlementReviewConverter =
     review_note: readString(data, 'review_note', path),
     reviewed_at: readNullableTimestamp(data, 'reviewed_at', path),
     reviewed_by: readNullableString(data, 'reviewed_by', path),
+    deposit_return_override:
+      readOptionalNullableNumber(data, 'deposit_return_override', path) ?? null,
+    deposit_return_note:
+      readOptionalNullableString(data, 'deposit_return_note', path) ?? '',
     ...metadata(data, path),
   }));
 
@@ -570,6 +574,12 @@ export const payrollSettingConverter = createConverter<PayrollSettingDocument>(
     variant_key: readNullableString(data, 'variant_key', path),
     variant_name: readNullableString(data, 'variant_name', path),
     amount: readNumber(data, 'amount', path),
+    tax_type:
+      readOptionalEnum(data, 'tax_type', path, ['GROSS', 'NET'] as const) ??
+      (data.setting_key === 'transport_allowance' ||
+      data.setting_key === 'housing_deposit'
+        ? 'NET'
+        : 'GROSS'),
     valid_from: readNonEmptyString(data, 'valid_from', path),
     valid_to: readNullableString(data, 'valid_to', path),
     active: readBoolean(data, 'active', path),

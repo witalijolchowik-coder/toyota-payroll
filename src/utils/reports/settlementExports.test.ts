@@ -419,6 +419,10 @@ function draft(
       companyAccommodationDeduction: 0,
       companyAccommodationMediaDeduction: 0,
       companyAccommodationRentDeduction: 0,
+      housingDepositHeld: 0,
+      housingDepositWithholding: 0,
+      housingDepositAutomaticReturn: 0,
+      housingDepositReturn: 0,
     },
     warnings: [],
     totals: {
@@ -430,6 +434,7 @@ function draft(
       bruttoAdditions: 440,
       nettoAllowances: 275,
       deductions: 0,
+      returns: 0,
       preliminaryGrossAdditions: 440,
       preliminaryGrossDeductions: 0,
     },

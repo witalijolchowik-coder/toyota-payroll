@@ -43,6 +43,7 @@ import {
   type DailyWorkTimeDeviation,
 } from './workTimeDeviations';
 import type { PlannedScheduleDay } from '../schedule';
+import { calculateHousingDeposit } from './allowances';
 
 export type PayrollDraftWarningCode =
   | 'employee-not-participating'
@@ -64,6 +65,8 @@ export type PayrollDraftWarningCode =
   | 'company-accommodation-missing-variant'
   | 'unresolved-company-accommodation-variant'
   | 'unresolved-own-housing-setting'
+  | 'unresolved-payroll-setting'
+  | 'unresolved-housing-deposit-setting'
   | 'critical-read-failure';
 
 export interface PayrollDraftWarning {
@@ -179,6 +182,10 @@ export interface EmployeeMonthlyCalculationDraft {
     companyAccommodationDeduction: number;
     companyAccommodationMediaDeduction: number;
     companyAccommodationRentDeduction: number;
+    housingDepositHeld: number;
+    housingDepositWithholding: number;
+    housingDepositAutomaticReturn: number;
+    housingDepositReturn: number;
   };
   warnings: PayrollDraftWarning[];
   totals: {
@@ -190,6 +197,7 @@ export interface EmployeeMonthlyCalculationDraft {
     bruttoAdditions: number;
     nettoAllowances: number;
     deductions: number;
+    returns: number;
     preliminaryGrossAdditions: number;
     preliminaryGrossDeductions: number;
   };
@@ -205,6 +213,7 @@ export interface MonthlyCalculationDraftInput {
   entitlements?: EmployeeSettlementEntitlements | null;
   calendarOptions?: PayrollCalendarOptions;
   plannedSchedule?: readonly PlannedScheduleDay[];
+  depositReturnOverride?: number | null;
 }
 
 export interface MonthlyCalculationDraftsInput extends Omit<
@@ -220,15 +229,11 @@ export interface MonthlyCalculationDraftsInput extends Omit<
     string,
     readonly PlannedScheduleDay[]
   >;
+  depositReturnOverridesByEmployeeId?: ReadonlyMap<string, number | null>;
 }
 
 const APPROVED_ABSENCE_CODES = new Set(['UW', 'UZ', 'OPD', 'KRW', 'WZN']);
 const VACATION_ABSENCE_CODES = new Set(['UW', 'UZ']);
-const DEFAULT_TRANSPORT_ALLOWANCE = 275;
-const DEFAULT_HOLIDAY_WORK_BONUS = 300;
-const DEFAULT_UDT_ALLOWANCE = 300;
-const DEFAULT_LAUNDRY_ALLOWANCE = 40;
-const DEFAULT_COMPANY_HOUSING_MEDIA = 500;
 
 function employmentPeriod(employee: Employee): EmploymentPeriod {
   return {
@@ -287,12 +292,11 @@ function configuredAmount(
   settings: readonly PayrollSetting[],
   settingKey: string,
   monthId: MonthId,
-  defaultAmount: number,
   variantKey: string | null = null,
-): number {
+): number | null {
   return (
     resolveEffectivePayrollSetting(settings, settingKey, monthId, variantKey)
-      ?.amount ?? defaultAmount
+      ?.amount ?? null
   );
 }
 
@@ -483,19 +487,20 @@ function calculateCompanyAccommodationDeduction({
     };
   }
 
-  const mediaMonthly =
-    resolveEffectivePayrollSetting(
-      settings,
-      'company_housing_media',
-      monthId,
-      assignment.variantKey,
-    )?.amount ??
-    configuredAmount(
-      settings,
-      'company_housing_media',
-      monthId,
-      DEFAULT_COMPANY_HOUSING_MEDIA,
-    );
+  const mediaMonthly = configuredAmount(
+    settings,
+    'company_housing_media',
+    monthId,
+    assignment.variantKey,
+  );
+  if (mediaMonthly === null) {
+    return {
+      media: 0,
+      rent: 0,
+      total: 0,
+      warnings: ['unresolved-company-accommodation-variant'] as const,
+    };
+  }
   const rentMonthly = rentSetting.amount;
   const media = prorateMoney(mediaMonthly, chargedDays, monthDays);
   const rent = prorateMoney(rentMonthly, chargedDays, monthDays);
@@ -513,6 +518,7 @@ export function calculateEmployeeMonthlyDraft({
   entitlements = null,
   calendarOptions = {},
   plannedSchedule,
+  depositReturnOverride = null,
 }: MonthlyCalculationDraftInput): EmployeeMonthlyCalculationDraft {
   const range = getPayrollMonthDateRange(monthId);
   const employment = employmentPeriod(employee);
@@ -886,42 +892,51 @@ export function calculateEmployeeMonthlyDraft({
       (group) => group.code !== 'L4' && !VACATION_ABSENCE_CODES.has(group.code),
     )
     .reduce((total, group) => total + group.nominalHours, 0);
+  const holidaySetting = resolveEffectivePayrollSetting(
+    payrollSettings,
+    'holiday_work_bonus',
+    monthId,
+  );
+  if (workTimeBeforeBalance.holidayWorkBonusEligible && !holidaySetting) {
+    warnings.push(warning('unresolved-payroll-setting'));
+  }
   const holidayWorkBonusBrutto = workTimeBeforeBalance.holidayWorkBonusEligible
-    ? configuredAmount(
-        payrollSettings,
-        'holiday_work_bonus',
-        monthId,
-        DEFAULT_HOLIDAY_WORK_BONUS,
-      )
+    ? (holidaySetting?.amount ?? 0)
     : 0;
+  const transportSetting = resolveEffectivePayrollSetting(
+    payrollSettings,
+    'transport_allowance',
+    monthId,
+  );
+  const laundrySetting = resolveEffectivePayrollSetting(
+    payrollSettings,
+    'laundry_allowance',
+    monthId,
+  );
+  if (!transportSetting || !laundrySetting) {
+    warnings.push(warning('unresolved-payroll-setting'));
+  }
   const transportAllowanceNetto = prorateByWorkedDays({
-    monthlyAmount: configuredAmount(
-      payrollSettings,
-      'transport_allowance',
-      monthId,
-      DEFAULT_TRANSPORT_ALLOWANCE,
-    ),
+    monthlyAmount: transportSetting?.amount ?? 0,
     eligibleWorkingDays: monthWorkingDays,
     physicallyWorkedDays: physicallyWorkedDates.size,
   });
   const laundryAllowanceBrutto = prorateByWorkedDays({
-    monthlyAmount: configuredAmount(
-      payrollSettings,
-      'laundry_allowance',
-      monthId,
-      DEFAULT_LAUNDRY_ALLOWANCE,
-    ),
+    monthlyAmount: laundrySetting?.amount ?? 0,
     eligibleWorkingDays: monthWorkingDays,
     physicallyWorkedDays: physicallyWorkedDates.size,
   });
+  const udtSetting = resolveEffectivePayrollSetting(
+    payrollSettings,
+    'udt_allowance',
+    monthId,
+  );
+  if (entitlements?.udtEligible && fullCalendarMonth && !udtSetting) {
+    warnings.push(warning('unresolved-payroll-setting'));
+  }
   const udtAllowanceBrutto =
     entitlements?.udtEligible && fullCalendarMonth
-      ? configuredAmount(
-          payrollSettings,
-          'udt_allowance',
-          monthId,
-          DEFAULT_UDT_ALLOWANCE,
-        )
+      ? (udtSetting?.amount ?? 0)
       : 0;
   const ownHousingSetting = resolveEffectivePayrollSetting(
     payrollSettings,
@@ -944,6 +959,33 @@ export function calculateEmployeeMonthlyDraft({
   companyAccommodation.warnings.forEach((code) => {
     warnings.push(warning(code));
   });
+  const accommodationStart = entitlements?.companyAccommodation
+    ?.contractStartDate
+    ? dateToIsoDate(entitlements.companyAccommodation.contractStartDate)
+    : null;
+  const depositSetting = accommodationStart
+    ? resolveEffectivePayrollSetting(
+        payrollSettings,
+        'housing_deposit',
+        accommodationStart.slice(0, 7) as MonthId,
+      )
+    : null;
+  if (accommodationStart && !depositSetting) {
+    warnings.push(warning('unresolved-housing-deposit-setting'));
+  }
+  const housingDeposit = calculateHousingDeposit({
+    monthId,
+    episodeId: entitlements?.companyAccommodation?.episodeId ?? null,
+    episodeStart: accommodationStart,
+    episodeEnd: entitlements?.companyAccommodation?.contractEndDate
+      ? dateToIsoDate(entitlements.companyAccommodation.contractEndDate)
+      : null,
+    employmentEnd: employee.employmentEndDate
+      ? dateToIsoDate(employee.employmentEndDate)
+      : null,
+    configuredAmount: depositSetting?.amount ?? null,
+    returnOverride: depositReturnOverride,
+  });
   const bruttoAdditions = roundMoney(
     (frequencyAmount ?? 0) +
       holidayWorkBonusBrutto +
@@ -952,8 +994,12 @@ export function calculateEmployeeMonthlyDraft({
       ownHousingAllowanceBrutto +
       manualIncreases,
   );
-  const nettoAllowances = transportAllowanceNetto;
-  const deductions = roundMoney(manualDecreases + companyAccommodation.total);
+  const nettoAllowances = roundMoney(
+    transportAllowanceNetto + housingDeposit.finalReturn,
+  );
+  const deductions = roundMoney(
+    manualDecreases + companyAccommodation.total + housingDeposit.withheld,
+  );
   const preliminaryGrossAdditions = roundMoney(
     (frequencyAmount ?? 0) +
       holidayWorkBonusBrutto +
@@ -1045,6 +1091,10 @@ export function calculateEmployeeMonthlyDraft({
       companyAccommodationDeduction: companyAccommodation.total,
       companyAccommodationMediaDeduction: companyAccommodation.media,
       companyAccommodationRentDeduction: companyAccommodation.rent,
+      housingDepositHeld: housingDeposit.held,
+      housingDepositWithholding: housingDeposit.withheld,
+      housingDepositAutomaticReturn: housingDeposit.automaticReturn,
+      housingDepositReturn: housingDeposit.finalReturn,
     },
     warnings,
     totals: {
@@ -1056,6 +1106,7 @@ export function calculateEmployeeMonthlyDraft({
       bruttoAdditions,
       nettoAllowances,
       deductions,
+      returns: housingDeposit.finalReturn,
       preliminaryGrossAdditions,
       preliminaryGrossDeductions: deductions,
     },
@@ -1066,6 +1117,7 @@ export function calculateMonthlyDrafts({
   employees,
   entitlementsByEmployeeId,
   plannedSchedulesByEmployeeId,
+  depositReturnOverridesByEmployeeId,
   ...input
 }: MonthlyCalculationDraftsInput): EmployeeMonthlyCalculationDraft[] {
   return employees.map((employee) =>
@@ -1073,6 +1125,8 @@ export function calculateMonthlyDrafts({
       ...input,
       employee,
       entitlements: entitlementsByEmployeeId?.get(employee.id) ?? null,
+      depositReturnOverride:
+        depositReturnOverridesByEmployeeId?.get(employee.id) ?? null,
       plannedSchedule: plannedSchedulesByEmployeeId?.get(employee.id),
     }),
   );

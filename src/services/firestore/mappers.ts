@@ -230,6 +230,8 @@ export function mapSettlementReviewDocument(
     reviewNote: document.review_note,
     reviewedAt: document.reviewed_at?.toDate() ?? null,
     reviewedBy: document.reviewed_by,
+    depositReturnOverride: document.deposit_return_override,
+    depositReturnNote: document.deposit_return_note,
     ...modificationMetadata(document),
   };
 }
@@ -345,6 +347,7 @@ export function mapPayrollSettingDocument(
     variantKey: document.variant_key,
     variantName: document.variant_name,
     amount: document.amount,
+    taxType: document.tax_type,
     validFrom: document.valid_from,
     validTo: document.valid_to,
     active: document.active,

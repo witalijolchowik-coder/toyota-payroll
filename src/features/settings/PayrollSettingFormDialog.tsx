@@ -9,27 +9,43 @@ import {
   MenuItem,
   Stack,
   TextField,
+  Typography,
 } from '@mui/material';
 
 import type {
   KnownPayrollSettingKey,
   MonthId,
+  PayrollSetting,
   PayrollSettingCreateInput,
 } from '../../types/firestore';
 import { currentPayrollMonthId } from '../../utils/payroll';
-import { validatePayrollSettingInput } from '../../utils/payroll/settings';
+import {
+  defaultPayrollSettingTaxType,
+  planPayrollSettingVersion,
+  validatePayrollSettingInput,
+} from '../../utils/payroll/settings';
 import { useTranslations } from '../../hooks/useTranslations';
 
 interface PayrollSettingFormDialogProps {
   allowedKeys?: KnownPayrollSettingKey[];
   initialKey?: KnownPayrollSettingKey;
+  settings?: PayrollSetting[];
   onClose: () => void;
   onSubmit: (input: PayrollSettingCreateInput) => Promise<void>;
+}
+
+function defaultAmountForSetting(key: KnownPayrollSettingKey): string {
+  if (key === 'transport_allowance') return '275';
+  if (key === 'laundry_allowance') return '40';
+  if (key === 'own_housing_allowance') return '300';
+  if (key === 'housing_deposit') return '99';
+  return '400';
 }
 
 export function PayrollSettingFormDialog({
   allowedKeys,
   initialKey,
+  settings = [],
   onClose,
   onSubmit,
 }: PayrollSettingFormDialogProps) {
@@ -64,6 +80,10 @@ export function PayrollSettingFormDialog({
       value: 'company_housing_media',
       label: t.settings.settingForm.options.companyMedia,
     },
+    {
+      value: 'housing_deposit',
+      label: t.settings.settingForm.options.housingDeposit,
+    },
   ];
   const settingOptions = allowedKeys
     ? allOptions.filter((option) => allowedKeys.includes(option.value))
@@ -73,7 +93,12 @@ export function PayrollSettingFormDialog({
   );
   const [variantKey, setVariantKey] = useState('');
   const [variantName, setVariantName] = useState('');
-  const [amount, setAmount] = useState('400');
+  const [amount, setAmount] = useState(() =>
+    defaultAmountForSetting(settingKey),
+  );
+  const [taxType, setTaxType] = useState<'GROSS' | 'NET'>(() =>
+    defaultPayrollSettingTaxType(settingKey),
+  );
   const [validFrom, setValidFrom] = useState<MonthId>(() =>
     currentPayrollMonthId(new Date()),
   );
@@ -82,6 +107,7 @@ export function PayrollSettingFormDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
+  const [impactConfirmed, setImpactConfirmed] = useState(false);
   const isAccommodation = settingKey === 'accommodation_allowance';
 
   const buildInput = (): PayrollSettingCreateInput => ({
@@ -89,15 +115,25 @@ export function PayrollSettingFormDialog({
     variantKey: isAccommodation ? variantKey : null,
     variantName: isAccommodation ? variantName : null,
     amount: amount.trim() ? Number(amount.replace(',', '.')) : Number.NaN,
+    taxType,
     validFrom,
     validTo: validTo || null,
     description,
   });
   const validation = validatePayrollSettingInput(buildInput());
+  const lifecyclePlan = planPayrollSettingVersion(settings, buildInput());
 
   const handleSubmit = async () => {
     setShowValidation(true);
     if (Object.keys(validation).length > 0) {
+      return;
+    }
+    if (lifecyclePlan.blockedReason) {
+      setSubmitError(true);
+      return;
+    }
+    if (lifecyclePlan.requiresConfirmation && !impactConfirmed) {
+      setImpactConfirmed(true);
       return;
     }
     setIsSubmitting(true);
@@ -127,9 +163,16 @@ export function PayrollSettingFormDialog({
             value={settingKey}
             onChange={(event) => {
               setSettingKey(event.target.value as KnownPayrollSettingKey);
-              if (event.target.value === 'frequency_bonus') {
-                setAmount('400');
-              }
+              setTaxType(
+                defaultPayrollSettingTaxType(event.target.value) as
+                  'GROSS' | 'NET',
+              );
+              setImpactConfirmed(false);
+              setAmount(
+                defaultAmountForSetting(
+                  event.target.value as KnownPayrollSettingKey,
+                ),
+              );
             }}
           >
             {settingOptions.map((option) => (
@@ -170,6 +213,17 @@ export function PayrollSettingFormDialog({
             }
             inputMode="decimal"
           />
+          <TextField
+            select
+            label={t.settings.settingForm.tax}
+            value={taxType}
+            onChange={(event) =>
+              setTaxType(event.target.value as 'GROSS' | 'NET')
+            }
+          >
+            <MenuItem value="GROSS">{t.settings.settingForm.gross}</MenuItem>
+            <MenuItem value="NET">{t.settings.settingForm.net}</MenuItem>
+          </TextField>
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
             <TextField
               type="month"
@@ -202,6 +256,24 @@ export function PayrollSettingFormDialog({
             multiline
             minRows={2}
           />
+          {lifecyclePlan.requiresConfirmation ? (
+            <Alert severity={lifecyclePlan.blockedReason ? 'error' : 'warning'}>
+              <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                {t.settings.settingForm.impactTitle}
+              </Typography>
+              <Typography variant="body2">
+                {lifecyclePlan.blockedReason
+                  ? t.settings.settingForm.complexOverlap
+                  : t.settings.settingForm.impactDescription}
+              </Typography>
+              {lifecyclePlan.versionsToShorten.map(({ setting, validTo }) => (
+                <Typography key={setting.id} variant="body2">
+                  {setting.validFrom} – {setting.validTo ?? '∞'} →{' '}
+                  {setting.validFrom} – {validTo}
+                </Typography>
+              ))}
+            </Alert>
+          ) : null}
         </Stack>
       </DialogContent>
       <DialogActions>
@@ -213,7 +285,9 @@ export function PayrollSettingFormDialog({
           onClick={() => void handleSubmit()}
           disabled={isSubmitting}
         >
-          {t.settings.settingForm.save}
+          {lifecyclePlan.requiresConfirmation && !impactConfirmed
+            ? t.settings.settingForm.preview
+            : t.settings.settingForm.save}
         </Button>
       </DialogActions>
     </Dialog>

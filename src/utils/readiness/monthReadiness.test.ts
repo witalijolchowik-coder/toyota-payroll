@@ -59,6 +59,7 @@ function setting(
     variantKey: null,
     variantName: null,
     amount: 100,
+    taxType: 'GROSS',
     validFrom: '2026-01',
     validTo: null,
     active: true,

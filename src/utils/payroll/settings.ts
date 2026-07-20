@@ -2,6 +2,7 @@ import type {
   MonthId,
   PayrollSetting,
   PayrollSettingCreateInput,
+  PayrollSettingTaxType,
 } from '../../types/firestore';
 import { parsePayrollMonthId } from './month';
 
@@ -19,6 +20,7 @@ export interface PayrollSettingValidationErrors {
   amount?: PayrollSettingValidationCode;
   validFrom?: PayrollSettingValidationCode;
   validTo?: PayrollSettingValidationCode;
+  taxType?: PayrollSettingValidationCode;
 }
 
 export class PayrollSettingResolutionError extends Error {
@@ -52,7 +54,18 @@ export function normalizePayrollSettingInput(
       : null,
     variantName: input.variantName?.trim() || null,
     description: input.description.trim(),
+    taxType:
+      input.taxType ?? defaultPayrollSettingTaxType(input.settingKey.trim()),
   };
+}
+
+export function defaultPayrollSettingTaxType(
+  settingKey: string,
+): PayrollSettingTaxType {
+  return settingKey === 'transport_allowance' ||
+    settingKey === 'housing_deposit'
+    ? 'NET'
+    : 'GROSS';
 }
 
 export function validatePayrollSettingInput(
@@ -66,6 +79,9 @@ export function validatePayrollSettingInput(
   }
   if (!Number.isFinite(normalized.amount) || normalized.amount < 0) {
     errors.amount = 'invalid-amount';
+  }
+  if (!normalized.taxType || !['GROSS', 'NET'].includes(normalized.taxType)) {
+    errors.taxType = 'required';
   }
   if (!isMonthId(normalized.validFrom)) {
     errors.validFrom = 'invalid-month';
@@ -90,6 +106,93 @@ export function validatePayrollSettingInput(
   }
 
   return errors;
+}
+
+export type PayrollSettingLifecycleStatus =
+  'FUTURE' | 'ACTIVE' | 'HISTORICAL' | 'CANCELLED';
+
+export interface PayrollSettingLifecyclePlan {
+  identity: string;
+  overlaps: PayrollSetting[];
+  versionsToShorten: Array<{ setting: PayrollSetting; validTo: MonthId }>;
+  affectedMonths: MonthId[];
+  requiresConfirmation: boolean;
+  blockedReason: 'multiple-overlaps' | null;
+}
+
+function previousMonth(monthId: MonthId): MonthId {
+  const [year, month] = monthId.split('-').map(Number);
+  const date = new Date(Date.UTC(year!, month! - 2, 1));
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}` as MonthId;
+}
+
+function enumerateMonths(start: MonthId, end: MonthId): MonthId[] {
+  const result: MonthId[] = [];
+  let cursor = start;
+  while (cursor <= end && result.length < 600) {
+    result.push(cursor);
+    const [year, month] = cursor.split('-').map(Number);
+    const date = new Date(Date.UTC(year!, month!, 1));
+    cursor =
+      `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}` as MonthId;
+  }
+  return result;
+}
+
+export function payrollSettingLifecycleStatus(
+  setting: Pick<PayrollSetting, 'active' | 'validFrom' | 'validTo'>,
+  currentMonth: MonthId,
+): PayrollSettingLifecycleStatus {
+  if (!setting.active) return 'CANCELLED';
+  if (setting.validFrom > currentMonth) return 'FUTURE';
+  if (setting.validTo && setting.validTo < currentMonth) return 'HISTORICAL';
+  return 'ACTIVE';
+}
+
+export function planPayrollSettingVersion(
+  settings: readonly PayrollSetting[],
+  input: PayrollSettingCreateInput,
+): PayrollSettingLifecyclePlan {
+  const normalized = normalizePayrollSettingInput(input);
+  const identity = payrollSettingIdentity({
+    settingKey: normalized.settingKey,
+    variantKey: normalized.variantKey,
+  });
+  const proposedEnd = normalized.validTo ?? ('9999-12' as MonthId);
+  const overlaps = settings.filter(
+    (setting) =>
+      setting.active &&
+      payrollSettingIdentity(setting) === identity &&
+      setting.validFrom <= proposedEnd &&
+      (setting.validTo ?? '9999-12') >= normalized.validFrom,
+  );
+  const versionsToShorten = overlaps
+    .filter((setting) => setting.validFrom < normalized.validFrom)
+    .map((setting) => ({
+      setting,
+      validTo: previousMonth(normalized.validFrom),
+    }));
+  const affectedEnd =
+    normalized.validTo ??
+    overlaps
+      .map((setting) => setting.validTo)
+      .filter((value): value is MonthId => Boolean(value))
+      .sort()
+      .at(-1) ??
+    normalized.validFrom;
+  const blockedReason =
+    overlaps.length > 1 ||
+    overlaps.some((setting) => setting.validFrom >= normalized.validFrom)
+      ? 'multiple-overlaps'
+      : null;
+  return {
+    identity,
+    overlaps,
+    versionsToShorten,
+    affectedMonths: enumerateMonths(normalized.validFrom, affectedEnd),
+    requiresConfirmation: overlaps.length > 0,
+    blockedReason,
+  };
 }
 
 export function payrollSettingIdentity(
@@ -123,12 +226,9 @@ export function resolveEffectivePayrollSetting(
   if (effective.length < 2) {
     return effective[0] ?? null;
   }
-  if (effective[0]!.validFrom === effective[1]!.validFrom) {
-    throw new PayrollSettingResolutionError(
-      'duplicate-effective-version',
-      normalizedKey,
-      monthId,
-    );
-  }
-  return effective[0]!;
+  throw new PayrollSettingResolutionError(
+    'duplicate-effective-version',
+    normalizedKey,
+    monthId,
+  );
 }

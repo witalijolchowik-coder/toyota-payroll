@@ -314,6 +314,12 @@ function SettlementReviewDetailsDialog({
     item.effectiveStatus,
   );
   const [note, setNote] = useState(item.reviewState?.reviewNote ?? '');
+  const [depositReturn, setDepositReturn] = useState(
+    item.reviewState?.depositReturnOverride?.toString() ?? '',
+  );
+  const [depositNote, setDepositNote] = useState(
+    item.reviewState?.depositReturnNote ?? '',
+  );
   const [isSaving, setIsSaving] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
   const employeeName = employee
@@ -337,6 +343,10 @@ function SettlementReviewDetailsDialog({
         tetaNumber: item.draft.tetaNumber,
         reviewStatus: status,
         reviewNote: note,
+        depositReturnOverride: depositReturn.trim()
+          ? Number(depositReturn.replace(',', '.'))
+          : null,
+        depositReturnNote: depositNote,
       });
       onClose();
     } catch {
@@ -457,22 +467,74 @@ function SettlementReviewDetailsDialog({
           </ReviewSection>
 
           <ReviewSection title={t.settlement.review.details.components}>
-            <Typography>
-              {t.settlement.draft.totals.frequencyBonus}:{' '}
-              {item.draft.totals.frequencyBonusAmount === null
-                ? t.settlement.grid.empty
-                : currencyFormatter.format(
-                    item.draft.totals.frequencyBonusAmount,
-                  )}
-            </Typography>
-            <Typography>
-              {t.settlement.draft.totals.transportNetto}:{' '}
-              {currencyFormatter.format(
-                item.draft.components.transportAllowanceNetto,
-              )}{' '}
-              · {t.settlement.draft.totals.deductions}:{' '}
-              {currencyFormatter.format(item.draft.totals.deductions)}
-            </Typography>
+            <Stack spacing={0.75}>
+              <ComponentLine
+                label={t.settlement.draft.totals.frequencyBonus}
+                amount={item.draft.components.frequencyBonusBrutto}
+                tax="Brutto"
+              />
+              <ComponentLine
+                label={t.settlement.draft.totals.laundry}
+                amount={item.draft.components.laundryAllowanceBrutto}
+                tax="Brutto"
+              />
+              <ComponentLine
+                label={t.settlement.draft.totals.transportNetto}
+                amount={item.draft.components.transportAllowanceNetto}
+                tax="Netto"
+              />
+              <ComponentLine
+                label={t.settlement.draft.totals.udt}
+                amount={item.draft.components.udtAllowanceBrutto}
+                tax="Brutto"
+              />
+              <ComponentLine
+                label={t.settlement.draft.totals.holidayBonus}
+                amount={item.draft.components.holidayWorkBonusBrutto}
+                tax="Brutto"
+              />
+              <ComponentLine
+                label={t.settlement.review.details.ownHousing}
+                amount={item.draft.components.ownHousingAllowanceBrutto}
+                tax="Brutto"
+              />
+              <ComponentLine
+                label={t.settlement.review.details.accommodationMedia}
+                amount={
+                  item.draft.components.companyAccommodationMediaDeduction
+                }
+                tax="Potrącenie"
+              />
+              <ComponentLine
+                label={t.settlement.review.details.accommodationRent}
+                amount={item.draft.components.companyAccommodationRentDeduction}
+                tax="Potrącenie"
+              />
+              <ComponentLine
+                label={t.settlement.review.details.depositWithholding}
+                amount={item.draft.components.housingDepositWithholding}
+                tax="Netto"
+              />
+              <ComponentLine
+                label={t.settlement.review.details.depositReturn}
+                amount={item.draft.components.housingDepositReturn}
+                tax="Netto"
+              />
+              <Divider />
+              <Typography sx={{ fontWeight: 700 }}>
+                {interpolate(t.settlement.review.details.componentTotals, {
+                  gross: currencyFormatter.format(
+                    item.draft.totals.bruttoAdditions,
+                  ),
+                  net: currencyFormatter.format(
+                    item.draft.totals.nettoAllowances,
+                  ),
+                  deductions: currencyFormatter.format(
+                    item.draft.totals.deductions,
+                  ),
+                })}
+              </Typography>
+            </Stack>
           </ReviewSection>
 
           <ReviewSection title={t.settlement.review.details.adjustments}>
@@ -537,6 +599,42 @@ function SettlementReviewDetailsDialog({
             minRows={2}
             disabled={isSettled}
           />
+          {item.draft.components.housingDepositAutomaticReturn > 0 ? (
+            <Stack spacing={1}>
+              <Alert severity="info">
+                {interpolate(t.settlement.review.details.depositInfo, {
+                  held: currencyFormatter.format(
+                    item.draft.components.housingDepositHeld,
+                  ),
+                  automatic: currencyFormatter.format(
+                    item.draft.components.housingDepositAutomaticReturn,
+                  ),
+                  final: currencyFormatter.format(
+                    item.draft.components.housingDepositReturn,
+                  ),
+                })}
+              </Alert>
+              <TextField
+                label={t.settlement.review.details.depositOverride}
+                value={depositReturn}
+                onChange={(event) => setDepositReturn(event.target.value)}
+                helperText={t.settlement.review.details.depositOverrideHelper}
+                error={
+                  Boolean(depositReturn.trim()) &&
+                  (Number(depositReturn.replace(',', '.')) < 0 ||
+                    Number(depositReturn.replace(',', '.')) >
+                      item.draft.components.housingDepositHeld)
+                }
+                disabled={isSettled}
+              />
+              <TextField
+                label={t.settlement.review.details.depositNote}
+                value={depositNote}
+                onChange={(event) => setDepositNote(event.target.value)}
+                disabled={isSettled}
+              />
+            </Stack>
+          ) : null}
           <Typography variant="caption" color="text.secondary">
             {item.reviewState?.reviewedAt
               ? interpolate(t.settlement.review.details.updatedBy, {
@@ -552,12 +650,38 @@ function SettlementReviewDetailsDialog({
         <Button
           variant="contained"
           onClick={() => void handleSave()}
-          disabled={isSettled || isSaving}
+          disabled={
+            isSettled ||
+            isSaving ||
+            (Boolean(depositReturn.trim()) &&
+              (Number(depositReturn.replace(',', '.')) < 0 ||
+                Number(depositReturn.replace(',', '.')) >
+                  item.draft.components.housingDepositHeld))
+          }
         >
           {t.settlement.review.details.save}
         </Button>
       </DialogActions>
     </Dialog>
+  );
+}
+
+function ComponentLine({
+  label,
+  amount,
+  tax,
+}: {
+  label: string;
+  amount: number | null;
+  tax: string;
+}) {
+  return (
+    <Stack direction="row" spacing={1} sx={{ justifyContent: 'space-between' }}>
+      <Typography>{label}</Typography>
+      <Typography sx={{ fontWeight: 700 }}>
+        {amount === null ? '—' : currencyFormatter.format(amount)} · {tax}
+      </Typography>
+    </Stack>
   );
 }
 

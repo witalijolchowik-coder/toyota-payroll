@@ -1,8 +1,9 @@
 import {
-  addDoc,
+  doc,
   getDocs,
   orderBy,
   query,
+  runTransaction,
   serverTimestamp,
 } from 'firebase/firestore';
 
@@ -14,6 +15,7 @@ import type {
 } from '../types/firestore';
 import {
   normalizePayrollSettingInput,
+  planPayrollSettingVersion,
   payrollSettingIdentity,
   validatePayrollSettingInput,
 } from '../utils/payroll';
@@ -29,7 +31,9 @@ export type PayrollSettingsServiceErrorCode =
   | 'authentication-required'
   | 'invalid-input'
   | 'duplicate-version'
-  | 'settled-history';
+  | 'settled-history'
+  | 'complex-overlap'
+  | 'unsafe-cancellation';
 
 export class PayrollSettingsServiceError extends Error {
   constructor(readonly code: PayrollSettingsServiceErrorCode) {
@@ -104,21 +108,42 @@ export async function createPayrollSettingVersion(
   ) {
     throw new PayrollSettingsServiceError('duplicate-version');
   }
-
-  const reference = await addDoc(repositories.payrollSettings, {
-    setting_key: normalized.settingKey,
-    variant_key: normalized.variantKey,
-    variant_name: normalized.variantName,
-    amount: normalized.amount,
-    valid_from: normalized.validFrom,
-    valid_to: normalized.validTo,
-    active: true,
-    description: normalized.description,
-    created_at: serverTimestamp(),
-    created_by: uid,
-    updated_at: serverTimestamp(),
-    updated_by: uid,
-  });
+  const plan = planPayrollSettingVersion(settings, normalized);
+  if (plan.blockedReason) {
+    throw new PayrollSettingsServiceError('complex-overlap');
+  }
+  const reference = doc(repositories.payrollSettings);
+  await runTransaction(
+    repositories.payrollSettings.firestore,
+    async (transaction) => {
+      for (const change of plan.versionsToShorten) {
+        transaction.update(
+          doc(repositories.payrollSettings, change.setting.id),
+          {
+            valid_to: change.validTo,
+            tax_type: change.setting.taxType,
+            updated_at: serverTimestamp(),
+            updated_by: uid,
+          },
+        );
+      }
+      transaction.set(reference, {
+        setting_key: normalized.settingKey,
+        variant_key: normalized.variantKey,
+        variant_name: normalized.variantName,
+        amount: normalized.amount,
+        tax_type: normalized.taxType!,
+        valid_from: normalized.validFrom,
+        valid_to: normalized.validTo,
+        active: true,
+        description: normalized.description,
+        created_at: serverTimestamp(),
+        created_by: uid,
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      });
+    },
+  );
   await recordAuditEntry({
     entityPath: `payrollSettings/${reference.id}`,
     action: 'create',
@@ -128,9 +153,80 @@ export async function createPayrollSettingVersion(
       setting_key: normalized.settingKey,
       variant_key: normalized.variantKey,
       amount: normalized.amount,
+      tax_type: normalized.taxType!,
       valid_from: normalized.validFrom,
       valid_to: normalized.validTo,
+      shortened_versions: plan.versionsToShorten.map((change) => ({
+        id: change.setting.id,
+        old_valid_to: change.setting.validTo,
+        new_valid_to: change.validTo,
+      })),
     },
   });
   return reference.id;
+}
+
+export async function endPayrollSettingVersion(
+  setting: PayrollSetting,
+  validTo: MonthId,
+): Promise<void> {
+  const { repositories, uid } = requireContext();
+  const settledThrough = await latestSettledMonthId();
+  if (
+    validTo < setting.validFrom ||
+    (settledThrough && validTo < settledThrough)
+  ) {
+    throw new PayrollSettingsServiceError('settled-history');
+  }
+  await runTransaction(
+    repositories.payrollSettings.firestore,
+    async (transaction) => {
+      transaction.update(doc(repositories.payrollSettings, setting.id), {
+        valid_to: validTo,
+        tax_type: setting.taxType,
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      });
+    },
+  );
+  await recordAuditEntry({
+    entityPath: `payrollSettings/${setting.id}`,
+    action: 'update',
+    actorUid: uid,
+    changes: {
+      operation: 'payroll-setting-version-ended',
+      old_valid_to: setting.validTo,
+      new_valid_to: validTo,
+    },
+  });
+}
+
+export async function cancelFuturePayrollSettingVersion(
+  setting: PayrollSetting,
+  currentMonth: MonthId,
+): Promise<void> {
+  const { repositories, uid } = requireContext();
+  if (!setting.active || setting.validFrom <= currentMonth) {
+    throw new PayrollSettingsServiceError('unsafe-cancellation');
+  }
+  await runTransaction(
+    repositories.payrollSettings.firestore,
+    async (transaction) => {
+      transaction.update(doc(repositories.payrollSettings, setting.id), {
+        active: false,
+        tax_type: setting.taxType,
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      });
+    },
+  );
+  await recordAuditEntry({
+    entityPath: `payrollSettings/${setting.id}`,
+    action: 'update',
+    actorUid: uid,
+    changes: {
+      operation: 'payroll-setting-version-cancelled',
+      valid_from: setting.validFrom,
+    },
+  });
 }

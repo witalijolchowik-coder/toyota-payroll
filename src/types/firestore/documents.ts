@@ -173,6 +173,8 @@ export interface SettlementReviewDocument
   review_note: string;
   reviewed_at: Timestamp | null;
   reviewed_by: string | null;
+  deposit_return_override: number | null;
+  deposit_return_note: string;
 }
 
 export type DailyValueSource = 'manual' | 'attendance_import';
@@ -259,16 +261,20 @@ export const PAYROLL_SETTING_KEYS = [
   'laundry_allowance',
   'own_housing_allowance',
   'company_housing_media',
+  'housing_deposit',
 ] as const;
 
 export type KnownPayrollSettingKey = (typeof PAYROLL_SETTING_KEYS)[number];
 export type PayrollSettingKey = KnownPayrollSettingKey | (string & {});
+export const PAYROLL_SETTING_TAX_TYPES = ['GROSS', 'NET'] as const;
+export type PayrollSettingTaxType = (typeof PAYROLL_SETTING_TAX_TYPES)[number];
 
 export interface PayrollSettingDocument extends ModificationMetadataDocument {
   setting_key: PayrollSettingKey;
   variant_key: string | null;
   variant_name: string | null;
   amount: number;
+  tax_type: PayrollSettingTaxType;
   valid_from: MonthId;
   valid_to: MonthId | null;
   active: boolean;

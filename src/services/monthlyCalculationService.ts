@@ -28,6 +28,9 @@ const BLOCKING_WARNINGS = new Set([
   'housing-entitlement-conflict',
   'company-accommodation-missing-variant',
   'unresolved-company-accommodation-variant',
+  'unresolved-own-housing-setting',
+  'unresolved-payroll-setting',
+  'unresolved-housing-deposit-setting',
   'critical-read-failure',
 ]);
 

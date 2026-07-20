@@ -3,6 +3,7 @@ import {
   employeeEntitlementCoversFullRange,
   employeeEntitlementsOverlap,
   resolveEmployeeSettlementEntitlements,
+  resolveCompanyAccommodationEpisodes,
 } from './employeeEntitlements';
 
 const createdAt = new Date('2026-01-01T00:00:00.000Z');
@@ -158,5 +159,48 @@ describe('employee entitlement resolver', () => {
         { validFrom: '2026-06-15', validTo: '2026-06-30' },
       ),
     ).toBe(true);
+  });
+
+  it('keeps a direct transfer between company housing objects in one episode', () => {
+    const episodes = resolveCompanyAccommodationEpisodes([
+      entitlement({
+        id: 'house-a',
+        type: 'COMPANY_ACCOMMODATION',
+        accommodationVariantKey: 'a',
+        validFrom: '2026-06-01',
+        validTo: '2026-06-15',
+      }),
+      entitlement({
+        id: 'house-b',
+        type: 'COMPANY_ACCOMMODATION',
+        accommodationVariantKey: 'b',
+        validFrom: '2026-06-16',
+        validTo: '2026-07-31',
+      }),
+    ]);
+    expect(episodes).toHaveLength(1);
+    expect(episodes[0]).toMatchObject({
+      id: 'house-a',
+      start: '2026-06-01',
+      end: '2026-07-31',
+    });
+  });
+
+  it('creates a new episode after a real accommodation gap', () => {
+    const episodes = resolveCompanyAccommodationEpisodes([
+      entitlement({
+        id: 'first',
+        type: 'COMPANY_ACCOMMODATION',
+        validFrom: '2026-06-01',
+        validTo: '2026-06-15',
+      }),
+      entitlement({
+        id: 'second',
+        type: 'COMPANY_ACCOMMODATION',
+        validFrom: '2026-06-18',
+        validTo: null,
+      }),
+    ]);
+    expect(episodes.map((episode) => episode.id)).toEqual(['first', 'second']);
   });
 });

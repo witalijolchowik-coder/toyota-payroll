@@ -900,6 +900,8 @@ describe('Firestore security rules', () => {
         review_note: '',
         reviewed_at: serverTimestamp(),
         reviewed_by: uid,
+        deposit_return_override: null,
+        deposit_return_note: '',
         ...modificationMetadata(uid),
       }),
     );
@@ -907,8 +909,17 @@ describe('Firestore security rules', () => {
       updateDoc(reviewState, {
         review_status: 'CHECKED',
         review_note: 'Sprawdzone',
+        deposit_return_override: 60,
+        deposit_return_note: 'Uszkodzenie wyposażenia',
         reviewed_at: serverTimestamp(),
         reviewed_by: uid,
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertFails(
+      updateDoc(reviewState, {
+        deposit_return_override: -1,
         updated_at: serverTimestamp(),
         updated_by: uid,
       }),
@@ -929,6 +940,8 @@ describe('Firestore security rules', () => {
       review_note: '',
       reviewed_at: serverTimestamp(),
       reviewed_by: uid,
+      deposit_return_override: null,
+      deposit_return_note: '',
       ...modificationMetadata(uid),
     };
 
@@ -1704,6 +1717,7 @@ describe('Firestore security rules', () => {
 
   it('allows append-only global payroll setting versions', async () => {
     const uid = 'coordinator-1';
+    await seedAppUser(uid, { role: 'admin' });
     const firestore = testEnvironment.authenticatedContext(uid).firestore();
     const setting = doc(firestore, 'payrollSettings/frequency-2026-08');
 
@@ -1713,6 +1727,7 @@ describe('Firestore security rules', () => {
         variant_key: null,
         variant_name: null,
         amount: 400,
+        tax_type: 'GROSS',
         valid_from: '2026-08',
         valid_to: null,
         active: true,
@@ -1727,7 +1742,60 @@ describe('Firestore security rules', () => {
         updated_by: uid,
       }),
     );
+    await assertSucceeds(
+      updateDoc(setting, {
+        valid_to: '2026-12',
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(setting, {
+        active: false,
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
     await assertFails(deleteDoc(setting));
+  });
+
+  it('denies payroll setting writes to a non-admin approved user', async () => {
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    await assertFails(
+      setDoc(doc(firestore, 'payrollSettings/not-admin'), {
+        setting_key: 'housing_deposit',
+        variant_key: null,
+        variant_name: null,
+        amount: 99,
+        tax_type: 'NET',
+        valid_from: '2026-08',
+        valid_to: null,
+        active: true,
+        description: '',
+        ...modificationMetadata(uid),
+      }),
+    );
+  });
+
+  it('rejects an unsupported payroll tax classification', async () => {
+    const uid = 'coordinator-1';
+    await seedAppUser(uid, { role: 'admin' });
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    await assertFails(
+      setDoc(doc(firestore, 'payrollSettings/invalid-tax'), {
+        setting_key: 'laundry_allowance',
+        variant_key: null,
+        variant_name: null,
+        amount: 40,
+        tax_type: 'UNKNOWN',
+        valid_from: '2026-08',
+        valid_to: null,
+        active: true,
+        description: '',
+        ...modificationMetadata(uid),
+      }),
+    );
   });
 
   it('rejects invalid payroll setting amounts and accommodation types', async () => {
@@ -1738,6 +1806,7 @@ describe('Firestore security rules', () => {
       variant_key: null,
       variant_name: null,
       amount: -1,
+      tax_type: 'GROSS',
       valid_from: '2026-08',
       valid_to: '2026-07',
       active: true,

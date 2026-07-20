@@ -55,6 +55,8 @@ const unresolvedIssueCodes = new Set<SettlementReviewIssueCode>([
   'company-accommodation-missing-variant',
   'unresolved-company-accommodation-variant',
   'unresolved-own-housing-setting',
+  'unresolved-payroll-setting',
+  'unresolved-housing-deposit-setting',
   'housing-entitlement-conflict',
   'uncovered-private-time',
   'uncovered-coverable-ni',
@@ -104,7 +106,9 @@ export function groupPayrollDraftWarning(
   if (
     warning.code === 'unresolved-frequency-bonus-setting' ||
     warning.code === 'unresolved-company-accommodation-variant' ||
-    warning.code === 'unresolved-own-housing-setting'
+    warning.code === 'unresolved-own-housing-setting' ||
+    warning.code === 'unresolved-payroll-setting' ||
+    warning.code === 'unresolved-housing-deposit-setting'
   ) {
     return 'configuration';
   }

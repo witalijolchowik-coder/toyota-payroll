@@ -98,6 +98,7 @@ function payrollSetting(
     variantKey: null,
     variantName: null,
     amount: 400,
+    taxType: 'GROSS',
     validFrom: '2026-01',
     validTo: null,
     active: true,
@@ -129,6 +130,29 @@ function adjustment(overrides: Partial<Adjustment>): Adjustment {
   };
 }
 
+function defaultPayrollSettings(): PayrollSetting[] {
+  return [
+    payrollSetting(),
+    payrollSetting({
+      id: 'transport',
+      settingKey: 'transport_allowance',
+      amount: 275,
+      taxType: 'NET',
+    }),
+    payrollSetting({
+      id: 'laundry',
+      settingKey: 'laundry_allowance',
+      amount: 40,
+    }),
+    payrollSetting({
+      id: 'holiday',
+      settingKey: 'holiday_work_bonus',
+      amount: 300,
+    }),
+    payrollSetting({ id: 'udt', settingKey: 'udt_allowance', amount: 300 }),
+  ];
+}
+
 function entitlement(
   overrides: Partial<EmployeeEntitlement> = {},
 ): EmployeeEntitlement {
@@ -154,7 +178,7 @@ function draft({
   target = employee(),
   dailyValues = [],
   absences = [],
-  settings = [payrollSetting()],
+  settings = defaultPayrollSettings(),
   adjustments = [],
   entitlements = null,
   calendarOptions = {},
@@ -653,7 +677,7 @@ describe('employee monthly calculation draft', () => {
       employees: [employee(), second],
       dailyValues: [],
       absences: [],
-      payrollSettings: [payrollSetting()],
+      payrollSettings: defaultPayrollSettings(),
       adjustments: [],
     });
 
@@ -684,7 +708,7 @@ describe('employee monthly calculation draft', () => {
       dailyValues: [],
       absences: [],
       payrollSettings: [
-        payrollSetting(),
+        ...defaultPayrollSettings(),
         payrollSetting({
           id: 'own-housing-setting',
           settingKey: 'own_housing_allowance',

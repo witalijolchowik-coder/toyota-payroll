@@ -1,3 +1,5 @@
+import type { MonthId } from '../../types/firestore';
+
 export const LAUNDRY_ALLOWANCE_MAX = 40;
 export const TRANSPORT_ALLOWANCE_MAX = 275;
 export const OWN_HOUSING_ALLOWANCE = 300;
@@ -115,6 +117,58 @@ export function calculateCompanyAccommodationCharge({
     accommodation,
     total: roundMoney(media + accommodation),
   };
+}
+
+export interface HousingDepositResult {
+  episodeId: string | null;
+  held: number;
+  withheld: number;
+  automaticReturn: number;
+  finalReturn: number;
+}
+
+export function calculateHousingDeposit({
+  monthId,
+  episodeId,
+  episodeStart,
+  episodeEnd,
+  employmentEnd,
+  configuredAmount,
+  returnOverride = null,
+}: {
+  monthId: MonthId;
+  episodeId: string | null;
+  episodeStart: IsoDateString | null;
+  episodeEnd: IsoDateString | null;
+  employmentEnd: IsoDateString | null;
+  configuredAmount: number | null;
+  returnOverride?: number | null;
+}): HousingDepositResult {
+  if (!episodeId || !episodeStart || configuredAmount === null) {
+    return {
+      episodeId,
+      held: 0,
+      withheld: 0,
+      automaticReturn: 0,
+      finalReturn: 0,
+    };
+  }
+  const moveInMonth = episodeStart.slice(0, 7);
+  const effectiveEnd =
+    episodeEnd && employmentEnd
+      ? episodeEnd < employmentEnd
+        ? episodeEnd
+        : employmentEnd
+      : (episodeEnd ?? employmentEnd);
+  const returnMonth = effectiveEnd?.slice(0, 7) ?? null;
+  const held = configuredAmount;
+  const withheld = monthId === moveInMonth ? held : 0;
+  const automaticReturn = returnMonth === monthId ? held : 0;
+  const finalReturn =
+    automaticReturn > 0 && returnOverride !== null
+      ? Math.min(held, Math.max(0, returnOverride))
+      : automaticReturn;
+  return { episodeId, held, withheld, automaticReturn, finalReturn };
 }
 
 type IsoDateString = `${number}-${number}-${number}` | string;

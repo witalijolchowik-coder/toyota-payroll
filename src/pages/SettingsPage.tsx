@@ -57,6 +57,10 @@ import type {
   PayrollSettingCreateInput,
 } from '../types/firestore';
 import {
+  currentPayrollMonthId,
+  payrollSettingLifecycleStatus,
+} from '../utils/payroll';
+import {
   SETTINGS_SECTION_STORAGE_KEY,
   resolveSettingsSection,
   type SettingsSection,
@@ -70,7 +74,10 @@ const currency = new Intl.NumberFormat('pl-PL', {
 type DepartmentFormState =
   { mode: 'add' } | { mode: 'edit'; department: Department } | null;
 type SettingFormState =
-  | { section: 'accommodation'; initialKey: 'own_housing_allowance' }
+  | {
+      section: 'accommodation';
+      initialKey: 'own_housing_allowance' | 'housing_deposit';
+    }
   | { section: 'allowances'; initialKey?: KnownPayrollSettingKey }
   | null;
 
@@ -82,7 +89,14 @@ export function SettingsPage() {
     SETTINGS_SECTION_STORAGE_KEY,
   );
   const section = resolveSettingsSection(querySection ?? storedSection);
-  const { settings, isLoading, error, createVersion } = usePayrollSettings();
+  const {
+    settings,
+    isLoading,
+    error,
+    createVersion,
+    endVersion,
+    cancelVersion,
+  } = usePayrollSettings();
   const {
     departments,
     isLoading: areDepartmentsLoading,
@@ -131,6 +145,25 @@ export function SettingsPage() {
     await createVersion(input);
     notify({
       message: t.settings.common.versionSaved,
+      severity: 'success',
+    });
+  };
+
+  const handleEndVersion = async (setting: PayrollSetting) => {
+    const validTo = window.prompt(
+      t.settings.versionActions.endPrompt,
+      currentPayrollMonthId(new Date()),
+    );
+    if (!validTo) return;
+    await endVersion(setting, validTo);
+    notify({ message: t.settings.versionActions.ended, severity: 'success' });
+  };
+
+  const handleCancelVersion = async (setting: PayrollSetting) => {
+    if (!window.confirm(t.settings.versionActions.cancelConfirm)) return;
+    await cancelVersion(setting, currentPayrollMonthId(new Date()));
+    notify({
+      message: t.settings.versionActions.cancelled,
       severity: 'success',
     });
   };
@@ -225,6 +258,14 @@ export function SettingsPage() {
                   initialKey: 'own_housing_allowance',
                 })
               }
+              onAddDeposit={() =>
+                setSettingFormState({
+                  section: 'accommodation',
+                  initialKey: 'housing_deposit',
+                })
+              }
+              onEndVersion={handleEndVersion}
+              onCancelVersion={handleCancelVersion}
             />
           ) : null}
           {section === 'allowances' ? (
@@ -232,6 +273,8 @@ export function SettingsPage() {
               settings={settings}
               isLoading={isLoading}
               onAdd={() => setSettingFormState({ section: 'allowances' })}
+              onEndVersion={handleEndVersion}
+              onCancelVersion={handleCancelVersion}
             />
           ) : null}
           {section === 'interface' ? <CalendarAppearancePanel /> : null}
@@ -240,16 +283,18 @@ export function SettingsPage() {
 
       {settingFormState ? (
         <PayrollSettingFormDialog
+          settings={settings}
           initialKey={settingFormState.initialKey}
           allowedKeys={
             settingFormState.section === 'accommodation'
-              ? ['own_housing_allowance']
+              ? ['own_housing_allowance', 'housing_deposit']
               : [
                   'frequency_bonus',
                   'transport_allowance',
                   'udt_allowance',
                   'holiday_work_bonus',
                   'laundry_allowance',
+                  'own_housing_allowance',
                 ]
           }
           onClose={() => setSettingFormState(null)}
@@ -414,6 +459,9 @@ function ShiftsSection({
                 </TableCell>
                 <TableCell>{t.organization.departments.table.status}</TableCell>
                 <TableCell align="right">
+                  {t.settings.versionActions.actions}
+                </TableCell>
+                <TableCell align="right">
                   {t.organization.departments.table.actions}
                 </TableCell>
               </TableRow>
@@ -469,6 +517,9 @@ function AccommodationSection({
   isLoading,
   onAddCategory,
   onAddOwnHousing,
+  onAddDeposit,
+  onEndVersion,
+  onCancelVersion,
 }: {
   categories: Array<{
     key: string;
@@ -482,10 +533,16 @@ function AccommodationSection({
   isLoading: boolean;
   onAddCategory: () => void;
   onAddOwnHousing: () => void;
+  onAddDeposit: () => void;
+  onEndVersion: (setting: PayrollSetting) => Promise<void>;
+  onCancelVersion: (setting: PayrollSetting) => Promise<void>;
 }) {
   const t = useTranslations();
   const ownHousing = settings.filter(
     (item) => item.settingKey === 'own_housing_allowance',
+  );
+  const deposits = settings.filter(
+    (item) => item.settingKey === 'housing_deposit',
   );
   return (
     <Stack spacing={2.5}>
@@ -539,7 +596,7 @@ function AccommodationSection({
             </TableHead>
             <TableBody>
               {isLoading ? (
-                <LoadingRows columns={5} />
+                <LoadingRows columns={6} />
               ) : (
                 categories.map((category) => (
                   <TableRow hover key={`${category.key}:${category.validFrom}`}>
@@ -588,7 +645,39 @@ function AccommodationSection({
             {t.settings.common.addVersion}
           </Button>
         </Stack>
-        <SettingVersionList settings={ownHousing} />
+        <SettingVersionList
+          settings={ownHousing}
+          onEnd={onEndVersion}
+          onCancel={onCancelVersion}
+        />
+      </Card>
+      <Card sx={{ p: 2.5 }}>
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={2}
+          sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' } }}
+        >
+          <Box>
+            <Typography variant="h6">
+              {t.settings.accommodationSection.housingDeposit}
+            </Typography>
+            <Typography color="text.secondary">
+              {t.settings.accommodationSection.housingDepositDescription}
+            </Typography>
+          </Box>
+          <Button
+            variant="outlined"
+            startIcon={<AddOutlined />}
+            onClick={onAddDeposit}
+          >
+            {t.settings.common.addVersion}
+          </Button>
+        </Stack>
+        <SettingVersionList
+          settings={deposits}
+          onEnd={onEndVersion}
+          onCancel={onCancelVersion}
+        />
       </Card>
     </Stack>
   );
@@ -598,10 +687,14 @@ function AllowancesSection({
   settings,
   isLoading,
   onAdd,
+  onEndVersion,
+  onCancelVersion,
 }: {
   settings: PayrollSetting[];
   isLoading: boolean;
   onAdd: () => void;
+  onEndVersion: (setting: PayrollSetting) => Promise<void>;
+  onCancelVersion: (setting: PayrollSetting) => Promise<void>;
 }) {
   const t = useTranslations();
   const businessSettings = settings.filter(
@@ -610,6 +703,7 @@ function AllowancesSection({
         'accommodation_allowance',
         'company_housing_media',
         'own_housing_allowance',
+        'housing_deposit',
       ].includes(item.settingKey),
   );
   const frequency = businessSettings
@@ -697,18 +791,24 @@ function AllowancesSection({
               <TableRow>
                 <TableCell>{t.settings.common.description}</TableCell>
                 <TableCell align="right">{t.settings.common.amount}</TableCell>
+                <TableCell>{t.settings.settingForm.tax}</TableCell>
                 <TableCell>{t.settings.common.validity}</TableCell>
                 <TableCell>{t.organization.departments.table.status}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {isLoading ? (
-                <LoadingRows columns={4} />
+                <LoadingRows columns={5} />
               ) : (
                 businessSettings
                   .filter((item) => item.settingKey !== 'frequency_bonus')
                   .map((setting) => (
-                    <BusinessSettingRow key={setting.id} setting={setting} />
+                    <BusinessSettingRow
+                      key={setting.id}
+                      setting={setting}
+                      onEnd={onEndVersion}
+                      onCancel={onCancelVersion}
+                    />
                   ))
               )}
             </TableBody>
@@ -768,7 +868,15 @@ function AllowancesSection({
   );
 }
 
-function BusinessSettingRow({ setting }: { setting: PayrollSetting }) {
+function BusinessSettingRow({
+  setting,
+  onEnd,
+  onCancel,
+}: {
+  setting: PayrollSetting;
+  onEnd: (setting: PayrollSetting) => Promise<void>;
+  onCancel: (setting: PayrollSetting) => Promise<void>;
+}) {
   const t = useTranslations();
   return (
     <TableRow hover>
@@ -783,6 +891,7 @@ function BusinessSettingRow({ setting }: { setting: PayrollSetting }) {
         ) : null}
       </TableCell>
       <TableCell align="right">{currency.format(setting.amount)}</TableCell>
+      <TableCell>{setting.taxType === 'NET' ? 'Netto' : 'Brutto'}</TableCell>
       <TableCell>
         {setting.validFrom} – {setting.validTo ?? t.settings.common.noEnd}
       </TableCell>
@@ -798,12 +907,24 @@ function BusinessSettingRow({ setting }: { setting: PayrollSetting }) {
           }
         />
       </TableCell>
+      <TableCell align="right">
+        <VersionActions setting={setting} onEnd={onEnd} onCancel={onCancel} />
+      </TableCell>
     </TableRow>
   );
 }
 
-function SettingVersionList({ settings }: { settings: PayrollSetting[] }) {
+function SettingVersionList({
+  settings,
+  onEnd,
+  onCancel,
+}: {
+  settings: PayrollSetting[];
+  onEnd: (setting: PayrollSetting) => Promise<void>;
+  onCancel: (setting: PayrollSetting) => Promise<void>;
+}) {
   const t = useTranslations();
+  const currentMonth = currentPayrollMonthId(new Date());
   if (settings.length === 0)
     return (
       <Typography color="text.secondary" sx={{ mt: 2 }}>
@@ -824,18 +945,69 @@ function SettingVersionList({ settings }: { settings: PayrollSetting[] }) {
             <Typography sx={{ fontWeight: 700 }}>
               {currency.format(setting.amount)}
             </Typography>
+            <Chip
+              size="small"
+              variant="outlined"
+              label={setting.taxType === 'NET' ? 'Netto' : 'Brutto'}
+            />
+            <VersionActions
+              setting={setting}
+              onEnd={onEnd}
+              onCancel={onCancel}
+            />
             <Typography color="text.secondary">
               {setting.validFrom} – {setting.validTo ?? t.settings.common.noEnd}
             </Typography>
-            {setting.active ? (
-              <Chip
-                size="small"
-                color="success"
-                label={t.settings.common.active}
-              />
-            ) : null}
+            <Chip
+              size="small"
+              color={
+                payrollSettingLifecycleStatus(setting, currentMonth) ===
+                'ACTIVE'
+                  ? 'success'
+                  : 'default'
+              }
+              label={
+                t.settings.settingStatus[
+                  payrollSettingLifecycleStatus(setting, currentMonth)
+                ]
+              }
+            />
           </Stack>
         ))}
+    </Stack>
+  );
+}
+
+function VersionActions({
+  setting,
+  onEnd,
+  onCancel,
+}: {
+  setting: PayrollSetting;
+  onEnd: (setting: PayrollSetting) => Promise<void>;
+  onCancel: (setting: PayrollSetting) => Promise<void>;
+}) {
+  const t = useTranslations();
+  const status = payrollSettingLifecycleStatus(
+    setting,
+    currentPayrollMonthId(new Date()),
+  );
+  return (
+    <Stack direction="row" spacing={0.5}>
+      {status === 'ACTIVE' ? (
+        <Button size="small" onClick={() => void onEnd(setting)}>
+          {t.settings.versionActions.end}
+        </Button>
+      ) : null}
+      {status === 'FUTURE' ? (
+        <Button
+          size="small"
+          color="error"
+          onClick={() => void onCancel(setting)}
+        >
+          {t.settings.versionActions.cancel}
+        </Button>
+      ) : null}
     </Stack>
   );
 }
@@ -862,6 +1034,7 @@ function settingLabel(key: string, t: ReturnType<typeof useTranslations>) {
     own_housing_allowance: t.settings.accommodationSection.ownHousing,
     accommodation_allowance: t.settings.accommodation.table.accommodation,
     company_housing_media: t.settings.accommodation.table.media,
+    housing_deposit: t.settings.accommodationSection.housingDeposit,
   };
   return labels[key] ?? key;
 }

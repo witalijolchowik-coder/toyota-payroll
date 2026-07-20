@@ -68,6 +68,9 @@ The attached design history contains several generations of the architecture. Th
 - [Actual work time and shift corrections](business-rules/actual-work-time-and-shift-corrections.md)
   - effective shift hours, department-local correction points, rotation,
     virtual plan defaults and manual od–do plan-to-fact corrections
+- [Versioned payroll settings and refundable housing deposit](business-rules/versioned-payroll-settings-lifecycle.md)
+  - non-overlapping configuration lifecycle, tax classification, canonical
+    settlement components, and idempotent deposit withholding/return
 
 Approved business-rules specifications govern payroll semantics. Architecture
 documents continue to govern system structure and implementation boundaries.

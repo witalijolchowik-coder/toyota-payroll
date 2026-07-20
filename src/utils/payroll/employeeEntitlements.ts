@@ -17,6 +17,7 @@ export interface EmployeeSettlementEntitlements {
     variantKey?: string | null;
     contractStartDate?: Date | null;
     contractEndDate?: Date | null;
+    episodeId?: string;
   } | null;
   reviewWarnings?: EntitlementResolutionWarningCode[];
 }
@@ -41,6 +42,55 @@ function monthIsoRange(monthId: MonthId): MonthIsoRange {
 
 function isoDateToUtcDate(isoDate: IsoDate): Date {
   return new Date(`${isoDate}T00:00:00.000Z`);
+}
+
+function nextIsoDate(isoDate: IsoDate): IsoDate {
+  const date = isoDateToUtcDate(isoDate);
+  date.setUTCDate(date.getUTCDate() + 1);
+  return date.toISOString().slice(0, 10) as IsoDate;
+}
+
+export interface CompanyAccommodationEpisode {
+  id: string;
+  start: IsoDate;
+  end: IsoDate | null;
+  entitlements: EmployeeEntitlement[];
+}
+
+export function resolveCompanyAccommodationEpisodes(
+  entitlements: readonly EmployeeEntitlement[],
+): CompanyAccommodationEpisode[] {
+  const ordered = entitlements
+    .filter(
+      (entry) =>
+        entry.type === 'COMPANY_ACCOMMODATION' && entry.status === 'ACTIVE',
+    )
+    .sort((a, b) => a.validFrom.localeCompare(b.validFrom));
+  const episodes: CompanyAccommodationEpisode[] = [];
+  for (const entitlement of ordered) {
+    const current = episodes.at(-1);
+    const isContinuous =
+      current &&
+      (current.end === null ||
+        entitlement.validFrom <= nextIsoDate(current.end));
+    if (isContinuous) {
+      current.entitlements.push(entitlement);
+      current.end =
+        current.end === null || entitlement.validTo === null
+          ? null
+          : current.end > entitlement.validTo
+            ? current.end
+            : entitlement.validTo;
+      continue;
+    }
+    episodes.push({
+      id: entitlement.id,
+      start: entitlement.validFrom,
+      end: entitlement.validTo,
+      entitlements: [entitlement],
+    });
+  }
+  return episodes;
 }
 
 function entitlementEnd(entitlement: EmployeeEntitlement): IsoDate {
@@ -135,6 +185,13 @@ export function resolveEmployeeSettlementEntitlements({
         employeeEntitlementOverlapsRange(entitlement, range),
       )
       .at(-1) ?? null;
+  const accommodationEpisode = resolveCompanyAccommodationEpisodes(
+    companyAccommodationEntitlements,
+  ).find(
+    (episode) =>
+      episode.start <= range.end &&
+      (episode.end === null || episode.end >= range.start),
+  );
 
   const overlappingOwnHousing = ownHousingEntitlements.some((ownHousing) =>
     companyAccommodationEntitlements.some(
@@ -168,10 +225,15 @@ export function resolveEmployeeSettlementEntitlements({
     companyAccommodation: companyAccommodation
       ? {
           variantKey: companyAccommodation.accommodationVariantKey,
-          contractStartDate: isoDateToUtcDate(companyAccommodation.validFrom),
-          contractEndDate: companyAccommodation.validTo
-            ? isoDateToUtcDate(companyAccommodation.validTo)
-            : null,
+          contractStartDate: accommodationEpisode
+            ? isoDateToUtcDate(accommodationEpisode.start)
+            : isoDateToUtcDate(companyAccommodation.validFrom),
+          contractEndDate: accommodationEpisode?.end
+            ? isoDateToUtcDate(accommodationEpisode.end)
+            : companyAccommodation.validTo
+              ? isoDateToUtcDate(companyAccommodation.validTo)
+              : null,
+          episodeId: accommodationEpisode?.id ?? companyAccommodation.id,
         }
       : null,
     reviewWarnings: [...warnings],

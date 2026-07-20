@@ -1268,7 +1268,10 @@ export const pl = {
       variantKeyHelper: 'Np. type-a',
       variantName: 'Nazwa typu',
       variantNameHelper: 'Np. Typ A',
-      amount: 'Kwota brutto (PLN)',
+      amount: 'Kwota (PLN)',
+      tax: 'Podatek',
+      gross: 'Brutto',
+      net: 'Netto',
       invalidAmount: 'Wprowadź nieujemną kwotę.',
       amountHelper: 'Wartość może zawierać część dziesiętną.',
       validFrom: 'Obowiązuje od',
@@ -1278,6 +1281,12 @@ export const pl = {
       description: 'Opis',
       cancel: 'Anuluj',
       save: 'Dodaj wersję',
+      preview: 'Sprawdź wpływ',
+      impactTitle: 'Wpływ na istniejące wersje',
+      impactDescription:
+        'Po potwierdzeniu poprzednia wersja zostanie zakończona w ostatnim dniu poprzedniego miesiąca.',
+      complexOverlap:
+        'Zmiana dotyka kilku wersji. Najpierw uporządkuj zakresy lub zakończ kolidujące wersje.',
       options: {
         frequencyBonus: 'Premia frekwencyjna',
         transport: 'Dodatek transportowy',
@@ -1287,7 +1296,24 @@ export const pl = {
         laundry: 'Dodatek za pranie',
         ownHousing: 'Dodatek za własne mieszkanie',
         companyMedia: 'Media w mieszkaniu firmowym',
+        housingDeposit: 'Kaucja za zakwaterowanie',
       },
+    },
+    settingStatus: {
+      FUTURE: 'Przyszła',
+      ACTIVE: 'Aktywna',
+      HISTORICAL: 'Historyczna',
+      CANCELLED: 'Anulowana',
+    },
+    versionActions: {
+      actions: 'Działania',
+      end: 'Zakończ obowiązywanie',
+      cancel: 'Anuluj wersję',
+      endPrompt: 'Podaj ostatni miesiąc obowiązywania w formacie RRRR-MM.',
+      cancelConfirm:
+        'Anulować tę przyszłą wersję? Dokument pozostanie w historii.',
+      ended: 'Okres obowiązywania wersji został zakończony.',
+      cancelled: 'Przyszła wersja została anulowana.',
     },
     shiftsAndSchedules: {
       title: 'Zmiany i grafiki',
@@ -1303,6 +1329,9 @@ export const pl = {
       ownHousingDescription:
         'Kwota dla pracownika spełniającego warunki przez pełny miesiąc.',
       history: 'Historia stawek zakwaterowania',
+      housingDeposit: 'Kaucja za zakwaterowanie',
+      housingDepositDescription:
+        'Zwrotna kaucja potrącana raz przy rozpoczęciu ciągłego pobytu i zwracana przy jego zakończeniu.',
     },
     allowancesSection: {
       title: 'Premie i dodatki',
@@ -1706,6 +1735,10 @@ export const pl = {
           'Nie znaleziono aktywnej stawki dla wariantu mieszkania firmowego.',
         'unresolved-own-housing-setting':
           'Nie znaleziono aktywnej stawki dodatku za własne mieszkanie.',
+        'unresolved-payroll-setting':
+          'Brakuje aktywnej wersji ustawienia potrzebnego do obliczenia komponentu.',
+        'unresolved-housing-deposit-setting':
+          'Brakuje stawki kaucji obowiązującej w miesiącu rozpoczęcia zakwaterowania.',
         'critical-read-failure':
           'Nie udało się odczytać części danych źródłowych. Wartości zależne pozostają nierozstrzygnięte.',
       },
@@ -1763,6 +1796,19 @@ export const pl = {
         close: 'Zamknij',
         updatedBy: 'Ostatnia zmiana: {{actor}} · {{date}}',
         notSaved: 'Status nie był jeszcze zapisany.',
+        ownHousing: 'Dodatek za własne mieszkanie',
+        accommodationMedia: 'Media',
+        accommodationRent: 'Zakwaterowanie',
+        depositWithholding: 'Potrącenie kaucji',
+        depositReturn: 'Zwrot kaucji',
+        componentTotals:
+          'Razem: brutto {{gross}} · netto {{net}} · potrącenia {{deductions}}',
+        depositInfo:
+          'Kaucja zatrzymana: {{held}} · zwrot automatyczny: {{automatic}} · zwrot końcowy: {{final}}',
+        depositOverride: 'Ręczna kwota zwrotu kaucji',
+        depositOverrideHelper:
+          'Pozostaw puste, aby użyć pełnego zwrotu automatycznego.',
+        depositNote: 'Powód korekty zwrotu kaucji',
       },
       actions: {
         calendar: 'Otwórz kalendarz pracownika',
