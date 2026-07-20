@@ -540,6 +540,13 @@ describe('employee monthly calculation draft', () => {
           variantName: 'Typ A',
           amount: 150,
         }),
+        payrollSetting({
+          id: 'type-a-media',
+          settingKey: 'company_housing_media',
+          variantKey: 'type-a',
+          variantName: 'Typ A',
+          amount: 500,
+        }),
       ],
     });
 

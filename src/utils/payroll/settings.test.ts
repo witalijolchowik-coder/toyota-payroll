@@ -53,7 +53,7 @@ describe('effective payroll setting resolution', () => {
 
   it('preserves historical resolution when a newer open version is added', () => {
     const settings = [
-      setting('original', '2026-01', 400),
+      setting('original', '2026-01', 400, { validTo: '2026-06' }),
       setting('future', '2026-07', 450),
     ];
 
