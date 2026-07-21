@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
-import type { Department, Employee } from '../../types/firestore';
+import type {
+  Department,
+  Employee,
+  EmployeeContract,
+} from '../../types/firestore';
 import {
   buildBulkEmployeeUpdatePreview,
   buildEmployeeUpdateTemplateCsv,
@@ -8,6 +12,8 @@ import {
   buildNewEmployeeTemplatePreview,
   EMPLOYEE_TEMPLATE_CLEAR_MARKER,
   employeeTemplateHeaders,
+  employeesExceedingContractTemplateLimit,
+  planEmployeeContractImport,
 } from './employeeTemplateImport';
 
 describe('employee template import', () => {
@@ -16,7 +22,15 @@ describe('employee template import', () => {
 
     expect(csv.startsWith('\uFEFF')).toBe(true);
     expect(csv).toContain('Numer TETA;Imię;Nazwisko');
-    expect(csv).toContain('Data rozpoczęcia pracy');
+    expect(employeeTemplateHeaders).toContain(
+      'Data pierwszego zatrudnienia w Toyota',
+    );
+    expect(employeeTemplateHeaders).not.toContain('Data rozpoczęcia pracy');
+    expect(employeeTemplateHeaders).not.toContain('Data zakończenia pracy');
+    for (let slot = 1; slot <= 5; slot += 1) {
+      expect(employeeTemplateHeaders).toContain(`Umowa ${slot} od`);
+      expect(employeeTemplateHeaders).toContain(`Umowa ${slot} do`);
+    }
   });
 
   it('builds a valid new employee candidate from CSV', () => {
@@ -30,7 +44,7 @@ describe('employee template import', () => {
           '',
           '',
           '2026-06-03',
-          '',
+          '2026-12-31',
           'Metal',
           'RED',
         ],
@@ -57,19 +71,15 @@ describe('employee template import', () => {
   it.each([
     [
       'missing first name',
-      ['WT-001', '', 'Kowalska', '', '', '', '2026-06-03'],
+      ['WT-001', '', 'Kowalska', '', '', '', '2026-06-03', '2026-12-31'],
       'missing-first-name',
     ],
     [
       'missing last name',
-      ['WT-001', 'Anna', '', '', '', '', '2026-06-03'],
+      ['WT-001', 'Anna', '', '', '', '', '2026-06-03', '2026-12-31'],
       'missing-last-name',
     ],
-    [
-      'missing employment start',
-      ['WT-001', 'Anna', 'Kowalska'],
-      'missing-employment-start',
-    ],
+    ['missing contract', ['WT-001', 'Anna', 'Kowalska'], 'missing-contract'],
   ])('blocks new employee row with %s', (_, row, warning) => {
     const preview = buildNewEmployeeTemplatePreview(csv([row]), [], []);
 
@@ -80,7 +90,7 @@ describe('employee template import', () => {
 
   it('allows preparation of a new employee without TETA and reports a warning', () => {
     const preview = buildNewEmployeeTemplatePreview(
-      csv([['', 'Anna', 'Kowalska', '', '', '', '2026-06-03']]),
+      csv([['', 'Anna', 'Kowalska', '', '', '', '2026-06-03', '2026-12-31']]),
       [],
       [],
     );
@@ -92,7 +102,9 @@ describe('employee template import', () => {
 
   it('does not create an existing employee with duplicate TETA', () => {
     const preview = buildNewEmployeeTemplatePreview(
-      csv([['WT-001', 'Anna', 'Kowalska', '', '', '', '2026-06-03']]),
+      csv([
+        ['WT-001', 'Anna', 'Kowalska', '', '', '', '2026-06-03', '2026-12-31'],
+      ]),
       [employee('employee-1', 'WT-001')],
       [],
     );
@@ -104,8 +116,8 @@ describe('employee template import', () => {
   it('detects duplicate TETA inside a new employee import file', () => {
     const preview = buildNewEmployeeTemplatePreview(
       csv([
-        ['WT-001', 'Anna', 'Kowalska', '', '', '', '2026-06-03'],
-        ['WT-001', 'Jan', 'Nowak', '', '', '', '2026-06-03'],
+        ['WT-001', 'Anna', 'Kowalska', '', '', '', '2026-06-03', '2026-12-31'],
+        ['WT-001', 'Jan', 'Nowak', '', '', '', '2026-06-03', '2026-12-31'],
       ]),
       [],
       [],
@@ -119,7 +131,18 @@ describe('employee template import', () => {
 
   it('imports optional passport and keeps blank optional fields null', () => {
     const preview = buildNewEmployeeTemplatePreview(
-      csv([['WT-001', 'Anna', 'Boiko', '', 'GN142425', '', '2026-06-03']]),
+      csv([
+        [
+          'WT-001',
+          'Anna',
+          'Boiko',
+          '',
+          'GN142425',
+          '',
+          '2026-06-03',
+          '2026-12-31',
+        ],
+      ]),
       [],
       [],
     );
@@ -135,7 +158,17 @@ describe('employee template import', () => {
   it('warns and keeps unknown department unassigned for new employees', () => {
     const preview = buildNewEmployeeTemplatePreview(
       csv([
-        ['WT-001', 'Anna', 'Kowalska', '', '', '', '2026-06-03', '', 'Unknown'],
+        [
+          'WT-001',
+          'Anna',
+          'Kowalska',
+          '',
+          '',
+          '',
+          '2026-06-03',
+          '2026-12-31',
+          'Unknown',
+        ],
       ]),
       [],
       [department('metal', 'Metal')],
@@ -149,7 +182,17 @@ describe('employee template import', () => {
   it('warns and keeps NA0 unassigned', () => {
     const preview = buildNewEmployeeTemplatePreview(
       csv([
-        ['WT-001', 'Anna', 'Kowalska', '', '', '', '2026-06-03', '', 'NA0'],
+        [
+          'WT-001',
+          'Anna',
+          'Kowalska',
+          '',
+          '',
+          '',
+          '2026-06-03',
+          '2026-12-31',
+          'NA0',
+        ],
       ]),
       [],
       [department('pu', 'PU'), department('headliner', 'Headliner')],
@@ -175,7 +218,7 @@ describe('employee template import', () => {
           '',
           '',
           '2026-06-03',
-          '',
+          '2026-12-31',
           rawDepartment,
         ],
       ]),
@@ -192,7 +235,7 @@ describe('employee template import', () => {
     expect(preview[0].warnings).not.toContain('department-unmapped');
   });
 
-  it('generates an update template for active employees not ended before today', () => {
+  it('keeps unresolved legacy-inactive employees in the operational template', () => {
     const csvText = buildEmployeeUpdateTemplateCsv(
       [
         employee('active', 'WT-001'),
@@ -207,8 +250,8 @@ describe('employee template import', () => {
     );
 
     expect(csvText).toContain('WT-001');
-    expect(csvText).not.toContain('WT-002');
-    expect(csvText).not.toContain('WT-003');
+    expect(csvText).toContain('WT-002');
+    expect(csvText).toContain('WT-003');
   });
 
   it('generates a fresh update template with only reference columns populated', () => {
@@ -249,8 +292,12 @@ describe('employee template import', () => {
       'Anna',
       'Kowalska',
     ]);
-    expect(rows[1].split(';').slice(3)).toEqual(
-      Array.from({ length: employeeTemplateHeaders.length - 3 }, () => ''),
+    const values = rows[1].split(';');
+    expect(values[employeeTemplateHeaders.indexOf('Umowa 1 od')]).toBe(
+      '2026-06-01',
+    );
+    expect(values[employeeTemplateHeaders.indexOf('Umowa 1 do')]).toBe(
+      '2026-12-31',
     );
     expect(first).not.toContain('Inny dokument');
     expect(first).not.toContain('+48 500 600 700');
@@ -448,6 +495,147 @@ describe('employee template import', () => {
     expect(preview[0].warnings).toContain('department-na0');
     expect(preview[0].updateInput).toBeNull();
   });
+
+  it('prefills all historical contracts oldest first and leaves unused slots empty', () => {
+    const existing = {
+      ...employee('employee-1', 'WT-001'),
+      contracts: [
+        contract('newer', '2026-04-01', '2026-06-30'),
+        contract('older', '2026-01-01', '2026-03-31'),
+      ],
+    };
+
+    const row = buildEmployeeUpdateTemplateCsv(
+      [existing],
+      [],
+      date('2026-06-10'),
+    )
+      .replace(/^\uFEFF/, '')
+      .trim()
+      .split('\r\n')[1]!
+      .split(';');
+
+    expect(row[employeeTemplateHeaders.indexOf('Umowa 1 od')]).toBe(
+      '2026-01-01',
+    );
+    expect(row[employeeTemplateHeaders.indexOf('Umowa 2 od')]).toBe(
+      '2026-04-01',
+    );
+    expect(row[employeeTemplateHeaders.indexOf('Umowa 3 od')]).toBe('');
+  });
+
+  it('reports more than five contracts without deleting the extra history', () => {
+    const existing = {
+      ...employee('employee-1', 'WT-001'),
+      contracts: Array.from({ length: 6 }, (_, index) =>
+        contract(
+          `contract-${index + 1}`,
+          `202${index}-01-01`,
+          `202${index}-12-31`,
+        ),
+      ),
+    };
+
+    expect(employeesExceedingContractTemplateLimit([existing])).toEqual([
+      existing,
+    ]);
+    const plan = planEmployeeContractImport(existing, []);
+    expect(plan.warnings).toContain('more-than-five-contracts');
+    expect(
+      plan.changes.filter(({ kind }) => kind === 'untouched'),
+    ).toHaveLength(6);
+  });
+
+  it('validates contract pairs, ranges, duplicates and overlaps', () => {
+    const partial = buildBulkEmployeeUpdatePreview(
+      updateCsv({
+        'Numer TETA': 'WT-001',
+        Imię: 'Anna',
+        Nazwisko: 'Kowalska',
+        'Umowa 1 od': '2026-07-01',
+      }),
+      [employee('employee-1', 'WT-001')],
+      [],
+    )[0]!;
+    const invalid = buildBulkEmployeeUpdatePreview(
+      updateCsv({
+        'Numer TETA': 'WT-001',
+        Imię: 'Anna',
+        Nazwisko: 'Kowalska',
+        'Umowa 1 od': '2026-07-31',
+        'Umowa 1 do': '2026-07-01',
+      }),
+      [employee('employee-1', 'WT-001')],
+      [],
+    )[0]!;
+    const duplicateAndOverlap = buildBulkEmployeeUpdatePreview(
+      updateCsv({
+        'Numer TETA': 'WT-001',
+        Imię: 'Anna',
+        Nazwisko: 'Kowalska',
+        'Umowa 1 od': '2026-01-01',
+        'Umowa 1 do': '2026-03-31',
+        'Umowa 2 od': '2026-01-01',
+        'Umowa 2 do': '2026-03-31',
+        'Umowa 3 od': '2026-03-15',
+        'Umowa 3 do': '2026-04-30',
+      }),
+      [employee('employee-1', 'WT-001')],
+      [],
+    )[0]!;
+
+    expect(partial.warnings).toContain('partial-contract');
+    expect(invalid.warnings).toContain('invalid-contract-range');
+    expect(duplicateAndOverlap.warnings).toEqual(
+      expect.arrayContaining(['duplicate-contract', 'overlapping-contract']),
+    );
+  });
+
+  it('ignores obsolete employment columns and never maps them to contracts', () => {
+    const legacyCsv = [
+      'Numer TETA;Imię;Nazwisko;Data rozpoczęcia pracy;Data zakończenia pracy',
+      'WT-001;Anna;Kowalska;2025-01-01;2025-01-31',
+    ].join('\n');
+    const existing = employee('employee-1', 'WT-001');
+    const preview = buildBulkEmployeeUpdatePreview(
+      legacyCsv,
+      [existing],
+      [],
+    )[0]!;
+
+    expect(preview.status).toBe('no-changes');
+    expect(preview.warnings).toContain('legacy-employment-columns-ignored');
+    expect(preview.importedContracts).toEqual([]);
+    expect(preview.contractChanges).toEqual([
+      expect.objectContaining({ kind: 'untouched' }),
+    ]);
+    expect(preview.updateInput).toBeNull();
+  });
+
+  it('matches exact contracts, proposes positional correction and preserves blank later slots', () => {
+    const existing = {
+      ...employee('employee-1', 'WT-001'),
+      contracts: [
+        contract('first', '2026-01-01', '2026-03-31'),
+        contract('second', '2026-04-01', '2026-06-30'),
+      ],
+    };
+    const exact = planEmployeeContractImport(existing, [
+      { slot: 1, startDate: '2026-01-01', endDate: '2026-03-31' },
+    ]);
+    const correction = planEmployeeContractImport(existing, [
+      { slot: 1, startDate: '2026-01-01', endDate: '2026-03-30' },
+      { slot: 2, startDate: '2026-03-31', endDate: '2026-06-30' },
+    ]);
+
+    expect(exact.changes).toEqual([
+      expect.objectContaining({ kind: 'unchanged' }),
+      expect.objectContaining({ kind: 'untouched' }),
+    ]);
+    expect(
+      correction.changes.filter(({ kind }) => kind === 'update'),
+    ).toHaveLength(2);
+  });
 });
 
 function csv(rows: readonly (readonly string[])[]): string {
@@ -458,8 +646,8 @@ function csv(rows: readonly (readonly string[])[]): string {
     'PESEL',
     'Paszport',
     'Inny dokument',
-    'Data rozpoczęcia pracy',
-    'Data zakończenia pracy',
+    'Umowa 1 od',
+    'Umowa 1 do',
     'Dział',
     'Zmiana',
   ];
@@ -494,6 +682,30 @@ function employee(id: string, tetaNumber: string): Employee {
     shiftAssignment: null,
     employmentStartDate: now,
     employmentEndDate: null,
+    contracts: [contract(`contract-${id}`, '2026-06-01', '2026-12-31')],
+    employmentEndEvents: [],
+    createdAt: now,
+    createdBy: 'test',
+    updatedAt: now,
+    updatedBy: 'test',
+  };
+}
+
+function contract(
+  id: string,
+  startDate: string,
+  endDate: string | null,
+): EmployeeContract {
+  const now = date('2026-06-01');
+  return {
+    id,
+    employeeId: 'employee-1',
+    tetaNumber: 'WT-001',
+    sequenceId: 'sequence-1',
+    startDate,
+    endDate,
+    status: 'ACTIVE',
+    note: null,
     createdAt: now,
     createdBy: 'test',
     updatedAt: now,

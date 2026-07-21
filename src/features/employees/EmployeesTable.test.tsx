@@ -23,6 +23,20 @@ const employee = {
   firstToyotaEmploymentDate: new Date('2025-01-02T00:00:00.000Z'),
   employmentStartDate: new Date('2026-01-03T00:00:00.000Z'),
   employmentEndDate: null,
+  contracts: [
+    {
+      id: 'contract-1',
+      employeeId: 'employee-1',
+      tetaNumber: 'WT-10',
+      sequenceId: 'sequence-1',
+      startDate: '2026-01-03',
+      endDate: null,
+      status: 'ACTIVE',
+      note: null,
+      ...metadata,
+    },
+  ],
+  employmentEndEvents: [],
   departmentId: 'metal',
   shiftAssignment: 'RED',
   isActive: true,
@@ -128,6 +142,12 @@ describe('EmployeesTable', () => {
             ...employee,
             isActive: false,
             employmentEndDate: new Date('2026-08-31T00:00:00.000Z'),
+            contracts: [
+              {
+                ...employee.contracts![0]!,
+                endDate: '2026-08-31',
+              },
+            ],
           },
         ]}
         departments={[department]}
@@ -158,6 +178,7 @@ describe('EmployeesTable', () => {
             firstToyotaEmploymentDate: null,
             employmentStartDate: null,
             employmentEndDate: null,
+            contracts: [],
           },
         ]}
         departments={[department]}

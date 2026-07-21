@@ -28,6 +28,7 @@ import type {
   EmployeeCreateInput,
 } from '../../types/firestore';
 import { deriveEmployeeMedicalStatus } from '../../utils/employees';
+import { activeContracts } from '../../utils/employees';
 import { isCanonicalExactDate } from '../../utils/forms/exactDateTimeInput';
 import {
   employeeInputFromForm,
@@ -51,6 +52,7 @@ function dateInputValue(value: Date | null): string {
 }
 
 function initialValues(employee?: Employee): EmployeeFormValues {
+  const firstContract = employee ? activeContracts(employee)[0] : null;
   return {
     tetaNumber: employee?.tetaNumber ?? '',
     firstName: employee?.firstName ?? '',
@@ -72,10 +74,12 @@ function initialValues(employee?: Employee): EmployeeFormValues {
     departmentId: employee?.departmentId ?? '',
     shiftAssignment: employee?.shiftAssignment ?? '',
     assignmentEffectiveDate: dateInputValue(
-      employee?.employmentStartDate ?? new Date(),
+      firstContract
+        ? new Date(`${firstContract.startDate}T00:00:00.000Z`)
+        : new Date(),
     ),
-    employmentStartDate: dateInputValue(employee?.employmentStartDate ?? null),
-    employmentEndDate: dateInputValue(employee?.employmentEndDate ?? null),
+    initialContractStartDate: '',
+    initialContractEndDate: '',
   };
 }
 
@@ -139,8 +143,8 @@ export function EmployeeFormDialog({
       values.medicalExaminationDate,
       values.medicalValidUntil,
       values.assignmentEffectiveDate,
-      values.employmentStartDate,
-      values.employmentEndDate,
+      values.initialContractStartDate,
+      values.initialContractEndDate,
     ];
     if (
       exactDateValues.some(
@@ -153,7 +157,9 @@ export function EmployeeFormDialog({
     if (!assignmentChanged) {
       input.assignmentEffectiveDate = null;
     }
-    const validationErrors = validateEmployeeInput(input);
+    const validationErrors = validateEmployeeInput(input, {
+      requireInitialContract: !employee,
+    });
 
     if (Object.keys(validationErrors).length > 0) {
       setErrors(validationErrors);
@@ -453,24 +459,26 @@ export function EmployeeFormDialog({
                   <ExactDateField
                     required
                     fullWidth
-                    label={t.employees.form.employmentStartDate}
-                    value={values.employmentStartDate}
-                    onValueChange={handleValueChange('employmentStartDate')}
-                    error={Boolean(errors.employmentStartDate)}
+                    label={t.employees.form.initialContractStartDate}
+                    value={values.initialContractStartDate}
+                    onValueChange={handleValueChange(
+                      'initialContractStartDate',
+                    )}
+                    error={Boolean(errors.initialContractStartDate)}
                     helperText={
-                      messageForError(errors.employmentStartDate) ??
-                      t.employees.form.employmentStartRequired
+                      messageForError(errors.initialContractStartDate) ??
+                      t.employees.form.initialContractStartHelper
                     }
                     invalidMessage={t.input.exactDateInvalid}
                     pickerLabel={t.input.openDatePicker}
                   />
                   <ExactDateField
                     fullWidth
-                    label={t.employees.form.employmentEndDate}
-                    value={values.employmentEndDate}
-                    onValueChange={handleValueChange('employmentEndDate')}
-                    error={Boolean(errors.employmentEndDate)}
-                    helperText={messageForError(errors.employmentEndDate)}
+                    label={t.employees.form.initialContractEndDate}
+                    value={values.initialContractEndDate}
+                    onValueChange={handleValueChange('initialContractEndDate')}
+                    error={Boolean(errors.initialContractEndDate)}
+                    helperText={messageForError(errors.initialContractEndDate)}
                     invalidMessage={t.input.exactDateInvalid}
                     pickerLabel={t.input.openDatePicker}
                   />

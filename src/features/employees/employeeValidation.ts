@@ -71,14 +71,19 @@ export function employeeInputFromForm(
     shiftAssignment: isEmployeeColorShift(values.shiftAssignment)
       ? values.shiftAssignment
       : null,
-    employmentStartDate: dateFromInput(values.employmentStartDate),
-    employmentEndDate: dateFromInput(values.employmentEndDate),
+    initialContract: values.initialContractStartDate
+      ? {
+          startDate: dateFromInput(values.initialContractStartDate)!,
+          endDate: dateFromInput(values.initialContractEndDate),
+        }
+      : null,
     assignmentEffectiveDate: values.assignmentEffectiveDate || null,
   });
 }
 
 export function validateEmployeeInput(
   input: EmployeeCreateInput,
+  options: { requireInitialContract?: boolean } = {},
 ): EmployeeValidationErrors {
   const normalized = normalizeEmployeeInput(input);
   const errors: EmployeeValidationErrors = {};
@@ -89,8 +94,8 @@ export function validateEmployeeInput(
   if (!normalized.lastName) {
     errors.lastName = 'required';
   }
-  if (!normalized.employmentStartDate) {
-    errors.employmentStartDate = 'required';
+  if ((options.requireInitialContract ?? true) && !normalized.initialContract) {
+    errors.initialContractStartDate = 'required';
   }
   if (
     normalized.assignmentEffectiveDate &&
@@ -99,11 +104,10 @@ export function validateEmployeeInput(
     errors.assignmentEffectiveDate = 'invalidDateRange';
   }
   if (
-    normalized.employmentStartDate &&
-    normalized.employmentEndDate &&
-    normalized.employmentEndDate < normalized.employmentStartDate
+    normalized.initialContract?.endDate &&
+    normalized.initialContract.endDate < normalized.initialContract.startDate
   ) {
-    errors.employmentEndDate = 'invalidDateRange';
+    errors.initialContractEndDate = 'invalidDateRange';
   }
   if (normalized.citizenship && !isValidCitizenship(normalized.citizenship)) {
     errors.citizenship = 'invalidCitizenship';

@@ -34,6 +34,7 @@ import {
   type CalendarDay,
   type SettlementCellValue,
 } from './monthUtils';
+import { activeContracts } from '../../utils/employees';
 import {
   appearanceKeyForAbsence,
   appearanceKeyForPlannedDay,
@@ -110,6 +111,18 @@ export function EmployeeCalendarDialog({
   const shiftLabel = employee.shiftAssignment
     ? t.organization.shifts[employee.shiftAssignment]
     : t.organization.shifts.unassigned;
+  const employmentLabel = activeContracts(employee)
+    .map((contract) =>
+      interpolate(t.settlement.employeeCalendar.employment, {
+        start: formatter.format(
+          new Date(`${contract.startDate}T00:00:00.000Z`),
+        ),
+        end: contract.endDate
+          ? formatter.format(new Date(`${contract.endDate}T00:00:00.000Z`))
+          : t.settlement.employeeCalendar.noEndDate,
+      }),
+    )
+    .join(', ');
 
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="lg">
@@ -137,14 +150,9 @@ export function EmployeeCalendarDialog({
             <Chip variant="outlined" label={monthLabel} />
             <Chip
               variant="outlined"
-              label={interpolate(t.settlement.employeeCalendar.employment, {
-                start: employee.employmentStartDate
-                  ? formatter.format(employee.employmentStartDate)
-                  : t.settlement.employeeCalendar.noStartDate,
-                end: employee.employmentEndDate
-                  ? formatter.format(employee.employmentEndDate)
-                  : t.settlement.employeeCalendar.noEndDate,
-              })}
+              label={
+                employmentLabel || t.settlement.employeeCalendar.noStartDate
+              }
             />
             <Chip
               variant="outlined"

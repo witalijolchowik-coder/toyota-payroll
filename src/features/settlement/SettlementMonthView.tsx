@@ -49,6 +49,7 @@ import {
   isEmployeeActiveOnDate,
   resolveMonthlyEmployeeEntitlements,
 } from '../../utils/payroll';
+import { activeContracts } from '../../utils/employees';
 import type { AbsenceCode } from '../../utils/absences';
 import { CalendarConstructorToolbar } from './CalendarConstructorToolbar';
 import {
@@ -216,7 +217,7 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
   }
 
   const employeesWithoutStartDate = data.employees.filter(
-    (employee) => !employee.employmentStartDate,
+    (employee) => activeContracts(employee).length === 0,
   );
   const participatingEmployees = data.employees.filter((employee) =>
     employeeParticipatesInMonth(employee, range),

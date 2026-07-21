@@ -1,8 +1,8 @@
 # Employee import templates and bulk updates — Block 15
 
 > The bulk-update column list and employee medical/contact extensions are
-> superseded by
-> [Employee update template and medical examinations](employee-update-medical-data.md).
+> superseded by [Employee update template and medical examinations](employee-update-medical-data.md)
+> and [Bulk contract import](contract-bulk-import-continuity.md).
 > The preview-first workflow and non-payroll scope below remain applicable.
 
 This block replaces the normal coordinator-facing employee import workflow with
@@ -50,8 +50,9 @@ Supported columns:
 - `PESEL` — optional;
 - `Paszport` — optional;
 - `Inny dokument` — optional;
-- `Data rozpoczęcia pracy` — required;
-- `Data zakończenia pracy` — optional;
+- `Umowa 1 od` / `Umowa 1 do` — required complete first contract;
+- `Umowa 2 od` / `Umowa 2 do` through `Umowa 5 od` / `Umowa 5 do` — optional
+  complete contract pairs;
 - `Dział` — optional;
 - `Zmiana` — optional (`RED`, `WHITE`, `BLUE`).
 
@@ -68,9 +69,9 @@ Creation is blocked when:
 - TETA is missing;
 - first name is missing;
 - last name is missing;
-- employment start is missing or invalid;
-- employment end is invalid;
-- date range is invalid;
+- first contract is missing or incomplete;
+- a contract date or date range is invalid;
+- supplied contracts duplicate or overlap;
 - shift value is invalid;
 - TETA is duplicated inside the file;
 - identity conflicts with another existing employee.
@@ -115,9 +116,11 @@ Supported clearable fields:
 - PESEL;
 - passport;
 - foreign document;
-- employment start/end date;
 - department;
 - shift.
+
+Blank contract slots never cancel or clear existing contracts. Contract
+cancellation stays an explicit operation in contract history.
 
 ## Preview statuses
 

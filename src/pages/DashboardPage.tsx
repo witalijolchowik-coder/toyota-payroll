@@ -1405,9 +1405,22 @@ function DeadlineRow({ deadline }: { deadline: DashboardDeadline }) {
           {formatDate(deadline.date)}
         </Typography>
         {deadline.decisionRequired ? (
-          <Typography variant="caption" color="error" sx={{ fontWeight: 800 }}>
-            {t.dashboard.deadlines.decisionRequired}
-          </Typography>
+          <Stack sx={{ alignItems: 'flex-end' }}>
+            <Typography
+              variant="caption"
+              color="error"
+              sx={{ fontWeight: 800 }}
+            >
+              {deadline.remainingDays === -1
+                ? t.dashboard.deadlines.overdueOneDay
+                : interpolate(t.dashboard.deadlines.overdueDays, {
+                    count: String(Math.abs(deadline.remainingDays ?? 0)),
+                  })}
+            </Typography>
+            <Typography variant="caption" color="error">
+              {t.dashboard.deadlines.decisionRequired}
+            </Typography>
+          </Stack>
         ) : deadline.remainingDays !== undefined &&
           deadline.remainingDays >= 1 &&
           deadline.remainingDays <= 5 ? (

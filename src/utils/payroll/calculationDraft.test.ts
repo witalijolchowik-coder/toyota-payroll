@@ -22,6 +22,25 @@ function utcDate(isoDate: string): Date {
 }
 
 function employee(overrides: Partial<Employee> = {}): Employee {
+  const employmentStartDate =
+    overrides.employmentStartDate ?? utcDate('2026-01-01');
+  const employmentEndDate = overrides.employmentEndDate ?? null;
+  const contracts = overrides.contracts ?? [
+    {
+      id: 'contract-1',
+      employeeId: 'employee-1',
+      tetaNumber: 'T001',
+      sequenceId: 'sequence-1',
+      startDate: employmentStartDate.toISOString().slice(0, 10),
+      endDate: employmentEndDate?.toISOString().slice(0, 10) ?? null,
+      status: 'ACTIVE' as const,
+      note: null,
+      createdAt,
+      createdBy: 'test',
+      updatedAt: createdAt,
+      updatedBy: 'test',
+    },
+  ];
   return {
     id: 'employee-1',
     tetaNumber: 'T001',
@@ -30,13 +49,15 @@ function employee(overrides: Partial<Employee> = {}): Employee {
     isActive: true,
     departmentId: null,
     shiftAssignment: null,
-    employmentStartDate: utcDate('2026-01-01'),
-    employmentEndDate: null,
+    employmentStartDate,
+    employmentEndDate,
+    employmentEndEvents: [],
     createdAt,
     createdBy: 'test',
     updatedAt: createdAt,
     updatedBy: 'test',
     ...overrides,
+    contracts,
     pesel: overrides.pesel ?? null,
     passportNumber: overrides.passportNumber ?? null,
     foreignDocumentNumber: overrides.foreignDocumentNumber ?? null,
@@ -239,6 +260,66 @@ describe('employee monthly calculation draft', () => {
       22 * STANDARD_WORKING_DAY_HOURS,
     );
     expect(result.totals.workedHours).toBe(22 * STANDARD_WORKING_DAY_HOURS);
+  });
+
+  it('treats consecutive contracts as full-month coverage for monthly allowances', () => {
+    const target = employee({
+      contracts: [
+        {
+          ...employee().contracts![0]!,
+          id: 'first-half',
+          startDate: '2026-06-01',
+          endDate: '2026-06-15',
+        },
+        {
+          ...employee().contracts![0]!,
+          id: 'second-half',
+          startDate: '2026-06-16',
+          endDate: '2026-08-31',
+        },
+      ],
+    });
+    const result = draft({
+      target,
+      entitlements: {
+        udtEligible: true,
+        ownHousingAllowanceEligible: true,
+      },
+      settings: [
+        ...defaultPayrollSettings(),
+        payrollSetting({
+          id: 'own-housing',
+          settingKey: 'own_housing_allowance',
+          amount: 200,
+        }),
+      ],
+    });
+
+    expect(result.employment.fullCalendarMonth).toBe(true);
+    expect(result.components.udtAllowanceBrutto).toBe(300);
+    expect(result.components.ownHousingAllowanceBrutto).toBe(200);
+    expect(result.totals.frequencyBonusAmount).toBe(400);
+  });
+
+  it('preserves a real one-day gap between contracts', () => {
+    const target = employee({
+      contracts: [
+        {
+          ...employee().contracts![0]!,
+          id: 'first-half',
+          startDate: '2026-06-01',
+          endDate: '2026-06-15',
+        },
+        {
+          ...employee().contracts![0]!,
+          id: 'second-half',
+          startDate: '2026-06-17',
+          endDate: '2026-08-31',
+        },
+      ],
+    });
+
+    expect(draft({ target }).employment.fullCalendarMonth).toBe(false);
   });
 
   it('uses manual override as the effective imported attendance value', () => {

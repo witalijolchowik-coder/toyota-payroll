@@ -20,6 +20,7 @@ import type {
 } from '../types/firestore';
 import {
   activeContracts,
+  planLegacyContractMigration,
   resolveLatestContract,
   validateEmployeeContract,
 } from '../utils/employees';
@@ -415,23 +416,26 @@ export async function endEmployeeEmployment(
 export async function bootstrapLegacyEmployeeContract(
   employee: Employee,
 ): Promise<string | null> {
-  if (employee.contracts?.length || !employee.employmentStartDate) return null;
+  const migration = planLegacyContractMigration(employee);
+  if (!migration) return null;
   const { repositories, uid } = requireContext();
-  const startDate = employee.employmentStartDate.toISOString().slice(0, 10);
-  const endDate =
-    employee.employmentEndDate?.toISOString().slice(0, 10) ?? null;
-  const reference = repositories.employeeContract(`legacy-${employee.id}`);
+  const reference = repositories.employeeContract(migration.contractId);
   const batch = writeBatch(repositories.employeeContracts.firestore);
   batch.set(reference, {
     employee_id: employee.id,
     teta_number: employee.tetaNumber,
-    sequence_id: `legacy-${employee.id}`,
-    start_date: startDate,
-    end_date: endDate,
+    sequence_id: migration.sequenceId,
+    start_date: migration.startDate,
+    end_date: migration.endDate,
     status: 'ACTIVE',
     note: 'Migracja z historycznych dat zatrudnienia',
     created_at: serverTimestamp(),
     created_by: uid,
+    updated_at: serverTimestamp(),
+    updated_by: uid,
+  });
+  batch.update(repositories.employee(employee.id), {
+    is_active: migration.restoreOperationalActive ? true : employee.isActive,
     updated_at: serverTimestamp(),
     updated_by: uid,
   });
@@ -441,9 +445,10 @@ export async function bootstrapLegacyEmployeeContract(
     actorUid: uid,
     changes: {
       operation: 'legacy-employment-period-migrated',
+      legacy_auto_archive_repaired: migration.restoreOperationalActive,
       employee_id: employee.id,
-      start_date: startDate,
-      end_date: endDate,
+      start_date: migration.startDate,
+      end_date: migration.endDate,
     },
   });
   await batch.commit();

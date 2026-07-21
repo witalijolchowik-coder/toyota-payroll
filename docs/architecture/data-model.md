@@ -81,9 +81,11 @@ sequence. A contract end date alone does not archive an employee. End events
 are immutable except for lifecycle cancellation; physical deletion is denied.
 
 The current contract, monthly participation, planned-day coverage, archive
-state and the cumulative 18-month limit are derived from all non-cancelled
-contracts. Legacy `employment_start` and `employment_end` employee fields are
-derived compatibility fields only. See
+state, exports, rotation and the cumulative 18-month limit are derived from all
+non-cancelled contracts and explicit employment-end events. Legacy
+`employment_start` and `employment_end` employee fields are deprecated,
+derived compatibility snapshots only; imports and calculations never use them
+as fallback coverage. See
 [Employment contract history](../business-rules/employment-contract-history.md).
 
 Optional medical-examination facts are kept on the employee document:

@@ -30,12 +30,14 @@ import type {
   EmployeeBulkUpdateResult,
   EmployeeImportProgress,
 } from '../../services/employeeImportService';
+import { previewEmployeeContractImpact } from '../../services/employeeContractsService';
 import type { Department, Employee } from '../../types/firestore';
 import {
   buildBulkEmployeeUpdatePreview,
   buildEmployeeUpdateTemplateCsv,
   buildNewEmployeeTemplateCsv,
   buildNewEmployeeTemplatePreview,
+  employeesExceedingContractTemplateLimit,
   EMPLOYEE_TEMPLATE_CLEAR_MARKER,
   EMPLOYEE_UPDATE_TEMPLATE_FILE_NAME,
   NEW_EMPLOYEE_TEMPLATE_FILE_NAME,
@@ -113,7 +115,10 @@ export function EmployeeTemplateImportDialog({
     [newRows, selectedNewIds],
   );
   const selectedUpdateRows = useMemo(
-    () => updateRows.filter((row) => selectedUpdateIds.has(row.id)),
+    () =>
+      updateRows.filter(
+        (row) => selectedUpdateIds.has(row.id) || row.status === 'blocked',
+      ),
     [updateRows, selectedUpdateIds],
   );
 
@@ -153,10 +158,58 @@ export function EmployeeTemplateImportDialog({
     setBusyMode('analyzing');
     setError(null);
     try {
-      const rows = buildBulkEmployeeUpdatePreview(
+      const parsedRows = buildBulkEmployeeUpdatePreview(
         await updateFile.text(),
         employees,
         departments,
+      );
+      const rows = await Promise.all(
+        parsedRows.map(async (row) => {
+          const periods = row.contractChanges.flatMap((change) => {
+            if (change.kind === 'create' && change.imported) {
+              return [
+                {
+                  startDate: change.imported.startDate,
+                  endDate: change.imported.endDate,
+                },
+              ];
+            }
+            if (
+              change.kind === 'update' &&
+              change.imported &&
+              change.existing
+            ) {
+              return [
+                {
+                  startDate: change.existing.startDate,
+                  endDate: change.existing.endDate,
+                },
+                {
+                  startDate: change.imported.startDate,
+                  endDate: change.imported.endDate,
+                },
+              ];
+            }
+            return [];
+          });
+          if (periods.length === 0 || row.status === 'blocked') return row;
+          const impact = await previewEmployeeContractImpact(periods);
+          if (impact.lockedMonths.length === 0) {
+            return {
+              ...row,
+              contractOpenMonths: impact.openMonths,
+              contractLockedMonths: impact.lockedMonths,
+            };
+          }
+          return {
+            ...row,
+            status: 'blocked' as const,
+            warnings: [...row.warnings, 'locked-contract-month' as const],
+            contractOpenMonths: impact.openMonths,
+            contractLockedMonths: impact.lockedMonths,
+            updateInput: null,
+          };
+        }),
       );
       setUpdateRows(rows);
       setSelectedUpdateIds(
@@ -492,6 +545,10 @@ function BulkUpdatePanel({
         .length - 2,
     [departments, employees],
   );
+  const employeesOverContractLimit = useMemo(
+    () => employeesExceedingContractTemplateLimit(employees),
+    [employees],
+  );
   return (
     <Stack spacing={2}>
       {result ? (
@@ -523,6 +580,13 @@ function BulkUpdatePanel({
           count: String(Math.max(0, includedCount)),
         })}
       </Typography>
+      {employeesOverContractLimit.length > 0 ? (
+        <Alert severity="warning">
+          {interpolate(t.employees.templateImport.contractLimitWarning, {
+            count: String(employeesOverContractLimit.length),
+          })}
+        </Alert>
+      ) : null}
       <TemplateActions
         file={file}
         downloadLabel={
@@ -597,7 +661,10 @@ function BulkUpdatePanel({
                         {formatName(row.firstName, row.lastName)}
                       </TableCell>
                       <TableCell>
-                        {row.changes.length > 0 ? (
+                        {row.changes.length > 0 ||
+                        row.contractChanges.some(
+                          (change) => change.kind !== 'untouched',
+                        ) ? (
                           <Stack spacing={0.5}>
                             {row.changes.map((change) => (
                               <Typography
@@ -618,6 +685,16 @@ function BulkUpdatePanel({
                                 )}
                               </Typography>
                             ))}
+                            {row.contractChanges
+                              .filter((change) => change.kind !== 'untouched')
+                              .map((change, index) => (
+                                <Typography
+                                  key={`${row.id}-contract-${index}`}
+                                  variant="body2"
+                                >
+                                  {formatContractChange(change, t)}
+                                </Typography>
+                              ))}
                           </Stack>
                         ) : (
                           <Typography variant="body2" color="text.secondary">
@@ -626,7 +703,17 @@ function BulkUpdatePanel({
                         )}
                       </TableCell>
                       <TableCell>
-                        <WarningChips warnings={row.warnings} />
+                        <Stack spacing={0.5}>
+                          <WarningChips warnings={row.warnings} />
+                          {row.contractLockedMonths?.length ? (
+                            <Typography variant="caption" color="error">
+                              {interpolate(
+                                t.employees.templateImport.lockedMonths,
+                                { months: row.contractLockedMonths.join(', ') },
+                              )}
+                            </Typography>
+                          ) : null}
+                        </Stack>
                       </TableCell>
                       <TableCell>
                         {result?.rows.find((item) => item.rowId === row.id) ? (
@@ -664,6 +751,22 @@ function BulkUpdatePanel({
       ) : null}
     </Stack>
   );
+}
+
+function formatContractChange(
+  change: BulkEmployeeUpdatePreviewRow['contractChanges'][number],
+  t: ReturnType<typeof useTranslations>,
+): string {
+  const imported = change.imported
+    ? `${change.imported.startDate} – ${change.imported.endDate}`
+    : t.employees.templateImport.empty;
+  const existing = change.existing
+    ? `${change.existing.startDate} – ${change.existing.endDate ?? '—'}`
+    : t.employees.templateImport.empty;
+  return interpolate(t.employees.templateImport.contractChange[change.kind], {
+    imported,
+    existing,
+  });
 }
 
 interface TemplateActionsProps {
@@ -761,20 +864,20 @@ function formatIdentity(
 }
 
 function formatEmployment(
-  row: Pick<
-    NewEmployeeTemplatePreviewRow,
-    'employmentStartDate' | 'employmentEndDate'
-  >,
+  row: Pick<NewEmployeeTemplatePreviewRow, 'importedContracts'>,
   t: ReturnType<typeof useTranslations>,
 ): string {
-  const start = row.employmentStartDate?.toISOString().slice(0, 10);
-  const end = row.employmentEndDate?.toISOString().slice(0, 10);
-  if (!start) {
+  if (row.importedContracts.length === 0) {
     return t.employees.templateImport.empty;
   }
-  return end
-    ? interpolate(t.employees.templateImport.employmentRange, { start, end })
-    : interpolate(t.employees.templateImport.employmentOpenRange, { start });
+  return row.importedContracts
+    .map((contract) =>
+      interpolate(t.employees.templateImport.employmentRange, {
+        start: contract.startDate,
+        end: contract.endDate,
+      }),
+    )
+    .join(', ');
 }
 
 function toggleSetValue(

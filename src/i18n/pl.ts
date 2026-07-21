@@ -98,7 +98,7 @@ export const pl = {
       },
       contracts: {
         title: 'Kończące się umowy',
-        helper: 'W ciągu najbliższych 30 dni',
+        helper: 'Nadchodzące i po terminie — wymagają uwagi',
       },
       medical: {
         title: 'Badania do odnowienia',
@@ -205,9 +205,12 @@ export const pl = {
     },
     deadlines: {
       title: 'Nadchodzące terminy',
-      description: 'Najbliższe umowy i badania w ciągu 30 dni.',
+      description:
+        'Umowy po terminie oraz najbliższe umowy i badania w ciągu 30 dni.',
       contract: 'Koniec zatrudnienia',
       decisionRequired: 'Umowa zakończona — brak decyzji',
+      overdueOneDay: 'Po terminie: 1 dzień',
+      overdueDays: 'Po terminie: {{count}} dni',
       oneDay: 'Pozostał 1 dzień',
       daysLeft: 'Pozostały {{count}} dni',
       medical: 'Ważność badania lekarskiego',
@@ -436,6 +439,7 @@ export const pl = {
       employmentPeriod: 'Okres zatrudnienia',
       firstEmployment: 'Pierwsze zatrudnienie',
       currentContract: 'Aktualna umowa',
+      contractOverdue: 'Umowa po terminie',
       limit: 'Limit',
       contractFrom: 'Od',
       contractTo: 'Do',
@@ -530,10 +534,10 @@ export const pl = {
       assignmentEffectiveDate: 'Data obowiązywania zmiany',
       assignmentEffectiveHelper:
         'Poprzednie dni zachowają dotychczasowe przypisanie w historii.',
-      employmentStartDate: 'Data rozpoczęcia zatrudnienia',
-      employmentStartRequired:
-        'Wymagane. Bez tej daty pracownik nie może bezpiecznie wejść do rozliczenia miesiąca.',
-      employmentEndDate: 'Data zakończenia zatrudnienia',
+      initialContractStartDate: 'Pierwsza umowa — od',
+      initialContractStartHelper:
+        'Tworzy pierwszy wpis w historii umów pracownika.',
+      initialContractEndDate: 'Pierwsza umowa — do',
       cancel: 'Anuluj',
       create: 'Dodaj',
       save: 'Zapisz zmiany',
@@ -741,6 +745,15 @@ export const pl = {
       employmentRange: '{{start}} – {{end}}',
       employmentOpenRange: 'od {{start}}',
       changeDescription: '{{field}}: {{oldValue}} → {{newValue}}',
+      contractLimitWarning:
+        '{{count}} pracowników ma więcej niż 5 umów. Szablon zawiera pierwszych 5, a pozostałe umowy pozostaną nietknięte.',
+      lockedMonths: 'Zablokowane miesiące: {{months}}.',
+      contractChange: {
+        unchanged: 'Umowa bez zmian: {{imported}}',
+        create: 'Nowa umowa: {{imported}}',
+        update: 'Zmiana dat umowy: {{existing}} → {{imported}}',
+        untouched: 'Istniejąca umowa pozostaje bez zmian: {{existing}}',
+      },
       resultSummary:
         'Zaktualizowano: {{updated}}, pominięto: {{skipped}}, zablokowano: {{blocked}}, błędy: {{errors}}.',
       tabs: {
@@ -795,15 +808,21 @@ export const pl = {
         'missing-teta': 'Brakuje numeru TETA.',
         'missing-first-name': 'Brakuje imienia.',
         'missing-last-name': 'Brakuje nazwiska.',
-        'missing-employment-start': 'Brakuje daty rozpoczęcia zatrudnienia.',
-        'invalid-employment-start':
-          'Data rozpoczęcia zatrudnienia jest nieprawidłowa.',
-        'invalid-employment-end':
-          'Data zakończenia zatrudnienia jest nieprawidłowa.',
-        'invalid-date-range':
-          'Data zakończenia nie może być wcześniejsza niż data rozpoczęcia.',
-        'contract-history-update-required':
-          'Daty umowy zmieniaj w historii umów pracownika. Import zbiorczy nie może nadpisać historii zatrudnienia.',
+        'missing-contract': 'Brakuje co najmniej jednej kompletnej umowy.',
+        'partial-contract': 'Umowa musi zawierać obie daty: „od” i „do”.',
+        'invalid-contract-date': 'Data umowy jest nieprawidłowa.',
+        'invalid-contract-range':
+          'Data końca umowy nie może być wcześniejsza niż data początku.',
+        'duplicate-contract': 'W pliku znajduje się duplikat umowy.',
+        'overlapping-contract': 'Umowy w pliku nakładają się.',
+        'ambiguous-contract-match':
+          'Nie można jednoznacznie dopasować zmienionej umowy. Popraw wiersz ręcznie.',
+        'locked-contract-month':
+          'Zmiana dotyczy zablokowanego miesiąca i nie może zostać zastosowana.',
+        'more-than-five-contracts':
+          'Pracownik ma więcej niż 5 umów. Dalsze umowy pozostaną nietknięte.',
+        'legacy-employment-columns-ignored':
+          'Przestarzałe kolumny dat zatrudnienia zostały zignorowane. Obowiązuje historia umów.',
         'duplicate-teta-in-file': 'Ten numer TETA powtarza się w pliku.',
         'existing-teta':
           'Pracownik z tym numerem TETA już istnieje — import go nie nadpisze.',

@@ -74,6 +74,9 @@ The attached design history contains several generations of the architecture. Th
 - [Employment contract history and explicit employment ending](business-rules/employment-contract-history.md)
   - canonical contract coverage, continuation and gaps, explicit ending,
     legacy migration, returning employees and the cumulative 18-month limit
+- [Bulk contract import, continuity and overdue decisions](business-rules/contract-bulk-import-continuity.md)
+  - five-contract CSV workflow, deterministic matching, locked-month safety,
+    continuous coverage and urgent expired-contract handling
 
 Approved business-rules specifications govern payroll semantics. Architecture
 documents continue to govern system structure and implementation boundaries.

@@ -55,11 +55,14 @@ import {
   EXCUSED_ABSENCE_CODES,
   UNEXPLAINED_ABSENCE_CODES,
   absenceCoversDate,
-  absenceEmploymentIssue,
   countUniqueEmployeesOnConfirmedL4Today,
   deriveL4BusinessStatus,
   normalizeAbsenceCode,
 } from '../utils/absences';
+import {
+  activeContracts,
+  isRangeFullyCoveredByContracts,
+} from '../utils/employees';
 import { currentPayrollMonthId } from '../utils/payroll';
 import { routes } from '../utils/routes';
 
@@ -498,12 +501,16 @@ function AbsenceTable({
         <TableBody>
           {absences.map((absence) => {
             const employee = employeesById.get(absence.employeeId);
-            const issue = employee
-              ? absenceEmploymentIssue(absence, {
-                  employmentStart: employee.employmentStartDate,
-                  employmentEnd: employee.employmentEndDate,
-                })
-              : 'missing-employment-start';
+            const issue =
+              !employee || activeContracts(employee).length === 0
+                ? 'missing-employment-start'
+                : isRangeFullyCoveredByContracts(
+                      employee,
+                      absence.startDate,
+                      absence.endDate,
+                    )
+                  ? null
+                  : 'outside-employment';
             const editable =
               absence.source === 'manual' && absence.status === 'ACTIVE';
             const statusPresentation = absenceStatusPresentation(

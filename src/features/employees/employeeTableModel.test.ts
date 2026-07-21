@@ -8,8 +8,49 @@ import {
 } from './employeeTableModel';
 
 const date = (value: string) => new Date(`${value}T00:00:00.000Z`);
-const employee = (overrides: Partial<Employee>): Employee =>
-  ({
+const employee = (overrides: Partial<Employee>): Employee => {
+  const start = overrides.employmentStartDate ?? date('2026-01-01');
+  const end = overrides.employmentEndDate ?? null;
+  const contracts =
+    overrides.contracts ??
+    (start
+      ? [
+          {
+            id: `contract-${overrides.id ?? 'e'}`,
+            employeeId: overrides.id ?? 'e',
+            tetaNumber: 'WT-10',
+            sequenceId: 'sequence-1',
+            startDate: start.toISOString().slice(0, 10),
+            endDate: end?.toISOString().slice(0, 10) ?? null,
+            status: 'ACTIVE' as const,
+            note: null,
+            createdAt: date('2026-01-01'),
+            createdBy: 'u',
+            updatedAt: date('2026-01-01'),
+            updatedBy: 'u',
+          },
+        ]
+      : []);
+  const employmentEndEvents =
+    overrides.employmentEndEvents ??
+    (end
+      ? [
+          {
+            id: 'end-1',
+            employeeId: overrides.id ?? 'e',
+            tetaNumber: 'WT-10',
+            sequenceId: 'sequence-1',
+            endDate: end.toISOString().slice(0, 10),
+            status: 'ACTIVE' as const,
+            reason: null,
+            createdAt: date('2026-01-01'),
+            createdBy: 'u',
+            updatedAt: date('2026-01-01'),
+            updatedBy: 'u',
+          },
+        ]
+      : []);
+  return {
     id: 'e',
     tetaNumber: 'WT-10',
     firstName: 'Jan',
@@ -20,14 +61,17 @@ const employee = (overrides: Partial<Employee>): Employee =>
     isActive: true,
     departmentId: null,
     shiftAssignment: null,
-    employmentStartDate: date('2026-01-01'),
-    employmentEndDate: null,
+    employmentStartDate: start,
+    employmentEndDate: end,
     createdAt: date('2026-01-01'),
     createdBy: 'u',
     updatedAt: date('2026-01-01'),
     updatedBy: 'u',
     ...overrides,
-  }) as Employee;
+    contracts,
+    employmentEndEvents,
+  } as Employee;
+};
 
 const department = (id: string, name: string): Department =>
   ({ id, name }) as Department;

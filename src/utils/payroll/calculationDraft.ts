@@ -8,7 +8,6 @@ import type {
   PayrollSetting,
 } from '../../types/firestore';
 import {
-  absenceEmploymentIssue,
   isImportedAbsence,
   isL4Absence,
   normalizeAbsenceCode,
@@ -43,6 +42,7 @@ import {
   employeeContractsOverlapRange,
   isDateCoveredByContracts,
   latestEmploymentEnd,
+  isRangeFullyCoveredByContracts,
 } from '../employees';
 
 export type PayrollDraftWarningCode =
@@ -609,7 +609,13 @@ export function calculateEmployeeMonthlyDraft({
     isPayrollEffectiveAbsence,
   );
   activeAbsences.forEach((absence) => {
-    if (absenceEmploymentIssue(absence, employment) === 'outside-employment') {
+    if (
+      !isRangeFullyCoveredByContracts(
+        employee,
+        absence.startDate,
+        absence.endDate,
+      )
+    ) {
       warnings.push(warning('absence-outside-employment', absence.startDate));
     }
   });

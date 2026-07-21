@@ -11,10 +11,24 @@ import {
 const date = (value: string) => new Date(`${value}T00:00:00.000Z`);
 
 describe('employee readiness helpers', () => {
-  it('derives current status from the employment dates', () => {
+  it('derives current status only from contract history', () => {
     const employee = {
-      employmentStartDate: date('2026-01-10'),
-      employmentEndDate: date('2026-07-10'),
+      contracts: [
+        {
+          id: 'contract',
+          employeeId: 'employee-1',
+          tetaNumber: 'WT-1',
+          sequenceId: 'sequence-1',
+          startDate: '2026-01-10',
+          endDate: '2026-07-10',
+          status: 'ACTIVE' as const,
+          note: null,
+          createdAt: date('2026-01-01'),
+          createdBy: 'test',
+          updatedAt: date('2026-01-01'),
+          updatedBy: 'test',
+        },
+      ],
     };
     expect(isEmployeeActiveOnDate(employee, date('2026-07-10'))).toBe(true);
     expect(isEmployeeActiveOnDate(employee, date('2026-07-11'))).toBe(false);

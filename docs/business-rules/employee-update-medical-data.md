@@ -35,16 +35,31 @@ The complete column order is:
 7. `Obywatelstwo`
 8. `Płeć`
 9. `Data pierwszego zatrudnienia w Toyota`
-10. `Data rozpoczęcia pracy`
-11. `Data zakończenia pracy`
-12. `Dział`
-13. `Grupa zmianowa`
-14. `Data badania lekarskiego`
-15. `Badanie ważne do`
-16. `Typ badania lekarskiego`
+10. `Umowa 1 od`
+11. `Umowa 1 do`
+12. `Umowa 2 od`
+13. `Umowa 2 do`
+14. `Umowa 3 od`
+15. `Umowa 3 do`
+16. `Umowa 4 od`
+17. `Umowa 4 do`
+18. `Umowa 5 od`
+19. `Umowa 5 do`
+20. `Dział`
+21. `Grupa zmianowa`
+22. `Data badania lekarskiego`
+23. `Badanie ważne do`
+24. `Typ badania lekarskiego`
 
-All columns from 4 through 16 are empty on every download. Current employee
-values, earlier uploads and browser state must never populate them.
+Contract columns are prefilled from every non-cancelled contract, oldest first,
+up to five slots. Identification columns remain populated and the other
+editable columns stay empty. More than five contracts produces a visible
+warning; later contracts remain stored and are never deleted by blank cells.
+
+The obsolete columns `Data rozpoczęcia pracy` and `Data zakończenia pracy` are
+not generated and are not editable employment coverage. An older CSV containing
+them is accepted with a non-blocking warning, but those values are ignored and
+are never mapped to `Umowa 1`.
 
 `Inny dokument` is retained only as a backward-compatible internal employee
 field. It is not downloaded, parsed or shown in the normal update workflow.

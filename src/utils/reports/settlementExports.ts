@@ -22,15 +22,7 @@ export interface SettlementExportDailyCell {
 }
 
 export interface SettlementExportRecord {
-  employee: Pick<
-    Employee,
-    | 'id'
-    | 'tetaNumber'
-    | 'firstName'
-    | 'lastName'
-    | 'employmentStartDate'
-    | 'employmentEndDate'
-  > &
+  employee: Pick<Employee, 'id' | 'tetaNumber' | 'firstName' | 'lastName'> &
     Partial<
       Pick<Employee, 'citizenship' | 'gender' | 'firstToyotaEmploymentDate'>
     >;

@@ -23,8 +23,8 @@ export interface EmployeeFormValues {
   departmentId: DepartmentId | '';
   shiftAssignment: EmployeeColorShift | '';
   assignmentEffectiveDate: string;
-  employmentStartDate: string;
-  employmentEndDate: string;
+  initialContractStartDate: string;
+  initialContractEndDate: string;
 }
 
 export type EmployeeFieldName =
@@ -42,8 +42,8 @@ export type EmployeeFieldName =
   | 'medicalValidUntil'
   | 'medicalExaminationType'
   | 'assignmentEffectiveDate'
-  | 'employmentStartDate'
-  | 'employmentEndDate';
+  | 'initialContractStartDate'
+  | 'initialContractEndDate';
 
 export type EmployeeValidationCode =
   | 'required'

@@ -387,8 +387,8 @@ function formatEmployment(
   row: EmployeeImportPreviewRow,
   t: ReturnType<typeof useTranslations>,
 ): string {
-  const start = formatImportDate(row.employmentStartDate);
-  const end = formatImportDate(row.employmentEndDate);
+  const start = formatImportDate(row.contractStartDate);
+  const end = formatImportDate(row.contractEndDate);
   if (!start) {
     return t.employees.import.empty;
   }

@@ -34,11 +34,25 @@ describe('employee employment helpers', () => {
     expect(source.getTime()).toBe(before);
   });
 
-  it('resolves only a period with a current contract start', () => {
+  it('resolves the period only from contract history', () => {
     expect(
       resolveCurrentEmploymentPeriod({
-        employmentStartDate: date('2026-06-01'),
-        employmentEndDate: date('2026-08-31'),
+        contracts: [
+          {
+            id: 'contract',
+            employeeId: 'employee-1',
+            tetaNumber: 'WT-1',
+            sequenceId: 'sequence-1',
+            startDate: '2026-06-01',
+            endDate: '2026-08-31',
+            status: 'ACTIVE',
+            note: null,
+            createdAt: date('2026-01-01'),
+            createdBy: 'test',
+            updatedAt: date('2026-01-01'),
+            updatedBy: 'test',
+          },
+        ],
       }),
     ).toEqual({
       startDate: date('2026-06-01'),
@@ -46,8 +60,7 @@ describe('employee employment helpers', () => {
     });
     expect(
       resolveCurrentEmploymentPeriod({
-        employmentStartDate: null,
-        employmentEndDate: date('2026-08-31'),
+        contracts: [],
       }),
     ).toBeNull();
   });

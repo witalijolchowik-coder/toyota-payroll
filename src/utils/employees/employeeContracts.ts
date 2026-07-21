@@ -19,6 +19,14 @@ export interface EmploymentCoveragePeriod {
   endDate: IsoDate;
 }
 
+export interface LegacyContractMigrationPlan {
+  contractId: string;
+  sequenceId: string;
+  startDate: IsoDate;
+  endDate: IsoDate | null;
+  restoreOperationalActive: boolean;
+}
+
 function isoDate(value: Date): IsoDate {
   return value.toISOString().slice(0, 10);
 }
@@ -40,40 +48,45 @@ function daysInclusive(start: IsoDate, end: IsoDate): number {
 }
 
 export function activeContracts(
-  employee: Pick<
-    Employee,
-    'contracts' | 'employmentStartDate' | 'employmentEndDate'
-  >,
+  employee: Pick<Employee, 'contracts'>,
 ): EmployeeContract[] {
   const contracts = (employee.contracts ?? []).filter(
     (contract) => contract.status === 'ACTIVE',
   );
-  if (contracts.length > 0) {
-    return [...contracts].sort((a, b) =>
-      a.startDate.localeCompare(b.startDate),
-    );
+  return [...contracts].sort((a, b) => a.startDate.localeCompare(b.startDate));
+}
+
+export function planLegacyContractMigration(
+  employee: Pick<
+    Employee,
+    | 'id'
+    | 'contracts'
+    | 'employmentStartDate'
+    | 'employmentEndDate'
+    | 'employmentEndEvents'
+    | 'isActive'
+  >,
+): LegacyContractMigrationPlan | null {
+  if ((employee.contracts?.length ?? 0) > 0 || !employee.employmentStartDate) {
+    return null;
   }
-  if (!employee.employmentStartDate) {
-    return [];
-  }
-  return [
-    {
-      id: 'legacy',
-      employeeId: '',
-      tetaNumber: '',
-      sequenceId: 'legacy',
-      startDate: isoDate(employee.employmentStartDate),
-      endDate: employee.employmentEndDate
-        ? isoDate(employee.employmentEndDate)
-        : null,
-      status: 'ACTIVE',
-      note: null,
-      createdAt: employee.employmentStartDate,
-      createdBy: 'legacy',
-      updatedAt: employee.employmentStartDate,
-      updatedBy: 'legacy',
-    },
-  ];
+  const startDate = isoDate(employee.employmentStartDate);
+  const endDate = employee.employmentEndDate
+    ? isoDate(employee.employmentEndDate)
+    : null;
+  const matchingExplicitEnd = (employee.employmentEndEvents ?? []).find(
+    (event) =>
+      event.status === 'ACTIVE' &&
+      Boolean(endDate) &&
+      event.endDate === endDate,
+  );
+  return {
+    contractId: `legacy-${employee.id}`,
+    sequenceId: matchingExplicitEnd?.sequenceId ?? `legacy-${employee.id}`,
+    startDate,
+    endDate,
+    restoreOperationalActive: !matchingExplicitEnd && !employee.isActive,
+  };
 }
 
 export function validateEmployeeContract(
@@ -106,10 +119,7 @@ export function validateEmployeeContract(
 }
 
 export function resolveCurrentContract(
-  employee: Pick<
-    Employee,
-    'contracts' | 'employmentStartDate' | 'employmentEndDate'
-  >,
+  employee: Pick<Employee, 'contracts'>,
   today = new Date(),
 ): EmployeeContract | null {
   const todayIso = isoDate(today);
@@ -123,19 +133,13 @@ export function resolveCurrentContract(
 }
 
 export function resolveLatestContract(
-  employee: Pick<
-    Employee,
-    'contracts' | 'employmentStartDate' | 'employmentEndDate'
-  >,
+  employee: Pick<Employee, 'contracts'>,
 ): EmployeeContract | null {
   return activeContracts(employee).at(-1) ?? null;
 }
 
 export function resolveFutureContract(
-  employee: Pick<
-    Employee,
-    'contracts' | 'employmentStartDate' | 'employmentEndDate'
-  >,
+  employee: Pick<Employee, 'contracts'>,
   today = new Date(),
 ): EmployeeContract | null {
   const todayIso = isoDate(today);
@@ -180,10 +184,7 @@ export function mergeEmploymentCoverage(
 }
 
 export function isDateCoveredByContracts(
-  employee: Pick<
-    Employee,
-    'contracts' | 'employmentStartDate' | 'employmentEndDate'
-  >,
+  employee: Pick<Employee, 'contracts'>,
   date: IsoDate,
 ): boolean {
   return activeContracts(employee).some(
@@ -194,10 +195,7 @@ export function isDateCoveredByContracts(
 }
 
 export function employeeContractsOverlapRange(
-  employee: Pick<
-    Employee,
-    'contracts' | 'employmentStartDate' | 'employmentEndDate'
-  >,
+  employee: Pick<Employee, 'contracts'>,
   start: IsoDate,
   end: IsoDate,
 ): boolean {
@@ -206,6 +204,22 @@ export function employeeContractsOverlapRange(
       contract.startDate <= end &&
       (!contract.endDate || contract.endDate >= start),
   );
+}
+
+export function isRangeFullyCoveredByContracts(
+  employee: Pick<Employee, 'contracts'>,
+  start: IsoDate,
+  end: IsoDate,
+): boolean {
+  if (end < start) return false;
+  let cursor = start;
+  for (const contract of activeContracts(employee)) {
+    if (contract.endDate && contract.endDate < cursor) continue;
+    if (contract.startDate > cursor) return false;
+    if (!contract.endDate || contract.endDate >= end) return true;
+    cursor = addDays(contract.endDate, 1);
+  }
+  return false;
 }
 
 export function contractBreakDays(
@@ -218,23 +232,14 @@ export function contractBreakDays(
 }
 
 export function nextContractStartDate(
-  employee: Pick<
-    Employee,
-    'contracts' | 'employmentStartDate' | 'employmentEndDate'
-  >,
+  employee: Pick<Employee, 'contracts'>,
 ): IsoDate | null {
   const latest = resolveLatestContract(employee);
   return latest?.endDate ? addDays(latest.endDate, 1) : null;
 }
 
 export function continuationDefaults(
-  employee: Pick<
-    Employee,
-    | 'contracts'
-    | 'employmentEndEvents'
-    | 'employmentStartDate'
-    | 'employmentEndDate'
-  >,
+  employee: Pick<Employee, 'contracts' | 'employmentEndEvents'>,
 ) {
   const latest = resolveLatestContract(employee);
   const closed = latestEmploymentEnd(employee);
@@ -261,13 +266,7 @@ export function latestEmploymentEnd(
 }
 
 export function requiresContractDecision(
-  employee: Pick<
-    Employee,
-    | 'contracts'
-    | 'employmentEndEvents'
-    | 'employmentStartDate'
-    | 'employmentEndDate'
-  >,
+  employee: Pick<Employee, 'contracts' | 'employmentEndEvents'>,
   today = new Date(),
 ): boolean {
   const latest = resolveLatestContract(employee);
@@ -281,24 +280,9 @@ export function requiresContractDecision(
 }
 
 export function isEmployeeArchived(
-  employee: Pick<
-    Employee,
-    | 'contracts'
-    | 'employmentEndEvents'
-    | 'employmentStartDate'
-    | 'employmentEndDate'
-  >,
+  employee: Pick<Employee, 'contracts' | 'employmentEndEvents'>,
   today = new Date(),
 ): boolean {
-  if (
-    (employee.contracts?.length ?? 0) === 0 &&
-    (employee.employmentEndEvents?.length ?? 0) === 0
-  ) {
-    return Boolean(
-      employee.employmentEndDate &&
-      isoDate(employee.employmentEndDate) < isoDate(today),
-    );
-  }
   const latest = resolveLatestContract(employee);
   const ended = latestEmploymentEnd(employee);
   return Boolean(
@@ -331,10 +315,7 @@ function addCalendarMonths(value: IsoDate, months: number): IsoDate {
 }
 
 export function calculateEmploymentLimit(
-  employee: Pick<
-    Employee,
-    'contracts' | 'employmentStartDate' | 'employmentEndDate'
-  >,
+  employee: Pick<Employee, 'contracts'>,
   today = new Date(),
 ): EmploymentLimitResult {
   const todayIso = isoDate(today);

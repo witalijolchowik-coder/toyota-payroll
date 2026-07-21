@@ -1,11 +1,15 @@
 import type {
   Department,
   Employee,
+  EmployeeContract,
   EmployeeColorShift,
   EmployeeCreateInput,
+  IsoDate,
 } from '../../types/firestore';
 import {
+  activeContracts,
   deriveEmployeeMedicalStatus,
+  isEmployeeArchived,
   isValidCitizenship,
   normalizeCitizenship,
   normalizeEmployeeGender,
@@ -46,8 +50,16 @@ export const employeeTemplateHeaders = [
   'Obywatelstwo',
   'Płeć',
   'Data pierwszego zatrudnienia w Toyota',
-  'Data rozpoczęcia pracy',
-  'Data zakończenia pracy',
+  'Umowa 1 od',
+  'Umowa 1 do',
+  'Umowa 2 od',
+  'Umowa 2 do',
+  'Umowa 3 od',
+  'Umowa 3 do',
+  'Umowa 4 od',
+  'Umowa 4 do',
+  'Umowa 5 od',
+  'Umowa 5 do',
   'Dział',
   'Grupa zmianowa',
   'Data badania lekarskiego',
@@ -67,11 +79,16 @@ export type EmployeeTemplateWarningCode =
   | 'missing-teta'
   | 'missing-first-name'
   | 'missing-last-name'
-  | 'missing-employment-start'
-  | 'invalid-employment-start'
-  | 'invalid-employment-end'
-  | 'invalid-date-range'
-  | 'contract-history-update-required'
+  | 'missing-contract'
+  | 'partial-contract'
+  | 'invalid-contract-date'
+  | 'invalid-contract-range'
+  | 'duplicate-contract'
+  | 'overlapping-contract'
+  | 'ambiguous-contract-match'
+  | 'locked-contract-month'
+  | 'more-than-five-contracts'
+  | 'legacy-employment-columns-ignored'
   | 'duplicate-teta-in-file'
   | 'existing-teta'
   | 'unknown-teta'
@@ -104,8 +121,7 @@ export interface NewEmployeeTemplatePreviewRow {
   pesel: string | null;
   passportNumber: string | null;
   foreignDocumentNumber: string | null;
-  employmentStartDate: Date | null;
-  employmentEndDate: Date | null;
+  importedContracts: ImportedEmployeeContract[];
   departmentId: string | null;
   departmentName: string | null;
   shiftAssignment: EmployeeColorShift | null;
@@ -120,6 +136,21 @@ export interface BulkEmployeeUpdateChange {
   newValue: string;
 }
 
+export interface ImportedEmployeeContract {
+  slot: number;
+  startDate: IsoDate;
+  endDate: IsoDate;
+}
+
+export type BulkContractChangeKind =
+  'unchanged' | 'create' | 'update' | 'untouched';
+
+export interface BulkEmployeeContractChange {
+  kind: BulkContractChangeKind;
+  imported: ImportedEmployeeContract | null;
+  existing: EmployeeContract | null;
+}
+
 export interface BulkEmployeeUpdatePreviewRow {
   id: string;
   rowNumber: number;
@@ -130,6 +161,10 @@ export interface BulkEmployeeUpdatePreviewRow {
   lastName: string;
   warnings: EmployeeTemplateWarningCode[];
   changes: BulkEmployeeUpdateChange[];
+  contractChanges: BulkEmployeeContractChange[];
+  importedContracts: ImportedEmployeeContract[];
+  contractOpenMonths?: string[];
+  contractLockedMonths?: string[];
   updateInput: EmployeeCreateInput | null;
   resultingMedicalStatus?: EmployeeMedicalStatus | null;
 }
@@ -137,6 +172,7 @@ export interface BulkEmployeeUpdatePreviewRow {
 interface ParsedTemplateRow {
   rowNumber: number;
   values: Record<EmployeeTemplateColumn, string>;
+  legacyEmploymentColumnsPresent: boolean;
 }
 
 interface DepartmentResolution {
@@ -146,6 +182,163 @@ interface DepartmentResolution {
     EmployeeTemplateWarningCode,
     'department-na0' | 'department-unmapped'
   > | null;
+}
+
+const CONTRACT_SLOT_COUNT = 5;
+
+function contractColumn(
+  slot: number,
+  edge: 'od' | 'do',
+): EmployeeTemplateColumn {
+  return `Umowa ${slot} ${edge}` as EmployeeTemplateColumn;
+}
+
+function toIsoDate(value: Date): IsoDate {
+  return value.toISOString().slice(0, 10) as IsoDate;
+}
+
+function readImportedContracts(row: ParsedTemplateRow): {
+  contracts: ImportedEmployeeContract[];
+  warnings: EmployeeTemplateWarningCode[];
+} {
+  const contracts: ImportedEmployeeContract[] = [];
+  const warnings: EmployeeTemplateWarningCode[] = [];
+
+  for (let slot = 1; slot <= CONTRACT_SLOT_COUNT; slot += 1) {
+    const rawStart = row.values[contractColumn(slot, 'od')];
+    const rawEnd = row.values[contractColumn(slot, 'do')];
+    if (!rawStart && !rawEnd) continue;
+    if (!rawStart || !rawEnd) {
+      warnings.push('partial-contract');
+      continue;
+    }
+    const start = parseImportedDate(rawStart);
+    const end = parseImportedDate(rawEnd);
+    if (!start || !end) {
+      warnings.push('invalid-contract-date');
+      continue;
+    }
+    const contract = {
+      slot,
+      startDate: toIsoDate(start),
+      endDate: toIsoDate(end),
+    };
+    if (contract.endDate < contract.startDate) {
+      warnings.push('invalid-contract-range');
+      continue;
+    }
+    contracts.push(contract);
+  }
+
+  contracts.sort((left, right) =>
+    left.startDate === right.startDate
+      ? left.endDate.localeCompare(right.endDate)
+      : left.startDate.localeCompare(right.startDate),
+  );
+  for (let index = 0; index < contracts.length; index += 1) {
+    const current = contracts[index]!;
+    const previous = contracts[index - 1];
+    if (
+      contracts.some(
+        (candidate, candidateIndex) =>
+          candidateIndex < index &&
+          candidate.startDate === current.startDate &&
+          candidate.endDate === current.endDate,
+      )
+    ) {
+      warnings.push('duplicate-contract');
+    } else if (previous && current.startDate <= previous.endDate) {
+      warnings.push('overlapping-contract');
+    }
+  }
+
+  if (row.legacyEmploymentColumnsPresent) {
+    warnings.push('legacy-employment-columns-ignored');
+  }
+  return { contracts, warnings: [...new Set(warnings)] };
+}
+
+export function planEmployeeContractImport(
+  employee: Employee,
+  importedContracts: readonly ImportedEmployeeContract[],
+): {
+  changes: BulkEmployeeContractChange[];
+  warnings: EmployeeTemplateWarningCode[];
+} {
+  const existing = activeContracts(employee);
+  const warnings: EmployeeTemplateWarningCode[] = [];
+  if (existing.length > CONTRACT_SLOT_COUNT) {
+    warnings.push('more-than-five-contracts');
+  }
+  if (importedContracts.length === 0) {
+    return {
+      changes: existing.map((contract) => ({
+        kind: 'untouched',
+        imported: null,
+        existing: contract,
+      })),
+      warnings,
+    };
+  }
+
+  const changes: BulkEmployeeContractChange[] = [];
+  const claimedExistingIds = new Set<string>();
+  const claimedImportedSlots = new Set<number>();
+  importedContracts.forEach((imported) => {
+    const exact = existing.find(
+      (contract) =>
+        !claimedExistingIds.has(contract.id) &&
+        contract.startDate === imported.startDate &&
+        contract.endDate === imported.endDate,
+    );
+    if (exact) {
+      claimedExistingIds.add(exact.id);
+      claimedImportedSlots.add(imported.slot);
+      changes.push({ kind: 'unchanged', imported, existing: exact });
+    }
+  });
+
+  const unmatchedImported = importedContracts.filter(
+    (contract) => !claimedImportedSlots.has(contract.slot),
+  );
+  const unmatchedExisting = existing.filter(
+    (contract) => !claimedExistingIds.has(contract.id),
+  );
+
+  if (
+    unmatchedImported.length > 0 &&
+    importedContracts.length === existing.length &&
+    unmatchedImported.length === unmatchedExisting.length
+  ) {
+    unmatchedImported.forEach((imported, index) => {
+      changes.push({
+        kind: 'update',
+        imported,
+        existing: unmatchedExisting[index]!,
+      });
+      claimedExistingIds.add(unmatchedExisting[index]!.id);
+    });
+  } else {
+    unmatchedImported.forEach((imported) => {
+      const overlaps = unmatchedExisting.filter(
+        (contract) =>
+          contract.startDate <= imported.endDate &&
+          (contract.endDate ?? '9999-12-31') >= imported.startDate,
+      );
+      if (overlaps.length > 0) {
+        warnings.push('ambiguous-contract-match');
+      } else {
+        changes.push({ kind: 'create', imported, existing: null });
+      }
+    });
+  }
+
+  existing
+    .filter((contract) => !claimedExistingIds.has(contract.id))
+    .forEach((contract) =>
+      changes.push({ kind: 'untouched', imported: null, existing: contract }),
+    );
+  return { changes, warnings: [...new Set(warnings)] };
 }
 
 export function buildNewEmployeeTemplateCsv(): string {
@@ -170,6 +363,14 @@ export function buildEmployeeUpdateTemplateCsv(
   return buildCsv([employeeTemplateHeaders, ...rows]);
 }
 
+export function employeesExceedingContractTemplateLimit(
+  employees: readonly Employee[],
+): Employee[] {
+  return employees.filter(
+    (employee) => activeContracts(employee).length > CONTRACT_SLOT_COUNT,
+  );
+}
+
 export function buildNewEmployeeTemplatePreview(
   csvText: string,
   existingEmployees: readonly Employee[],
@@ -181,8 +382,9 @@ export function buildNewEmployeeTemplatePreview(
   const existingByIdentity = buildEmployeeByIdentity(existingEmployees);
 
   return rows.map((row) => {
-    const raw = readTemplateEmployeeValues(row);
-    const warnings: EmployeeTemplateWarningCode[] = [];
+    const contractData = readImportedContracts(row);
+    const raw = readTemplateEmployeeValues(row, contractData.contracts);
+    const warnings: EmployeeTemplateWarningCode[] = [...contractData.warnings];
 
     if (!raw.tetaNumber) {
       warnings.push('missing-teta');
@@ -193,22 +395,7 @@ export function buildNewEmployeeTemplatePreview(
     if (!raw.lastName) {
       warnings.push('missing-last-name');
     }
-    if (!row.values['Data rozpoczęcia pracy']) {
-      warnings.push('missing-employment-start');
-    }
-    if (row.values['Data rozpoczęcia pracy'] && !raw.employmentStartDate) {
-      warnings.push('invalid-employment-start');
-    }
-    if (row.values['Data zakończenia pracy'] && !raw.employmentEndDate) {
-      warnings.push('invalid-employment-end');
-    }
-    if (
-      raw.employmentStartDate &&
-      raw.employmentEndDate &&
-      raw.employmentEndDate < raw.employmentStartDate
-    ) {
-      warnings.push('invalid-date-range');
-    }
+    if (contractData.contracts.length === 0) warnings.push('missing-contract');
     if (duplicateTetas.has(raw.tetaNumber)) {
       warnings.push('duplicate-teta-in-file');
     }
@@ -284,6 +471,7 @@ export function buildNewEmployeeTemplatePreview(
       rowNumber: row.rowNumber,
       status,
       ...raw,
+      importedContracts: contractData.contracts,
       departmentId: department.departmentId,
       departmentName: department.departmentName,
       warnings,
@@ -306,7 +494,8 @@ export function buildBulkEmployeeUpdatePreview(
     const matchingEmployees = employeesByTeta.get(rawTeta) ?? [];
     const employee =
       matchingEmployees.length === 1 ? matchingEmployees[0] : null;
-    const warnings: EmployeeTemplateWarningCode[] = [];
+    const contractData = readImportedContracts(row);
+    const warnings: EmployeeTemplateWarningCode[] = [...contractData.warnings];
 
     if (!rawTeta) {
       warnings.push('missing-teta');
@@ -356,33 +545,6 @@ export function buildBulkEmployeeUpdatePreview(
         'firstToyotaEmploymentDate',
         'invalid-first-toyota-employment-date',
       );
-      applyDateUpdate(
-        row,
-        employee,
-        updateInput,
-        changes,
-        warnings,
-        'Data rozpoczęcia pracy',
-        'employmentStartDate',
-        'invalid-employment-start',
-      );
-      applyDateUpdate(
-        row,
-        employee,
-        updateInput,
-        changes,
-        warnings,
-        'Data zakończenia pracy',
-        'employmentEndDate',
-        'invalid-employment-end',
-      );
-      if (
-        changes.some((change) =>
-          ['employmentStartDate', 'employmentEndDate'].includes(change.field),
-        )
-      ) {
-        warnings.push('contract-history-update-required');
-      }
       applyDepartmentUpdate(
         row,
         employee,
@@ -421,13 +583,6 @@ export function buildBulkEmployeeUpdatePreview(
       );
       applyMedicalTypeUpdate(row, employee, updateInput, changes, warnings);
 
-      if (
-        updateInput.employmentStartDate &&
-        updateInput.employmentEndDate &&
-        updateInput.employmentEndDate < updateInput.employmentStartDate
-      ) {
-        warnings.push('invalid-date-range');
-      }
       if (
         updateInput.medicalExaminationDate &&
         updateInput.medicalValidUntil &&
@@ -475,7 +630,15 @@ export function buildBulkEmployeeUpdatePreview(
       }
     }
 
-    const status = resolveBulkUpdateStatus(warnings, changes);
+    const contractPlan = employee
+      ? planEmployeeContractImport(employee, contractData.contracts)
+      : { changes: [], warnings: [] };
+    warnings.push(...contractPlan.warnings);
+    const status = resolveBulkUpdateStatus(
+      [...new Set(warnings)],
+      changes,
+      contractPlan.changes,
+    );
 
     return {
       id: `update-${row.rowNumber}`,
@@ -487,8 +650,10 @@ export function buildBulkEmployeeUpdatePreview(
         normalizeImportText(row.values['Imię']) || employee?.firstName || '',
       lastName:
         normalizeImportText(row.values['Nazwisko']) || employee?.lastName || '',
-      warnings,
+      warnings: [...new Set(warnings)],
       changes,
+      contractChanges: contractPlan.changes,
+      importedContracts: contractData.contracts,
       updateInput:
         status === 'ready' || status === 'warning' ? updateInput : null,
       resultingMedicalStatus,
@@ -500,15 +665,7 @@ export function shouldIncludeInUpdateTemplate(
   employee: Employee,
   today = new Date(),
 ): boolean {
-  if (!employee.isActive) {
-    return false;
-  }
-  const todayStart = new Date(
-    Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()),
-  );
-  return (
-    !employee.employmentEndDate || employee.employmentEndDate >= todayStart
-  );
+  return !isEmployeeArchived(employee, today);
 }
 
 function parseEmployeeTemplateCsv(csvText: string): ParsedTemplateRow[] {
@@ -518,6 +675,16 @@ function parseEmployeeTemplateCsv(csvText: string): ParsedTemplateRow[] {
   }
 
   const headerMap = new Map<EmployeeTemplateColumn, number>();
+  const legacyEmploymentColumnsPresent = matrix[0].some((header) =>
+    [
+      'datarozpoczeciapracy',
+      'employmentstart',
+      'employmentstartdate',
+      'datazakonczeniapracy',
+      'employmentend',
+      'employmentenddate',
+    ].includes(normalizeImportKey(header)),
+  );
   matrix[0].forEach((header, index) => {
     const column = resolveTemplateColumn(header);
     if (column && !headerMap.has(column)) {
@@ -535,7 +702,7 @@ function parseEmployeeTemplateCsv(csvText: string): ParsedTemplateRow[] {
     if (!Object.values(values).some(Boolean)) {
       return [];
     }
-    return [{ rowNumber: index + 2, values }];
+    return [{ rowNumber: index + 2, values, legacyEmploymentColumnsPresent }];
   });
 }
 
@@ -562,12 +729,16 @@ function resolveTemplateColumn(value: string): EmployeeTemplateColumn | null {
     gender: 'Płeć',
     datapierwszegozatrudnieniawtoyota: 'Data pierwszego zatrudnienia w Toyota',
     firsttoyotaemploymentdate: 'Data pierwszego zatrudnienia w Toyota',
-    datarozpoczeciapracy: 'Data rozpoczęcia pracy',
-    employmentstart: 'Data rozpoczęcia pracy',
-    employmentstartdate: 'Data rozpoczęcia pracy',
-    datazakonczeniapracy: 'Data zakończenia pracy',
-    employmentend: 'Data zakończenia pracy',
-    employmentenddate: 'Data zakończenia pracy',
+    umowa1od: 'Umowa 1 od',
+    umowa1do: 'Umowa 1 do',
+    umowa2od: 'Umowa 2 od',
+    umowa2do: 'Umowa 2 do',
+    umowa3od: 'Umowa 3 od',
+    umowa3do: 'Umowa 3 do',
+    umowa4od: 'Umowa 4 od',
+    umowa4do: 'Umowa 4 do',
+    umowa5od: 'Umowa 5 od',
+    umowa5do: 'Umowa 5 do',
     dzial: 'Dział',
     department: 'Dział',
     grupazmianowa: 'Grupa zmianowa',
@@ -585,10 +756,10 @@ function resolveTemplateColumn(value: string): EmployeeTemplateColumn | null {
   return mapping[key] ?? null;
 }
 
-function readTemplateEmployeeValues(row: ParsedTemplateRow): Omit<
-  EmployeeCreateInput,
-  'isActive' | 'departmentId'
-> & {
+function readTemplateEmployeeValues(
+  row: ParsedTemplateRow,
+  contracts: readonly ImportedEmployeeContract[],
+): Omit<EmployeeCreateInput, 'isActive' | 'departmentId'> & {
   departmentId?: never;
 } {
   const shift = normalizeImportText(
@@ -615,10 +786,14 @@ function readTemplateEmployeeValues(row: ParsedTemplateRow): Omit<
       row.values['Typ badania lekarskiego'],
     ),
     shiftAssignment: isEmployeeColorShift(shift) ? shift : null,
-    employmentStartDate: parseImportedDate(
-      row.values['Data rozpoczęcia pracy'],
-    ),
-    employmentEndDate: parseImportedDate(row.values['Data zakończenia pracy']),
+    // Compatibility values for atomic creation only. Contract documents remain
+    // the authoritative source immediately after the employee is created.
+    initialContract: contracts[0]
+      ? {
+          startDate: new Date(`${contracts[0].startDate}T00:00:00.000Z`),
+          endDate: new Date(`${contracts[0].endDate}T00:00:00.000Z`),
+        }
+      : null,
   };
 }
 
@@ -681,11 +856,13 @@ function resolveNewEmployeeTemplateStatus(
   const blockingWarnings: EmployeeTemplateWarningCode[] = [
     'missing-first-name',
     'missing-last-name',
-    'missing-employment-start',
-    'invalid-employment-start',
-    'invalid-employment-end',
-    'invalid-date-range',
-    'contract-history-update-required',
+    'missing-contract',
+    'partial-contract',
+    'invalid-contract-date',
+    'invalid-contract-range',
+    'duplicate-contract',
+    'overlapping-contract',
+    'ambiguous-contract-match',
     'invalid-shift',
     'invalid-citizenship',
     'invalid-gender',
@@ -703,6 +880,7 @@ function resolveNewEmployeeTemplateStatus(
 function resolveBulkUpdateStatus(
   warnings: readonly EmployeeTemplateWarningCode[],
   changes: readonly BulkEmployeeUpdateChange[],
+  contractChanges: readonly BulkEmployeeContractChange[],
 ): BulkEmployeeUpdateStatus {
   const blockingWarnings: EmployeeTemplateWarningCode[] = [
     'missing-teta',
@@ -713,9 +891,12 @@ function resolveBulkUpdateStatus(
     'invalid-citizenship',
     'invalid-gender',
     'invalid-first-toyota-employment-date',
-    'invalid-employment-start',
-    'invalid-employment-end',
-    'invalid-date-range',
+    'partial-contract',
+    'invalid-contract-date',
+    'invalid-contract-range',
+    'duplicate-contract',
+    'overlapping-contract',
+    'ambiguous-contract-match',
     'invalid-shift',
     'invalid-shift-for-department',
     'invalid-medical-examination-date',
@@ -726,19 +907,28 @@ function resolveBulkUpdateStatus(
   if (warnings.some((warning) => blockingWarnings.includes(warning))) {
     return 'blocked';
   }
-  if (changes.length === 0) {
+  const hasContractMutation = contractChanges.some(
+    (change) => change.kind === 'create' || change.kind === 'update',
+  );
+  if (changes.length === 0 && !hasContractMutation) {
     return 'no-changes';
   }
   return warnings.length > 0 ? 'warning' : 'ready';
 }
 
 function employeeToTemplateRow(employee: Employee): string[] {
-  return [
-    employee.tetaNumber,
-    employee.firstName,
-    employee.lastName,
-    ...Array.from({ length: employeeTemplateHeaders.length - 3 }, () => ''),
-  ];
+  const values = new Map<EmployeeTemplateColumn, string>([
+    ['Numer TETA', employee.tetaNumber],
+    ['Imię', employee.firstName],
+    ['Nazwisko', employee.lastName],
+  ]);
+  activeContracts(employee)
+    .slice(0, CONTRACT_SLOT_COUNT)
+    .forEach((contract, index) => {
+      values.set(contractColumn(index + 1, 'od'), contract.startDate);
+      values.set(contractColumn(index + 1, 'do'), contract.endDate ?? '');
+    });
+  return employeeTemplateHeaders.map((header) => values.get(header) ?? '');
 }
 
 function employeeToUpdateInput(employee: Employee): EmployeeCreateInput {
@@ -753,8 +943,7 @@ function employeeToUpdateInput(employee: Employee): EmployeeCreateInput {
     isActive: employee.isActive,
     departmentId: employee.departmentId,
     shiftAssignment: employee.shiftAssignment,
-    employmentStartDate: employee.employmentStartDate,
-    employmentEndDate: employee.employmentEndDate,
+    initialContract: null,
     citizenship: employee.citizenship,
     gender: employee.gender,
     firstToyotaEmploymentDate: employee.firstToyotaEmploymentDate,
@@ -896,24 +1085,16 @@ function applyDateUpdate(
   column: Extract<
     EmployeeTemplateColumn,
     | 'Data pierwszego zatrudnienia w Toyota'
-    | 'Data rozpoczęcia pracy'
-    | 'Data zakończenia pracy'
     | 'Data badania lekarskiego'
     | 'Badanie ważne do'
   >,
   field: Extract<
     keyof EmployeeCreateInput,
-    | 'firstToyotaEmploymentDate'
-    | 'employmentStartDate'
-    | 'employmentEndDate'
-    | 'medicalExaminationDate'
-    | 'medicalValidUntil'
+    'firstToyotaEmploymentDate' | 'medicalExaminationDate' | 'medicalValidUntil'
   >,
   invalidWarning: Extract<
     EmployeeTemplateWarningCode,
     | 'invalid-first-toyota-employment-date'
-    | 'invalid-employment-start'
-    | 'invalid-employment-end'
     | 'invalid-medical-examination-date'
     | 'invalid-medical-valid-until'
   >,

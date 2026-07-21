@@ -35,10 +35,7 @@ export function calculateFirstEmploymentLimit(
 }
 
 export function resolveCurrentEmploymentPeriod(
-  employee: Pick<
-    Employee,
-    'contracts' | 'employmentStartDate' | 'employmentEndDate'
-  >,
+  employee: Pick<Employee, 'contracts'>,
 ): ResolvedEmploymentPeriod | null {
   const contract =
     resolveCurrentContract(employee) ?? resolveLatestContract(employee);
@@ -50,20 +47,11 @@ export function resolveCurrentEmploymentPeriod(
         : null,
     };
   }
-  if (!employee.employmentStartDate) {
-    return null;
-  }
-  return {
-    startDate: employee.employmentStartDate,
-    endDate: employee.employmentEndDate,
-  };
+  return null;
 }
 
 export function calculateProjectedEmploymentLimit(
-  employee: Pick<
-    Employee,
-    'contracts' | 'employmentStartDate' | 'employmentEndDate'
-  >,
+  employee: Pick<Employee, 'contracts'>,
   today = new Date(),
 ): Date | null {
   const result = calculateEmploymentLimit(employee, today);

@@ -9,8 +9,10 @@ import {
   contractBreakDays,
   employeeContractsOverlapRange,
   isDateCoveredByContracts,
+  isRangeFullyCoveredByContracts,
   isEmployeeArchived,
   mergeEmploymentCoverage,
+  planLegacyContractMigration,
   requiresContractDecision,
   resolveCurrentContract,
   resolveFutureContract,
@@ -147,6 +149,24 @@ describe('employee contract history', () => {
     ).toBe(false);
   });
 
+  it('treats next-day contracts as continuous coverage and preserves a real gap', () => {
+    const continuous = employee([
+      contract('first', '2026-06-01', '2026-06-15'),
+      contract('second', '2026-06-16', '2026-06-30'),
+    ]);
+    const withGap = employee([
+      contract('first', '2026-06-01', '2026-06-15'),
+      contract('second', '2026-06-17', '2026-06-30'),
+    ]);
+
+    expect(
+      isRangeFullyCoveredByContracts(continuous, '2026-06-01', '2026-06-30'),
+    ).toBe(true);
+    expect(
+      isRangeFullyCoveredByContracts(withGap, '2026-06-01', '2026-06-30'),
+    ).toBe(false);
+  });
+
   it('does not archive on expiry alone and resolves the decision after explicit ending', () => {
     const expired = employee([contract('ended', '2026-06-01', '2026-06-30')]);
     const today = new Date('2026-07-02T00:00:00.000Z');
@@ -173,6 +193,52 @@ describe('employee contract history', () => {
     expect(
       isEmployeeArchived(returned, new Date('2026-07-20T00:00:00.000Z')),
     ).toBe(false);
+  });
+
+  it.each(['BARTŁOMIEJ PASZKO', 'KACPER KUŚMIERCZYK'])(
+    'repairs a generic legacy auto-archive without fabricating an end event: %s',
+    () => {
+      const plan = planLegacyContractMigration({
+        id: 'legacy-employee',
+        contracts: [],
+        employmentStartDate: new Date('2026-01-01T00:00:00.000Z'),
+        employmentEndDate: new Date('2026-06-30T00:00:00.000Z'),
+        employmentEndEvents: [],
+        isActive: false,
+      });
+
+      expect(plan).toEqual({
+        contractId: 'legacy-legacy-employee',
+        sequenceId: 'legacy-legacy-employee',
+        startDate: '2026-01-01',
+        endDate: '2026-06-30',
+        restoreOperationalActive: true,
+      });
+      expect(
+        planLegacyContractMigration({
+          id: 'legacy-employee',
+          contracts: [contract('already-migrated', '2026-01-01', '2026-06-30')],
+          employmentStartDate: new Date('2026-01-01T00:00:00.000Z'),
+          employmentEndDate: new Date('2026-06-30T00:00:00.000Z'),
+          employmentEndEvents: [],
+          isActive: true,
+        }),
+      ).toBeNull();
+    },
+  );
+
+  it('preserves an explicit archived sequence during legacy migration', () => {
+    const plan = planLegacyContractMigration({
+      id: 'closed',
+      contracts: [],
+      employmentStartDate: new Date('2026-01-01T00:00:00.000Z'),
+      employmentEndDate: new Date('2026-06-30T00:00:00.000Z'),
+      employmentEndEvents: [endEvent('explicit-sequence', '2026-06-30')],
+      isActive: false,
+    });
+
+    expect(plan?.sequenceId).toBe('explicit-sequence');
+    expect(plan?.restoreOperationalActive).toBe(false);
   });
 });
 

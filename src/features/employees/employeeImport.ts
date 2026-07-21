@@ -33,8 +33,8 @@ export interface ToyotaEmployeeImportRow {
   lastName: string;
   tetaNumber: string;
   departmentName: string;
-  employmentStartDate: Date | null;
-  employmentEndDate: Date | null;
+  contractStartDate: Date | null;
+  contractEndDate: Date | null;
 }
 
 export interface SozEmployeeImportRow {
@@ -59,8 +59,8 @@ export interface EmployeeImportPreviewRow {
   pesel: string | null;
   passportNumber: string | null;
   foreignDocumentNumber: string | null;
-  employmentStartDate: Date | null;
-  employmentEndDate: Date | null;
+  contractStartDate: Date | null;
+  contractEndDate: Date | null;
   sourceDepartmentName: string;
   departmentId: string | null;
   departmentName: string | null;
@@ -195,8 +195,8 @@ export function parseToyotaEmployeeRowsFromMatrix(
       lastName: normalizeImportText(row[lastNameIndex]),
       tetaNumber: normalizeTetaNumber(normalizeImportText(row[tetaIndex])),
       departmentName: normalizeImportText(row[departmentIndex]),
-      employmentStartDate: parseImportedDate(row[startIndex]),
-      employmentEndDate: parseImportedDate(row[endIndex]),
+      contractStartDate: parseImportedDate(row[startIndex]),
+      contractEndDate: parseImportedDate(row[endIndex]),
     }))
     .filter((row) => row.firstName || row.lastName || row.tetaNumber);
 }
@@ -287,7 +287,7 @@ export function buildEmployeeImportPreview({
     if (!toyotaRow.tetaNumber) {
       warnings.push('missing-teta');
     }
-    if (!toyotaRow.employmentStartDate) {
+    if (!toyotaRow.contractStartDate) {
       warnings.push('missing-employment-start');
     }
     if (duplicateTetaNumbers.has(normalizeTetaNumber(toyotaRow.tetaNumber))) {
@@ -354,8 +354,8 @@ export function buildEmployeeImportPreview({
       pesel: mergedIdentity.pesel,
       passportNumber: mergedIdentity.passportNumber,
       foreignDocumentNumber: mergedIdentity.foreignDocumentNumber,
-      employmentStartDate: toyotaRow.employmentStartDate,
-      employmentEndDate: toyotaRow.employmentEndDate,
+      contractStartDate: toyotaRow.contractStartDate,
+      contractEndDate: toyotaRow.contractEndDate,
       sourceDepartmentName: toyotaRow.departmentName,
       departmentId: departmentMatch.id,
       departmentName: departmentMatch.name,
@@ -378,8 +378,8 @@ export function buildEmployeeImportPreview({
       pesel: row.source === 'soz-pl' ? row.identityNumber : null,
       passportNumber: row.source === 'soz-ua' ? row.identityNumber : null,
       foreignDocumentNumber: null,
-      employmentStartDate: null,
-      employmentEndDate: null,
+      contractStartDate: null,
+      contractEndDate: null,
       sourceDepartmentName: '',
       departmentId: null,
       departmentName: null,
@@ -648,7 +648,11 @@ function buildCreateInput(
     isActive: true,
     departmentId,
     shiftAssignment: null,
-    employmentStartDate: toyotaRow.employmentStartDate,
-    employmentEndDate: toyotaRow.employmentEndDate,
+    initialContract: toyotaRow.contractStartDate
+      ? {
+          startDate: toyotaRow.contractStartDate,
+          endDate: toyotaRow.contractEndDate,
+        }
+      : null,
   };
 }

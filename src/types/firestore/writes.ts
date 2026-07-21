@@ -38,8 +38,10 @@ export interface EmployeeCreateInput {
   isActive: boolean;
   departmentId: DepartmentId | null;
   shiftAssignment: EmployeeColorShift | null;
-  employmentStartDate: Date | null;
-  employmentEndDate: Date | null;
+  initialContract: {
+    startDate: Date;
+    endDate: Date | null;
+  } | null;
   assignmentEffectiveDate?: IsoDate | null;
 }
 

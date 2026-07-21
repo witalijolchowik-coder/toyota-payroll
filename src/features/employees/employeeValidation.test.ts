@@ -43,8 +43,10 @@ function validInput(
     isActive: true,
     departmentId: null,
     shiftAssignment: null,
-    employmentStartDate: new Date('2026-07-01T00:00:00.000Z'),
-    employmentEndDate: null,
+    initialContract: {
+      startDate: new Date('2026-07-01T00:00:00.000Z'),
+      endDate: null,
+    },
     ...overrides,
   };
 }
@@ -57,13 +59,13 @@ describe('employee validation', () => {
           tetaNumber: ' ',
           firstName: '',
           lastName: '  ',
-          employmentStartDate: null,
+          initialContract: null,
         }),
       ),
     ).toEqual({
       firstName: 'required',
       lastName: 'required',
-      employmentStartDate: 'required',
+      initialContractStartDate: 'required',
     });
   });
 
@@ -71,11 +73,13 @@ describe('employee validation', () => {
     expect(
       validateEmployeeInput(
         validInput({
-          employmentStartDate: new Date('2026-07-10T00:00:00.000Z'),
-          employmentEndDate: new Date('2026-07-01T00:00:00.000Z'),
+          initialContract: {
+            startDate: new Date('2026-07-10T00:00:00.000Z'),
+            endDate: new Date('2026-07-01T00:00:00.000Z'),
+          },
         }),
       ),
-    ).toEqual({ employmentEndDate: 'invalidDateRange' });
+    ).toEqual({ initialContractEndDate: 'invalidDateRange' });
   });
 
   it('normalizes TETA and employee names before persistence', () => {

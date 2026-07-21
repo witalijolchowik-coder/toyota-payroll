@@ -44,7 +44,7 @@ describe('employee import foundation', () => {
         departmentName: 'METAL',
       }),
     ]);
-    expect(rows[0].employmentStartDate?.toISOString().slice(0, 10)).toBe(
+    expect(rows[0].contractStartDate?.toISOString().slice(0, 10)).toBe(
       '2026-06-03',
     );
   });
@@ -86,8 +86,8 @@ describe('employee import foundation', () => {
           lastName: 'Kowalska',
           tetaNumber: 'WT-001',
           departmentName: 'METAL',
-          employmentStartDate: date('2026-06-03'),
-          employmentEndDate: null,
+          contractStartDate: date('2026-06-03'),
+          contractEndDate: null,
         },
       ],
       sozRows: [
@@ -131,8 +131,8 @@ describe('employee import foundation', () => {
           lastName: 'Kowalska',
           tetaNumber: 'WT-001',
           departmentName: 'METAL',
-          employmentStartDate: date('2026-06-03'),
-          employmentEndDate: null,
+          contractStartDate: date('2026-06-03'),
+          contractEndDate: null,
         },
       ],
       sozRows: [],
@@ -150,8 +150,8 @@ describe('employee import foundation', () => {
     const common = {
       source: 'toyota' as const,
       departmentName: 'METAL',
-      employmentStartDate: date('2026-06-03'),
-      employmentEndDate: null,
+      contractStartDate: date('2026-06-03'),
+      contractEndDate: null,
     };
     const preview = buildEmployeeImportPreview({
       toyotaRows: [
@@ -192,8 +192,8 @@ describe('employee import foundation', () => {
           lastName: 'Kowalska',
           tetaNumber: '',
           departmentName: 'METAL',
-          employmentStartDate: null,
-          employmentEndDate: null,
+          contractStartDate: null,
+          contractEndDate: null,
         },
       ],
       sozRows: [],
@@ -218,8 +218,8 @@ describe('employee import foundation', () => {
           lastName: 'Kowalska',
           tetaNumber: 'WT-001',
           departmentName: 'NA0',
-          employmentStartDate: date('2026-06-03'),
-          employmentEndDate: null,
+          contractStartDate: date('2026-06-03'),
+          contractEndDate: null,
         },
       ],
       sozRows: [],
@@ -242,8 +242,8 @@ describe('employee import foundation', () => {
           lastName: 'Boiko',
           tetaNumber: 'WT-002',
           departmentName: 'METAL',
-          employmentStartDate: date('2026-06-03'),
-          employmentEndDate: null,
+          contractStartDate: date('2026-06-03'),
+          contractEndDate: null,
         },
       ],
       sozRows: [

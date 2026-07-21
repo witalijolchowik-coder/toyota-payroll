@@ -36,6 +36,7 @@ import {
 import { getFirestoreRepositories } from './firestoreService';
 import { appendAuditEntryToBatch, recordAuditEntry } from './auditService';
 import { preserveFirstToyotaEmploymentDate } from '../utils/payroll';
+import { bootstrapLegacyEmployeeContract } from './employeeContractsService';
 
 export type EmployeeServiceErrorCode =
   'firebase-unavailable' | 'authentication-required' | 'duplicate-teta';
@@ -81,8 +82,8 @@ function assignmentEffectiveDate(input: EmployeeCreateInput): IsoDate {
   if (input.assignmentEffectiveDate) {
     return input.assignmentEffectiveDate;
   }
-  if (input.employmentStartDate) {
-    return dateToIsoDate(input.employmentStartDate);
+  if (input.initialContract) {
+    return dateToIsoDate(input.initialContract.startDate);
   }
   return dateToIsoDate(new Date());
 }
@@ -138,19 +139,38 @@ export function subscribeToEmployees(
     let employeeDocuments: Employee[] = [];
     let contracts = [] as ReturnType<typeof mapEmployeeContractDocument>[];
     let endEvents = [] as ReturnType<typeof mapEmploymentEndEventDocument>[];
+    let employeesLoaded = false;
+    let contractsLoaded = false;
+    let endsLoaded = false;
+    const migrationsStarted = new Set<string>();
 
     const emit = () => {
-      onEmployees(
-        employeeDocuments.map((employee) => ({
-          ...employee,
-          contracts: contracts.filter(
-            (contract) => contract.employeeId === employee.id,
-          ),
-          employmentEndEvents: endEvents.filter(
-            (event) => event.employeeId === employee.id,
-          ),
-        })),
-      );
+      const hydrated = employeeDocuments.map((employee) => ({
+        ...employee,
+        contracts: contracts.filter(
+          (contract) => contract.employeeId === employee.id,
+        ),
+        employmentEndEvents: endEvents.filter(
+          (event) => event.employeeId === employee.id,
+        ),
+      }));
+      onEmployees(hydrated);
+      if (employeesLoaded && contractsLoaded && endsLoaded) {
+        hydrated
+          .filter(
+            (employee) =>
+              !migrationsStarted.has(employee.id) &&
+              (employee.contracts?.length ?? 0) === 0 &&
+              Boolean(employee.employmentStartDate),
+          )
+          .forEach((employee) => {
+            migrationsStarted.add(employee.id);
+            void bootstrapLegacyEmployeeContract(employee).catch((error) => {
+              migrationsStarted.delete(employee.id);
+              console.error('Legacy contract migration failed', error);
+            });
+          });
+      }
     };
 
     const unsubscribeAuth = onAuthStateChanged(
@@ -167,6 +187,7 @@ export function subscribeToEmployees(
         unsubscribeEmployees = onSnapshot(
           employeesQuery,
           (snapshot) => {
+            employeesLoaded = true;
             employeeDocuments = snapshot.docs.map((document) =>
               mapEmployeeDocument(document.id, document.data()),
             );
@@ -177,6 +198,7 @@ export function subscribeToEmployees(
         unsubscribeContracts = onSnapshot(
           repositories.employeeContracts,
           (snapshot) => {
+            contractsLoaded = true;
             contracts = snapshot.docs.map((document) =>
               mapEmployeeContractDocument(document.id, document.data()),
             );
@@ -187,6 +209,7 @@ export function subscribeToEmployees(
         unsubscribeEnds = onSnapshot(
           repositories.employmentEndEvents,
           (snapshot) => {
+            endsLoaded = true;
             endEvents = snapshot.docs.map((document) =>
               mapEmploymentEndEventDocument(document.id, document.data()),
             );
@@ -220,7 +243,7 @@ export async function createEmployee(
   await assertUniqueActiveTeta(normalized);
 
   const employee = doc(repositories.employees);
-  const contract = normalized.employmentStartDate
+  const contract = normalized.initialContract
     ? doc(repositories.employeeContracts)
     : null;
   const assignment = doc(repositories.employeeAssignments);
@@ -246,22 +269,28 @@ export async function createEmployee(
     is_active: true,
     department_id: normalized.departmentId,
     shift_assignment: normalized.shiftAssignment,
-    employment_start_date: timestampOrNull(normalized.employmentStartDate),
-    employment_end_date: timestampOrNull(normalized.employmentEndDate),
+    // Deprecated compatibility snapshot. New business logic reads the
+    // employeeContracts collection exclusively.
+    employment_start_date: timestampOrNull(
+      normalized.initialContract?.startDate ?? null,
+    ),
+    employment_end_date: timestampOrNull(
+      normalized.initialContract?.endDate ?? null,
+    ),
     created_at: serverTimestamp(),
     created_by: actorUid,
     updated_at: serverTimestamp(),
     updated_by: actorUid,
   });
 
-  if (contract && normalized.employmentStartDate) {
+  if (contract && normalized.initialContract) {
     batch.set(contract, {
       employee_id: employee.id,
       teta_number: normalized.tetaNumber,
       sequence_id: `initial-${employee.id}`,
-      start_date: dateToIsoDate(normalized.employmentStartDate),
-      end_date: normalized.employmentEndDate
-        ? dateToIsoDate(normalized.employmentEndDate)
+      start_date: dateToIsoDate(normalized.initialContract.startDate),
+      end_date: normalized.initialContract.endDate
+        ? dateToIsoDate(normalized.initialContract.endDate)
         : null,
       status: 'ACTIVE',
       note: null,
@@ -293,8 +322,8 @@ export async function createEmployee(
     actorUid,
     changes: {
       operation: 'employee-created',
-      employment_start_date:
-        normalized.employmentStartDate?.toISOString() ?? null,
+      initial_contract_start_date:
+        normalized.initialContract?.startDate.toISOString() ?? null,
       first_toyota_employment_date:
         normalized.firstToyotaEmploymentDate?.toISOString() ?? null,
       department_id: normalized.departmentId,
@@ -378,10 +407,6 @@ export async function updateEmployee(
       before: previousEmployee
         ? {
             teta_number: previousEmployee.tetaNumber,
-            employment_start_date:
-              previousEmployee.employmentStartDate?.toISOString() ?? null,
-            employment_end_date:
-              previousEmployee.employmentEndDate?.toISOString() ?? null,
             first_toyota_employment_date:
               previousEmployee.firstToyotaEmploymentDate?.toISOString() ?? null,
             phone_number: previousEmployee.phoneNumber ?? null,
@@ -399,10 +424,6 @@ export async function updateEmployee(
         : null,
       after: {
         teta_number: normalized.tetaNumber,
-        employment_start_date:
-          normalized.employmentStartDate?.toISOString() ?? null,
-        employment_end_date:
-          normalized.employmentEndDate?.toISOString() ?? null,
         first_toyota_employment_date:
           stableFirstToyotaEmploymentDate?.toISOString() ?? null,
         phone_number: normalized.phoneNumber ?? null,

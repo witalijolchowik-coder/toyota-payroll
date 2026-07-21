@@ -106,12 +106,15 @@ oddzielna od początku bieżącego cyklu.
 Migracja tworzy dokładnie jedną umowę z prawidłowego legacy
 `employment_start` / `employment_end`, tylko gdy pracownik nie ma historii
 umów. Ponowne uruchomienie jest idempotentne, nie nadpisuje nowszej historii
-i zapisuje audyt.
+i zapisuje audyt. Jeżeli stary dokument był nieaktywny wyłącznie dlatego, że
+umowa wygasła, a nie ma zgodnego jawnego zdarzenia zakończenia, migracja
+przywraca go do widoku operacyjnego i pozostawia stan wymagający decyzji.
+Zgodne jawne zakończenie zachowuje swój identyfikator sekwencji i archiwum.
 
-Import masowy nie może zmieniać dat zatrudnienia pracownika posiadającego
-historię umów. Taki wiersz wymaga działania na poziomie konkretnej umowy.
-Pozostałe dane pracownika nadal mogą być aktualizowane normalnym procesem
-podglądu importu.
+Import masowy zmienia wyłącznie konkretne dokumenty umów przez ten sam serwis,
+którego używa ręczna korekta. Legacy daty pracownika są ignorowane. Pola
+zgodności na dokumencie pracownika mogą pozostać przejściowo tylko jako
+wyliczony, nieedytowalny snapshot historii umów.
 
 ## Korekta i anulowanie umowy
 

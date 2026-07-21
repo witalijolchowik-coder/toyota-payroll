@@ -35,6 +35,7 @@ import {
   calculateFirstEmploymentLimit,
   calculateProjectedEmploymentLimit,
   formatPolishDate,
+  requiresContractDecision,
   resolveCurrentEmploymentPeriod,
 } from '../../utils/employees';
 import { hasCurrentStatusConflict } from '../../utils/payroll';
@@ -556,6 +557,7 @@ function CurrentContractCell({
   t: ReturnType<typeof useTranslations>;
 }) {
   const period = resolveCurrentEmploymentPeriod(employee);
+  const overdue = requiresContractDecision(employee);
 
   if (!period) {
     return (
@@ -569,6 +571,15 @@ function CurrentContractCell({
 
   return (
     <Stack spacing={0.25}>
+      {overdue ? (
+        <Typography
+          variant="caption"
+          color="error.main"
+          sx={{ fontWeight: 800, whiteSpace: 'nowrap' }}
+        >
+          {t.employees.table.contractOverdue}
+        </Typography>
+      ) : null}
       <ContractDateLine
         label={t.employees.table.contractFrom}
         value={formatPolishDate(period.startDate)}
@@ -581,6 +592,11 @@ function CurrentContractCell({
             : t.employees.table.openEndedContract
         }
       />
+      {overdue ? (
+        <Typography variant="caption" color="error.main">
+          {t.employees.contracts.decisionRequired}
+        </Typography>
+      ) : null}
     </Stack>
   );
 }

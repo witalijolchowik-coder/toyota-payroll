@@ -377,6 +377,45 @@ describe('dashboardModel', () => {
 });
 
 function employee(id: string, changes: Partial<Employee> = {}): Employee {
+  const employmentStartDate =
+    changes.employmentStartDate ?? new Date('2026-01-01T00:00:00.000Z');
+  const employmentEndDate = changes.employmentEndDate ?? null;
+  const sequenceId = `sequence-${id}`;
+  const contracts = changes.contracts ?? [
+    {
+      id: `contract-${id}`,
+      employeeId: id,
+      tetaNumber: `WT-${id}`,
+      sequenceId,
+      startDate: employmentStartDate.toISOString().slice(0, 10),
+      endDate: employmentEndDate?.toISOString().slice(0, 10) ?? null,
+      status: 'ACTIVE' as const,
+      note: null,
+      createdAt: today,
+      createdBy: 'test',
+      updatedAt: today,
+      updatedBy: 'test',
+    },
+  ];
+  const employmentEndEvents =
+    changes.employmentEndEvents ??
+    (employmentEndDate
+      ? [
+          {
+            id: `end-${id}`,
+            employeeId: id,
+            tetaNumber: `WT-${id}`,
+            sequenceId,
+            endDate: employmentEndDate.toISOString().slice(0, 10),
+            status: 'ACTIVE' as const,
+            reason: null,
+            createdAt: today,
+            createdBy: 'test',
+            updatedAt: today,
+            updatedBy: 'test',
+          },
+        ]
+      : []);
   return {
     id,
     tetaNumber: `WT-${id}`,
@@ -388,13 +427,15 @@ function employee(id: string, changes: Partial<Employee> = {}): Employee {
     isActive: true,
     departmentId: null,
     shiftAssignment: null,
-    employmentStartDate: new Date('2026-01-01T00:00:00.000Z'),
-    employmentEndDate: null,
+    employmentStartDate,
+    employmentEndDate,
     createdAt: today,
     createdBy: 'test',
     updatedAt: today,
     updatedBy: 'test',
     ...changes,
+    contracts,
+    employmentEndEvents,
   };
 }
 
