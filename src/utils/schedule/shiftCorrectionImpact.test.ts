@@ -28,7 +28,11 @@ const department = (id = 'metal'): Department => ({
   ...metadata,
 });
 
-const employee = (id: string, departmentId = 'metal'): Employee => ({
+const employee = (
+  id: string,
+  departmentId = 'metal',
+  startDate = '2026-01-01',
+): Employee => ({
   id,
   tetaNumber: `TETA-${id}`,
   firstName: 'Jan',
@@ -39,8 +43,21 @@ const employee = (id: string, departmentId = 'metal'): Employee => ({
   isActive: true,
   departmentId,
   shiftAssignment: 'RED',
-  employmentStartDate: new Date('2026-01-01T00:00:00Z'),
+  employmentStartDate: new Date(`${startDate}T00:00:00Z`),
   employmentEndDate: null,
+  contracts: [
+    {
+      id: `contract-${id}`,
+      employeeId: id,
+      tetaNumber: `TETA-${id}`,
+      sequenceId: `sequence-${id}`,
+      startDate,
+      endDate: null,
+      status: 'ACTIVE',
+      note: null,
+      ...metadata,
+    },
+  ],
   ...metadata,
 });
 
@@ -143,10 +160,7 @@ describe('shift correction impact', () => {
   });
 
   it('does not count BHP days overridden by the correction', () => {
-    const starter = {
-      ...employee('starter'),
-      employmentStartDate: new Date('2026-07-06T00:00:00Z'),
-    };
+    const starter = employee('starter', 'metal', '2026-07-06');
     const result = analyzeShiftCorrectionImpact({
       proposal,
       openMonthIds: ['2026-07'],

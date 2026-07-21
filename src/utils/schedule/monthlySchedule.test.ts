@@ -173,6 +173,12 @@ function date(value: string): Date {
 
 function employee(overrides: Partial<Employee> = {}): Employee {
   const now = date('2026-06-01');
+  const start = Object.hasOwn(overrides, 'employmentStartDate')
+    ? (overrides.employmentStartDate ?? null)
+    : now;
+  const end = Object.hasOwn(overrides, 'employmentEndDate')
+    ? (overrides.employmentEndDate ?? null)
+    : null;
   return {
     id: 'employee-1',
     tetaNumber: 'WT-001',
@@ -184,13 +190,33 @@ function employee(overrides: Partial<Employee> = {}): Employee {
     isActive: true,
     departmentId: null,
     shiftAssignment: null,
-    employmentStartDate: now,
-    employmentEndDate: null,
+    employmentStartDate: start,
+    employmentEndDate: end,
     createdAt: now,
     createdBy: 'test',
     updatedAt: now,
     updatedBy: 'test',
     ...overrides,
+    contracts:
+      overrides.contracts ??
+      (start
+        ? [
+            {
+              id: 'contract-1',
+              employeeId: overrides.id ?? 'employee-1',
+              tetaNumber: overrides.tetaNumber ?? 'WT-001',
+              sequenceId: 'sequence-1',
+              startDate: start.toISOString().slice(0, 10),
+              endDate: end?.toISOString().slice(0, 10) ?? null,
+              status: 'ACTIVE',
+              note: null,
+              createdAt: now,
+              createdBy: 'test',
+              updatedAt: now,
+              updatedBy: 'test',
+            },
+          ]
+        : []),
   };
 }
 

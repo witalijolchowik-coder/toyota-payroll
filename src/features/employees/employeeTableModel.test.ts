@@ -9,8 +9,12 @@ import {
 
 const date = (value: string) => new Date(`${value}T00:00:00.000Z`);
 const employee = (overrides: Partial<Employee>): Employee => {
-  const start = overrides.employmentStartDate ?? date('2026-01-01');
-  const end = overrides.employmentEndDate ?? null;
+  const start = Object.hasOwn(overrides, 'employmentStartDate')
+    ? (overrides.employmentStartDate ?? null)
+    : date('2026-01-01');
+  const end = Object.hasOwn(overrides, 'employmentEndDate')
+    ? (overrides.employmentEndDate ?? null)
+    : null;
   const contracts =
     overrides.contracts ??
     (start

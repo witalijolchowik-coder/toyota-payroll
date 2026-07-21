@@ -17,6 +17,12 @@ const metadata = {
 };
 
 function employee(overrides: Partial<Employee> = {}): Employee {
+  const start = Object.hasOwn(overrides, 'employmentStartDate')
+    ? (overrides.employmentStartDate ?? null)
+    : new Date('2026-01-01T00:00:00Z');
+  const end = Object.hasOwn(overrides, 'employmentEndDate')
+    ? (overrides.employmentEndDate ?? null)
+    : null;
   return {
     ...metadata,
     id: 'employee-1',
@@ -31,9 +37,26 @@ function employee(overrides: Partial<Employee> = {}): Employee {
     isActive: true,
     departmentId: 'paint',
     shiftAssignment: 'RED',
-    employmentStartDate: new Date('2026-01-01T00:00:00Z'),
-    employmentEndDate: null,
+    employmentStartDate: start,
+    employmentEndDate: end,
     ...overrides,
+    contracts:
+      overrides.contracts ??
+      (start
+        ? [
+            {
+              id: 'contract-1',
+              employeeId: overrides.id ?? 'employee-1',
+              tetaNumber: overrides.tetaNumber ?? '100',
+              sequenceId: 'sequence-1',
+              startDate: start.toISOString().slice(0, 10),
+              endDate: end?.toISOString().slice(0, 10) ?? null,
+              status: 'ACTIVE',
+              note: null,
+              ...metadata,
+            },
+          ]
+        : []),
   };
 }
 

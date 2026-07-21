@@ -25,6 +25,19 @@ const employee: Employee = {
   shiftAssignment: 'RED',
   employmentStartDate: new Date('2026-06-01T00:00:00.000Z'),
   employmentEndDate: null,
+  contracts: [
+    {
+      id: 'contract-1',
+      employeeId: 'employee-1',
+      tetaNumber: 'TETA-1001',
+      sequenceId: 'sequence-1',
+      startDate: '2026-06-01',
+      endDate: null,
+      status: 'ACTIVE',
+      note: null,
+      ...metadata,
+    },
+  ],
   ...metadata,
 };
 
