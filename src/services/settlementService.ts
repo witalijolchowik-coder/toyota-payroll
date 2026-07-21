@@ -41,14 +41,27 @@ import {
   mapSettlementReviewDocument,
   mapShiftHoursVersionDocument,
   mapDepartmentShiftCorrectionDocument,
+  mapEmployeeContractDocument,
+  mapEmploymentEndEventDocument,
 } from './firestore/mappers';
 import {
   getFirestoreClient,
   getFirestoreRepositories,
 } from './firestoreService';
+import { hydrateEmployeesWithEmploymentHistory } from './employeeHistoryHydration';
 
 export type SettlementServiceErrorCode =
-  'firebase-unavailable' | 'authentication-required' | 'month-unavailable';
+  | 'firebase-unavailable'
+  | 'authentication-required'
+  | 'month-unavailable'
+  | 'contract-history-unavailable';
+
+export type SettlementLoadingStage =
+  'month' | 'employees' | 'contracts' | 'settlement';
+
+interface LoadSettlementMonthOptions {
+  onLoadingStage?: (stage: SettlementLoadingStage) => void;
+}
 
 export class SettlementServiceError extends Error {
   constructor(readonly code: SettlementServiceErrorCode) {
@@ -103,6 +116,7 @@ async function optionalSettlementLayer<T>(
 
 export async function loadSettlementMonth(
   monthId: MonthId,
+  options: LoadSettlementMonthOptions = {},
 ): Promise<SettlementMonthData | null> {
   const repositories = getFirestoreRepositories();
   if (!repositories) {
@@ -110,6 +124,7 @@ export async function loadSettlementMonth(
   }
 
   await requireActorUid();
+  options.onLoadingStage?.('month');
   const monthRepository = repositories.forMonth(monthId);
   const monthSnapshot = await getDoc(monthRepository.month);
 
@@ -117,11 +132,34 @@ export async function loadSettlementMonth(
     return null;
   }
 
+  options.onLoadingStage?.('employees');
   const employeesQuery = query(repositories.employees, orderBy('teta_number'));
   const employeesSnapshot = await getDocs(employeesQuery);
-  const employees = employeesSnapshot.docs.map((document) =>
+  const employeeDocuments = employeesSnapshot.docs.map((document) =>
     mapEmployeeDocument(document.id, document.data()),
   );
+
+  options.onLoadingStage?.('contracts');
+  let employees: Employee[];
+  try {
+    const [contractsSnapshot, endEventsSnapshot] = await Promise.all([
+      getDocs(repositories.employeeContracts),
+      getDocs(repositories.employmentEndEvents),
+    ]);
+    employees = hydrateEmployeesWithEmploymentHistory(
+      employeeDocuments,
+      contractsSnapshot.docs.map((document) =>
+        mapEmployeeContractDocument(document.id, document.data()),
+      ),
+      endEventsSnapshot.docs.map((document) =>
+        mapEmploymentEndEventDocument(document.id, document.data()),
+      ),
+    );
+  } catch {
+    throw new SettlementServiceError('contract-history-unavailable');
+  }
+
+  options.onLoadingStage?.('settlement');
   const sourceFailures: string[] = [];
 
   const [

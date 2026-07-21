@@ -37,6 +37,7 @@ import { getFirestoreRepositories } from './firestoreService';
 import { appendAuditEntryToBatch, recordAuditEntry } from './auditService';
 import { preserveFirstToyotaEmploymentDate } from '../utils/payroll';
 import { bootstrapLegacyEmployeeContract } from './employeeContractsService';
+import { hydrateEmployeesWithEmploymentHistory } from './employeeHistoryHydration';
 
 export type EmployeeServiceErrorCode =
   'firebase-unavailable' | 'authentication-required' | 'duplicate-teta';
@@ -145,15 +146,11 @@ export function subscribeToEmployees(
     const migrationsStarted = new Set<string>();
 
     const emit = () => {
-      const hydrated = employeeDocuments.map((employee) => ({
-        ...employee,
-        contracts: contracts.filter(
-          (contract) => contract.employeeId === employee.id,
-        ),
-        employmentEndEvents: endEvents.filter(
-          (event) => event.employeeId === employee.id,
-        ),
-      }));
+      const hydrated = hydrateEmployeesWithEmploymentHistory(
+        employeeDocuments,
+        contracts,
+        endEvents,
+      );
       onEmployees(hydrated);
       if (employeesLoaded && contractsLoaded && endsLoaded) {
         hydrated

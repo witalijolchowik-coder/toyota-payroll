@@ -125,7 +125,7 @@ const allSettings = [
 );
 
 describe('month readiness assessment', () => {
-  it('treats missing employment start as blocking and excludes from participants', () => {
+  it('treats missing contract history as blocking and excludes from participants', () => {
     const readiness = assessMonthReadiness({
       monthId: '2026-07',
       month: null,
@@ -139,7 +139,7 @@ describe('month readiness assessment', () => {
     expect(readiness.issues).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
-          code: 'employee-missing-employment-start',
+          code: 'employee-missing-contract-history',
           severity: 'blocking',
         }),
         expect.objectContaining({ code: 'month-missing' }),

@@ -330,8 +330,7 @@ export const pl = {
         'month-missing': 'Miesiąc nie został jeszcze utworzony.',
         'calendar-overrides-unresolved':
           'Toyota-specyficzne wyjątki kalendarza nie są jeszcze potwierdzone.',
-        'employee-missing-employment-start':
-          'Brakuje daty rozpoczęcia zatrudnienia.',
+        'employee-missing-contract-history': 'Brakuje historii umów.',
         'employee-missing-identity': 'Brakuje danych identyfikacyjnych do SOZ.',
         'employee-missing-teta': 'Brakuje numeru TETA.',
         'employee-missing-citizenship': 'Brakuje informacji o obywatelstwie.',
@@ -2037,10 +2036,13 @@ export const pl = {
       description:
         'Dane tego miesiąca są tylko do odczytu. Zmiany w okresie rozliczeniowym są zablokowane.',
     },
-    incompleteEmployment: {
-      title: 'Niekompletne dane zatrudnienia',
-      description:
-        'Liczba pracowników bez daty rozpoczęcia, których nie można przypisać do miesiąca: {{count}}.',
+    contractHistoryDiagnostics: {
+      missingTitle: 'Brak historii umów',
+      missingDescription:
+        'Liczba pracowników bez aktywnej historii umów: {{count}}.',
+      invalidTitle: 'Konflikt w historii umów',
+      invalidDescription:
+        'Nie można jednoznacznie ustalić okresu zatrudnienia dla {{count}} pracowników. Popraw nakładające się lub nieprawidłowe umowy.',
     },
     grid: {
       teta: 'TETA',
@@ -2219,6 +2221,12 @@ export const pl = {
       },
     },
     loading: 'Ładowanie rozliczenia miesięcznego',
+    loadingStages: {
+      month: 'Ładowanie miesiąca',
+      employees: 'Ładowanie pracowników',
+      contracts: 'Ładowanie historii umów',
+      settlement: 'Ładowanie danych rozliczenia',
+    },
     notifications: {
       created: 'Miesiąc został utworzony.',
       dailyValueSaved: 'Godziny zostały zapisane.',
@@ -2235,6 +2243,8 @@ export const pl = {
         'Do odczytu i utworzenia miesiąca wymagane jest aktywne uwierzytelnienie Firebase.',
       monthUnavailable:
         'Dokument miesiąca nie jest dostępny. Spróbuj ponownie.',
+      contractHistoryUnavailable:
+        'Nie udało się wczytać historii umów. Spróbuj ponownie.',
       generic:
         'Sprawdź połączenie z Firebase oraz uprawnienia i spróbuj ponownie.',
     },

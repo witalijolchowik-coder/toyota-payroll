@@ -774,6 +774,32 @@ describe('employee monthly calculation draft', () => {
     expect(results[1]?.employment.participatesInMonth).toBe(false);
   });
 
+  it('calculates monthly participation exclusively from contract history', () => {
+    const worker = employee({
+      employmentStartDate: null,
+      employmentEndDate: null,
+      contracts: [
+        {
+          ...employee().contracts![0]!,
+          startDate: '2026-06-10',
+          endDate: '2026-06-30',
+        },
+      ],
+    });
+
+    const [result] = calculateMonthlyDrafts({
+      monthId: '2026-06',
+      employees: [worker],
+      dailyValues: [],
+      absences: [],
+      payrollSettings: defaultPayrollSettings(),
+      adjustments: [],
+    });
+
+    expect(result?.employment.participatesInMonth).toBe(true);
+    expect(result?.employment.individualNominalHours).toBeGreaterThan(0);
+  });
+
   it('aggregates settlement components from effective-dated employee entitlements', () => {
     const employees = [employee()];
     const entitlementsByEmployeeId = resolveMonthlyEmployeeEntitlements({

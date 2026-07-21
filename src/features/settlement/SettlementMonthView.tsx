@@ -49,7 +49,6 @@ import {
   isEmployeeActiveOnDate,
   resolveMonthlyEmployeeEntitlements,
 } from '../../utils/payroll';
-import { activeContracts } from '../../utils/employees';
 import type { AbsenceCode } from '../../utils/absences';
 import { CalendarConstructorToolbar } from './CalendarConstructorToolbar';
 import {
@@ -65,9 +64,9 @@ import { DailyValueEditorDialog } from './DailyValueEditorDialog';
 import { EmployeeCalendarDialog } from './EmployeeCalendarDialog';
 import {
   createCalendarDays,
-  employeeParticipatesInMonth,
   getMonthDateRange,
   isDayWithinEmployment,
+  resolveMonthlyEmployeeParticipation,
   type CalendarDay,
   type SettlementCellValue,
 } from './monthUtils';
@@ -102,8 +101,15 @@ const monthFormatter = new Intl.DateTimeFormat('pl-PL', {
 export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
   const t = useTranslations();
   const { notify } = useNotification();
-  const { data, error, isLoading, isCreating, createMonth, reload } =
-    useSettlementMonth(monthId);
+  const {
+    data,
+    error,
+    isLoading,
+    loadingStage,
+    isCreating,
+    createMonth,
+    reload,
+  } = useSettlementMonth(monthId);
   const [editingCell, setEditingCell] = useState<{
     employee: Employee;
     day: CalendarDay;
@@ -138,6 +144,11 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
         <CardContent>
           <Stack spacing={2}>
             <Skeleton width={240} height={32} />
+            <Typography color="text.secondary">
+              {loadingStage
+                ? t.settlement.loadingStages[loadingStage]
+                : t.settlement.loading}
+            </Typography>
             <Skeleton variant="rounded" height={220} />
           </Stack>
         </CardContent>
@@ -216,12 +227,11 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
     );
   }
 
-  const employeesWithoutStartDate = data.employees.filter(
-    (employee) => activeContracts(employee).length === 0,
+  const participation = resolveMonthlyEmployeeParticipation(
+    data.employees,
+    range,
   );
-  const participatingEmployees = data.employees.filter((employee) =>
-    employeeParticipatesInMonth(employee, range),
-  );
+  const participatingEmployees = participation.participants;
   const participatingEmployeeIds = new Set(
     participatingEmployees.map((employee) => employee.id),
   );
@@ -485,13 +495,33 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
         </Alert>
       ) : null}
 
-      {employeesWithoutStartDate.length > 0 ? (
+      {participation.missingContractHistory.length > 0 ? (
         <Alert severity="warning">
-          <strong>{t.settlement.incompleteEmployment.title}</strong>
+          <strong>
+            {t.settlement.contractHistoryDiagnostics.missingTitle}
+          </strong>
           <br />
-          {interpolate(t.settlement.incompleteEmployment.description, {
-            count: employeesWithoutStartDate.length.toString(),
-          })}
+          {interpolate(
+            t.settlement.contractHistoryDiagnostics.missingDescription,
+            {
+              count: participation.missingContractHistory.length.toString(),
+            },
+          )}
+        </Alert>
+      ) : null}
+
+      {participation.invalidContractHistory.length > 0 ? (
+        <Alert severity="error">
+          <strong>
+            {t.settlement.contractHistoryDiagnostics.invalidTitle}
+          </strong>
+          <br />
+          {interpolate(
+            t.settlement.contractHistoryDiagnostics.invalidDescription,
+            {
+              count: participation.invalidContractHistory.length.toString(),
+            },
+          )}
         </Alert>
       ) : null}
 
@@ -897,6 +927,9 @@ function serviceErrorMessage(
   }
   if (code === 'month-unavailable') {
     return t.settlement.errors.monthUnavailable;
+  }
+  if (code === 'contract-history-unavailable') {
+    return t.settlement.errors.contractHistoryUnavailable;
   }
   return t.settlement.errors.generic;
 }

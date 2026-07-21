@@ -5,6 +5,7 @@ import {
   createSettlementMonth,
   loadSettlementMonth,
   SettlementServiceError,
+  type SettlementLoadingStage,
   type SettlementMonthData,
 } from '../../services/settlementService';
 import type { MonthId } from '../../types/firestore';
@@ -13,6 +14,7 @@ interface SettlementMonthState {
   data: SettlementMonthData | null;
   error: Error | null;
   isLoading: boolean;
+  loadingStage: SettlementLoadingStage | null;
   isCreating: boolean;
 }
 
@@ -20,6 +22,7 @@ const initialState: SettlementMonthState = {
   data: null,
   error: null,
   isLoading: true,
+  loadingStage: 'month',
   isCreating: false,
 };
 
@@ -30,14 +33,28 @@ export function useSettlementMonth(monthId: MonthId) {
   useEffect(() => {
     let cancelled = false;
     showLoading();
+    setState({
+      data: null,
+      error: null,
+      isLoading: true,
+      loadingStage: 'month',
+      isCreating: false,
+    });
 
-    void loadSettlementMonth(monthId)
+    void loadSettlementMonth(monthId, {
+      onLoadingStage: (loadingStage) => {
+        if (!cancelled) {
+          setState((current) => ({ ...current, loadingStage }));
+        }
+      },
+    })
       .then((data) => {
         if (!cancelled) {
           setState({
             data,
             error: null,
             isLoading: false,
+            loadingStage: null,
             isCreating: false,
           });
         }
@@ -48,6 +65,7 @@ export function useSettlementMonth(monthId: MonthId) {
             data: null,
             error: error instanceof Error ? error : new Error(String(error)),
             isLoading: false,
+            loadingStage: null,
             isCreating: false,
           });
         }
@@ -61,18 +79,31 @@ export function useSettlementMonth(monthId: MonthId) {
 
   const reload = useCallback(async () => {
     showLoading();
+    setState((current) => ({
+      ...current,
+      error: null,
+      isLoading: true,
+      loadingStage: 'month',
+    }));
     try {
-      const data = await loadSettlementMonth(monthId);
+      const data = await loadSettlementMonth(monthId, {
+        onLoadingStage: (loadingStage) => {
+          setState((current) => ({ ...current, loadingStage }));
+        },
+      });
       setState({
         data,
         error: null,
         isLoading: false,
+        loadingStage: null,
         isCreating: false,
       });
     } catch (error) {
       setState((current) => ({
         ...current,
         error: error instanceof Error ? error : new Error(String(error)),
+        isLoading: false,
+        loadingStage: null,
       }));
       throw error;
     } finally {
@@ -85,12 +116,17 @@ export function useSettlementMonth(monthId: MonthId) {
       ...current,
       error: null,
       isCreating: true,
+      loadingStage: 'month',
     }));
     showLoading();
 
     try {
       await createSettlementMonth(monthId);
-      const data = await loadSettlementMonth(monthId);
+      const data = await loadSettlementMonth(monthId, {
+        onLoadingStage: (loadingStage) => {
+          setState((current) => ({ ...current, loadingStage }));
+        },
+      });
       if (!data) {
         throw new SettlementServiceError('month-unavailable');
       }
@@ -98,12 +134,15 @@ export function useSettlementMonth(monthId: MonthId) {
         data,
         error: null,
         isLoading: false,
+        loadingStage: null,
         isCreating: false,
       });
     } catch (error) {
       setState((current) => ({
         ...current,
         error: error instanceof Error ? error : new Error(String(error)),
+        isLoading: false,
+        loadingStage: null,
         isCreating: false,
       }));
       throw error;

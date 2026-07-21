@@ -7,6 +7,7 @@ import {
   getMonthDateRange,
   parseMonthId,
   previousMonthId,
+  resolveMonthlyEmployeeParticipation,
   resolveSettlementCellValue,
 } from './monthUtils';
 
@@ -123,6 +124,128 @@ describe('payroll-period employee participation', () => {
         june,
       ),
     ).toBe(false);
+  });
+
+  it('uses June contract history when legacy employee dates are empty', () => {
+    const juneContract = employee({
+      employmentStartDate: null,
+      employmentEndDate: null,
+      contracts: [
+        {
+          ...employee().contracts![0]!,
+          startDate: '2026-06-01',
+          endDate: '2026-06-30',
+        },
+      ],
+    });
+
+    expect(employeeParticipatesInMonth(juneContract, june)).toBe(true);
+  });
+
+  it('uses historical contracts even when the current contract starts in July', () => {
+    const worker = employee({
+      employmentStartDate: null,
+      employmentEndDate: null,
+      contracts: [
+        {
+          ...employee().contracts![0]!,
+          id: 'june-contract',
+          sequenceId: 'sequence-june',
+          startDate: '2026-06-01',
+          endDate: '2026-06-30',
+        },
+        {
+          ...employee().contracts![0]!,
+          id: 'july-contract',
+          sequenceId: 'sequence-july',
+          startDate: '2026-07-01',
+          endDate: null,
+        },
+      ],
+    });
+
+    expect(employeeParticipatesInMonth(worker, june)).toBe(true);
+  });
+
+  it('excludes a worker without a contract overlapping June', () => {
+    const worker = employee({
+      employmentStartDate: null,
+      employmentEndDate: null,
+      contracts: [
+        {
+          ...employee().contracts![0]!,
+          startDate: '2026-07-01',
+          endDate: null,
+        },
+      ],
+    });
+
+    expect(employeeParticipatesInMonth(worker, june)).toBe(false);
+  });
+
+  it('includes an archived worker and consecutive contracts only once', () => {
+    const worker = employee({
+      isActive: false,
+      employmentStartDate: null,
+      employmentEndDate: null,
+      contracts: [
+        {
+          ...employee().contracts![0]!,
+          id: 'first-half',
+          startDate: '2026-06-01',
+          endDate: '2026-06-15',
+        },
+        {
+          ...employee().contracts![0]!,
+          id: 'second-half',
+          sequenceId: 'sequence-2',
+          startDate: '2026-06-16',
+          endDate: '2026-06-30',
+        },
+      ],
+    });
+
+    expect(
+      resolveMonthlyEmployeeParticipation([worker], june).participants,
+    ).toEqual([worker]);
+  });
+
+  it('distinguishes missing and invalid contract history from no June coverage', () => {
+    const missing = employee({ contracts: [] });
+    const outside = employee({
+      contracts: [
+        {
+          ...employee().contracts![0]!,
+          startDate: '2026-07-01',
+          endDate: null,
+        },
+      ],
+    });
+    const invalid = employee({
+      contracts: [
+        {
+          ...employee().contracts![0]!,
+          id: 'overlap-1',
+          startDate: '2026-06-01',
+          endDate: '2026-06-20',
+        },
+        {
+          ...employee().contracts![0]!,
+          id: 'overlap-2',
+          sequenceId: 'sequence-2',
+          startDate: '2026-06-15',
+          endDate: '2026-06-30',
+        },
+      ],
+    });
+
+    const result = resolveMonthlyEmployeeParticipation(
+      [missing, outside, invalid],
+      june,
+    );
+    expect(result.participants).toEqual([]);
+    expect(result.missingContractHistory).toEqual([missing]);
+    expect(result.invalidContractHistory).toEqual([invalid]);
   });
 });
 

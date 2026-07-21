@@ -13,8 +13,10 @@ import {
 } from '../../utils/payroll';
 import { resolveEffectiveAttendanceValue } from '../../utils/attendance';
 import {
+  activeContracts,
   employeeContractsOverlapRange,
   isDateCoveredByContracts,
+  validateEmployeeContract,
 } from '../../utils/employees';
 
 export type ParsedMonthId = ParsedPayrollMonth;
@@ -43,6 +45,12 @@ export interface SettlementCellValue {
   fallbackHours: number | null;
   coordinatorNote: string | null;
   workTimeCorrection?: DailyValue['workTimeCorrection'] | null;
+}
+
+export interface MonthlyEmployeeParticipation {
+  participants: Employee[];
+  missingContractHistory: Employee[];
+  invalidContractHistory: Employee[];
 }
 
 export const parseMonthId = parsePayrollMonthId;
@@ -102,6 +110,38 @@ export function employeeParticipatesInMonth(
     utcDateToIsoDate(range.start),
     utcDateToIsoDate(range.end),
   );
+}
+
+export function resolveMonthlyEmployeeParticipation(
+  employees: readonly Employee[],
+  range: MonthDateRange,
+): MonthlyEmployeeParticipation {
+  const result: MonthlyEmployeeParticipation = {
+    participants: [],
+    missingContractHistory: [],
+    invalidContractHistory: [],
+  };
+
+  employees.forEach((employee) => {
+    const contracts = activeContracts(employee);
+    if (contracts.length === 0) {
+      result.missingContractHistory.push(employee);
+      return;
+    }
+    if (
+      contracts.some(
+        (contract) => validateEmployeeContract(contract, contracts).length > 0,
+      )
+    ) {
+      result.invalidContractHistory.push(employee);
+      return;
+    }
+    if (employeeParticipatesInMonth(employee, range)) {
+      result.participants.push(employee);
+    }
+  });
+
+  return result;
 }
 
 export function isDayWithinEmployment(

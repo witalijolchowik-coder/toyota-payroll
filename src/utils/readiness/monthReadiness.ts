@@ -37,7 +37,7 @@ export type ReadinessSeverity = 'blocking' | 'warning' | 'optional' | 'info';
 export type ReadinessIssueCode =
   | 'month-missing'
   | 'calendar-overrides-unresolved'
-  | 'employee-missing-employment-start'
+  | 'employee-missing-contract-history'
   | 'employee-missing-identity'
   | 'employee-missing-teta'
   | 'employee-missing-citizenship'
@@ -226,18 +226,20 @@ export function assessMonthReadiness({
     if (contracts.length === 0) {
       addIssue(summary, {
         ...baseIssue,
-        code: 'employee-missing-employment-start',
+        code: 'employee-missing-contract-history',
         severity: 'blocking',
         target: 'employees',
       });
       return;
     }
 
+    let hasInvalidContractHistory = false;
     const invalidContract = contracts.find(
       (contract) =>
         Boolean(contract.endDate) && contract.endDate! < contract.startDate,
     );
     if (invalidContract) {
+      hasInvalidContractHistory = true;
       addIssue(summary, {
         ...baseIssue,
         code: 'employee-contract-invalid',
@@ -249,6 +251,7 @@ export function assessMonthReadiness({
     contracts.slice(1).forEach((contract, index) => {
       const previous = contracts[index]!;
       if (!previous.endDate || contract.startDate <= previous.endDate) {
+        hasInvalidContractHistory = true;
         addIssue(summary, {
           ...baseIssue,
           code: 'employee-contract-overlap',
@@ -276,6 +279,10 @@ export function assessMonthReadiness({
         severity: 'warning',
         target: 'employees',
       });
+    }
+
+    if (hasInvalidContractHistory) {
+      return;
     }
 
     if (!employeeParticipates(employee, monthId)) {
