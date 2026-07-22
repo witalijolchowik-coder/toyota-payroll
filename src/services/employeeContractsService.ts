@@ -3,7 +3,9 @@ import {
   doc,
   getDoc,
   getDocs,
+  query,
   serverTimestamp,
+  where,
   writeBatch,
 } from 'firebase/firestore';
 
@@ -20,13 +22,20 @@ import type {
 } from '../types/firestore';
 import {
   activeContracts,
+  employeeContractHistoryRevision,
   planLegacyContractMigration,
   resolveLatestContract,
   validateEmployeeContract,
 } from '../utils/employees';
-import { mapMonthDocument } from './firestore/mappers';
+import {
+  mapEmployeeContractDocument,
+  mapEmployeeDocument,
+  mapEmploymentEndEventDocument,
+  mapMonthDocument,
+} from './firestore/mappers';
 import { getFirestoreRepositories } from './firestoreService';
 import { appendAuditEntryToBatch } from './auditService';
+import { hydrateEmployeesWithEmploymentHistory } from './employeeHistoryHydration';
 
 export type EmployeeContractServiceErrorCode =
   | 'firebase-unavailable'
@@ -35,6 +44,8 @@ export type EmployeeContractServiceErrorCode =
   | 'invalid-contract'
   | 'duplicate-contract'
   | 'overlapping-contract'
+  | 'contract-read-failure'
+  | 'mutation-conflict'
   | 'locked-month'
   | 'invalid-employment-end';
 
@@ -53,6 +64,11 @@ export interface EmployeeContractImpact {
   lockedMonths: MonthId[];
 }
 
+export interface EmployeeContractState {
+  employee: Employee;
+  revision: string;
+}
+
 function requireContext() {
   const repositories = getFirestoreRepositories();
   if (!repositories) {
@@ -63,6 +79,77 @@ function requireContext() {
     throw new EmployeeContractServiceError('authentication-required');
   }
   return { repositories, uid };
+}
+
+export async function loadEmployeeContractState(
+  employeeId: EmployeeId,
+): Promise<EmployeeContractState> {
+  const { repositories } = requireContext();
+  try {
+    const employeeSnapshot = await getDoc(repositories.employee(employeeId));
+    if (!employeeSnapshot.exists()) {
+      throw new EmployeeContractServiceError('employee-not-found');
+    }
+    const [contractsSnapshot, endEventsSnapshot] = await Promise.all([
+      getDocs(
+        query(
+          repositories.employeeContracts,
+          where('employee_id', '==', employeeId),
+        ),
+      ),
+      getDocs(
+        query(
+          repositories.employmentEndEvents,
+          where('employee_id', '==', employeeId),
+        ),
+      ),
+    ]);
+    const employee = hydrateEmployeesWithEmploymentHistory(
+      [mapEmployeeDocument(employeeSnapshot.id, employeeSnapshot.data())],
+      contractsSnapshot.docs.map((document) =>
+        mapEmployeeContractDocument(document.id, document.data()),
+      ),
+      endEventsSnapshot.docs.map((document) =>
+        mapEmploymentEndEventDocument(document.id, document.data()),
+      ),
+    )[0];
+    if (!employee) {
+      throw new EmployeeContractServiceError('employee-not-found');
+    }
+    return {
+      employee,
+      revision: employeeContractHistoryRevision(employee),
+    };
+  } catch (error) {
+    if (error instanceof EmployeeContractServiceError) {
+      throw error;
+    }
+    throw new EmployeeContractServiceError('contract-read-failure');
+  }
+}
+
+async function currentMutationState(
+  employeeId: EmployeeId,
+  expectedRevision?: string,
+): Promise<EmployeeContractState> {
+  const state = await loadEmployeeContractState(employeeId);
+  if (expectedRevision && state.revision !== expectedRevision) {
+    throw new EmployeeContractServiceError('mutation-conflict');
+  }
+  return state;
+}
+
+function currentContract(
+  employee: Employee,
+  contractId: string,
+): EmployeeContract {
+  const contract = employee.contracts?.find(
+    (candidate) => candidate.id === contractId,
+  );
+  if (!contract) {
+    throw new EmployeeContractServiceError('mutation-conflict');
+  }
+  return contract;
 }
 
 function impactedMonthIds(
@@ -138,10 +225,12 @@ function throwValidation(
 }
 
 export async function createEmployeeContract(
-  employee: Employee,
+  employeeId: EmployeeId,
   input: Omit<EmployeeContractCreateInput, 'employeeId' | 'tetaNumber'>,
+  expectedRevision?: string,
 ): Promise<string> {
   const { repositories, uid } = requireContext();
+  const { employee } = await currentMutationState(employeeId, expectedRevision);
   throwValidation(
     { id: '', startDate: input.startDate, endDate: input.endDate },
     activeContracts(employee),
@@ -221,11 +310,14 @@ export async function createEmployeeContract(
 }
 
 export async function updateEmployeeContract(
-  employee: Employee,
-  contract: EmployeeContract,
+  employeeId: EmployeeId,
+  contractId: string,
   input: EmployeeContractUpdateInput,
+  expectedRevision?: string,
 ): Promise<void> {
   const { repositories, uid } = requireContext();
+  const { employee } = await currentMutationState(employeeId, expectedRevision);
+  const contract = currentContract(employee, contractId);
   throwValidation(
     { id: contract.id, startDate: input.startDate, endDate: input.endDate },
     activeContracts(employee),
@@ -297,10 +389,13 @@ export async function updateEmployeeContract(
 }
 
 export async function cancelEmployeeContract(
-  employee: Employee,
-  contract: EmployeeContract,
+  employeeId: EmployeeId,
+  contractId: string,
+  expectedRevision?: string,
 ): Promise<void> {
   const { repositories, uid } = requireContext();
+  const { employee } = await currentMutationState(employeeId, expectedRevision);
+  const contract = currentContract(employee, contractId);
   const impact = await monthImpactForPeriods([contract]);
   if (impact.locked.length > 0) {
     throw new EmployeeContractServiceError('locked-month', impact.locked);
@@ -349,10 +444,12 @@ export async function cancelEmployeeContract(
 }
 
 export async function endEmployeeEmployment(
-  employee: Employee,
+  employeeId: EmployeeId,
   input: Omit<EmploymentEndCreateInput, 'employeeId' | 'tetaNumber'>,
+  expectedRevision?: string,
 ): Promise<string> {
   const { repositories, uid } = requireContext();
+  const { employee } = await currentMutationState(employeeId, expectedRevision);
   const latest = resolveLatestContract(employee);
   if (
     !latest?.endDate ||
@@ -414,8 +511,10 @@ export async function endEmployeeEmployment(
 }
 
 export async function bootstrapLegacyEmployeeContract(
-  employee: Employee,
+  employeeId: EmployeeId,
+  expectedRevision?: string,
 ): Promise<string | null> {
+  const { employee } = await currentMutationState(employeeId, expectedRevision);
   const migration = planLegacyContractMigration(employee);
   if (!migration) return null;
   const { repositories, uid } = requireContext();

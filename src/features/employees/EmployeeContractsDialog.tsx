@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import AddOutlined from '@mui/icons-material/AddOutlined';
 import PersonOffOutlined from '@mui/icons-material/PersonOffOutlined';
 import EditOutlined from '@mui/icons-material/EditOutlined';
@@ -26,12 +26,18 @@ import type {
   Employee,
   EmployeeContract,
   EmployeeContractUpdateInput,
+  EmployeeId,
 } from '../../types/firestore';
-import type { EmployeeContractImpact } from '../../services/employeeContractsService';
+import {
+  EmployeeContractServiceError,
+  type EmployeeContractImpact,
+  type EmployeeContractState,
+} from '../../services/employeeContractsService';
 import {
   contractBreakDays,
   contractStatus,
   continuationDefaults,
+  employeeContractHistoryRevision,
   latestEmploymentEnd,
   requiresContractDecision,
   resolveLatestContract,
@@ -41,17 +47,28 @@ import {
 interface Props {
   employee: Employee;
   onClose: () => void;
-  onCreate: (input: {
-    sequenceId: string;
-    startDate: string;
-    endDate: string | null;
-    note: string | null;
-  }) => Promise<void>;
-  onUpdate: (
-    contract: EmployeeContract,
-    input: EmployeeContractUpdateInput,
+  onReload: (employeeId: EmployeeId) => Promise<EmployeeContractState>;
+  onCreate: (
+    employeeId: EmployeeId,
+    input: {
+      sequenceId: string;
+      startDate: string;
+      endDate: string | null;
+      note: string | null;
+    },
+    expectedRevision: string,
   ) => Promise<void>;
-  onCancelContract: (contract: EmployeeContract) => Promise<void>;
+  onUpdate: (
+    employeeId: EmployeeId,
+    contractId: string,
+    input: EmployeeContractUpdateInput,
+    expectedRevision: string,
+  ) => Promise<void>;
+  onCancelContract: (
+    employeeId: EmployeeId,
+    contractId: string,
+    expectedRevision: string,
+  ) => Promise<void>;
   onPreviewUpdate: (
     contract: EmployeeContract,
     input: EmployeeContractUpdateInput,
@@ -59,17 +76,25 @@ interface Props {
   onPreviewCancellation: (
     contract: EmployeeContract,
   ) => Promise<EmployeeContractImpact>;
-  onEndEmployment: (input: {
-    sequenceId: string;
-    endDate: string;
-    reason: string | null;
-  }) => Promise<void>;
-  onBootstrapLegacy: () => Promise<void>;
+  onEndEmployment: (
+    employeeId: EmployeeId,
+    input: {
+      sequenceId: string;
+      endDate: string;
+      reason: string | null;
+    },
+    expectedRevision: string,
+  ) => Promise<void>;
+  onBootstrapLegacy: (
+    employeeId: EmployeeId,
+    expectedRevision: string,
+  ) => Promise<void>;
 }
 
 export function EmployeeContractsDialog({
   employee,
   onClose,
+  onReload,
   onCreate,
   onUpdate,
   onCancelContract,
@@ -79,14 +104,19 @@ export function EmployeeContractsDialog({
   onBootstrapLegacy,
 }: Props) {
   const t = useTranslations();
+  const [contractState, setContractState] = useState<EmployeeContractState>({
+    employee,
+    revision: employeeContractHistoryRevision(employee),
+  });
+  const currentEmployee = contractState.employee;
   const contracts = useMemo(
     () =>
-      [...(employee.contracts ?? [])].sort((a, b) =>
+      [...(currentEmployee.contracts ?? [])].sort((a, b) =>
         b.startDate.localeCompare(a.startDate),
       ),
-    [employee.contracts],
+    [currentEmployee.contracts],
   );
-  const continuation = continuationDefaults(employee);
+  const continuation = continuationDefaults(currentEmployee);
   const [editing, setEditing] = useState<EmployeeContract | 'new' | null>(null);
   const [startDate, setStartDate] = useState(continuation.startDate ?? '');
   const [endDate, setEndDate] = useState('');
@@ -94,6 +124,7 @@ export function EmployeeContractsDialog({
   const [reason, setReason] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [refreshing, setRefreshing] = useState(true);
   const [impact, setImpact] = useState<{
     action: 'update' | 'cancel';
     contractId: string;
@@ -101,8 +132,51 @@ export function EmployeeContractsDialog({
   } | null>(null);
   const [cancellationTarget, setCancellationTarget] =
     useState<EmployeeContract | null>(null);
-  const latest = resolveLatestContract(employee);
-  const ended = latestEmploymentEnd(employee);
+  const latest = resolveLatestContract(currentEmployee);
+  const ended = latestEmploymentEnd(currentEmployee);
+
+  useEffect(() => {
+    let active = true;
+    void onReload(employee.id)
+      .then((state) => {
+        if (active) setContractState(state);
+      })
+      .catch((caught: unknown) => {
+        if (active) setError(contractErrorMessage(caught, t));
+      })
+      .finally(() => {
+        if (active) setRefreshing(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [employee.id, onReload, t]);
+
+  const reloadCurrentState = async () => {
+    setRefreshing(true);
+    try {
+      const state = await onReload(currentEmployee.id);
+      setContractState(state);
+      return state;
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  const recoverFromMutationError = async (caught: unknown) => {
+    if (
+      caught instanceof EmployeeContractServiceError &&
+      caught.code === 'mutation-conflict'
+    ) {
+      try {
+        await reloadCurrentState();
+      } catch {
+        setError(t.employees.contracts.errors.contractReadFailure);
+        return;
+      }
+    }
+    setError(contractErrorMessage(caught, t));
+  };
 
   const beginCreate = () => {
     setEditing('new');
@@ -132,23 +206,31 @@ export function EmployeeContractsDialog({
       },
       contracts,
     );
-    if (!startDate || issues.length > 0) {
-      setError(t.employees.contracts.validation);
+    if (!startDate) {
+      setError(t.employees.contracts.errors.missingDate);
+      return;
+    }
+    if (issues.length > 0) {
+      setError(contractValidationMessage(issues[0]?.code, t));
       return;
     }
     setBusy(true);
     setError(null);
     try {
       if (editing === 'new') {
-        await onCreate({
-          sequenceId:
-            ended && ended.sequenceId === latest?.sequenceId
-              ? `sequence-${Date.now()}`
-              : (latest?.sequenceId ?? `sequence-${Date.now()}`),
-          startDate,
-          endDate: endDate || null,
-          note: note.trim() || null,
-        });
+        await onCreate(
+          currentEmployee.id,
+          {
+            sequenceId:
+              ended && ended.sequenceId === latest?.sequenceId
+                ? `sequence-${Date.now()}`
+                : (latest?.sequenceId ?? `sequence-${Date.now()}`),
+            startDate,
+            endDate: endDate || null,
+            note: note.trim() || null,
+          },
+          contractState.revision,
+        );
       } else if (editing) {
         if (impact?.action !== 'update' || impact.contractId !== editing.id) {
           const value = await onPreviewUpdate(editing, {
@@ -160,18 +242,22 @@ export function EmployeeContractsDialog({
           return;
         }
         if (impact.value.lockedMonths.length > 0) return;
-        await onUpdate(editing, {
-          startDate,
-          endDate: endDate || null,
-          note: note.trim() || null,
-        });
+        await onUpdate(
+          currentEmployee.id,
+          editing.id,
+          {
+            startDate,
+            endDate: endDate || null,
+            note: note.trim() || null,
+          },
+          contractState.revision,
+        );
       }
+      await reloadCurrentState();
       setEditing(null);
       setImpact(null);
     } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : t.employees.contracts.error,
-      );
+      await recoverFromMutationError(caught);
     } finally {
       setBusy(false);
     }
@@ -185,9 +271,7 @@ export function EmployeeContractsDialog({
       setCancellationTarget(contract);
       setImpact({ action: 'cancel', contractId: contract.id, value });
     } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : t.employees.contracts.error,
-      );
+      setError(contractErrorMessage(caught, t));
     } finally {
       setBusy(false);
     }
@@ -205,13 +289,16 @@ export function EmployeeContractsDialog({
     setBusy(true);
     setError(null);
     try {
-      await onCancelContract(cancellationTarget);
+      await onCancelContract(
+        currentEmployee.id,
+        cancellationTarget.id,
+        contractState.revision,
+      );
+      await reloadCurrentState();
       setCancellationTarget(null);
       setImpact(null);
     } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : t.employees.contracts.error,
-      );
+      await recoverFromMutationError(caught);
     } finally {
       setBusy(false);
     }
@@ -222,15 +309,31 @@ export function EmployeeContractsDialog({
     setBusy(true);
     setError(null);
     try {
-      await onEndEmployment({
-        sequenceId: latest.sequenceId,
-        endDate: latest.endDate,
-        reason: reason.trim() || null,
-      });
-    } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : t.employees.contracts.error,
+      await onEndEmployment(
+        currentEmployee.id,
+        {
+          sequenceId: latest.sequenceId,
+          endDate: latest.endDate,
+          reason: reason.trim() || null,
+        },
+        contractState.revision,
       );
+      await reloadCurrentState();
+    } catch (caught) {
+      await recoverFromMutationError(caught);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const migrateLegacy = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await onBootstrapLegacy(currentEmployee.id, contractState.revision);
+      await reloadCurrentState();
+    } catch (caught) {
+      await recoverFromMutationError(caught);
     } finally {
       setBusy(false);
     }
@@ -239,25 +342,29 @@ export function EmployeeContractsDialog({
   return (
     <Dialog open onClose={onClose} fullWidth maxWidth="md">
       <DialogTitle>
-        {t.employees.contracts.title}: {employee.firstName} {employee.lastName}
+        {t.employees.contracts.title}: {currentEmployee.firstName}{' '}
+        {currentEmployee.lastName}
       </DialogTitle>
       <DialogContent>
         <Stack spacing={2} sx={{ pt: 1 }}>
-          {requiresContractDecision(employee) ? (
+          {refreshing ? (
+            <Alert severity="info">{t.employees.contracts.refreshing}</Alert>
+          ) : null}
+          {requiresContractDecision(currentEmployee) ? (
             <Alert severity="error">
               {t.employees.contracts.decisionRequired}
             </Alert>
           ) : null}
           {error ? <Alert severity="error">{error}</Alert> : null}
-          {contracts.length === 0 && employee.employmentStartDate ? (
+          {contracts.length === 0 && currentEmployee.employmentStartDate ? (
             <Alert
               severity="info"
               action={
                 <Button
                   color="inherit"
                   size="small"
-                  disabled={busy}
-                  onClick={() => void onBootstrapLegacy()}
+                  disabled={busy || refreshing}
+                  onClick={() => void migrateLegacy()}
                 >
                   {t.employees.contracts.migrate}
                 </Button>
@@ -270,6 +377,7 @@ export function EmployeeContractsDialog({
             <Button
               variant="contained"
               startIcon={<AddOutlined />}
+              disabled={busy || refreshing}
               onClick={beginCreate}
             >
               {contracts.length
@@ -332,7 +440,7 @@ export function EmployeeContractsDialog({
                 </Button>
                 <Button
                   variant="contained"
-                  disabled={busy}
+                  disabled={busy || refreshing}
                   onClick={() => void saveContract()}
                 >
                   {t.employees.contracts.save}
@@ -380,6 +488,7 @@ export function EmployeeContractsDialog({
                     <TableCell align="right">
                       <IconButton
                         aria-label={t.employees.contracts.edit}
+                        disabled={busy || refreshing}
                         onClick={() => beginEdit(contract)}
                       >
                         <EditOutlined />
@@ -387,7 +496,7 @@ export function EmployeeContractsDialog({
                       <IconButton
                         color="error"
                         aria-label={t.employees.contracts.remove}
-                        disabled={busy}
+                        disabled={busy || refreshing}
                         onClick={() => void previewCancellation(contract)}
                       >
                         <PersonOffOutlined />
@@ -407,7 +516,7 @@ export function EmployeeContractsDialog({
                 sx={{ justifyContent: 'flex-end' }}
               >
                 <Button
-                  disabled={busy}
+                  disabled={busy || refreshing}
                   onClick={() => {
                     setCancellationTarget(null);
                     setImpact(null);
@@ -418,7 +527,9 @@ export function EmployeeContractsDialog({
                 <Button
                   color="error"
                   variant="contained"
-                  disabled={busy || impact.value.lockedMonths.length > 0}
+                  disabled={
+                    busy || refreshing || impact.value.lockedMonths.length > 0
+                  }
                   onClick={() => void confirmCancellation()}
                 >
                   {t.employees.contracts.confirmCancellation}
@@ -445,7 +556,7 @@ export function EmployeeContractsDialog({
               <Button
                 color="error"
                 variant="outlined"
-                disabled={busy}
+                disabled={busy || refreshing}
                 onClick={() => void finishEmployment()}
               >
                 {t.employees.contracts.endEmployment}
@@ -459,6 +570,50 @@ export function EmployeeContractsDialog({
       </DialogActions>
     </Dialog>
   );
+}
+
+type ContractTranslations = ReturnType<typeof useTranslations>;
+
+// Exported for focused validation tests; the component remains the only UI consumer.
+// eslint-disable-next-line react-refresh/only-export-components
+export function contractValidationMessage(
+  code: 'invalid-range' | 'duplicate' | 'overlap' | undefined,
+  t: ContractTranslations,
+): string {
+  if (code === 'overlap') return t.employees.contracts.errors.overlap;
+  if (code === 'duplicate') return t.employees.contracts.errors.duplicate;
+  if (code === 'invalid-range') {
+    return t.employees.contracts.errors.invalidRange;
+  }
+  return t.employees.contracts.validation;
+}
+
+// eslint-disable-next-line react-refresh/only-export-components
+export function contractErrorMessage(
+  error: unknown,
+  t: ContractTranslations,
+): string {
+  if (!(error instanceof EmployeeContractServiceError)) {
+    return t.employees.contracts.error;
+  }
+  switch (error.code) {
+    case 'overlapping-contract':
+      return t.employees.contracts.errors.overlap;
+    case 'duplicate-contract':
+      return t.employees.contracts.errors.duplicate;
+    case 'invalid-contract':
+      return t.employees.contracts.errors.invalidRange;
+    case 'locked-month':
+      return t.employees.contracts.errors.lockedMonth;
+    case 'contract-read-failure':
+      return t.employees.contracts.errors.contractReadFailure;
+    case 'mutation-conflict':
+      return t.employees.contracts.errors.mutationConflict;
+    case 'invalid-employment-end':
+      return t.employees.contracts.errors.invalidEmploymentEnd;
+    default:
+      return t.employees.contracts.error;
+  }
 }
 
 function ContractImpactAlert({

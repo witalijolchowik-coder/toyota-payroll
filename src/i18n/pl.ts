@@ -609,6 +609,22 @@ export const pl = {
       validation:
         'Popraw zakres umowy. Umowy nie mogą się pokrywać ani powtarzać.',
       error: 'Nie udało się zapisać historii umów.',
+      refreshing: 'Odświeżanie aktualnej historii umów…',
+      errors: {
+        overlap: 'Nowa umowa nakłada się na istniejącą umowę.',
+        duplicate: 'Taka umowa już istnieje.',
+        invalidRange:
+          'Data zakończenia umowy nie może być wcześniejsza niż data rozpoczęcia.',
+        missingDate: 'Podaj datę rozpoczęcia umowy.',
+        lockedMonth:
+          'Zmiana obejmuje zablokowany miesiąc. Najpierw odblokuj miesiąc.',
+        contractReadFailure:
+          'Nie udało się odczytać aktualnej historii umów. Spróbuj ponownie.',
+        mutationConflict:
+          'Historia umów została zmieniona w innym miejscu. Dane odświeżono — sprawdź je i ponów operację.',
+        invalidEmploymentEnd:
+          'Nie można zakończyć zatrudnienia dla nieaktualnej umowy. Historia umów została odświeżona.',
+      },
       editImpact: 'Wpływ korekty umowy',
       cancellationImpact: 'Wpływ anulowania błędnej umowy',
       openMonths: 'Otwarte miesiące do ponownego przeliczenia',

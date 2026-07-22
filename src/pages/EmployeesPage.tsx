@@ -47,6 +47,7 @@ import type {
   EmployeeCreateInput,
   EmployeeEntitlement,
   EmployeeEntitlementCreateInput,
+  EmployeeId,
 } from '../types/firestore';
 
 type EmployeeFormState =
@@ -72,6 +73,7 @@ export function EmployeesPage() {
     previewContractCancellation,
     endEmployment,
     migrateLegacyContract,
+    reloadEmployeeContracts,
   } = useEmployees();
   const {
     departments,
@@ -106,8 +108,15 @@ export function EmployeesPage() {
     employee: Employee;
     currentAccommodation: EmployeeEntitlement | null;
   } | null>(null);
-  const [contractsEmployee, setContractsEmployee] = useState<Employee | null>(
-    null,
+  const [contractsEmployeeId, setContractsEmployeeId] =
+    useState<EmployeeId | null>(null);
+  const contractsEmployee = useMemo(
+    () =>
+      contractsEmployeeId
+        ? (employees.find((employee) => employee.id === contractsEmployeeId) ??
+          null)
+        : null,
+    [contractsEmployeeId, employees],
   );
 
   const filteredEmployees = useMemo(() => {
@@ -247,14 +256,20 @@ export function EmployeesPage() {
   const hasFilters = Boolean(search.trim()) || status !== 'active';
 
   useEffect(() => {
-    const contractsEmployeeId = searchParams.get('contractsEmployeeId');
-    if (contractsEmployeeId && employees.length > 0 && !contractsEmployee) {
+    const requestedContractsEmployeeId = searchParams.get(
+      'contractsEmployeeId',
+    );
+    if (
+      requestedContractsEmployeeId &&
+      employees.length > 0 &&
+      !contractsEmployeeId
+    ) {
       const employee = employees.find(
-        (candidate) => candidate.id === contractsEmployeeId,
+        (candidate) => candidate.id === requestedContractsEmployeeId,
       );
       if (employee) {
         queueMicrotask(() => {
-          setContractsEmployee(employee);
+          setContractsEmployeeId(employee.id);
           const next = new URLSearchParams(searchParams);
           next.delete('contractsEmployeeId');
           setSearchParams(next, { replace: true });
@@ -278,7 +293,13 @@ export function EmployeesPage() {
       next.delete('editEmployeeId');
       setSearchParams(next, { replace: true });
     });
-  }, [contractsEmployee, employees, formState, searchParams, setSearchParams]);
+  }, [
+    contractsEmployeeId,
+    employees,
+    formState,
+    searchParams,
+    setSearchParams,
+  ]);
 
   return (
     <Stack spacing={3}>
@@ -342,7 +363,7 @@ export function EmployeesPage() {
             }
             onEdit={(employee) => setFormState({ mode: 'edit', employee })}
             onDeactivate={setDeactivationTarget}
-            onContracts={setContractsEmployee}
+            onContracts={(employee) => setContractsEmployeeId(employee.id)}
             entitlements={entitlements}
             onAccommodation={(employee, currentAccommodation) =>
               setAccommodationState({ employee, currentAccommodation })
@@ -377,28 +398,26 @@ export function EmployeesPage() {
 
       {contractsEmployee ? (
         <EmployeeContractsDialog
-          employee={
-            employees.find(
-              (employee) => employee.id === contractsEmployee.id,
-            ) ?? contractsEmployee
-          }
-          onClose={() => setContractsEmployee(null)}
-          onCreate={async (input) => {
-            await addContract(contractsEmployee, input);
+          key={contractsEmployee.id}
+          employee={contractsEmployee}
+          onClose={() => setContractsEmployeeId(null)}
+          onReload={reloadEmployeeContracts}
+          onCreate={async (employeeId, input, revision) => {
+            await addContract(employeeId, input, revision);
           }}
-          onUpdate={async (contract, input) => {
-            await editContract(contractsEmployee, contract, input);
+          onUpdate={async (employeeId, contractId, input, revision) => {
+            await editContract(employeeId, contractId, input, revision);
           }}
-          onCancelContract={(contract) =>
-            cancelContract(contractsEmployee, contract)
+          onCancelContract={(employeeId, contractId, revision) =>
+            cancelContract(employeeId, contractId, revision)
           }
           onPreviewUpdate={previewContractEdit}
           onPreviewCancellation={previewContractCancellation}
-          onEndEmployment={async (input) => {
-            await endEmployment(contractsEmployee, input);
+          onEndEmployment={async (employeeId, input, revision) => {
+            await endEmployment(employeeId, input, revision);
           }}
-          onBootstrapLegacy={async () => {
-            await migrateLegacyContract(contractsEmployee);
+          onBootstrapLegacy={async (employeeId, revision) => {
+            await migrateLegacyContract(employeeId, revision);
           }}
         />
       ) : null}

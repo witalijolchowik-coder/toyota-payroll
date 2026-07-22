@@ -7,6 +7,7 @@ import type {
 import {
   calculateEmploymentLimit,
   contractBreakDays,
+  employeeContractHistoryRevision,
   employeeContractsOverlapRange,
   isDateCoveredByContracts,
   isRangeFullyCoveredByContracts,
@@ -103,6 +104,35 @@ describe('employee contract history', () => {
         existing,
       )[0]?.code,
     ).toBe('overlap');
+  });
+
+  it('changes the canonical revision after edit, create or cancellation and ignores cancelled overlaps', () => {
+    const openEnded = employee([contract('legacy', '2026-04-24', null)]);
+    const edited = employee([contract('legacy', '2026-04-24', '2026-05-31')]);
+    const created = employee([
+      contract('legacy', '2026-04-24', '2026-05-31'),
+      contract('next', '2026-06-01', '2026-08-31'),
+    ]);
+    const cancelled = employee([
+      contract('legacy', '2026-04-24', '2026-05-31'),
+      { ...contract('next', '2026-06-01', '2026-08-31'), status: 'CANCELLED' },
+    ]);
+
+    expect(employeeContractHistoryRevision(openEnded)).not.toBe(
+      employeeContractHistoryRevision(edited),
+    );
+    expect(employeeContractHistoryRevision(edited)).not.toBe(
+      employeeContractHistoryRevision(created),
+    );
+    expect(employeeContractHistoryRevision(created)).not.toBe(
+      employeeContractHistoryRevision(cancelled),
+    );
+    expect(
+      validateEmployeeContract(
+        contract('replacement', '2026-06-01', '2026-08-31'),
+        cancelled.contracts,
+      ),
+    ).toEqual([]);
   });
 
   it('resolves the contract covering today and keeps a future continuation separate', () => {

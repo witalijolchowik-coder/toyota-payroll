@@ -27,6 +27,32 @@ export interface LegacyContractMigrationPlan {
   restoreOperationalActive: boolean;
 }
 
+export function employeeContractHistoryRevision(
+  employee: Pick<Employee, 'contracts' | 'employmentEndEvents'>,
+): string {
+  const contracts = [...(employee.contracts ?? [])]
+    .sort((first, second) => first.id.localeCompare(second.id))
+    .map((contract) => [
+      contract.id,
+      contract.sequenceId,
+      contract.startDate,
+      contract.endDate,
+      contract.status,
+      contract.updatedAt?.toISOString() ?? null,
+    ]);
+  const endEvents = [...(employee.employmentEndEvents ?? [])]
+    .sort((first, second) => first.id.localeCompare(second.id))
+    .map((event) => [
+      event.id,
+      event.sequenceId,
+      event.endDate,
+      event.status,
+      event.updatedAt?.toISOString() ?? null,
+    ]);
+
+  return JSON.stringify({ contracts, endEvents });
+}
+
 function isoDate(value: Date): IsoDate {
   return value.toISOString().slice(0, 10);
 }

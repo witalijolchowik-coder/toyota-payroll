@@ -162,7 +162,7 @@ export function subscribeToEmployees(
           )
           .forEach((employee) => {
             migrationsStarted.add(employee.id);
-            void bootstrapLegacyEmployeeContract(employee).catch((error) => {
+            void bootstrapLegacyEmployeeContract(employee.id).catch((error) => {
               migrationsStarted.delete(employee.id);
               console.error('Legacy contract migration failed', error);
             });

@@ -62,7 +62,7 @@ export async function createEmployeesFromTemplatePreview(
     let employee = syntheticImportedEmployee(employeeId, row);
     for (const imported of row.importedContracts.slice(1)) {
       const sequenceId = importedContractSequenceId(employee, imported);
-      const id = await createEmployeeContract(employee, {
+      const id = await createEmployeeContract(employee.id, {
         sequenceId,
         startDate: imported.startDate,
         endDate: imported.endDate,
@@ -327,7 +327,7 @@ async function applyImportedContractChanges(
     if (change.kind === 'untouched') continue;
     if (!change.imported) continue;
     if (change.kind === 'update' && change.existing) {
-      await updateEmployeeContract(employee, change.existing, {
+      await updateEmployeeContract(employee.id, change.existing.id, {
         startDate: change.imported.startDate,
         endDate: change.imported.endDate,
         note: change.existing.note,
@@ -353,7 +353,7 @@ async function applyImportedContractChanges(
       continue;
     }
     const sequenceId = importedContractSequenceId(employee, change.imported);
-    const id = await createEmployeeContract(employee, {
+    const id = await createEmployeeContract(employee.id, {
       sequenceId,
       startDate: change.imported.startDate,
       endDate: change.imported.endDate,

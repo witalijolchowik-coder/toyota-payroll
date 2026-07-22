@@ -12,10 +12,12 @@ import {
   bootstrapLegacyEmployeeContract,
   createEmployeeContract,
   endEmployeeEmployment,
+  loadEmployeeContractState,
   previewEmployeeContractImpact,
   updateEmployeeContract,
 } from '../../services/employeeContractsService';
 import type { EmployeeContractImpact } from '../../services/employeeContractsService';
+import type { EmployeeContractState } from '../../services/employeeContractsService';
 import type {
   Employee,
   EmployeeCreateInput,
@@ -88,29 +90,39 @@ export function useEmployees() {
 
   const addContract = useCallback(
     (
-      employee: Employee,
+      employeeId: EmployeeId,
       input: {
         sequenceId: string;
         startDate: string;
         endDate: string | null;
         note: string | null;
       },
-    ) => runMutation(() => createEmployeeContract(employee, input)),
+      expectedRevision: string,
+    ) =>
+      runMutation(() =>
+        createEmployeeContract(employeeId, input, expectedRevision),
+      ),
     [runMutation],
   );
 
   const editContract = useCallback(
     (
-      employee: Employee,
-      contract: EmployeeContract,
+      employeeId: EmployeeId,
+      contractId: string,
       input: EmployeeContractUpdateInput,
-    ) => runMutation(() => updateEmployeeContract(employee, contract, input)),
+      expectedRevision: string,
+    ) =>
+      runMutation(() =>
+        updateEmployeeContract(employeeId, contractId, input, expectedRevision),
+      ),
     [runMutation],
   );
 
   const cancelContract = useCallback(
-    (employee: Employee, contract: EmployeeContract) =>
-      runMutation(() => cancelEmployeeContract(employee, contract)),
+    (employeeId: EmployeeId, contractId: string, expectedRevision: string) =>
+      runMutation(() =>
+        cancelEmployeeContract(employeeId, contractId, expectedRevision),
+      ),
     [runMutation],
   );
 
@@ -134,18 +146,29 @@ export function useEmployees() {
 
   const endEmployment = useCallback(
     (
-      employee: Employee,
+      employeeId: EmployeeId,
       input: {
         sequenceId: string;
         endDate: string;
         reason: string | null;
       },
-    ) => runMutation(() => endEmployeeEmployment(employee, input)),
+      expectedRevision: string,
+    ) =>
+      runMutation(() =>
+        endEmployeeEmployment(employeeId, input, expectedRevision),
+      ),
     [runMutation],
   );
   const migrateLegacyContract = useCallback(
-    (employee: Employee) =>
-      runMutation(() => bootstrapLegacyEmployeeContract(employee)),
+    (employeeId: EmployeeId, expectedRevision: string) =>
+      runMutation(() =>
+        bootstrapLegacyEmployeeContract(employeeId, expectedRevision),
+      ),
+    [runMutation],
+  );
+  const reloadEmployeeContracts = useCallback(
+    (employeeId: EmployeeId): Promise<EmployeeContractState> =>
+      runMutation(() => loadEmployeeContractState(employeeId)),
     [runMutation],
   );
 
@@ -161,5 +184,6 @@ export function useEmployees() {
     previewContractCancellation,
     endEmployment,
     migrateLegacyContract,
+    reloadEmployeeContracts,
   };
 }
