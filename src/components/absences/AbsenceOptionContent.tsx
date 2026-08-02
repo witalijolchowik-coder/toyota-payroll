@@ -1,4 +1,5 @@
-import { Box, MenuItem, Typography } from '@mui/material';
+import { forwardRef } from 'react';
+import { Box, MenuItem, type MenuItemProps, Typography } from '@mui/material';
 
 import { useCalendarAppearance } from '../../hooks/useCalendarAppearance';
 import type { AbsenceCode } from '../../utils/absences';
@@ -9,7 +10,8 @@ interface AbsenceOptionContentProps {
   description: string;
 }
 
-type AbsenceMenuItemProps = AbsenceOptionContentProps;
+type AbsenceMenuItemProps = AbsenceOptionContentProps &
+  Omit<MenuItemProps, 'value'>;
 
 export function AbsenceOptionContent({
   code,
@@ -62,10 +64,19 @@ export function AbsenceOptionContent({
   );
 }
 
-export function AbsenceMenuItem({ code, description }: AbsenceMenuItemProps) {
-  return (
-    <MenuItem value={code} sx={{ minHeight: 44 }}>
-      <AbsenceOptionContent code={code} description={description} />
-    </MenuItem>
-  );
-}
+export const AbsenceMenuItem = forwardRef<HTMLLIElement, AbsenceMenuItemProps>(
+  function AbsenceMenuItem({ code, description, sx, ...menuItemProps }, ref) {
+    return (
+      <MenuItem
+        {...menuItemProps}
+        ref={ref}
+        value={code}
+        sx={[{ minHeight: 44 }, ...(Array.isArray(sx) ? sx : [sx])].filter(
+          Boolean,
+        )}
+      >
+        <AbsenceOptionContent code={code} description={description} />
+      </MenuItem>
+    );
+  },
+);

@@ -1,11 +1,11 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 
 import { CalendarAppearanceContext } from '../../contexts/CalendarAppearanceContext';
 import {
   DEFAULT_CALENDAR_APPEARANCE,
   type CalendarAppearancePalette,
 } from '../../utils/calendarAppearance';
-import { AbsenceOptionContent } from './AbsenceOptionContent';
+import { AbsenceMenuItem, AbsenceOptionContent } from './AbsenceOptionContent';
 
 describe('AbsenceOptionContent', () => {
   it('uses the configured calendar colors only on the canonical code', () => {
@@ -46,5 +46,23 @@ describe('AbsenceOptionContent', () => {
       color: DEFAULT_CALENDAR_APPEARANCE.uw.text,
       backgroundColor: DEFAULT_CALENDAR_APPEARANCE.uw.background,
     });
+  });
+
+  it('forwards selection handlers injected by Material UI Select', () => {
+    const onClick = vi.fn();
+
+    render(
+      <AbsenceMenuItem
+        code="UW"
+        description="Urlop wypoczynkowy"
+        onClick={onClick}
+        role="option"
+      />,
+    );
+
+    const option = screen.getByRole('option');
+    fireEvent.click(option);
+
+    expect(onClick).toHaveBeenCalledOnce();
   });
 });
