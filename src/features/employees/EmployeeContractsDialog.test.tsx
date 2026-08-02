@@ -196,10 +196,12 @@ describe('EmployeeContractsDialog canonical contract session', () => {
 
     await waitFor(() =>
       expect(
-        screen.getByText('ZakoĹ„cz zatrudnienie wczeĹ›niej'),
+        screen.getByText(pl.employees.contracts.endEmploymentEarly),
       ).toBeVisible(),
     );
-    expect(screen.getByLabelText('Ostatni dzieĹ„ zatrudnienia')).toBeEnabled();
+    expect(
+      screen.getByLabelText(pl.employees.contracts.endEmploymentDate),
+    ).toBeEnabled();
   });
 
   it('edits an open-ended legacy contract and adds its continuation without reopening', async () => {

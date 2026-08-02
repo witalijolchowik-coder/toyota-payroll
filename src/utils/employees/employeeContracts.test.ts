@@ -94,9 +94,9 @@ describe('employee contract history', () => {
     ]);
     expect(
       planEmploymentTermination(
-        employee(value.contracts, [endEvent('sequence-current', '2026-07-15')]),
+        employee(value.contracts, [endEvent('sequence-current', '2026-10-15')]),
         'sequence-current',
-        '2026-07-15',
+        '2026-10-15',
       ),
     ).toBeNull();
   });
