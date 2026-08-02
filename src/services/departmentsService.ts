@@ -50,6 +50,12 @@ export function canonicalDepartmentsFallback(): Department[] {
   }));
 }
 
+export function canonicalDepartmentsToSeed(existingIds: ReadonlySet<string>) {
+  return CANONICAL_DEPARTMENTS.filter(
+    (department) => !existingIds.has(department.id),
+  );
+}
+
 function requireContext() {
   const repositories = getFirestoreRepositories();
   if (!repositories) {
@@ -120,7 +126,7 @@ export async function createDepartment(
 
   await setDoc(doc(repositories.departments, normalized.id), {
     name: canonical.uiName,
-    shift_mode: canonical.shiftMode,
+    shift_mode: normalized.shiftMode,
     active: normalized.active,
     rotation_anchor_week_start: canonical.rotationAnchor.weekStartIsoDate,
     rotation_base_assignment: canonical.rotationAnchor.baseAssignment,
@@ -165,26 +171,20 @@ async function ensureCanonicalDepartments({
   const existingIds = new Set(snapshot.docs.map((document) => document.id));
 
   await Promise.all(
-    CANONICAL_DEPARTMENTS.map((department) => {
+    canonicalDepartmentsToSeed(existingIds).map((department) => {
       const data = {
         name: department.uiName,
         shift_mode: department.shiftMode,
         active: true,
         rotation_anchor_week_start: department.rotationAnchor.weekStartIsoDate,
         rotation_base_assignment: department.rotationAnchor.baseAssignment,
+        created_at: serverTimestamp(),
+        created_by: uid,
         updated_at: serverTimestamp(),
         updated_by: uid,
-        ...(existingIds.has(department.id)
-          ? {}
-          : {
-              created_at: serverTimestamp(),
-              created_by: uid,
-            }),
       };
 
-      return setDoc(doc(repositories.departments, department.id), data, {
-        merge: true,
-      });
+      return setDoc(doc(repositories.departments, department.id), data);
     }),
   );
 }
