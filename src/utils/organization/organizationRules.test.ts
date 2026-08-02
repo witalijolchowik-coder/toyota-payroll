@@ -1,6 +1,10 @@
 import {
   allowedColorShiftsForMode,
   CANONICAL_DEPARTMENT_IDS,
+  CANONICAL_DEPARTMENTS,
+  canonicalDepartmentFunctionalGroup,
+  canonicalDepartmentOfficialName,
+  canonicalDepartmentUiName,
   colorShiftLabelKey,
   departmentKeyFromName,
   isDepartmentShiftMode,
@@ -17,27 +21,36 @@ describe('department and shift organization rules', () => {
     expect(departmentKeyFromName(' Szwalnia ')).toBe('szwalnia');
   });
 
-  it('contains only canonical MVP departments', () => {
+  it('contains exactly the seven final canonical departments with stable unique IDs', () => {
     expect(CANONICAL_DEPARTMENT_IDS).toEqual([
-      'metal',
-      'szwalnia',
-      'montaz',
-      'pu',
-      'headliner',
+      'montaz-toyota',
+      'headliner-bmw',
+      'pu-toyota',
+      'szwalnia-toyota',
+      'metal-402b',
+      'metal-936b',
       'magazyn',
     ]);
+    expect(new Set(CANONICAL_DEPARTMENT_IDS).size).toBe(7);
+    expect(CANONICAL_DEPARTMENTS).toHaveLength(7);
+    CANONICAL_DEPARTMENTS.forEach((department) => {
+      expect(department.officialName).toBeTruthy();
+      expect(department.uiName).toBeTruthy();
+      expect(department.functionalGroup).toBeTruthy();
+    });
     expect(CANONICAL_DEPARTMENT_IDS).not.toContain('lakiernia');
     expect(CANONICAL_DEPARTMENT_IDS).not.toContain('pen');
     expect(CANONICAL_DEPARTMENT_IDS).not.toContain('podsufitki');
   });
 
   it.each([
-    [' Metal ', 'metal'],
-    ['szwalnia', 'szwalnia'],
-    ['MONTAZ', 'montaz'],
-    ['Montaż', 'montaz'],
-    ['PU', 'pu'],
-    ['Headliner', 'headliner'],
+    ['MFG Toyota Metal 402B', 'metal-402b'],
+    ['Metal 936B', 'metal-936b'],
+    ['szwalnia', 'szwalnia-toyota'],
+    ['MONTAZ', 'montaz-toyota'],
+    ['Montaż Toyota', 'montaz-toyota'],
+    ['PU', 'pu-toyota'],
+    ['Headliner', 'headliner-bmw'],
     ['magazyn', 'magazyn'],
   ])('safely resolves canonical department %s', (raw, expectedId) => {
     expect(resolveCanonicalDepartment(raw)).toMatchObject({
@@ -53,6 +66,25 @@ describe('department and shift organization rules', () => {
     expect(resolveCanonicalDepartment('Lakiernia')).toEqual({
       status: 'unknown',
     });
+    expect(resolveCanonicalDepartment('Metal')).toEqual({
+      status: 'ambiguous-legacy-metal',
+    });
+    expect(resolveCanonicalDepartment('Nowy projekt')).toEqual({
+      status: 'unknown',
+    });
+  });
+
+  it('separates UI, official and functional names without merging Metal lines', () => {
+    expect(canonicalDepartmentUiName('metal-402b')).toBe('Metal 402B');
+    expect(canonicalDepartmentOfficialName('metal-402b')).toBe(
+      'MFG Toyota Metal 402B',
+    );
+    expect(canonicalDepartmentFunctionalGroup('metal-402b')).toBe('METAL');
+    expect(canonicalDepartmentFunctionalGroup('metal-936b')).toBe('METAL');
+    expect(canonicalDepartmentUiName('metal-936b')).toBe('Metal 936B');
+    expect(canonicalDepartmentUiName('metal-402b')).not.toBe(
+      canonicalDepartmentUiName('metal-936b'),
+    );
   });
 
   it('recognizes only supported employee color shifts', () => {

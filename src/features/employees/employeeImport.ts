@@ -573,7 +573,10 @@ function resolveDepartment(
   > | null;
 } {
   const resolution = resolveCanonicalDepartment(sourceDepartmentName);
-  if (resolution.status === 'unknown') {
+  if (
+    resolution.status === 'unknown' ||
+    resolution.status === 'ambiguous-legacy-metal'
+  ) {
     return { id: null, name: null, warning: 'department-unmapped' };
   }
   if (resolution.status === 'unresolved-na0') {

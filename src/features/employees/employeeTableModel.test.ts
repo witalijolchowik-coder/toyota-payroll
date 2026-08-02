@@ -114,12 +114,27 @@ describe('employee table model', () => {
   });
 
   it('uses canonical department order and department-first shift sorting', () => {
-    const departments = [department('metal', 'Metal'), department('pu', 'PU')];
+    const departments = [
+      department('metal-402b', 'Metal 402B'),
+      department('pu-toyota', 'PU Toyota'),
+    ];
     const result = sortEmployees(
       [
-        employee({ id: '1', departmentId: 'pu', shiftAssignment: 'RED' }),
-        employee({ id: '2', departmentId: 'metal', shiftAssignment: 'WHITE' }),
-        employee({ id: '3', departmentId: 'metal', shiftAssignment: 'RED' }),
+        employee({
+          id: '1',
+          departmentId: 'pu-toyota',
+          shiftAssignment: 'RED',
+        }),
+        employee({
+          id: '2',
+          departmentId: 'metal-402b',
+          shiftAssignment: 'WHITE',
+        }),
+        employee({
+          id: '3',
+          departmentId: 'metal-402b',
+          shiftAssignment: 'RED',
+        }),
       ],
       departments,
       { key: 'shift', direction: 'asc' },

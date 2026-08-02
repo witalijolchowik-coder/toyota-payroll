@@ -105,17 +105,21 @@ Firestore does not provide unique field constraints. TETA uniqueness therefore r
 
 ## Departments and employee color shifts
 
-Departments are editable reference documents under `/departments`. Employee
-documents store stable `department_id` and optional `shift_assignment`
+Departments are fixed canonical reference documents under `/departments`.
+Employee documents store stable `department_id` and optional `shift_assignment`
 (`RED`, `WHITE`, `BLUE`, or `null`).
 
 These fields describe current coordination context. They do not decide
 payroll-month participation and they are not duplicated into operational
 attendance, absence, adjustment, import or settlement documents.
 
-The MVP canonical department set is limited to Metal, Szwalnia, Montaż, PU,
-Headliner and Magazyn. `NA0` is not a department and remains an unresolved
-manual-assignment issue.
+The current canonical set contains exactly `montaz-toyota`, `headliner-bmw`,
+`pu-toyota`, `szwalnia-toyota`, `metal-402b`, `metal-936b` and `magazyn`.
+Each registry entry owns an official output name, a shorter UI label and a
+functional group. Generic legacy `Metal` is ambiguous and cannot be mapped
+without a source assignment. `NA0` is not a department and remains an
+unresolved manual-assignment issue. See
+[Canonical departments and July 2026 assignment migration](../business-rules/canonical-departments-migration.md).
 
 Department documents may store a local rotation anchor:
 

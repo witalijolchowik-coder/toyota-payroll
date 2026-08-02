@@ -45,25 +45,25 @@ describe('employee template import', () => {
           '',
           '2026-06-03',
           '2026-12-31',
-          'Metal',
+          'Metal 402B',
           'RED',
         ],
       ]),
       [],
-      [department('metal', 'Metal')],
+      [department('metal-402b', 'Metal 402B')],
     );
 
     expect(preview[0]).toMatchObject({
       status: 'new',
       tetaNumber: 'WT-001',
       pesel: '81010112345',
-      departmentId: 'metal',
+      departmentId: 'metal-402b',
       shiftAssignment: 'RED',
     });
     expect(preview[0].createInput).toMatchObject({
       tetaNumber: 'WT-001',
       pesel: '81010112345',
-      departmentId: 'metal',
+      departmentId: 'metal-402b',
       shiftAssignment: 'RED',
     });
   });
@@ -171,7 +171,7 @@ describe('employee template import', () => {
         ],
       ]),
       [],
-      [department('metal', 'Metal')],
+      [department('metal-402b', 'Metal 402B')],
     );
 
     expect(preview[0].departmentId).toBeNull();
@@ -195,7 +195,10 @@ describe('employee template import', () => {
         ],
       ]),
       [],
-      [department('pu', 'PU'), department('headliner', 'Headliner')],
+      [
+        department('pu-toyota', 'PU Toyota'),
+        department('headliner-bmw', 'Headliner BMW'),
+      ],
     );
 
     expect(preview[0].departmentId).toBeNull();
@@ -203,9 +206,11 @@ describe('employee template import', () => {
   });
 
   it.each([
-    ['MONTAZ', 'montaz'],
-    ['PU', 'pu'],
-    ['Headliner', 'headliner'],
+    ['MONTAZ', 'montaz-toyota'],
+    ['PU', 'pu-toyota'],
+    ['Headliner', 'headliner-bmw'],
+    ['Metal 402B', 'metal-402b'],
+    ['MFG Toyota Metal 936B', 'metal-936b'],
     ['magazyn', 'magazyn'],
   ])('matches canonical department %s safely', (rawDepartment, expectedId) => {
     const preview = buildNewEmployeeTemplatePreview(
@@ -224,15 +229,43 @@ describe('employee template import', () => {
       ]),
       [],
       [
-        department('montaz', 'Montaż'),
-        department('pu', 'PU'),
-        department('headliner', 'Headliner'),
+        department('montaz-toyota', 'Montaż Toyota'),
+        department('pu-toyota', 'PU Toyota'),
+        department('headliner-bmw', 'Headliner BMW'),
+        department('metal-402b', 'Metal 402B'),
+        department('metal-936b', 'Metal 936B'),
         department('magazyn', 'Magazyn'),
       ],
     );
 
     expect(preview[0].departmentId).toBe(expectedId);
     expect(preview[0].warnings).not.toContain('department-unmapped');
+  });
+
+  it('does not accept generic legacy Metal as a new assignment', () => {
+    const preview = buildNewEmployeeTemplatePreview(
+      csv([
+        [
+          'WT-001',
+          'Anna',
+          'Kowalska',
+          '',
+          '',
+          '',
+          '2026-06-03',
+          '2026-12-31',
+          'Metal',
+        ],
+      ]),
+      [],
+      [
+        department('metal-402b', 'Metal 402B'),
+        department('metal-936b', 'Metal 936B'),
+      ],
+    );
+
+    expect(preview[0].departmentId).toBeNull();
+    expect(preview[0].warnings).toContain('department-unmapped');
   });
 
   it('keeps unresolved legacy-inactive employees in the operational template', () => {
@@ -266,18 +299,18 @@ describe('employee template import', () => {
       medicalExaminationDate: date('2026-01-02'),
       medicalValidUntil: date('2027-01-02'),
       medicalExaminationType: 'PRODUKCJA' as const,
-      departmentId: 'metal',
+      departmentId: 'metal-402b',
       shiftAssignment: 'RED' as const,
     };
 
     const first = buildEmployeeUpdateTemplateCsv(
       [current],
-      [department('metal', 'Metal')],
+      [department('metal-402b', 'Metal 402B')],
       date('2026-06-10'),
     );
     const second = buildEmployeeUpdateTemplateCsv(
       [current],
-      [department('metal', 'Metal')],
+      [department('metal-402b', 'Metal 402B')],
       date('2026-06-10'),
     );
     const rows = first
@@ -401,7 +434,7 @@ describe('employee template import', () => {
   it('normalizes phone, citizenship, gender and medical data', () => {
     const existing = {
       ...employee('employee-1', 'WT-001'),
-      departmentId: 'metal',
+      departmentId: 'metal-402b',
     };
     const preview = buildBulkEmployeeUpdatePreview(
       updateCsv({
@@ -417,7 +450,7 @@ describe('employee template import', () => {
         'Typ badania lekarskiego': 'Pracownik produkcji',
       }),
       [existing],
-      [department('metal', 'Metal')],
+      [department('metal-402b', 'Metal 402B')],
     );
 
     expect(preview[0].status).toBe('ready');
@@ -474,13 +507,13 @@ describe('employee template import', () => {
 
   it('updates department when safely matched and leaves shift optional', () => {
     const preview = buildBulkEmployeeUpdatePreview(
-      csv([['WT-001', '', '', '', '', '', '', '', 'Metal', '']]),
+      csv([['WT-001', '', '', '', '', '', '', '', 'Metal 936B', '']]),
       [employee('employee-1', 'WT-001')],
-      [department('metal', 'Metal')],
+      [department('metal-936b', 'Metal 936B')],
     );
 
     expect(preview[0].status).toBe('ready');
-    expect(preview[0].updateInput?.departmentId).toBe('metal');
+    expect(preview[0].updateInput?.departmentId).toBe('metal-936b');
     expect(preview[0].updateInput?.shiftAssignment).toBeNull();
   });
 
@@ -488,7 +521,10 @@ describe('employee template import', () => {
     const preview = buildBulkEmployeeUpdatePreview(
       csv([['WT-001', '', '', '', '', '', '', '', 'NA0']]),
       [employee('employee-1', 'WT-001')],
-      [department('pu', 'PU'), department('headliner', 'Headliner')],
+      [
+        department('pu-toyota', 'PU Toyota'),
+        department('headliner-bmw', 'Headliner BMW'),
+      ],
     );
 
     expect(preview[0].status).toBe('no-changes');

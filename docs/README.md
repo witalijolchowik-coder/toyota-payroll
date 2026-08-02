@@ -77,6 +77,9 @@ The attached design history contains several generations of the architecture. Th
 - [Bulk contract import, continuity and overdue decisions](business-rules/contract-bulk-import-continuity.md)
   - five-contract CSV workflow, deterministic matching, locked-month safety,
     continuous coverage and urgent expired-contract handling
+- [Canonical departments and July 2026 assignment migration](business-rules/canonical-departments-migration.md)
+  - seven stable departments, official/UI/functional naming, source-file
+    reconciliation, legacy aliases and safe incomplete employee creation
 
 Approved business-rules specifications govern payroll semantics. Architecture
 documents continue to govern system structure and implementation boundaries.

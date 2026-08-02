@@ -1,5 +1,9 @@
 # ADR 0026: Business settings navigation and shared calendar appearance
 
+The department labels and sort order in this decision are historical. Current
+editable departments and their order come from the shared registry described
+in the [canonical departments migration](../business-rules/canonical-departments-migration.md).
+
 ## Decision
 
 Global settings are divided into four business subsections: **Zmiany i

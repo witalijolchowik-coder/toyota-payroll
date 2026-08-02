@@ -31,41 +31,26 @@ export interface DepartmentRotationAnchor {
 
 export interface CanonicalDepartmentDefinition {
   id: DepartmentId;
-  name: string;
+  officialName: string;
+  uiName: string;
+  functionalGroup: DepartmentFunctionalGroup;
   shiftMode: Exclude<DepartmentShiftMode, 'UNKNOWN'>;
   allowedColorShifts: EmployeeColorShift[];
   rotationAnchor: DepartmentRotationAnchor;
   aliases: string[];
 }
 
+export type DepartmentFunctionalGroup =
+  'METAL' | 'SZWALNIA' | 'MONTAZ' | 'PU' | 'HEADLINER' | 'MAGAZYN';
+
 const DEFAULT_ROTATION_WEEK_START = '2026-01-05' as IsoDate;
 
 export const CANONICAL_DEPARTMENTS: readonly CanonicalDepartmentDefinition[] = [
   {
-    id: 'metal',
-    name: 'Metal',
-    shiftMode: 'THREE_SHIFT',
-    allowedColorShifts: ['RED', 'WHITE', 'BLUE'],
-    rotationAnchor: {
-      weekStartIsoDate: DEFAULT_ROTATION_WEEK_START,
-      baseAssignment: { RED: 'FIRST', WHITE: 'SECOND', BLUE: 'NIGHT' },
-    },
-    aliases: ['metal'],
-  },
-  {
-    id: 'szwalnia',
-    name: 'Szwalnia',
-    shiftMode: 'TWO_SHIFT',
-    allowedColorShifts: ['RED', 'WHITE'],
-    rotationAnchor: {
-      weekStartIsoDate: DEFAULT_ROTATION_WEEK_START,
-      baseAssignment: { RED: 'FIRST', WHITE: 'SECOND' },
-    },
-    aliases: ['szwalnia'],
-  },
-  {
-    id: 'montaz',
-    name: 'Montaż',
+    id: 'montaz-toyota',
+    officialName: 'MFG ASSY HL TOYOTA',
+    uiName: 'Montaż Toyota',
+    functionalGroup: 'MONTAZ',
     shiftMode: 'THREE_SHIFT',
     allowedColorShifts: ['RED', 'WHITE', 'BLUE'],
     rotationAnchor: {
@@ -75,19 +60,10 @@ export const CANONICAL_DEPARTMENTS: readonly CanonicalDepartmentDefinition[] = [
     aliases: ['montaz', 'montaż'],
   },
   {
-    id: 'pu',
-    name: 'PU',
-    shiftMode: 'TWO_SHIFT',
-    allowedColorShifts: ['RED', 'WHITE'],
-    rotationAnchor: {
-      weekStartIsoDate: DEFAULT_ROTATION_WEEK_START,
-      baseAssignment: { RED: 'FIRST', WHITE: 'SECOND' },
-    },
-    aliases: ['pu'],
-  },
-  {
-    id: 'headliner',
-    name: 'Headliner',
+    id: 'headliner-bmw',
+    officialName: 'MFG BMW Headliner',
+    uiName: 'Headliner BMW',
+    functionalGroup: 'HEADLINER',
     shiftMode: 'TWO_SHIFT',
     allowedColorShifts: ['RED', 'WHITE'],
     rotationAnchor: {
@@ -97,8 +73,62 @@ export const CANONICAL_DEPARTMENTS: readonly CanonicalDepartmentDefinition[] = [
     aliases: ['headliner'],
   },
   {
+    id: 'pu-toyota',
+    officialName: 'MFG PIANY PU Seat Toyota',
+    uiName: 'PU Toyota',
+    functionalGroup: 'PU',
+    shiftMode: 'TWO_SHIFT',
+    allowedColorShifts: ['RED', 'WHITE'],
+    rotationAnchor: {
+      weekStartIsoDate: DEFAULT_ROTATION_WEEK_START,
+      baseAssignment: { RED: 'FIRST', WHITE: 'SECOND' },
+    },
+    aliases: ['pu'],
+  },
+  {
+    id: 'szwalnia-toyota',
+    officialName: 'MFG Toyota Cover',
+    uiName: 'Szwalnia Toyota',
+    functionalGroup: 'SZWALNIA',
+    shiftMode: 'TWO_SHIFT',
+    allowedColorShifts: ['RED', 'WHITE'],
+    rotationAnchor: {
+      weekStartIsoDate: DEFAULT_ROTATION_WEEK_START,
+      baseAssignment: { RED: 'FIRST', WHITE: 'SECOND' },
+    },
+    aliases: ['szwalnia'],
+  },
+  {
+    id: 'metal-402b',
+    officialName: 'MFG Toyota Metal 402B',
+    uiName: 'Metal 402B',
+    functionalGroup: 'METAL',
+    shiftMode: 'THREE_SHIFT',
+    allowedColorShifts: ['RED', 'WHITE', 'BLUE'],
+    rotationAnchor: {
+      weekStartIsoDate: DEFAULT_ROTATION_WEEK_START,
+      baseAssignment: { RED: 'FIRST', WHITE: 'SECOND', BLUE: 'NIGHT' },
+    },
+    aliases: [],
+  },
+  {
+    id: 'metal-936b',
+    officialName: 'MFG Toyota Metal 936B',
+    uiName: 'Metal 936B',
+    functionalGroup: 'METAL',
+    shiftMode: 'THREE_SHIFT',
+    allowedColorShifts: ['RED', 'WHITE', 'BLUE'],
+    rotationAnchor: {
+      weekStartIsoDate: DEFAULT_ROTATION_WEEK_START,
+      baseAssignment: { RED: 'FIRST', WHITE: 'SECOND', BLUE: 'NIGHT' },
+    },
+    aliases: [],
+  },
+  {
     id: 'magazyn',
-    name: 'Magazyn',
+    officialName: 'PC REC. ASSY TOY',
+    uiName: 'Magazyn',
+    functionalGroup: 'MAGAZYN',
     shiftMode: 'THREE_SHIFT',
     allowedColorShifts: ['RED', 'WHITE', 'BLUE'],
     rotationAnchor: {
@@ -110,7 +140,7 @@ export const CANONICAL_DEPARTMENTS: readonly CanonicalDepartmentDefinition[] = [
 ];
 
 export const INITIAL_DEPARTMENT_NAMES = CANONICAL_DEPARTMENTS.map(
-  (department) => department.name,
+  (department) => department.uiName,
 );
 
 export const CANONICAL_DEPARTMENT_IDS = CANONICAL_DEPARTMENTS.map(
@@ -124,6 +154,9 @@ export type CanonicalDepartmentResolution =
     }
   | {
       status: 'unresolved-na0';
+    }
+  | {
+      status: 'ambiguous-legacy-metal';
     }
   | {
       status: 'unknown';
@@ -194,10 +227,17 @@ export function resolveCanonicalDepartment(
     return { status: 'unresolved-na0' };
   }
 
+  if (key === 'metal') {
+    return { status: 'ambiguous-legacy-metal' };
+  }
+
   const department = CANONICAL_DEPARTMENTS.find((candidate) =>
-    [candidate.id, candidate.name, ...candidate.aliases].some(
-      (alias) => normalizeDepartmentMatchKey(alias) === key,
-    ),
+    [
+      candidate.id,
+      candidate.officialName,
+      candidate.uiName,
+      ...candidate.aliases,
+    ].some((alias) => normalizeDepartmentMatchKey(alias) === key),
   );
 
   if (!department) {
@@ -205,6 +245,31 @@ export function resolveCanonicalDepartment(
   }
 
   return { status: 'matched', department };
+}
+
+export function canonicalDepartmentUiName(
+  value: string | null | undefined,
+): string | null {
+  const resolution = resolveCanonicalDepartment(value);
+  return resolution.status === 'matched' ? resolution.department.uiName : null;
+}
+
+export function canonicalDepartmentOfficialName(
+  value: string | null | undefined,
+): string | null {
+  const resolution = resolveCanonicalDepartment(value);
+  return resolution.status === 'matched'
+    ? resolution.department.officialName
+    : null;
+}
+
+export function canonicalDepartmentFunctionalGroup(
+  value: string | null | undefined,
+): DepartmentFunctionalGroup | null {
+  const resolution = resolveCanonicalDepartment(value);
+  return resolution.status === 'matched'
+    ? resolution.department.functionalGroup
+    : null;
 }
 
 export function isEmployeeColorShift(

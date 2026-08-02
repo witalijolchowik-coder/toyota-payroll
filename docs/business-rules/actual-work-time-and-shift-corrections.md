@@ -1,5 +1,9 @@
 # Rzeczywisty czas pracy i korekty zmian
 
+> Current correction documents use the seven stable department IDs from
+> [Canonical departments and July 2026 assignment migration](canonical-departments-migration.md).
+> Legacy labels below describe the original functional groups only.
+
 ## Źródło czasu pracy
 
 System nie ma wiarygodnego pliku wejść i wyjść. Planowany przedział jest więc wirtualnym domyślnym czasem rzeczywistym. Dokument `dailyValues` powstaje dopiero po jawnej korekcie koordynatora. Nie wdrażamy importu ewidencji wejść/wyjść.

@@ -12,12 +12,13 @@ import {
 
 describe('employee medical and contact helpers', () => {
   it.each([
-    ['Metal', 'PRODUKCJA'],
-    ['Montaż', 'PRODUKCJA'],
-    ['Szwalnia', 'PRODUKCJA'],
+    ['Metal 402B', 'PRODUKCJA'],
+    ['MFG Toyota Metal 936B', 'PRODUKCJA'],
+    ['Montaż Toyota', 'PRODUKCJA'],
+    ['Szwalnia Toyota', 'PRODUKCJA'],
     ['Magazyn', 'MAGAZYNIER'],
-    ['Headliner', 'PRODUKCJA_HL_PU'],
-    ['PU', 'PRODUKCJA_HL_PU'],
+    ['Headliner BMW', 'PRODUKCJA_HL_PU'],
+    ['PU Toyota', 'PRODUKCJA_HL_PU'],
   ])('maps %s to the expected medical type', (department, expected) => {
     expect(expectedMedicalTypeForDepartment(department)).toBe(expected);
   });

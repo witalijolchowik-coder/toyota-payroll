@@ -3,6 +3,7 @@ import {
   isEmployeeArchived,
   resolveCurrentEmploymentPeriod,
 } from '../../utils/employees';
+import { CANONICAL_DEPARTMENTS } from '../../utils/organization';
 
 export type EmployeeListMode = 'active' | 'archive';
 export type EmployeeSortKey =
@@ -19,14 +20,9 @@ export interface EmployeeSortState {
   direction: SortDirection;
 }
 
-const departmentOrder = [
-  'Metal',
-  'Szwalnia',
-  'Montaż',
-  'PU',
-  'Headliner',
-  'Magazyn',
-];
+const departmentOrder = CANONICAL_DEPARTMENTS.map(
+  (department) => department.uiName,
+);
 const shiftOrder = ['RED', 'WHITE', 'BLUE'];
 
 export function employeeMatchesListMode(

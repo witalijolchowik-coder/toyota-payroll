@@ -1,5 +1,9 @@
 # Employee register and day editor interaction
 
+The department labels and sort order in this decision are historical. Current
+editable departments and their order come from the shared registry described
+in the [canonical departments migration](../business-rules/canonical-departments-migration.md).
+
 ## Employee register
 
 - The default operational mode is `Aktywni`; `Archiwum` contains employees whose final employment end date is before today. An absence never moves an employee to the archive.

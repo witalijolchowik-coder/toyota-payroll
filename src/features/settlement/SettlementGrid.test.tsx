@@ -21,7 +21,7 @@ const employee: Employee = {
   passportNumber: null,
   foreignDocumentNumber: null,
   isActive: true,
-  departmentId: 'montaz',
+  departmentId: 'montaz-toyota',
   shiftAssignment: 'RED',
   employmentStartDate: new Date('2026-06-01T00:00:00.000Z'),
   employmentEndDate: null,
@@ -42,8 +42,8 @@ const employee: Employee = {
 };
 
 const department: Department = {
-  id: 'montaz',
-  name: 'Montaż',
+  id: 'montaz-toyota',
+  name: 'Montaż Toyota',
   shiftMode: 'THREE_SHIFT',
   active: true,
   ...metadata,
@@ -61,11 +61,11 @@ describe('SettlementGrid', () => {
     );
 
     expect(screen.getByText('Jan Kowalski')).toBeInTheDocument();
-    expect(screen.getByText('Montaż')).toBeInTheDocument();
+    expect(screen.getByText('Montaż Toyota')).toBeInTheDocument();
     expect(screen.getByText('Zmiana Red')).toBeInTheDocument();
     expect(screen.queryByText('TETA-1001')).not.toBeInTheDocument();
     expect(
-      screen.getByTestId('settlement-department-group-montaz'),
+      screen.getByTestId('settlement-department-group-montaz-toyota'),
     ).toHaveTextContent('1');
   });
 
@@ -87,10 +87,10 @@ describe('SettlementGrid', () => {
     );
 
     const toggle = screen.getByRole('button', {
-      name: 'Zwiń dział: Montaż',
+      name: 'Zwiń dział: Montaż Toyota',
     });
     expect(
-      screen.getByTestId('settlement-department-group-montaz'),
+      screen.getByTestId('settlement-department-group-montaz-toyota'),
     ).toHaveTextContent('2');
     expect(screen.getByText('Jan Kowalski')).toBeInTheDocument();
     expect(screen.getByText('Anna Nowak')).toBeInTheDocument();
@@ -100,7 +100,7 @@ describe('SettlementGrid', () => {
     expect(screen.queryByText('Anna Nowak')).not.toBeInTheDocument();
 
     fireEvent.click(
-      screen.getByRole('button', { name: 'Rozwiń dział: Montaż' }),
+      screen.getByRole('button', { name: 'Rozwiń dział: Montaż Toyota' }),
     );
     expect(screen.getByText('Jan Kowalski')).toBeInTheDocument();
     expect(screen.getByText('Anna Nowak')).toBeInTheDocument();

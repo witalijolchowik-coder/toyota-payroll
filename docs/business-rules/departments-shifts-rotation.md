@@ -1,5 +1,9 @@
 # Departments, shifts and rotation - Block 7
 
+> Department naming in this historical block is superseded by
+> [Canonical departments and July 2026 assignment migration](canonical-departments-migration.md).
+> Shift rules now consume the canonical department's functional group.
+
 This document captures the approved foundation for departments, employee shift
 assignment and future weekly rotation. It does not introduce payroll
 calculation consequences.

@@ -118,7 +118,7 @@ export function DepartmentFormDialog({
               const nextName = event.target.value;
               setName(nextName);
               const definition = CANONICAL_DEPARTMENTS.find(
-                (item) => item.name === nextName,
+                (item) => item.uiName === nextName,
               );
               if (definition) setShiftMode(definition.shiftMode);
             }}
@@ -130,8 +130,8 @@ export function DepartmentFormDialog({
             }
           >
             {CANONICAL_DEPARTMENTS.map((item) => (
-              <MenuItem key={item.id} value={item.name}>
-                {item.name}
+              <MenuItem key={item.id} value={item.uiName}>
+                {item.uiName}
               </MenuItem>
             ))}
           </TextField>

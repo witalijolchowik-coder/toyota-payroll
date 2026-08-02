@@ -37,14 +37,14 @@ const employee = {
     },
   ],
   employmentEndEvents: [],
-  departmentId: 'metal',
+  departmentId: 'metal-402b',
   shiftAssignment: 'RED',
   isActive: true,
   ...metadata,
 } as Employee;
 const department = {
-  id: 'metal',
-  name: 'Metal',
+  id: 'metal-402b',
+  name: 'Metal 402B',
   shiftMode: 'THREE_SHIFT',
   active: true,
   ...metadata,
@@ -79,7 +79,7 @@ describe('EmployeesTable', () => {
     expect(screen.getAllByRole('columnheader')[1]).toHaveTextContent('Telefon');
     expect(screen.getByText('+48 500 000 000')).toBeInTheDocument();
     expect(screen.getByText('🇵🇱')).toBeInTheDocument();
-    expect(screen.getByText('Metal')).toBeInTheDocument();
+    expect(screen.getByText('Metal 402B')).toBeInTheDocument();
     expect(screen.getByText('Red')).toBeInTheDocument();
     expect(
       screen.queryByRole('columnheader', { name: 'Status' }),

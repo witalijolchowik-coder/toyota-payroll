@@ -4,6 +4,10 @@
 
 Accepted
 
+The department labels in this decision are historical. Their current stable
+identities, UI labels and functional groups are defined by the
+[canonical departments migration](../business-rules/canonical-departments-migration.md).
+
 ## Context
 
 Monthly Settlement needs a planned schedule layer before final payroll closing

@@ -248,6 +248,10 @@ Authentication session.
 
 ## Business Rules Block 18 implementation
 
+> The department names in this historical milestone were superseded by the
+> [canonical departments migration](business-rules/canonical-departments-migration.md).
+> Current editable data uses the seven fixed canonical department IDs.
+
 - Department selection and imports use the canonical MVP department set:
   Metal, Szwalnia, Montaż, PU, Headliner and Magazyn.
 - `NA0` and unknown department names remain unresolved warnings and are not

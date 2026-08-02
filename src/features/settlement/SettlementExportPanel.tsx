@@ -37,6 +37,7 @@ import {
   resolveSettlementCellValue,
   type CalendarDay,
 } from './monthUtils';
+import { canonicalDepartmentOfficialName } from '../../utils/organization';
 
 interface SettlementExportPanelProps {
   monthId: MonthId;
@@ -86,9 +87,11 @@ export function SettlementExportPanel({
       return [
         {
           employee,
-          departmentName: employee.departmentId
-            ? departmentsById.get(employee.departmentId)?.name
-            : null,
+          departmentName:
+            canonicalDepartmentOfficialName(employee.departmentId) ??
+            (employee.departmentId
+              ? departmentsById.get(employee.departmentId)?.name
+              : null),
           identity: {
             pesel: employee.pesel,
             passport: employee.passportNumber,

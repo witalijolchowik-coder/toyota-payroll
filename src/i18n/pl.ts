@@ -744,6 +744,77 @@ export const pl = {
         createFailed: 'Nie udało się utworzyć zaznaczonych pracowników.',
       },
     },
+    departmentAssignmentImport: {
+      open: 'Przypisanie działów',
+      title: 'Migracja działów i przypisań pracowników',
+      description:
+        'Wczytaj plik PS z aktualnym przydziałem oraz bilans lipcowy z numerami TETA. Najpierw sprawdź deterministyczny podgląd, a dopiero potem zastosuj bezpieczne zmiany.',
+      effectiveDateInfo:
+        'Zmiany przypisania obowiązują od 1 lipca 2026. Umowy, daty zatrudnienia, dane osobowe i zamknięte rozliczenia nie są zmieniane.',
+      empty: '—',
+      files: {
+        assignment: 'Wybierz plik PS — przydział',
+        balance: 'Wybierz plik bilansu z TETA',
+        notSelected: 'Nie wybrano pliku',
+      },
+      actions: {
+        preview: 'Przygotuj podgląd',
+        analyzing: 'Analizowanie...',
+        apply: 'Zastosuj bezpieczne zmiany: {{count}}',
+        close: 'Zamknij',
+      },
+      summary: {
+        sourceRows: 'Wiersze źródłowe: {{count}}',
+        unique: 'Unikalne osoby: {{count}}',
+        updated: 'Do aktualizacji: {{count}}',
+        created: 'Do utworzenia: {{count}}',
+        duplicates: 'Duplikaty: {{count}}',
+        unresolved: 'Bez TETA: {{count}}',
+        conflicts: 'Konflikty: {{count}}',
+      },
+      table: {
+        row: 'Wiersz',
+        status: 'Klasyfikacja',
+        employee: 'Pracownik',
+        teta: 'TETA',
+        currentDepartment: 'Aktualny dział',
+        targetDepartment: 'Dział docelowy',
+        details: 'Szczegóły',
+      },
+      status: {
+        'existing-unchanged': 'Bez zmian',
+        'existing-changed': 'Zmiana działu',
+        'new-employee': 'Nowy pracownik',
+        'duplicate-source-row-ignored': 'Duplikat pominięty',
+        'unresolved-teta': 'Nieustalone TETA',
+        'conflicting-department': 'Konflikt działów',
+        'excluded-non-worker': 'Wykluczono',
+        'missing-from-assignment-source': 'Brak w przydziale',
+        'ambiguous-legacy-metal': 'Niejednoznaczny Metal',
+        'legacy-department-migrated': 'Migracja nazwy',
+      },
+      details: {
+        'explicit-workforce-exclusion':
+          'Rekord celowo wyłączony z ewidencji pracowników.',
+        'ambiguous-teta': 'Kilka pozycji bilansu pasuje do tej osoby.',
+        'missing-teta': 'Nie znaleziono wiarygodnego numeru TETA w bilansie.',
+        'ambiguous-existing-employee':
+          'Dane pasują do więcej niż jednego istniejącego pracownika.',
+        'manual-department-assignment-required':
+          'Stary dział Metal wymaga ręcznego wyboru linii 402B albo 936B.',
+        'safe-one-to-one-legacy-alias':
+          'Jednoznaczna stara nazwa zostanie zastąpiona nazwą kanoniczną.',
+      },
+      progress: 'Zapisywanie: {{completed}} / {{total}}',
+      result:
+        'Utworzono: {{created}}, zaktualizowano: {{updated}}, pominięto: {{skipped}}.',
+      errors: {
+        filesRequired: 'Wybierz oba pliki źródłowe.',
+        analyzeFailed:
+          'Nie udało się przeanalizować plików. Sprawdź ich strukturę.',
+        applyFailed: 'Nie udało się zastosować zmian przypisania działów.',
+      },
+    },
     templateImport: {
       open: 'Import i aktualizacja pracowników',
       title: 'Import i aktualizacja pracowników',
@@ -988,7 +1059,7 @@ export const pl = {
         generatedId: 'Identyfikator',
         stableId: 'Identyfikator pozostaje bez zmian.',
         canonicalOnly:
-          'Dostępne są wyłącznie ustalone działy: Metal, Szwalnia, Montaż, PU, Headliner i Magazyn.',
+          'Dostępne są wyłącznie ustalone działy: Montaż Toyota, Headliner BMW, PU Toyota, Szwalnia Toyota, Metal 402B, Metal 936B i Magazyn.',
         required: 'Nazwa działu jest wymagana.',
         saveFailed: 'Nie udało się zapisać działu. Sprawdź dane i uprawnienia.',
         cancel: 'Anuluj',

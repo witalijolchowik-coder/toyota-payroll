@@ -38,7 +38,7 @@ export function canonicalDepartmentsFallback(): Department[] {
   const now = new Date(0);
   return CANONICAL_DEPARTMENTS.map((department) => ({
     id: department.id,
-    name: department.name,
+    name: department.uiName,
     shiftMode: department.shiftMode,
     active: true,
     rotationAnchorWeekStart: department.rotationAnchor.weekStartIsoDate,
@@ -73,7 +73,7 @@ export function normalizeDepartmentInput(
       canonical.status === 'matched'
         ? canonical.department.id
         : input.id.trim() || departmentKeyFromName(name),
-    name: canonical.status === 'matched' ? canonical.department.name : name,
+    name: canonical.status === 'matched' ? canonical.department.uiName : name,
   };
 }
 
@@ -119,7 +119,7 @@ export async function createDepartment(
   }
 
   await setDoc(doc(repositories.departments, normalized.id), {
-    name: canonical.name,
+    name: canonical.uiName,
     shift_mode: canonical.shiftMode,
     active: normalized.active,
     rotation_anchor_week_start: canonical.rotationAnchor.weekStartIsoDate,
@@ -140,14 +140,14 @@ export async function updateDepartment(
   const canonical = getCanonicalDepartmentDefinition(departmentId);
   const normalized = {
     ...input,
-    name: canonical?.name ?? normalizeDepartmentName(input.name),
+    name: canonical?.uiName ?? normalizeDepartmentName(input.name),
   };
   if (!validateDepartmentInput(normalized) || !canonical) {
     throw new DepartmentsServiceError('invalid-input');
   }
 
   await updateDoc(doc(repositories.departments, departmentId), {
-    name: canonical.name,
+    name: canonical.uiName,
     shift_mode: normalized.shiftMode,
     active: normalized.active,
     rotation_anchor_week_start: canonical.rotationAnchor.weekStartIsoDate,
@@ -167,7 +167,7 @@ async function ensureCanonicalDepartments({
   await Promise.all(
     CANONICAL_DEPARTMENTS.map((department) => {
       const data = {
-        name: department.name,
+        name: department.uiName,
         shift_mode: department.shiftMode,
         active: true,
         rotation_anchor_week_start: department.rotationAnchor.weekStartIsoDate,

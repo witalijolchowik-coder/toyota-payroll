@@ -393,11 +393,12 @@ function SortableHeader({
 }
 
 const departmentStyles: Record<string, { bg: string; color: string }> = {
-  Metal: { bg: '#dbeafe', color: '#1e3a8a' },
-  Szwalnia: { bg: '#fce7f3', color: '#831843' },
-  Montaż: { bg: '#dcfce7', color: '#14532d' },
-  PU: { bg: '#fef3c7', color: '#78350f' },
-  Headliner: { bg: '#ede9fe', color: '#4c1d95' },
+  'Metal 402B': { bg: '#dbeafe', color: '#1e3a8a' },
+  'Metal 936B': { bg: '#bfdbfe', color: '#172554' },
+  'Szwalnia Toyota': { bg: '#fce7f3', color: '#831843' },
+  'Montaż Toyota': { bg: '#dcfce7', color: '#14532d' },
+  'PU Toyota': { bg: '#fef3c7', color: '#78350f' },
+  'Headliner BMW': { bg: '#ede9fe', color: '#4c1d95' },
   Magazyn: { bg: '#e5e7eb', color: '#1f2937' },
 };
 

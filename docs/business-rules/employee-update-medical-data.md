@@ -1,5 +1,9 @@
 # Employee update template and medical examinations
 
+> Department/type compatibility is now resolved through the functional groups
+> in [Canonical departments and July 2026 assignment migration](canonical-departments-migration.md),
+> not through visible department text.
+
 This specification extends the existing employee register and Block 15 bulk
 update flow. It does not create a parallel employee model.
 

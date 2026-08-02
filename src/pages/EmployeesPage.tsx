@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import AddOutlined from '@mui/icons-material/AddOutlined';
+import AccountTreeOutlined from '@mui/icons-material/AccountTreeOutlined';
 import UploadFileOutlined from '@mui/icons-material/UploadFileOutlined';
 import { Alert, Button, Card, Divider, Stack } from '@mui/material';
 
@@ -11,6 +12,7 @@ import { EmployeeAccommodationDialog } from '../features/employees/EmployeeAccom
 import { EmployeeEntitlementsPanel } from '../features/employees/EmployeeEntitlementsPanel';
 import { EmployeeFormDialog } from '../features/employees/EmployeeFormDialog';
 import { EmployeeContractsDialog } from '../features/employees/EmployeeContractsDialog';
+import { DepartmentAssignmentImportDialog } from '../features/employees/DepartmentAssignmentImportDialog';
 import { EmployeeTemplateImportDialog } from '../features/employees/EmployeeTemplateImportDialog';
 import { EmployeesEmptyState } from '../features/employees/EmployeesEmptyState';
 import { EmployeesTable } from '../features/employees/EmployeesTable';
@@ -38,6 +40,7 @@ import {
   type EmployeeServiceErrorCode,
 } from '../services/employeesService';
 import {
+  applyDepartmentAssignmentReconciliation,
   createEmployeesFromTemplatePreview,
   updateEmployeesFromTemplatePreview,
   type EmployeeImportProgress,
@@ -100,6 +103,10 @@ export function EmployeesPage() {
   const [entitlementFormState, setEntitlementFormState] =
     useState<EntitlementFormState>(null);
   const [isImportOpen, setIsImportOpen] = useState(false);
+  const [
+    isDepartmentAssignmentImportOpen,
+    setIsDepartmentAssignmentImportOpen,
+  ] = useState(false);
   const [deactivationTarget, setDeactivationTarget] = useState<Employee | null>(
     null,
   );
@@ -311,6 +318,13 @@ export function EmployeesPage() {
           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
             <Button
               variant="outlined"
+              startIcon={<AccountTreeOutlined />}
+              onClick={() => setIsDepartmentAssignmentImportOpen(true)}
+            >
+              {t.employees.departmentAssignmentImport.open}
+            </Button>
+            <Button
+              variant="outlined"
               startIcon={<UploadFileOutlined />}
               onClick={() => setIsImportOpen(true)}
             >
@@ -480,6 +494,14 @@ export function EmployeesPage() {
           onClose={() => setIsImportOpen(false)}
           onCreateEmployees={handleCreateEmployeesFromTemplate}
           onUpdateEmployees={handleUpdateEmployeesFromTemplate}
+        />
+      ) : null}
+
+      {isDepartmentAssignmentImportOpen ? (
+        <DepartmentAssignmentImportDialog
+          employees={employees}
+          onClose={() => setIsDepartmentAssignmentImportOpen(false)}
+          onApply={applyDepartmentAssignmentReconciliation}
         />
       ) : null}
     </Stack>

@@ -39,13 +39,13 @@ describe('settlement calendar employee layout', () => {
     const result = buildCalendarEmployeeRows({
       employees: [
         employee('4', 'Bez Działu', null),
-        employee('3', 'Nowak', 'szwalnia'),
-        employee('2', 'Żak', 'metal'),
-        employee('1', 'Adamski', 'metal'),
+        employee('3', 'Nowak', 'szwalnia-toyota'),
+        employee('2', 'Żak', 'metal-402b'),
+        employee('1', 'Adamski', 'metal-402b'),
       ],
       departments: [
-        department('szwalnia', 'Szwalnia'),
-        department('metal', 'Metal'),
+        department('szwalnia-toyota', 'Szwalnia Toyota'),
+        department('metal-402b', 'Metal 402B'),
       ],
       assignments: [],
       referenceDate: '2026-06-01',

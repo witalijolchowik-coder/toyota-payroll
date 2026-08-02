@@ -1,5 +1,9 @@
 # Department structure and monthly schedule planning — Block 18
 
+> The six legacy labels in this block are no longer selectable departments.
+> The current seven IDs, official/UI names and functional groups are defined in
+> [Canonical departments and July 2026 assignment migration](canonical-departments-migration.md).
+
 This block defines the operational monthly planned schedule layer. It does not
 calculate payroll amounts and does not close or freeze a month.
 

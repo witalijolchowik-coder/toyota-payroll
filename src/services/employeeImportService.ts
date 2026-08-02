@@ -13,6 +13,16 @@ import {
 } from './employeeContractsService';
 import { auth } from '../config/firebase';
 import { recordAuditEntry } from './auditService';
+import {
+  DEPARTMENT_ASSIGNMENT_EFFECTIVE_DATE,
+  isApplicableDepartmentAssignmentRow,
+  type DepartmentAssignmentReconciliation,
+  type DepartmentAssignmentReconciliationRow,
+} from '../features/employees/departmentAssignmentImport';
+import {
+  canonicalDepartmentOfficialName,
+  canonicalDepartmentUiName,
+} from '../utils/organization';
 
 const EMPLOYEE_IMPORT_UPDATE_CONCURRENCY = 5;
 
@@ -24,6 +34,141 @@ export interface EmployeeImportProgress {
 export interface EmployeeImportCreateResult {
   createdEmployeeIds: EmployeeId[];
   skippedCount: number;
+}
+
+export interface DepartmentAssignmentImportResult {
+  createdEmployeeIds: EmployeeId[];
+  updatedEmployeeIds: EmployeeId[];
+  skippedCount: number;
+}
+
+export async function applyDepartmentAssignmentReconciliation(
+  reconciliation: DepartmentAssignmentReconciliation,
+  onProgress?: (progress: EmployeeImportProgress) => void,
+): Promise<DepartmentAssignmentImportResult> {
+  const applicableRows = reconciliation.rows.filter(
+    isApplicableDepartmentAssignmentRow,
+  );
+  const createdEmployeeIds: EmployeeId[] = [];
+  const updatedEmployeeIds: EmployeeId[] = [];
+  let completed = 0;
+  onProgress?.({ completed, total: applicableRows.length });
+
+  for (const row of applicableRows) {
+    if (!row.targetDepartmentId) continue;
+    if (row.status === 'new-employee') {
+      if (!row.tetaNumber) continue;
+      const employeeId = await createEmployee({
+        tetaNumber: row.tetaNumber,
+        firstName: row.firstName,
+        lastName: row.lastName,
+        pesel: null,
+        passportNumber: null,
+        foreignDocumentNumber: null,
+        phoneNumber: null,
+        citizenship: null,
+        gender: null,
+        firstToyotaEmploymentDate: null,
+        medicalExaminationDate: null,
+        medicalValidUntil: null,
+        medicalExaminationType: null,
+        isActive: true,
+        departmentId: row.targetDepartmentId,
+        shiftAssignment: null,
+        initialContract: null,
+        assignmentEffectiveDate: DEPARTMENT_ASSIGNMENT_EFFECTIVE_DATE,
+      });
+      createdEmployeeIds.push(employeeId);
+      await recordDepartmentAssignmentAudit(row, employeeId, 'create');
+    } else if (row.employee) {
+      await updateEmployee(row.employee.id, {
+        tetaNumber: row.employee.tetaNumber,
+        firstName: row.employee.firstName,
+        lastName: row.employee.lastName,
+        pesel: row.employee.pesel,
+        passportNumber: row.employee.passportNumber,
+        foreignDocumentNumber: row.employee.foreignDocumentNumber,
+        phoneNumber: row.employee.phoneNumber ?? null,
+        citizenship: row.employee.citizenship ?? null,
+        gender: row.employee.gender ?? null,
+        firstToyotaEmploymentDate:
+          row.employee.firstToyotaEmploymentDate ?? null,
+        medicalExaminationDate: row.employee.medicalExaminationDate ?? null,
+        medicalValidUntil: row.employee.medicalValidUntil ?? null,
+        medicalExaminationType: row.employee.medicalExaminationType ?? null,
+        isActive: row.employee.isActive,
+        departmentId: row.targetDepartmentId,
+        shiftAssignment: row.employee.shiftAssignment,
+        initialContract: null,
+        assignmentEffectiveDate: DEPARTMENT_ASSIGNMENT_EFFECTIVE_DATE,
+      });
+      updatedEmployeeIds.push(row.employee.id);
+      await recordDepartmentAssignmentAudit(row, row.employee.id, 'update');
+    }
+    completed += 1;
+    onProgress?.({ completed, total: applicableRows.length });
+  }
+
+  const actorUid = auth?.currentUser?.uid;
+  if (actorUid && applicableRows.length > 0) {
+    await recordAuditEntry({
+      entityPath: 'employees',
+      action: 'update',
+      actorUid,
+      changes: {
+        operation: 'canonical-department-assignment-import',
+        effective_date: DEPARTMENT_ASSIGNMENT_EFFECTIVE_DATE,
+        assignment_rows: reconciliation.assignmentRowCount,
+        unique_assignments: reconciliation.assignmentUniqueEmployeeCount,
+        created: createdEmployeeIds.length,
+        updated: updatedEmployeeIds.length,
+        duplicate_rows_ignored:
+          reconciliation.counts['duplicate-source-row-ignored'],
+        conflicts: reconciliation.counts['conflicting-department'],
+        unresolved_teta: reconciliation.counts['unresolved-teta'],
+        excluded_non_workers: reconciliation.counts['excluded-non-worker'],
+        ambiguous_legacy_metal: reconciliation.counts['ambiguous-legacy-metal'],
+      },
+    });
+  }
+
+  return {
+    createdEmployeeIds,
+    updatedEmployeeIds,
+    skippedCount: reconciliation.rows.length - applicableRows.length,
+  };
+}
+
+async function recordDepartmentAssignmentAudit(
+  row: DepartmentAssignmentReconciliationRow,
+  employeeId: EmployeeId,
+  action: 'create' | 'update',
+) {
+  const actorUid = auth?.currentUser?.uid;
+  if (!actorUid) return;
+  await recordAuditEntry({
+    entityPath: `employees/${employeeId}`,
+    action,
+    actorUid,
+    changes: {
+      operation:
+        action === 'create'
+          ? 'employee-created-from-department-assignment'
+          : 'canonical-department-changed',
+      source: 'PS-przydzial-2026-07',
+      source_row: row.sourceRowNumber,
+      teta_number: row.tetaNumber,
+      previous_department_id: row.currentDepartmentId,
+      target_department_id: row.targetDepartmentId,
+      target_department_ui_name: canonicalDepartmentUiName(
+        row.targetDepartmentId,
+      ),
+      target_department_official_name: canonicalDepartmentOfficialName(
+        row.targetDepartmentId,
+      ),
+      contract_data_changed: false,
+    },
+  });
 }
 
 export async function createEmployeesFromImportPreview(

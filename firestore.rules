@@ -281,7 +281,8 @@ service cloud.firestore {
           'created_at', 'created_by', 'updated_at', 'updated_by'
         ])
         && data.department_id in [
-          'metal', 'szwalnia', 'montaz', 'pu', 'headliner', 'magazyn'
+          'montaz-toyota', 'headliner-bmw', 'pu-toyota',
+          'szwalnia-toyota', 'metal-402b', 'metal-936b', 'magazyn'
         ]
         && isIsoDate(data.effective_date)
         && data.shift_mode in ['TWO_SHIFT', 'THREE_SHIFT']

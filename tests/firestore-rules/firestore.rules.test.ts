@@ -2139,7 +2139,7 @@ describe('Firestore security rules', () => {
     const uid = 'coordinator-1';
     const firestore = testEnvironment.authenticatedContext(uid).firestore();
     const payload = {
-      department_id: 'metal',
+      department_id: 'metal-402b',
       effective_date: '2026-07-06',
       shift_mode: 'THREE_SHIFT',
       group_assignments: { RED: 'FIRST', WHITE: 'NIGHT', BLUE: 'SECOND' },
@@ -2149,7 +2149,7 @@ describe('Firestore security rules', () => {
     };
     await assertSucceeds(
       setDoc(
-        doc(firestore, 'departmentShiftCorrections', 'metal-2026-07-06'),
+        doc(firestore, 'departmentShiftCorrections', 'metal-402b-2026-07-06'),
         payload,
       ),
     );
@@ -2157,6 +2157,12 @@ describe('Firestore security rules', () => {
       setDoc(doc(firestore, 'departmentShiftCorrections', 'invalid'), {
         ...payload,
         group_assignments: { RED: 'FIRST', WHITE: 'FIRST', BLUE: 'NIGHT' },
+      }),
+    );
+    await assertFails(
+      setDoc(doc(firestore, 'departmentShiftCorrections', 'legacy-metal'), {
+        ...payload,
+        department_id: 'metal',
       }),
     );
   });
@@ -2168,7 +2174,7 @@ describe('Firestore security rules', () => {
       .firestore();
     await assertFails(
       setDoc(doc(inactive, 'departmentShiftCorrections', 'denied'), {
-        department_id: 'szwalnia',
+        department_id: 'szwalnia-toyota',
         effective_date: '2026-07-06',
         shift_mode: 'TWO_SHIFT',
         group_assignments: { RED: 'FIRST', WHITE: 'SECOND' },
@@ -2183,7 +2189,7 @@ describe('Firestore security rules', () => {
     const reference = doc(firestore, 'departmentShiftCorrections', 'protected');
     await assertSucceeds(
       setDoc(reference, {
-        department_id: 'szwalnia',
+        department_id: 'szwalnia-toyota',
         effective_date: '2026-07-06',
         shift_mode: 'TWO_SHIFT',
         group_assignments: { RED: 'FIRST', WHITE: 'SECOND' },
