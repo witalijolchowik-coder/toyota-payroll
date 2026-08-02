@@ -304,6 +304,29 @@ export function employmentEndForSequence(
   );
 }
 
+/**
+ * Returns an explicit employment end only when it belongs to the supplied
+ * contract period. Legacy data can contain an older end event that shares a
+ * sequence id with a later contract created after the employee returned. Such
+ * an event must not close or block actions for the later contract.
+ */
+export function employmentEndForContract(
+  employee: Pick<Employee, 'employmentEndEvents'>,
+  contract: Pick<EmployeeContract, 'sequenceId' | 'startDate' | 'endDate'>,
+): EmploymentEndEvent | null {
+  return (
+    (employee.employmentEndEvents ?? [])
+      .filter(
+        (event) =>
+          event.status === 'ACTIVE' &&
+          event.sequenceId === contract.sequenceId &&
+          event.endDate >= contract.startDate &&
+          (!contract.endDate || event.endDate <= contract.endDate),
+      )
+      .sort((a, b) => b.endDate.localeCompare(a.endDate))[0] ?? null
+  );
+}
+
 export interface EmploymentTerminationPlan {
   targetContract: EmployeeContract;
   futureContracts: EmployeeContract[];
@@ -325,7 +348,7 @@ export function planEmploymentTermination(
   if (
     !latest ||
     latest.sequenceId !== sequenceId ||
-    employmentEndForSequence(employee, sequenceId)
+    employmentEndForContract(employee, latest)
   ) {
     return null;
   }

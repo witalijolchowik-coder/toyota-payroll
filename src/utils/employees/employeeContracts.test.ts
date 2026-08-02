@@ -101,6 +101,25 @@ describe('employee contract history', () => {
     ).toBeNull();
   });
 
+  it('ignores a stale end event that predates the current contract', () => {
+    const value = employee(
+      [
+        contract('previous', '2026-04-24', '2026-05-31', 'legacy-sequence'),
+        contract('current', '2026-06-01', '2026-08-31', 'legacy-sequence'),
+      ],
+      [endEvent('legacy-sequence', '2026-05-31')],
+    );
+
+    const plan = planEmploymentTermination(
+      value,
+      'legacy-sequence',
+      '2026-07-15',
+    );
+
+    expect(plan?.targetContract.id).toBe('current');
+    expect(plan?.futureContracts).toEqual([]);
+  });
+
   it('accepts a continuation and a real gap but rejects invalid, duplicate and overlapping ranges', () => {
     const existing = [contract('first', '2026-06-02', '2026-07-02')];
 

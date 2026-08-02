@@ -39,7 +39,7 @@ import {
   contractStatus,
   continuationDefaults,
   employeeContractHistoryRevision,
-  employmentEndForSequence,
+  employmentEndForContract,
   requiresContractDecision,
   resolveLatestContract,
   validateEmployeeContract,
@@ -154,7 +154,7 @@ export function EmployeeContractsDialog({
     useState<EmployeeTerminationImpact | null>(null);
   const latest = resolveLatestContract(currentEmployee);
   const latestSequenceEnd = latest
-    ? employmentEndForSequence(currentEmployee, latest.sequenceId)
+    ? employmentEndForContract(currentEmployee, latest)
     : null;
 
   useEffect(() => {

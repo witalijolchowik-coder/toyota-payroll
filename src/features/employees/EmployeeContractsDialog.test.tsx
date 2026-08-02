@@ -7,7 +7,11 @@ import {
   EmployeeContractServiceError,
   type EmployeeContractState,
 } from '../../services/employeeContractsService';
-import type { Employee, EmployeeContract } from '../../types/firestore';
+import type {
+  Employee,
+  EmployeeContract,
+  EmploymentEndEvent,
+} from '../../types/firestore';
 import { employeeContractHistoryRevision } from '../../utils/employees';
 import {
   contractErrorMessage,
@@ -40,7 +44,10 @@ function contract(
   };
 }
 
-function employee(contracts: EmployeeContract[]): Employee {
+function employee(
+  contracts: EmployeeContract[],
+  employmentEndEvents: EmploymentEndEvent[] = [],
+): Employee {
   return {
     id: 'employee-1',
     tetaNumber: 'WT-1',
@@ -52,7 +59,7 @@ function employee(contracts: EmployeeContract[]): Employee {
     departmentId: null,
     shiftAssignment: null,
     contracts,
-    employmentEndEvents: [],
+    employmentEndEvents,
     employmentStartDate: null,
     employmentEndDate: null,
     isActive: true,
@@ -163,6 +170,36 @@ describe('EmployeeContractsDialog canonical contract session', () => {
       }),
     );
     await waitFor(() => expect(onEndEmployment).toHaveBeenCalledTimes(1));
+  });
+
+  it('shows early termination after reactivation when an old end event predates the current contract', async () => {
+    const staleEndEvent: EmploymentEndEvent = {
+      id: 'old-end',
+      employeeId: 'employee-1',
+      tetaNumber: 'WT-1',
+      sequenceId: 'legacy-sequence',
+      endDate: '2026-05-31',
+      status: 'ACTIVE',
+      reason: null,
+      ...metadata,
+    };
+    const current = employee(
+      [
+        contract('previous', '2026-04-24', '2026-05-31'),
+        contract('current', '2026-06-01', '2026-08-31'),
+      ],
+      [staleEndEvent],
+    );
+    const onReload = vi.fn().mockResolvedValue(state(current));
+
+    renderDialog({ initial: current, onReload });
+
+    await waitFor(() =>
+      expect(
+        screen.getByText('ZakoĹ„cz zatrudnienie wczeĹ›niej'),
+      ).toBeVisible(),
+    );
+    expect(screen.getByLabelText('Ostatni dzieĹ„ zatrudnienia')).toBeEnabled();
   });
 
   it('edits an open-ended legacy contract and adds its continuation without reopening', async () => {
