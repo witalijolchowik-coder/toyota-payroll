@@ -11,7 +11,9 @@ interface AbsenceOptionContentProps {
 }
 
 type AbsenceMenuItemProps = AbsenceOptionContentProps &
-  Omit<MenuItemProps, 'value'>;
+  Omit<MenuItemProps, 'value'> & {
+    value: AbsenceCode;
+  };
 
 export function AbsenceOptionContent({
   code,
@@ -65,12 +67,15 @@ export function AbsenceOptionContent({
 }
 
 export const AbsenceMenuItem = forwardRef<HTMLLIElement, AbsenceMenuItemProps>(
-  function AbsenceMenuItem({ code, description, sx, ...menuItemProps }, ref) {
+  function AbsenceMenuItem(
+    { code, description, sx, value, ...menuItemProps },
+    ref,
+  ) {
     return (
       <MenuItem
         {...menuItemProps}
         ref={ref}
-        value={code}
+        value={value}
         sx={[{ minHeight: 44 }, ...(Array.isArray(sx) ? sx : [sx])].filter(
           Boolean,
         )}

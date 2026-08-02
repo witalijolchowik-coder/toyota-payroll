@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { Select } from '@mui/material';
 import { fireEvent, render, screen } from '@testing-library/react';
 
 import { CalendarAppearanceContext } from '../../contexts/CalendarAppearanceContext';
@@ -49,20 +51,38 @@ describe('AbsenceOptionContent', () => {
   });
 
   it('forwards selection handlers injected by Material UI Select', () => {
-    const onClick = vi.fn();
+    function Harness() {
+      const [value, setValue] = useState('L4');
 
-    render(
-      <AbsenceMenuItem
-        code="UW"
-        description="Urlop wypoczynkowy"
-        onClick={onClick}
-        role="option"
-      />,
-    );
+      return (
+        <Select
+          aria-label="Rodzaj nieobecności"
+          value={value}
+          onChange={(event) => setValue(event.target.value)}
+        >
+          <AbsenceMenuItem
+            value="L4"
+            code="L4"
+            description="Zwolnienie lekarskie"
+          />
+          <AbsenceMenuItem
+            value="UW"
+            code="UW"
+            description="Urlop wypoczynkowy"
+          />
+        </Select>
+      );
+    }
 
-    const option = screen.getByRole('option');
-    fireEvent.click(option);
+    render(<Harness />);
 
-    expect(onClick).toHaveBeenCalledOnce();
+    const select = screen.getByRole('combobox', {
+      name: 'Rodzaj nieobecności',
+    });
+    fireEvent.mouseDown(select);
+    fireEvent.click(screen.getByTestId('absence-code-UW'));
+
+    expect(select).toHaveTextContent('UW');
+    expect(select).toHaveTextContent('Urlop wypoczynkowy');
   });
 });

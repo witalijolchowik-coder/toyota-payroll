@@ -200,6 +200,7 @@ export function AbsenceFormDialog({
               {ABSENCE_CODES.map((code) => (
                 <AbsenceMenuItem
                   key={code}
+                  value={code}
                   code={code}
                   description={t.absences.typeDescriptions[code]}
                 />

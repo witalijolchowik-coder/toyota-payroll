@@ -651,6 +651,7 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
                   {(['L4', 'UW', 'UZ', 'NN'] as const).map((code) => (
                     <AbsenceMenuItem
                       key={code}
+                      value={code}
                       code={code}
                       description={t.absences.typeDescriptions[code]}
                     />
