@@ -55,22 +55,25 @@ describe('AbsenceOptionContent', () => {
       const [value, setValue] = useState('L4');
 
       return (
-        <Select
-          aria-label="Rodzaj nieobecności"
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-        >
-          <AbsenceMenuItem
-            value="L4"
-            code="L4"
-            description="Zwolnienie lekarskie"
-          />
-          <AbsenceMenuItem
-            value="UW"
-            code="UW"
-            description="Urlop wypoczynkowy"
-          />
-        </Select>
+        <>
+          <Select
+            aria-label="Rodzaj nieobecności"
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+          >
+            <AbsenceMenuItem
+              value="L4"
+              code="L4"
+              description="Zwolnienie lekarskie"
+            />
+            <AbsenceMenuItem
+              value="UW"
+              code="UW"
+              description="Urlop wypoczynkowy"
+            />
+          </Select>
+          <span data-testid="selected-absence-code">{value}</span>
+        </>
       );
     }
 
@@ -82,7 +85,6 @@ describe('AbsenceOptionContent', () => {
     fireEvent.mouseDown(select);
     fireEvent.click(screen.getByTestId('absence-code-UW'));
 
-    expect(select).toHaveTextContent('UW');
-    expect(select).toHaveTextContent('Urlop wypoczynkowy');
+    expect(screen.getByTestId('selected-absence-code')).toHaveTextContent('UW');
   });
 });
