@@ -233,7 +233,7 @@ describe('SettlementGrid', () => {
     expect(screen.queryByText('50%')).not.toBeInTheDocument();
     expect(screen.queryByText('100%')).not.toBeInTheDocument();
     expect(screen.queryByText('2 h · noc')).not.toBeInTheDocument();
-    expect(screen.getByText('11 h').parentElement).toHaveStyle({
+    expect(screen.getByText('11 h').parentElement?.parentElement).toHaveStyle({
       gridTemplateRows: '1.1rem 0.85rem',
     });
   });
