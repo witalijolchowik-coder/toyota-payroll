@@ -63,12 +63,14 @@ function endEvent(sequenceId: string, endDate: string): EmploymentEndEvent {
 function employee(
   contracts: EmployeeContract[],
   employmentEndEvents: EmploymentEndEvent[] = [],
+  isActive = true,
 ) {
   return {
     contracts,
     employmentEndEvents,
     employmentStartDate: null,
     employmentEndDate: null,
+    isActive,
   };
 }
 
@@ -94,7 +96,11 @@ describe('employee contract history', () => {
     ]);
     expect(
       planEmploymentTermination(
-        employee(value.contracts, [endEvent('sequence-current', '2026-10-15')]),
+        employee(
+          value.contracts,
+          [endEvent('sequence-current', '2026-10-15')],
+          false,
+        ),
         'sequence-current',
         '2026-10-15',
       ),
@@ -118,6 +124,24 @@ describe('employee contract history', () => {
 
     expect(plan?.targetContract.id).toBe('current');
     expect(plan?.futureContracts).toEqual([]);
+    expect(plan?.previousEndEvent).toBeNull();
+  });
+
+  it('replaces a current-sequence end event when the employee is operationally active', () => {
+    const existingEnd = endEvent('legacy-sequence', '2026-08-31');
+    const value = employee(
+      [contract('current', '2026-06-01', '2026-08-31', 'legacy-sequence')],
+      [existingEnd],
+    );
+
+    const plan = planEmploymentTermination(
+      value,
+      'legacy-sequence',
+      '2026-08-15',
+    );
+
+    expect(plan?.targetContract.id).toBe('current');
+    expect(plan?.previousEndEvent).toEqual(existingEnd);
   });
 
   it('accepts a continuation and a real gap but rejects invalid, duplicate and overlapping ranges', () => {

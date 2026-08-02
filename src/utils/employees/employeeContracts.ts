@@ -331,6 +331,7 @@ export interface EmploymentTerminationPlan {
   targetContract: EmployeeContract;
   futureContracts: EmployeeContract[];
   affectedContracts: EmployeeContract[];
+  previousEndEvent: EmploymentEndEvent | null;
 }
 
 /**
@@ -340,15 +341,18 @@ export interface EmploymentTerminationPlan {
  * employment ends before it starts.
  */
 export function planEmploymentTermination(
-  employee: Pick<Employee, 'contracts' | 'employmentEndEvents'>,
+  employee: Pick<Employee, 'contracts' | 'employmentEndEvents' | 'isActive'>,
   sequenceId: string,
   endDate: IsoDate,
 ): EmploymentTerminationPlan | null {
   const latest = resolveLatestContract(employee);
+  const previousEndEvent = latest
+    ? employmentEndForContract(employee, latest)
+    : null;
   if (
     !latest ||
     latest.sequenceId !== sequenceId ||
-    employmentEndForContract(employee, latest)
+    (previousEndEvent && !employee.isActive)
   ) {
     return null;
   }
@@ -370,6 +374,7 @@ export function planEmploymentTermination(
     targetContract,
     futureContracts,
     affectedContracts: [targetContract, ...futureContracts],
+    previousEndEvent,
   };
 }
 

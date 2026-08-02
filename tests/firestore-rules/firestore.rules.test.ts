@@ -1977,6 +1977,19 @@ describe('Firestore security rules', () => {
       note: null,
       ...contractMetadata,
     });
+    const previousEnd = doc(
+      firestore,
+      'employmentEndEvents/early-previous-end',
+    );
+    await setDoc(previousEnd, {
+      employee_id: 'employee-1',
+      teta_number: 'TETA-1001',
+      sequence_id: 'sequence-early',
+      end_date: '2026-08-31',
+      status: 'ACTIVE',
+      reason: 'Poprzednia decyzja',
+      ...modificationMetadata(uid),
+    });
 
     const batch = writeBatch(firestore);
     batch.update(current, {
@@ -1985,6 +1998,11 @@ describe('Firestore security rules', () => {
       updated_by: uid,
     });
     batch.update(future, {
+      status: 'CANCELLED',
+      updated_at: serverTimestamp(),
+      updated_by: uid,
+    });
+    batch.update(previousEnd, {
       status: 'CANCELLED',
       updated_at: serverTimestamp(),
       updated_by: uid,
@@ -2021,6 +2039,7 @@ describe('Firestore security rules', () => {
         sequence_id: 'sequence-early',
         end_date: '2026-07-15',
         shortened_contract_id: 'early-current',
+        replaced_employment_end_event_id: 'early-previous-end',
         cancelled_future_contract_ids: ['early-future'],
         affected_open_months: ['2026-07'],
       },

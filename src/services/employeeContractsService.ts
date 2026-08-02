@@ -522,6 +522,13 @@ export async function endEmployeeEmployment(
       updated_by: uid,
     });
   });
+  if (plan.previousEndEvent) {
+    batch.update(repositories.employmentEndEvent(plan.previousEndEvent.id), {
+      status: 'CANCELLED',
+      updated_at: serverTimestamp(),
+      updated_by: uid,
+    });
+  }
   batch.set(reference, {
     employee_id: employee.id,
     teta_number: employee.tetaNumber,
@@ -562,6 +569,7 @@ export async function endEmployeeEmployment(
       reason: input.reason,
       shortened_contract_id: plan.targetContract.id,
       previous_contract_end_date: plan.targetContract.endDate,
+      replaced_employment_end_event_id: plan.previousEndEvent?.id ?? null,
       cancelled_future_contract_ids: plan.futureContracts.map(
         (contract) => contract.id,
       ),

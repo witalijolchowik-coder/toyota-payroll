@@ -574,7 +574,7 @@ export function EmployeeContractsDialog({
               </Stack>
             </Stack>
           ) : null}
-          {latest && !latestSequenceEnd ? (
+          {latest && (currentEmployee.isActive || !latestSequenceEnd) ? (
             <Stack
               spacing={1.5}
               sx={{ p: 2, border: 1, borderColor: 'divider', borderRadius: 2 }}
