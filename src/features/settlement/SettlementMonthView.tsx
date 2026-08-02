@@ -38,6 +38,10 @@ import {
   clearManualDailyValue,
   saveManualDailyValue,
 } from '../../services/dailyValueService';
+import {
+  cancelDailyShiftCorrection,
+  saveDailyShiftCorrection,
+} from '../../services/scheduleCorrectionService';
 import type {
   Employee,
   EmployeeColorShift,
@@ -72,6 +76,7 @@ import {
 } from './monthUtils';
 import {
   generateEmployeeMonthlySchedule,
+  resolveShiftInterval,
   type PlannedScheduleDay,
 } from '../../utils/schedule';
 import { parseDailyHoursInput } from './dailyValueEntry';
@@ -783,6 +788,31 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
           value={editingCell.value}
           hasGoverningAbsence={editingCell.hasGoverningAbsence}
           plannedDay={editingCell.plannedDay}
+          shiftIntervals={{
+            FIRST: resolveShiftInterval(
+              'FIRST',
+              editingCell.day.isoDate,
+              data.shiftHoursVersions,
+            ),
+            SECOND: resolveShiftInterval(
+              'SECOND',
+              editingCell.day.isoDate,
+              data.shiftHoursVersions,
+            ),
+            NIGHT: resolveShiftInterval(
+              'NIGHT',
+              editingCell.day.isoDate,
+              data.shiftHoursVersions,
+            ),
+          }}
+          activeScheduleCorrection={
+            data.scheduleCorrections.find(
+              (correction) =>
+                correction.employeeId === editingCell.employee.id &&
+                correction.date === editingCell.day.isoDate &&
+                correction.status === 'ACTIVE',
+            ) ?? null
+          }
           governingAbsence={
             participatingAbsences.find(
               (absence) =>
@@ -813,11 +843,6 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
               },
               existingAbsence ?? null,
             );
-            await reload();
-            notify({
-              message: t.settlement.notifications.dailyValueSaved,
-              severity: 'success',
-            });
           }}
           onClear={async () => {
             await clearManualDailyValue(
@@ -825,9 +850,46 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
               editingCell.employee.id,
               editingCell.day.isoDate,
             );
+          }}
+          onSaveScheduleCorrection={async (shift, plannedHours, note) => {
+            const currentCorrection =
+              data.scheduleCorrections.find(
+                (correction) =>
+                  correction.employeeId === editingCell.employee.id &&
+                  correction.date === editingCell.day.isoDate &&
+                  correction.status === 'ACTIVE',
+              ) ?? null;
+            await saveDailyShiftCorrection(
+              monthId,
+              {
+                employeeId: editingCell.employee.id,
+                tetaNumber: editingCell.employee.tetaNumber,
+                date: editingCell.day.isoDate,
+                plannedShift: shift,
+                plannedHours,
+                note,
+              },
+              currentCorrection,
+            );
+          }}
+          onResetScheduleCorrection={async () => {
+            const currentCorrection = data.scheduleCorrections.find(
+              (correction) =>
+                correction.employeeId === editingCell.employee.id &&
+                correction.date === editingCell.day.isoDate &&
+                correction.status === 'ACTIVE',
+            );
+            if (currentCorrection) {
+              await cancelDailyShiftCorrection(monthId, currentCorrection);
+            }
+          }}
+          onWorkTimeCommitted={async (operation) => {
             await reload();
             notify({
-              message: t.settlement.notifications.dailyValueCleared,
+              message:
+                operation === 'cleared'
+                  ? t.settlement.notifications.dailyValueCleared
+                  : t.settlement.notifications.dailyValueSaved,
               severity: 'success',
             });
           }}

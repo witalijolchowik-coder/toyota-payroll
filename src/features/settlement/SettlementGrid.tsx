@@ -23,6 +23,7 @@ import KeyboardArrowDown from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUp from '@mui/icons-material/KeyboardArrowUp';
 import LayersOutlined from '@mui/icons-material/LayersOutlined';
 import PrecisionManufacturingOutlined from '@mui/icons-material/PrecisionManufacturingOutlined';
+import RestartAltOutlined from '@mui/icons-material/RestartAltOutlined';
 import ViewStreamOutlined from '@mui/icons-material/ViewStreamOutlined';
 import { Fragment, useState, type ReactNode } from 'react';
 
@@ -529,6 +530,10 @@ export function SettlementGrid({
                                         displayMode={displayMode}
                                         valueKind={value.kind}
                                         workTimeBreakdown={workTimeBreakdown}
+                                        hasScheduleCorrection={
+                                          plannedDay?.source ===
+                                          'manual-correction'
+                                        }
                                         appearanceKey={appearanceKey}
                                         palette={palette}
                                         t={t}
@@ -854,6 +859,7 @@ function CellHoursContent({
   displayMode,
   valueKind,
   workTimeBreakdown,
+  hasScheduleCorrection,
   appearanceKey,
   palette,
   t,
@@ -862,6 +868,7 @@ function CellHoursContent({
   displayMode: 'hours' | 'shifts';
   valueKind: ReturnType<typeof resolveSettlementCellValue>['kind'];
   workTimeBreakdown: DailyWorkTimeDeviation | null;
+  hasScheduleCorrection: boolean;
   appearanceKey: CalendarAppearanceKey;
   palette: CalendarAppearancePalette;
   t: ReturnType<typeof useTranslations>;
@@ -888,13 +895,22 @@ function CellHoursContent({
     >
       <Box
         component="span"
-        sx={
-          showBreakdown
+        sx={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 0.2,
+          ...(showBreakdown
             ? { color: palette[appearanceKey].text, fontStyle: 'italic' }
-            : cellValueSx(valueKind, appearanceKey, palette)
-        }
+            : cellValueSx(valueKind, appearanceKey, palette)),
+        }}
       >
-        {displayLabel}
+        <Box component="span">{displayLabel}</Box>
+        {hasScheduleCorrection ? (
+          <RestartAltOutlined
+            aria-label={t.settlement.grid.scheduleManualCorrection}
+            sx={{ color: palette.manualCorrection.text, fontSize: 12 }}
+          />
+        ) : null}
       </Box>
       {showBreakdown ? (
         <Box

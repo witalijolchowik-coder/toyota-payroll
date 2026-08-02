@@ -140,6 +140,11 @@ describe('monthly schedule planning', () => {
     const corrections: ScheduleCorrection[] = [
       correction(worker, '2026-06-10', 'NIGHT_SHIFT', 'NIGHT', 8),
     ];
+    const automaticSchedule = generateEmployeeMonthlySchedule({
+      employee: worker,
+      days,
+      departments: [department('metal-402b', 'Metal 402B', 'THREE_SHIFT')],
+    });
     const schedule = generateEmployeeMonthlySchedule({
       employee: worker,
       days,
@@ -150,7 +155,80 @@ describe('monthly schedule planning', () => {
     expect(schedule.find((day) => day.date === '2026-06-10')).toMatchObject({
       source: 'manual-correction',
       label: '8 / N',
+      shift: 'NIGHT',
     });
+    expect(schedule.find((day) => day.date === '2026-06-09')).toEqual(
+      automaticSchedule.find((day) => day.date === '2026-06-09'),
+    );
+    expect(schedule.find((day) => day.date === '2026-06-11')).toEqual(
+      automaticSchedule.find((day) => day.date === '2026-06-11'),
+    );
+    expect(worker.shiftAssignment).toBe('RED');
+  });
+
+  it('ignores a cancelled correction and restores the automatic brigade plan', () => {
+    const worker = employee({
+      departmentId: 'metal-402b',
+      shiftAssignment: 'RED',
+      employmentStartDate: date('2026-06-01'),
+    });
+    const days = createCalendarDays('2026-06', {
+      publicHolidays: getPublicHolidaysForYear(2026),
+    });
+    const automaticSchedule = generateEmployeeMonthlySchedule({
+      employee: worker,
+      days,
+      departments: [department('metal-402b', 'Metal 402B', 'THREE_SHIFT')],
+    });
+    const cancelled = {
+      ...correction(worker, '2026-06-10', 'NIGHT_SHIFT', 'NIGHT', 8),
+      status: 'CANCELLED' as const,
+    };
+    const restoredSchedule = generateEmployeeMonthlySchedule({
+      employee: worker,
+      days,
+      departments: [department('metal-402b', 'Metal 402B', 'THREE_SHIFT')],
+      options: { corrections: [cancelled] },
+    });
+
+    expect(restoredSchedule.find((day) => day.date === '2026-06-10')).toEqual(
+      automaticSchedule.find((day) => day.date === '2026-06-10'),
+    );
+  });
+
+  it('ignores corrections belonging to another employee', () => {
+    const worker = employee({
+      departmentId: 'metal-402b',
+      shiftAssignment: 'RED',
+      employmentStartDate: date('2026-06-01'),
+    });
+    const anotherWorker = employee({
+      id: 'employee-2',
+      tetaNumber: 'WT-002',
+      departmentId: 'metal-402b',
+      shiftAssignment: 'BLUE',
+      employmentStartDate: date('2026-06-01'),
+    });
+    const days = createCalendarDays('2026-06', {
+      publicHolidays: getPublicHolidaysForYear(2026),
+    });
+    const automaticSchedule = generateEmployeeMonthlySchedule({
+      employee: worker,
+      days,
+      departments: [department('metal-402b', 'Metal 402B', 'THREE_SHIFT')],
+    });
+    const schedule = generateEmployeeMonthlySchedule({
+      employee: worker,
+      days,
+      departments: [department('metal-402b', 'Metal 402B', 'THREE_SHIFT')],
+      options: {
+        corrections: [
+          correction(anotherWorker, '2026-06-10', 'NIGHT_SHIFT', 'NIGHT', 8),
+        ],
+      },
+    });
+
+    expect(schedule).toEqual(automaticSchedule);
   });
 
   it('does not produce blank relevant days', () => {

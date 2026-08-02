@@ -2265,6 +2265,9 @@ export const pl = {
         planSummary: 'Plan dnia',
         resultSummary: 'Podsumowanie czasu pracy',
         plannedShift: 'Planowana zmiana',
+        scheduleCorrectionActive:
+          'Dla tego dnia obowiązuje ręczna korekta grafiku. Ponowny przelicznik miesiąca jej nie zastąpi.',
+        resetSchedule: 'Przywróć zmianę z grafiku',
         planDetails: 'Planowane: {{start}}–{{end}}, {{hours}} h.',
         plannedInterval: 'Plan: {{start}}–{{end}}',
         actualStart: 'Rzeczywisty start',
@@ -2309,7 +2312,7 @@ export const pl = {
       },
       cancel: 'Anuluj',
       save: 'Zapisz',
-      clear: 'Usuń korektę ręczną',
+      clear: 'Usuń ręczne godziny',
       validation: {
         notNumber: 'Wprowadź prawidłową liczbę.',
         negative: 'Liczba godzin nie może być ujemna.',
@@ -2335,7 +2338,7 @@ export const pl = {
     },
     notifications: {
       created: 'Miesiąc został utworzony.',
-      dailyValueSaved: 'Godziny zostały zapisane.',
+      dailyValueSaved: 'Zmiany dnia zostały zapisane.',
       dailyValueCleared: 'Wartość ręczna została usunięta.',
       absenceSaved: 'Nieobecność została zapisana.',
       manualL4Saved:

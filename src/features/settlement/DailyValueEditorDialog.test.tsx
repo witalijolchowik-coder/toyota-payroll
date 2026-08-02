@@ -1,7 +1,11 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { vi } from 'vitest';
 
-import type { Employee } from '../../types/firestore';
+import type {
+  Employee,
+  ScheduleCorrection,
+  WorkTimeCorrectionInput,
+} from '../../types/firestore';
 import type { AbsenceCode } from '../../utils/absences';
 import type { PlannedScheduleDay } from '../../utils/schedule';
 import { createCalendarDays } from './monthUtils';
@@ -39,14 +43,53 @@ const plannedDay: PlannedScheduleDay = {
   plannedEndTime: '14:00',
   plannedDuration: 8,
 };
+const shiftIntervals = {
+  FIRST: { startTime: '06:00', endTime: '14:00' },
+  SECOND: { startTime: '14:00', endTime: '22:00' },
+  NIGHT: { startTime: '22:00', endTime: '06:00' },
+} as const;
+const activeScheduleCorrection: ScheduleCorrection = {
+  id: 'correction-1',
+  monthId: '2026-06',
+  employeeId: employee.id,
+  tetaNumber: employee.tetaNumber,
+  date: day.isoDate,
+  kind: 'NIGHT_SHIFT',
+  plannedShift: 'NIGHT',
+  plannedHours: 8,
+  note: null,
+  status: 'ACTIVE',
+  createdAt: new Date('2026-06-01T00:00:00.000Z'),
+  createdBy: 'user-1',
+  updatedAt: new Date('2026-06-01T00:00:00.000Z'),
+  updatedBy: 'user-1',
+};
 
 function renderDialog(
   overrides: {
     plannedDay?: PlannedScheduleDay;
+    activeScheduleCorrection?: ScheduleCorrection | null;
     onSaveAbsence?: (code: AbsenceCode, note: string | null) => Promise<void>;
+    onSaveScheduleCorrection?: (
+      shift: 'FIRST' | 'SECOND' | 'NIGHT',
+      plannedHours: number,
+      note: string | null,
+    ) => Promise<void>;
+    onResetScheduleCorrection?: () => Promise<void>;
+    onSave?: (
+      hours: number,
+      note: string | null,
+      workTimeCorrection: WorkTimeCorrectionInput | null,
+    ) => Promise<void>;
   } = {},
 ) {
   const onSaveAbsence = overrides.onSaveAbsence ?? vi.fn(async () => undefined);
+  const onSaveScheduleCorrection =
+    overrides.onSaveScheduleCorrection ?? vi.fn(async () => undefined);
+  const onResetScheduleCorrection =
+    overrides.onResetScheduleCorrection ?? vi.fn(async () => undefined);
+  const onSave = overrides.onSave ?? vi.fn(async () => undefined);
+  const onWorkTimeCommitted = vi.fn(async () => undefined);
   render(
     <DailyValueEditorDialog
       employee={employee}
@@ -54,13 +97,24 @@ function renderDialog(
       value={value}
       hasGoverningAbsence={false}
       plannedDay={overrides.plannedDay ?? plannedDay}
+      shiftIntervals={shiftIntervals}
+      activeScheduleCorrection={overrides.activeScheduleCorrection}
       onClose={vi.fn()}
-      onSave={vi.fn()}
+      onSave={onSave}
       onClear={vi.fn()}
+      onSaveScheduleCorrection={onSaveScheduleCorrection}
+      onResetScheduleCorrection={onResetScheduleCorrection}
+      onWorkTimeCommitted={onWorkTimeCommitted}
       onSaveAbsence={onSaveAbsence}
     />,
   );
-  return { onSaveAbsence };
+  return {
+    onSave,
+    onSaveAbsence,
+    onSaveScheduleCorrection,
+    onResetScheduleCorrection,
+    onWorkTimeCommitted,
+  };
 }
 
 describe('DailyValueEditorDialog', () => {
@@ -106,6 +160,90 @@ describe('DailyValueEditorDialog', () => {
     });
 
     expect(screen.getByTestId('night-hours')).toHaveTextContent('8 h');
+  });
+
+  it('persists a selected shift even when its standard hours need no daily value', async () => {
+    const { onSave, onSaveScheduleCorrection, onWorkTimeCommitted } =
+      renderDialog();
+
+    fireEvent.mouseDown(screen.getByLabelText('Planowana zmiana'));
+    fireEvent.click(screen.getByRole('option', { name: 'Nocna zmiana' }));
+
+    expect(screen.getByLabelText('Rzeczywisty start')).toHaveValue('22:00');
+    expect(screen.getByLabelText('Rzeczywisty koniec')).toHaveValue('06:00');
+    expect(screen.getByTestId('night-hours')).toHaveTextContent('8 h');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zapisz' }));
+    await waitFor(() =>
+      expect(onSaveScheduleCorrection).toHaveBeenCalledWith('NIGHT', 8, null),
+    );
+    expect(onSave).not.toHaveBeenCalled();
+    expect(onWorkTimeCommitted).toHaveBeenCalledWith('saved');
+  });
+
+  it('stores actual times separately when they differ from the corrected planned shift', async () => {
+    const { onSave, onSaveScheduleCorrection } = renderDialog();
+
+    fireEvent.mouseDown(screen.getByLabelText('Planowana zmiana'));
+    fireEvent.click(screen.getByRole('option', { name: 'Nocna zmiana' }));
+    fireEvent.change(screen.getByLabelText('Rzeczywisty koniec'), {
+      target: { value: '08:00' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Zapisz' }));
+
+    await waitFor(() =>
+      expect(onSaveScheduleCorrection).toHaveBeenCalledWith('NIGHT', 8, null),
+    );
+    expect(onSave).toHaveBeenCalledWith(10, null, {
+      plannedShift: 'NIGHT',
+      plannedStartTime: '22:00',
+      plannedEndTime: '06:00',
+      actualStartTime: '22:00',
+      actualEndTime: '08:00',
+      classificationOverride: null,
+    });
+  });
+
+  it('resets an active daily schedule correction to the generated schedule', async () => {
+    const nightPlan = {
+      ...plannedDay,
+      source: 'manual-correction' as const,
+      shift: 'NIGHT' as const,
+      label: '8 / N',
+      plannedStartTime: '22:00',
+      plannedEndTime: '06:00',
+    };
+    const { onResetScheduleCorrection, onWorkTimeCommitted } = renderDialog({
+      plannedDay: nightPlan,
+      activeScheduleCorrection,
+    });
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Przywróć zmianę z grafiku' }),
+    );
+    await waitFor(() => expect(onResetScheduleCorrection).toHaveBeenCalled());
+    expect(onWorkTimeCommitted).toHaveBeenCalledWith('saved');
+  });
+
+  it('does not write or audit an unchanged active correction when reopened', () => {
+    const nightPlan = {
+      ...plannedDay,
+      source: 'manual-correction' as const,
+      shift: 'NIGHT' as const,
+      label: '8 / N',
+      plannedStartTime: '22:00',
+      plannedEndTime: '06:00',
+    };
+    const { onSave, onSaveScheduleCorrection, onWorkTimeCommitted } =
+      renderDialog({
+        plannedDay: nightPlan,
+        activeScheduleCorrection,
+      });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zapisz' }));
+    expect(onSaveScheduleCorrection).not.toHaveBeenCalled();
+    expect(onSave).not.toHaveBeenCalled();
+    expect(onWorkTimeCommitted).not.toHaveBeenCalled();
   });
 
   it('saves manual L4 through the shared absence tab as reported', async () => {

@@ -3,7 +3,12 @@ import { vi } from 'vitest';
 
 import { SettlementGrid } from './SettlementGrid';
 import { createCalendarDays } from './monthUtils';
-import type { DailyValue, Department, Employee } from '../../types/firestore';
+import type {
+  DailyValue,
+  Department,
+  Employee,
+  ScheduleCorrection,
+} from '../../types/firestore';
 
 const metadata = {
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -133,6 +138,56 @@ describe('SettlementGrid', () => {
       }),
     );
     expect(editDay).toHaveBeenCalledTimes(1);
+  });
+
+  it('visibly marks a day-level manual schedule correction', () => {
+    const scheduleCorrection: ScheduleCorrection = {
+      id: 'employee-1_2026-06-03',
+      monthId: '2026-06',
+      employeeId: employee.id,
+      tetaNumber: employee.tetaNumber,
+      date: '2026-06-03',
+      kind: 'NIGHT_SHIFT',
+      plannedShift: 'NIGHT',
+      plannedHours: 8,
+      note: null,
+      status: 'ACTIVE',
+      ...metadata,
+    };
+    render(
+      <SettlementGrid
+        employees={[employee]}
+        departments={[department]}
+        days={createCalendarDays('2026-06')}
+        dailyValues={[]}
+        scheduleCorrections={[scheduleCorrection]}
+      />,
+    );
+
+    expect(
+      screen.getByLabelText(
+        'Ręczna korekta planu miesięcznego. Nie zmienia rzeczywistych godzin pracy.',
+      ),
+    ).toBeInTheDocument();
+  });
+
+  it('keeps day cells read-only in a settled month', () => {
+    render(
+      <SettlementGrid
+        employees={[employee]}
+        departments={[department]}
+        days={createCalendarDays('2026-06')}
+        dailyValues={[]}
+        isSettled
+        onEditCell={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.queryByRole('button', {
+        name: 'Edytuj dzień: Kowalski Jan, 2026-06-01',
+      }),
+    ).not.toBeInTheDocument();
   });
 
   it('shows a readable overtime and night breakdown in hours mode', () => {

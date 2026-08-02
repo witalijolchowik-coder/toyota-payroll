@@ -165,6 +165,15 @@ Schedule corrections affect the planned schedule view only. They must not
 overwrite actual attendance, imported daily values, manual daily values or
 absence documents.
 
+The day editor persists a coordinator-selected first, second or night shift as
+an `ACTIVE` schedule correction for that employee and date. This correction has
+priority over the automatically generated department/color-group rotation in
+calendar display and payroll plan evaluation, including after recalculation.
+Resetting the day plan changes the correction lifecycle to `CANCELLED`; it does
+not delete audit history, and the automatic rotation becomes effective again.
+Actual start/end times remain a separate attendance fact and are evaluated
+against the corrected plan when an explicit deviation is saved.
+
 Employee documents may also store optional export identity fields:
 
 - `pesel`;

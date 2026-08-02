@@ -37,6 +37,13 @@ export function dailyValueDocumentId(employeeId: string, date: string): string {
   return `${safeEmployeeId}_${date}`;
 }
 
+export function scheduleCorrectionDocumentId(
+  employeeId: string,
+  date: string,
+): string {
+  return dailyValueDocumentId(employeeId, date);
+}
+
 export const firestorePaths = {
   appUsers: 'appUsers',
   calendarAppearance: 'appConfig/calendarAppearance',

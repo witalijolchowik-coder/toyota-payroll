@@ -1402,13 +1402,13 @@ service cloud.firestore {
           && hasCreateMetadata(request.resource.data);
         allow update: if isAuthenticated()
           && monthExistsAndIsOpen(monthId)
-          && resource.data.status == 'ACTIVE'
           && validScheduleCorrection(request.resource.data)
           && request.resource.data.date[0:7] == monthId
           && hasUpdateMetadata(request.resource.data)
           && (
             (
-              request.resource.data.status == 'ACTIVE'
+              resource.data.status == 'ACTIVE'
+              && request.resource.data.status == 'ACTIVE'
               && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
                 'kind',
                 'planned_shift',
@@ -1420,7 +1420,21 @@ service cloud.firestore {
             )
             || (
               request.resource.data.status == 'CANCELLED'
+              && resource.data.status == 'ACTIVE'
               && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'status',
+                'updated_at',
+                'updated_by'
+              ])
+            )
+            || (
+              resource.data.status == 'CANCELLED'
+              && request.resource.data.status == 'ACTIVE'
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+                'kind',
+                'planned_shift',
+                'planned_hours',
+                'note',
                 'status',
                 'updated_at',
                 'updated_by'

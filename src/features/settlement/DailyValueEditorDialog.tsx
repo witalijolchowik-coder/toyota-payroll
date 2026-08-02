@@ -1,4 +1,5 @@
 import { useState, type FormEvent } from 'react';
+import RestartAltOutlined from '@mui/icons-material/RestartAltOutlined';
 import {
   Alert,
   Box,
@@ -35,11 +36,12 @@ import type {
   Absence,
   ActualWorkingShift,
   Employee,
+  ScheduleCorrection,
+  ShiftInterval,
   WorkTimeCorrectionInput,
 } from '../../types/firestore';
 import { ABSENCE_CODES, type AbsenceCode } from '../../utils/absences';
 import {
-  DEFAULT_SHIFT_INTERVALS,
   intervalHours,
   isValidClockTime,
   resolveDailyWorkTimeDeviation,
@@ -61,6 +63,8 @@ interface DailyValueEditorDialogProps {
   hasGoverningAbsence: boolean;
   governingAbsence?: Absence | null;
   plannedDay?: PlannedScheduleDay;
+  shiftIntervals: Record<ActualWorkingShift, ShiftInterval>;
+  activeScheduleCorrection?: ScheduleCorrection | null;
   onClose: () => void;
   onSave: (
     hours: number,
@@ -68,6 +72,13 @@ interface DailyValueEditorDialogProps {
     workTimeCorrection: WorkTimeCorrectionInput | null,
   ) => Promise<void>;
   onClear: () => Promise<void>;
+  onSaveScheduleCorrection: (
+    shift: ActualWorkingShift,
+    plannedHours: number,
+    note: string | null,
+  ) => Promise<void>;
+  onResetScheduleCorrection: () => Promise<void>;
+  onWorkTimeCommitted: (operation: 'saved' | 'cleared') => Promise<void>;
   onSaveAbsence: (code: AbsenceCode, note: string | null) => Promise<void>;
 }
 
@@ -85,9 +96,14 @@ export function DailyValueEditorDialog({
   hasGoverningAbsence,
   governingAbsence = null,
   plannedDay,
+  shiftIntervals,
+  activeScheduleCorrection = null,
   onClose,
   onSave,
   onClear,
+  onSaveScheduleCorrection,
+  onResetScheduleCorrection,
+  onWorkTimeCommitted,
   onSaveAbsence,
 }: DailyValueEditorDialogProps) {
   const t = useTranslations();
@@ -104,7 +120,10 @@ export function DailyValueEditorDialog({
     () => value.coordinatorNote ?? governingAbsence?.note ?? '',
   );
   const [plannedShift, setPlannedShift] = useState<ActualWorkingShift | ''>(
-    () => value.workTimeCorrection?.plannedShift ?? plannedShiftFromSchedule,
+    () =>
+      activeScheduleCorrection
+        ? plannedShiftFromSchedule
+        : (value.workTimeCorrection?.plannedShift ?? plannedShiftFromSchedule),
   );
   const [actualStartTime, setActualStartTime] = useState(
     () =>
@@ -127,16 +146,10 @@ export function DailyValueEditorDialog({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const employeeName = `${employee.lastName} ${employee.firstName}`;
-  const plannedInterval = plannedShift
-    ? plannedDay?.shift === plannedShift &&
-      plannedDay.plannedStartTime &&
-      plannedDay.plannedEndTime
-      ? {
-          startTime: plannedDay.plannedStartTime,
-          endTime: plannedDay.plannedEndTime,
-        }
-      : DEFAULT_SHIFT_INTERVALS[plannedShift]
-    : null;
+  const plannedInterval = plannedShift ? shiftIntervals[plannedShift] : null;
+  const selectedPlannedHours = plannedInterval
+    ? intervalHours(plannedInterval)
+    : plannedHours;
   const parsedHours = parseDailyHoursInput(input);
   const inferredActual =
     plannedInterval && actualStartTime && actualEndTime
@@ -221,9 +234,24 @@ export function DailyValueEditorDialog({
     setSubmitError(null);
     try {
       await onClear();
+      await onWorkTimeCommitted('cleared');
       onClose();
     } catch (error) {
       setSubmitError(serviceErrorMessage(error, 'clear', t));
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const resetScheduleCorrection = async () => {
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      await onResetScheduleCorrection();
+      await onWorkTimeCommitted('saved');
+      onClose();
+    } catch (error) {
+      setSubmitError(serviceErrorMessage(error, 'save', t));
     } finally {
       setIsSubmitting(false);
     }
@@ -255,7 +283,7 @@ export function DailyValueEditorDialog({
     }
     if (timeValidationError || !plannedShift || !plannedInterval) return;
     const normalizedNote = note.trim() || null;
-    const mutation = decideDailyValueMutation({
+    let mutation = decideDailyValueMutation({
       parsed: effectiveParsedHours,
       currentKind: value.kind,
       currentHours: value.hours,
@@ -268,31 +296,60 @@ export function DailyValueEditorDialog({
           ? null
           : value.fallbackHours,
     });
-    if (mutation === 'none') return onClose();
-    if (mutation === 'clear') return void clearValue();
+    const needsCorrection =
+      effectiveParsedHours.kind === 'value' &&
+      (effectiveParsedHours.hours !== selectedPlannedHours ||
+        actualStartTime !== plannedInterval.startTime ||
+        actualEndTime !== plannedInterval.endTime);
+    const currentCorrection = value.workTimeCorrection;
+    const correctionDetailsChanged = needsCorrection
+      ? !currentCorrection ||
+        currentCorrection.plannedShift !== plannedShift ||
+        currentCorrection.plannedStartTime !== plannedInterval.startTime ||
+        currentCorrection.plannedEndTime !== plannedInterval.endTime ||
+        currentCorrection.actualStartTime !== actualStartTime ||
+        currentCorrection.actualEndTime !== actualEndTime
+      : Boolean(currentCorrection);
+    if (
+      mutation === 'none' &&
+      correctionDetailsChanged &&
+      (value.kind === 'manual' || value.kind === 'imported-override')
+    ) {
+      mutation = 'save';
+    }
+    const scheduleNeedsSave = plannedShift !== plannedDay?.shift;
+    if (mutation === 'none' && !scheduleNeedsSave) return onClose();
     if (effectiveParsedHours.kind !== 'value' || !inferredActual) return;
 
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      const needsCorrection =
-        effectiveParsedHours.hours !== plannedHours ||
-        actualStartTime !== plannedInterval.startTime ||
-        actualEndTime !== plannedInterval.endTime;
-      await onSave(
-        effectiveParsedHours.hours,
-        normalizedNote,
-        needsCorrection
-          ? {
-              plannedShift,
-              plannedStartTime: plannedInterval.startTime,
-              plannedEndTime: plannedInterval.endTime,
-              actualStartTime: inferredActual.startTime,
-              actualEndTime: inferredActual.endTime,
-              classificationOverride: null,
-            }
-          : null,
-      );
+      if (scheduleNeedsSave) {
+        await onSaveScheduleCorrection(
+          plannedShift,
+          selectedPlannedHours,
+          normalizedNote,
+        );
+      }
+      if (mutation === 'clear') {
+        await onClear();
+      } else if (mutation === 'save') {
+        await onSave(
+          effectiveParsedHours.hours,
+          normalizedNote,
+          needsCorrection
+            ? {
+                plannedShift,
+                plannedStartTime: plannedInterval.startTime,
+                plannedEndTime: plannedInterval.endTime,
+                actualStartTime: inferredActual.startTime,
+                actualEndTime: inferredActual.endTime,
+                classificationOverride: null,
+              }
+            : null,
+        );
+      }
+      await onWorkTimeCommitted(mutation === 'clear' ? 'cleared' : 'saved');
       onClose();
     } catch (error) {
       setSubmitError(serviceErrorMessage(error, 'save', t));
@@ -389,11 +446,18 @@ export function DailyValueEditorDialog({
                       value={plannedShift}
                       onChange={(event) => {
                         const next = event.target.value as ActualWorkingShift;
-                        const interval = DEFAULT_SHIFT_INTERVALS[next];
+                        const previousInterval = plannedInterval;
+                        const followsPreviousPlan = Boolean(
+                          previousInterval &&
+                          actualStartTime === previousInterval.startTime &&
+                          actualEndTime === previousInterval.endTime,
+                        );
+                        const interval = shiftIntervals[next];
                         setPlannedShift(next);
-                        if (!actualStartTime)
+                        if (!actualStartTime || followsPreviousPlan)
                           setActualStartTime(interval.startTime);
-                        if (!actualEndTime) setActualEndTime(interval.endTime);
+                        if (!actualEndTime || followsPreviousPlan)
+                          setActualEndTime(interval.endTime);
                       }}
                     >
                       <MenuItem value="FIRST">
@@ -422,11 +486,29 @@ export function DailyValueEditorDialog({
                       </Typography>
                       <Typography variant="body2" sx={{ fontWeight: 700 }}>
                         {plannedInterval
-                          ? `${plannedInterval.startTime}–${plannedInterval.endTime} · ${formatHours(plannedHours)} h`
+                          ? `${plannedInterval.startTime}–${plannedInterval.endTime} · ${formatHours(selectedPlannedHours)} h`
                           : '—'}
                       </Typography>
                     </Box>
                   </Box>
+                  {activeScheduleCorrection ? (
+                    <Alert
+                      severity="info"
+                      action={
+                        <Button
+                          color="inherit"
+                          size="small"
+                          startIcon={<RestartAltOutlined />}
+                          onClick={() => void resetScheduleCorrection()}
+                          disabled={isSubmitting}
+                        >
+                          {t.settlement.editor.workTime.resetSchedule}
+                        </Button>
+                      }
+                    >
+                      {t.settlement.editor.workTime.scheduleCorrectionActive}
+                    </Alert>
+                  ) : null}
                   <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
                     <ExactTimeField
                       label={t.settlement.editor.workTime.actualStart}

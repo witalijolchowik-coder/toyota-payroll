@@ -1033,6 +1033,17 @@ describe('Firestore security rules', () => {
         updated_by: uid,
       }),
     );
+    await assertSucceeds(
+      updateDoc(correction, {
+        kind: 'SECOND_SHIFT',
+        planned_shift: 'SECOND',
+        planned_hours: 8,
+        note: 'Ponowna korekta tego samego dnia',
+        status: 'ACTIVE',
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
     await assertFails(deleteDoc(correction));
   });
 
@@ -1070,6 +1081,41 @@ describe('Firestore security rules', () => {
         status: 'ACTIVE',
         ...modificationMetadata(uid),
       }),
+    );
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(
+        doc(
+          context.firestore(),
+          'months/2026-08/scheduleCorrections/employee-1_2026-08-14',
+        ),
+        {
+          employee_id: 'employee-1',
+          teta_number: 'TETA-1001',
+          date: '2026-08-14',
+          kind: 'FIRST_SHIFT',
+          planned_shift: 'FIRST',
+          planned_hours: 8,
+          note: null,
+          status: 'ACTIVE',
+          created_at: new Date('2026-07-01T00:00:00.000Z'),
+          created_by: 'system',
+          updated_at: new Date('2026-07-01T00:00:00.000Z'),
+          updated_by: 'system',
+        },
+      );
+    });
+    await assertFails(
+      updateDoc(
+        doc(
+          firestore,
+          'months/2026-08/scheduleCorrections/employee-1_2026-08-14',
+        ),
+        {
+          status: 'CANCELLED',
+          updated_at: serverTimestamp(),
+          updated_by: uid,
+        },
+      ),
     );
   });
 
