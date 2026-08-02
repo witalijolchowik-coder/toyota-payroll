@@ -458,6 +458,25 @@ export async function deactivateEmployee(
   });
 }
 
+export async function reactivateEmployee(
+  employeeId: EmployeeId,
+): Promise<void> {
+  const actorUid = requireActorUid();
+  const repositories = requireRepositories();
+
+  await updateDoc(repositories.employee(employeeId), {
+    is_active: true,
+    updated_at: serverTimestamp(),
+    updated_by: actorUid,
+  });
+  await recordAuditEntry({
+    entityPath: `employees/${employeeId}`,
+    action: 'update',
+    actorUid,
+    changes: { operation: 'employee-reactivated', is_active: true },
+  });
+}
+
 async function appendEmployeeAssignmentReplacementToBatch(
   batch: ReturnType<typeof writeBatch>,
   input: EmployeeAssignmentCreateInput,

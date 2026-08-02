@@ -1,5 +1,6 @@
 import EditOutlined from '@mui/icons-material/EditOutlined';
 import PersonOffOutlined from '@mui/icons-material/PersonOffOutlined';
+import PersonOutlined from '@mui/icons-material/PersonOutlined';
 import HomeWorkOutlined from '@mui/icons-material/HomeWorkOutlined';
 import HouseOutlined from '@mui/icons-material/HouseOutlined';
 import WarningAmberOutlined from '@mui/icons-material/WarningAmberOutlined';
@@ -35,6 +36,7 @@ import {
   calculateFirstEmploymentLimit,
   calculateProjectedEmploymentLimit,
   formatPolishDate,
+  isEmployeeArchived,
   requiresContractDecision,
   resolveCurrentEmploymentPeriod,
 } from '../../utils/employees';
@@ -51,6 +53,7 @@ interface EmployeesTableProps {
   isLoading: boolean;
   onEdit: (employee: Employee) => void;
   onDeactivate: (employee: Employee) => void;
+  onReactivate?: (employee: Employee) => void;
   onContracts?: (employee: Employee) => void;
   entitlements: EmployeeEntitlement[];
   onAccommodation: (
@@ -68,6 +71,7 @@ export function EmployeesTable({
   isLoading,
   onEdit,
   onDeactivate,
+  onReactivate,
   onContracts,
   entitlements,
   onAccommodation,
@@ -352,6 +356,25 @@ export function EmployeesTable({
                               sx={actionButtonSx}
                             >
                               <PersonOffOutlined fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                        ) : !isEmployeeArchived(employee) && onReactivate ? (
+                          <Tooltip
+                            title={interpolate(t.employees.table.reactivate, {
+                              name: employeeName,
+                            })}
+                          >
+                            <IconButton
+                              size="small"
+                              color="primary"
+                              aria-label={interpolate(
+                                t.employees.table.reactivate,
+                                { name: employeeName },
+                              )}
+                              onClick={() => onReactivate(employee)}
+                              sx={actionButtonSx}
+                            >
+                              <PersonOutlined fontSize="small" />
                             </IconButton>
                           </Tooltip>
                         ) : null}

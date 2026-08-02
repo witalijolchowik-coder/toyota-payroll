@@ -233,4 +233,36 @@ describe('EmployeesTable', () => {
     expect(onEdit).toHaveBeenCalledWith(employee);
     expect(onDeactivate).toHaveBeenCalledWith(employee);
   });
+
+  it('shows a restore action for a technically deactivated employee', () => {
+    const inactiveEmployee = { ...employee, isActive: false };
+    const onReactivate = vi.fn();
+    render(
+      <EmployeesTable
+        employees={[inactiveEmployee]}
+        departments={[department]}
+        isLoading={false}
+        mode="active"
+        sort={{ key: 'employee', direction: 'asc' }}
+        onSort={vi.fn()}
+        onEdit={vi.fn()}
+        onDeactivate={vi.fn()}
+        onReactivate={onReactivate}
+        entitlements={[]}
+        onAccommodation={vi.fn()}
+      />,
+    );
+
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Przywróć pracownika jako aktywnego: Jan Kowalski',
+      }),
+    );
+    expect(onReactivate).toHaveBeenCalledWith(inactiveEmployee);
+    expect(
+      screen.queryByRole('button', {
+        name: 'Dezaktywuj pracownika: Jan Kowalski',
+      }),
+    ).not.toBeInTheDocument();
+  });
 });

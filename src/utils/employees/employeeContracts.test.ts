@@ -13,6 +13,7 @@ import {
   isRangeFullyCoveredByContracts,
   isEmployeeArchived,
   mergeEmploymentCoverage,
+  planEmploymentTermination,
   planLegacyContractMigration,
   requiresContractDecision,
   resolveCurrentContract,
@@ -72,6 +73,34 @@ function employee(
 }
 
 describe('employee contract history', () => {
+  it('plans an early employment end and cancels later contracts in the same sequence', () => {
+    const value = employee([
+      contract('old', '2025-01-01', '2025-06-30', 'sequence-old'),
+      contract('current', '2026-06-01', '2026-08-31', 'sequence-current'),
+      contract('renewal', '2026-09-01', '2026-12-31', 'sequence-current'),
+    ]);
+
+    const plan = planEmploymentTermination(
+      value,
+      'sequence-current',
+      '2026-07-15',
+    );
+
+    expect(plan?.targetContract.id).toBe('current');
+    expect(plan?.futureContracts.map((item) => item.id)).toEqual(['renewal']);
+    expect(plan?.affectedContracts.map((item) => item.id)).toEqual([
+      'current',
+      'renewal',
+    ]);
+    expect(
+      planEmploymentTermination(
+        employee(value.contracts, [endEvent('sequence-current', '2026-07-15')]),
+        'sequence-current',
+        '2026-07-15',
+      ),
+    ).toBeNull();
+  });
+
   it('accepts a continuation and a real gap but rejects invalid, duplicate and overlapping ranges', () => {
     const existing = [contract('first', '2026-06-02', '2026-07-02')];
 
@@ -273,6 +302,19 @@ describe('employee contract history', () => {
 });
 
 describe('cumulative 18-month employment limit', () => {
+  it('counts only actual contract coverage after early termination and rehire', () => {
+    const result = calculateEmploymentLimit(
+      employee([
+        contract('ended-early', '2025-01-01', '2025-06-30', 'sequence-1'),
+        contract('rehired', '2025-09-01', null, 'sequence-2'),
+      ]),
+      new Date('2025-09-30T00:00:00.000Z'),
+    );
+
+    expect(result.cycleStart).toBe('2025-01-01');
+    expect(result.usedDays).toBe(211);
+  });
+
   it('counts an open current contract and projects the calendar-accurate continuous limit', () => {
     const result = calculateEmploymentLimit(
       employee([contract('open', '2026-01-31', null)]),

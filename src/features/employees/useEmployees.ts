@@ -4,6 +4,7 @@ import { useGlobalLoading } from '../../hooks/useGlobalLoading';
 import {
   createEmployee,
   deactivateEmployee,
+  reactivateEmployee,
   subscribeToEmployees,
   updateEmployee,
 } from '../../services/employeesService';
@@ -14,9 +15,13 @@ import {
   endEmployeeEmployment,
   loadEmployeeContractState,
   previewEmployeeContractImpact,
+  previewEmployeeTerminationImpact,
   updateEmployeeContract,
 } from '../../services/employeeContractsService';
-import type { EmployeeContractImpact } from '../../services/employeeContractsService';
+import type {
+  EmployeeContractImpact,
+  EmployeeTerminationImpact,
+} from '../../services/employeeContractsService';
 import type { EmployeeContractState } from '../../services/employeeContractsService';
 import type {
   Employee,
@@ -88,6 +93,12 @@ export function useEmployees() {
     [runMutation],
   );
 
+  const setEmployeeActive = useCallback(
+    (employeeId: EmployeeId) =>
+      runMutation(() => reactivateEmployee(employeeId)),
+    [runMutation],
+  );
+
   const addContract = useCallback(
     (
       employeeId: EmployeeId,
@@ -144,6 +155,20 @@ export function useEmployees() {
     [],
   );
 
+  const previewEmploymentEnd = useCallback(
+    (
+      employeeId: EmployeeId,
+      input: {
+        sequenceId: string;
+        endDate: string;
+        reason: string | null;
+      },
+      expectedRevision: string,
+    ): Promise<EmployeeTerminationImpact> =>
+      previewEmployeeTerminationImpact(employeeId, input, expectedRevision),
+    [],
+  );
+
   const endEmployment = useCallback(
     (
       employeeId: EmployeeId,
@@ -177,11 +202,13 @@ export function useEmployees() {
     addEmployee,
     editEmployee,
     setEmployeeInactive,
+    setEmployeeActive,
     addContract,
     editContract,
     cancelContract,
     previewContractEdit,
     previewContractCancellation,
+    previewEmploymentEnd,
     endEmployment,
     migrateLegacyContract,
     reloadEmployeeContracts,

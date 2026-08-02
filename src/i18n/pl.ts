@@ -457,6 +457,7 @@ export const pl = {
       noStartDate: 'brak daty rozpoczęcia',
       edit: 'Edytuj pracownika: {{name}}',
       deactivate: 'Dezaktywuj pracownika: {{name}}',
+      reactivate: 'Przywróć pracownika jako aktywnego: {{name}}',
       statusConflict:
         'Status techniczny różni się od statusu wynikającego z dat zatrudnienia.',
     },
@@ -484,6 +485,8 @@ export const pl = {
         'Nie udało się zapisać pracownika. Sprawdź dane i spróbuj ponownie.',
       deactivateFailed:
         'Nie udało się dezaktywować pracownika. Spróbuj ponownie.',
+      reactivateFailed:
+        'Nie udało się przywrócić pracownika. Spróbuj ponownie.',
       duplicateTeta: 'Aktywny pracownik z tym numerem TETA już istnieje.',
     },
     form: {
@@ -575,10 +578,18 @@ export const pl = {
       cancel: 'Anuluj',
       confirm: 'Dezaktywuj',
     },
+    reactivate: {
+      title: 'Przywrócić pracownika?',
+      description:
+        'Pracownik {{name}} ponownie otrzyma aktywny status operacyjny. Historia umów nie zostanie zmieniona.',
+      cancel: 'Anuluj',
+      confirm: 'Przywróć',
+    },
     notifications: {
       created: 'Pracownik został dodany.',
       updated: 'Dane pracownika zostały zapisane.',
       deactivated: 'Pracownik został dezaktywowany.',
+      reactivated: 'Pracownik został przywrócony jako aktywny.',
     },
     contracts: {
       title: 'Umowy',
@@ -605,7 +616,14 @@ export const pl = {
         'Daty zatrudnienia pochodzą ze starszego rekordu. Przenieś je jednorazowo do historii umów.',
       migrate: 'Utwórz historię umów',
       endEmployment: 'Zakończ zatrudnienie',
+      endEmploymentEarly: 'Zakończ zatrudnienie wcześniej',
       endEmploymentDate: 'Ostatni dzień zatrudnienia',
+      endEmploymentDateHelp:
+        'Wskaż faktyczny ostatni dzień pracy objęty aktualną umową.',
+      previewEmploymentEnd: 'Sprawdź skutki zakończenia',
+      confirmEmploymentEnd: 'Potwierdź zakończenie zatrudnienia',
+      terminationImpact: 'Wpływ zakończenia zatrudnienia',
+      futureContractsToCancel: 'Późniejsze umowy do anulowania',
       validation:
         'Popraw zakres umowy. Umowy nie mogą się pokrywać ani powtarzać.',
       error: 'Nie udało się zapisać historii umów.',
@@ -623,7 +641,8 @@ export const pl = {
         mutationConflict:
           'Historia umów została zmieniona w innym miejscu. Dane odświeżono — sprawdź je i ponów operację.',
         invalidEmploymentEnd:
-          'Nie można zakończyć zatrudnienia dla nieaktualnej umowy. Historia umów została odświeżona.',
+          'Wybrana data nie jest objęta aktualną sekwencją umów. Sprawdź datę i historię umów.',
+        missingEmploymentEndDate: 'Podaj faktyczny ostatni dzień zatrudnienia.',
       },
       editImpact: 'Wpływ korekty umowy',
       cancellationImpact: 'Wpływ anulowania błędnej umowy',

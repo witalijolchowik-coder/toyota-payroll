@@ -291,6 +291,65 @@ export function latestEmploymentEnd(
   );
 }
 
+export function employmentEndForSequence(
+  employee: Pick<Employee, 'employmentEndEvents'>,
+  sequenceId: string,
+): EmploymentEndEvent | null {
+  return (
+    (employee.employmentEndEvents ?? [])
+      .filter(
+        (event) => event.status === 'ACTIVE' && event.sequenceId === sequenceId,
+      )
+      .sort((a, b) => b.endDate.localeCompare(a.endDate))[0] ?? null
+  );
+}
+
+export interface EmploymentTerminationPlan {
+  targetContract: EmployeeContract;
+  futureContracts: EmployeeContract[];
+  affectedContracts: EmployeeContract[];
+}
+
+/**
+ * Resolves the canonical contract mutation required to end the latest
+ * employment sequence on a coordinator-selected date. A later contract in
+ * the same sequence is a planned continuation and must be cancelled when the
+ * employment ends before it starts.
+ */
+export function planEmploymentTermination(
+  employee: Pick<Employee, 'contracts' | 'employmentEndEvents'>,
+  sequenceId: string,
+  endDate: IsoDate,
+): EmploymentTerminationPlan | null {
+  const latest = resolveLatestContract(employee);
+  if (
+    !latest ||
+    latest.sequenceId !== sequenceId ||
+    employmentEndForSequence(employee, sequenceId)
+  ) {
+    return null;
+  }
+
+  const sequenceContracts = activeContracts(employee).filter(
+    (contract) => contract.sequenceId === sequenceId,
+  );
+  const targetContract = sequenceContracts.find(
+    (contract) =>
+      contract.startDate <= endDate &&
+      (!contract.endDate || contract.endDate >= endDate),
+  );
+  if (!targetContract) return null;
+
+  const futureContracts = sequenceContracts.filter(
+    (contract) => contract.startDate > endDate,
+  );
+  return {
+    targetContract,
+    futureContracts,
+    affectedContracts: [targetContract, ...futureContracts],
+  };
+}
+
 export function requiresContractDecision(
   employee: Pick<Employee, 'contracts' | 'employmentEndEvents'>,
   today = new Date(),

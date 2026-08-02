@@ -1927,6 +1927,108 @@ describe('Firestore security rules', () => {
     await assertFails(deleteDoc(reference));
   });
 
+  it('allows an approved user to restore a technically deactivated employee', async () => {
+    await seedEmployee('employee-1');
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const reference = doc(firestore, 'employees/employee-1');
+
+    await assertSucceeds(
+      updateDoc(reference, {
+        is_active: false,
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(reference, {
+        is_active: true,
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+  });
+
+  it('allows the atomic live-shaped early employment termination writes', async () => {
+    await seedEmployee('employee-1');
+    await seedMonth('2026-07', false);
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const current = doc(firestore, 'employeeContracts/early-current');
+    const future = doc(firestore, 'employeeContracts/early-future');
+    const contractMetadata = modificationMetadata(uid);
+    await setDoc(current, {
+      employee_id: 'employee-1',
+      teta_number: 'TETA-1001',
+      sequence_id: 'sequence-early',
+      start_date: '2026-06-01',
+      end_date: '2026-08-31',
+      status: 'ACTIVE',
+      note: null,
+      ...contractMetadata,
+    });
+    await setDoc(future, {
+      employee_id: 'employee-1',
+      teta_number: 'TETA-1001',
+      sequence_id: 'sequence-early',
+      start_date: '2026-09-01',
+      end_date: '2026-12-31',
+      status: 'ACTIVE',
+      note: null,
+      ...contractMetadata,
+    });
+
+    const batch = writeBatch(firestore);
+    batch.update(current, {
+      end_date: '2026-07-15',
+      updated_at: serverTimestamp(),
+      updated_by: uid,
+    });
+    batch.update(future, {
+      status: 'CANCELLED',
+      updated_at: serverTimestamp(),
+      updated_by: uid,
+    });
+    batch.set(doc(firestore, 'employmentEndEvents/early-end'), {
+      employee_id: 'employee-1',
+      teta_number: 'TETA-1001',
+      sequence_id: 'sequence-early',
+      end_date: '2026-07-15',
+      status: 'ACTIVE',
+      reason: 'Rezygnacja pracownika',
+      ...modificationMetadata(uid),
+    });
+    batch.update(doc(firestore, 'employees/employee-1'), {
+      is_active: false,
+      employment_end_date: new Date('2026-07-15T00:00:00.000Z'),
+      updated_at: serverTimestamp(),
+      updated_by: uid,
+    });
+    batch.update(doc(firestore, 'months/2026-07'), {
+      calculation_status: 'queued',
+      calculation_input_hash: null,
+      updated_at: serverTimestamp(),
+      updated_by: uid,
+    });
+    batch.set(doc(firestore, 'auditLog/early-end-audit'), {
+      entity_path: 'employmentEndEvents/early-end',
+      action: 'create',
+      actor_uid: uid,
+      occurred_at: serverTimestamp(),
+      changes: {
+        operation: 'employment-explicitly-ended',
+        employee_id: 'employee-1',
+        sequence_id: 'sequence-early',
+        end_date: '2026-07-15',
+        shortened_contract_id: 'early-current',
+        cancelled_future_contract_ids: ['early-future'],
+        affected_open_months: ['2026-07'],
+      },
+    });
+
+    await assertSucceeds(batch.commit());
+  });
+
   it('denies payroll setting writes to a non-admin approved user', async () => {
     const uid = 'coordinator-1';
     const firestore = testEnvironment.authenticatedContext(uid).firestore();

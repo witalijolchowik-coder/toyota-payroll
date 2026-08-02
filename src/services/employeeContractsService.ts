@@ -23,8 +23,8 @@ import type {
 import {
   activeContracts,
   employeeContractHistoryRevision,
+  planEmploymentTermination,
   planLegacyContractMigration,
-  resolveLatestContract,
   validateEmployeeContract,
 } from '../utils/employees';
 import {
@@ -62,6 +62,11 @@ export class EmployeeContractServiceError extends Error {
 export interface EmployeeContractImpact {
   openMonths: MonthId[];
   lockedMonths: MonthId[];
+}
+
+export interface EmployeeTerminationImpact extends EmployeeContractImpact {
+  shortenedContractId: string;
+  cancelledFutureContractIds: string[];
 }
 
 export interface EmployeeContractState {
@@ -195,6 +200,22 @@ async function monthImpactForPeriods(
   };
 }
 
+async function monthImpactForTermination(
+  plan: NonNullable<ReturnType<typeof planEmploymentTermination>>,
+  endDate: IsoDate,
+): Promise<{ open: MonthId[]; locked: MonthId[] }> {
+  return monthImpactForPeriods([
+    {
+      // Months before the selected last employment day remain unchanged. The
+      // termination month is included because its individual nominal and
+      // settlement inputs may change after shortening the covering contract.
+      startDate: endDate,
+      endDate: plan.targetContract.endDate,
+    },
+    ...plan.futureContracts,
+  ]);
+}
+
 export async function previewEmployeeContractImpact(
   periods: Array<{ startDate: IsoDate; endDate: IsoDate | null }>,
 ): Promise<EmployeeContractImpact> {
@@ -202,6 +223,31 @@ export async function previewEmployeeContractImpact(
   return {
     openMonths: impact.open,
     lockedMonths: impact.locked,
+  };
+}
+
+export async function previewEmployeeTerminationImpact(
+  employeeId: EmployeeId,
+  input: Omit<EmploymentEndCreateInput, 'employeeId' | 'tetaNumber'>,
+  expectedRevision?: string,
+): Promise<EmployeeTerminationImpact> {
+  const { employee } = await currentMutationState(employeeId, expectedRevision);
+  const plan = planEmploymentTermination(
+    employee,
+    input.sequenceId,
+    input.endDate,
+  );
+  if (!plan) {
+    throw new EmployeeContractServiceError('invalid-employment-end');
+  }
+  const impact = await monthImpactForTermination(plan, input.endDate);
+  return {
+    openMonths: impact.open,
+    lockedMonths: impact.locked,
+    shortenedContractId: plan.targetContract.id,
+    cancelledFutureContractIds: plan.futureContracts.map(
+      (contract) => contract.id,
+    ),
   };
 }
 
@@ -450,20 +496,32 @@ export async function endEmployeeEmployment(
 ): Promise<string> {
   const { repositories, uid } = requireContext();
   const { employee } = await currentMutationState(employeeId, expectedRevision);
-  const latest = resolveLatestContract(employee);
-  if (
-    !latest?.endDate ||
-    latest.sequenceId !== input.sequenceId ||
-    latest.endDate !== input.endDate
-  ) {
+  const plan = planEmploymentTermination(
+    employee,
+    input.sequenceId,
+    input.endDate,
+  );
+  if (!plan) {
     throw new EmployeeContractServiceError('invalid-employment-end');
   }
-  const impact = await monthImpactForPeriods([latest]);
+  const impact = await monthImpactForTermination(plan, input.endDate);
   if (impact.locked.length > 0) {
     throw new EmployeeContractServiceError('locked-month', impact.locked);
   }
   const reference = doc(repositories.employmentEndEvents);
   const batch = writeBatch(repositories.employmentEndEvents.firestore);
+  batch.update(repositories.employeeContract(plan.targetContract.id), {
+    end_date: input.endDate,
+    updated_at: serverTimestamp(),
+    updated_by: uid,
+  });
+  plan.futureContracts.forEach((contract) => {
+    batch.update(repositories.employeeContract(contract.id), {
+      status: 'CANCELLED',
+      updated_at: serverTimestamp(),
+      updated_by: uid,
+    });
+  });
   batch.set(reference, {
     employee_id: employee.id,
     teta_number: employee.tetaNumber,
@@ -502,6 +560,11 @@ export async function endEmployeeEmployment(
       sequence_id: input.sequenceId,
       end_date: input.endDate,
       reason: input.reason,
+      shortened_contract_id: plan.targetContract.id,
+      previous_contract_end_date: plan.targetContract.endDate,
+      cancelled_future_contract_ids: plan.futureContracts.map(
+        (contract) => contract.id,
+      ),
       deposit_return_required: true,
       affected_open_months: impact.open,
     },

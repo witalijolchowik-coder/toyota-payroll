@@ -13,6 +13,7 @@ import type { Employee } from '../../types/firestore';
 
 interface DeactivateEmployeeDialogProps {
   employee: Employee;
+  action: 'deactivate' | 'reactivate';
   isSubmitting: boolean;
   onClose: () => void;
   onConfirm: () => void;
@@ -20,34 +21,37 @@ interface DeactivateEmployeeDialogProps {
 
 export function DeactivateEmployeeDialog({
   employee,
+  action,
   isSubmitting,
   onClose,
   onConfirm,
 }: DeactivateEmployeeDialogProps) {
   const t = useTranslations();
   const employeeName = `${employee.firstName} ${employee.lastName}`;
+  const copy =
+    action === 'deactivate' ? t.employees.deactivate : t.employees.reactivate;
 
   return (
     <Dialog open onClose={isSubmitting ? undefined : onClose} maxWidth="xs">
-      <DialogTitle>{t.employees.deactivate.title}</DialogTitle>
+      <DialogTitle>{copy.title}</DialogTitle>
       <DialogContent>
         <Typography color="text.secondary">
-          {interpolate(t.employees.deactivate.description, {
+          {interpolate(copy.description, {
             name: employeeName,
           })}
         </Typography>
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 2.5 }}>
         <Button onClick={onClose} disabled={isSubmitting}>
-          {t.employees.deactivate.cancel}
+          {copy.cancel}
         </Button>
         <Button
           onClick={onConfirm}
-          color="error"
+          color={action === 'deactivate' ? 'error' : 'primary'}
           variant="contained"
           disabled={isSubmitting}
         >
-          {t.employees.deactivate.confirm}
+          {copy.confirm}
         </Button>
       </DialogActions>
     </Dialog>

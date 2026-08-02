@@ -32,13 +32,14 @@ import {
   EmployeeContractServiceError,
   type EmployeeContractImpact,
   type EmployeeContractState,
+  type EmployeeTerminationImpact,
 } from '../../services/employeeContractsService';
 import {
   contractBreakDays,
   contractStatus,
   continuationDefaults,
   employeeContractHistoryRevision,
-  latestEmploymentEnd,
+  employmentEndForSequence,
   requiresContractDecision,
   resolveLatestContract,
   validateEmployeeContract,
@@ -76,6 +77,15 @@ interface Props {
   onPreviewCancellation: (
     contract: EmployeeContract,
   ) => Promise<EmployeeContractImpact>;
+  onPreviewEmploymentEnd: (
+    employeeId: EmployeeId,
+    input: {
+      sequenceId: string;
+      endDate: string;
+      reason: string | null;
+    },
+    expectedRevision: string,
+  ) => Promise<EmployeeTerminationImpact>;
   onEndEmployment: (
     employeeId: EmployeeId,
     input: {
@@ -100,6 +110,7 @@ export function EmployeeContractsDialog({
   onCancelContract,
   onPreviewUpdate,
   onPreviewCancellation,
+  onPreviewEmploymentEnd,
   onEndEmployment,
   onBootstrapLegacy,
 }: Props) {
@@ -122,6 +133,13 @@ export function EmployeeContractsDialog({
   const [endDate, setEndDate] = useState('');
   const [note, setNote] = useState('');
   const [reason, setReason] = useState('');
+  const [employmentEndDate, setEmploymentEndDate] = useState(() => {
+    const initialLatest = resolveLatestContract(employee);
+    const today = new Date().toISOString().slice(0, 10);
+    return initialLatest?.endDate && initialLatest.endDate < today
+      ? initialLatest.endDate
+      : '';
+  });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [refreshing, setRefreshing] = useState(true);
@@ -132,8 +150,12 @@ export function EmployeeContractsDialog({
   } | null>(null);
   const [cancellationTarget, setCancellationTarget] =
     useState<EmployeeContract | null>(null);
+  const [terminationImpact, setTerminationImpact] =
+    useState<EmployeeTerminationImpact | null>(null);
   const latest = resolveLatestContract(currentEmployee);
-  const ended = latestEmploymentEnd(currentEmployee);
+  const latestSequenceEnd = latest
+    ? employmentEndForSequence(currentEmployee, latest.sequenceId)
+    : null;
 
   useEffect(() => {
     let active = true;
@@ -185,6 +207,7 @@ export function EmployeeContractsDialog({
     setNote('');
     setError(null);
     setImpact(null);
+    setTerminationImpact(null);
     setCancellationTarget(null);
   };
   const beginEdit = (contract: EmployeeContract) => {
@@ -194,6 +217,7 @@ export function EmployeeContractsDialog({
     setNote(contract.note ?? '');
     setError(null);
     setImpact(null);
+    setTerminationImpact(null);
     setCancellationTarget(null);
   };
 
@@ -222,7 +246,8 @@ export function EmployeeContractsDialog({
           currentEmployee.id,
           {
             sequenceId:
-              ended && ended.sequenceId === latest?.sequenceId
+              latestSequenceEnd &&
+              latestSequenceEnd.sequenceId === latest?.sequenceId
                 ? `sequence-${Date.now()}`
                 : (latest?.sequenceId ?? `sequence-${Date.now()}`),
             startDate,
@@ -305,20 +330,32 @@ export function EmployeeContractsDialog({
   };
 
   const finishEmployment = async () => {
-    if (!latest?.endDate) return;
+    if (!latest) return;
+    if (!employmentEndDate) {
+      setError(t.employees.contracts.errors.missingEmploymentEndDate);
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      await onEndEmployment(
-        currentEmployee.id,
-        {
-          sequenceId: latest.sequenceId,
-          endDate: latest.endDate,
-          reason: reason.trim() || null,
-        },
-        contractState.revision,
-      );
+      const input = {
+        sequenceId: latest.sequenceId,
+        endDate: employmentEndDate,
+        reason: reason.trim() || null,
+      };
+      if (!terminationImpact) {
+        const value = await onPreviewEmploymentEnd(
+          currentEmployee.id,
+          input,
+          contractState.revision,
+        );
+        setTerminationImpact(value);
+        return;
+      }
+      if (terminationImpact.lockedMonths.length > 0) return;
+      await onEndEmployment(currentEmployee.id, input, contractState.revision);
       await reloadCurrentState();
+      setTerminationImpact(null);
     } catch (caught) {
       await recoverFromMutationError(caught);
     } finally {
@@ -537,29 +574,49 @@ export function EmployeeContractsDialog({
               </Stack>
             </Stack>
           ) : null}
-          {latest?.endDate && !ended ? (
+          {latest && !latestSequenceEnd ? (
             <Stack
               spacing={1.5}
               sx={{ p: 2, border: 1, borderColor: 'divider', borderRadius: 2 }}
             >
               <Typography variant="h6">
-                {t.employees.contracts.endEmployment}
+                {t.employees.contracts.endEmploymentEarly}
               </Typography>
-              <Typography color="text.secondary">
-                {t.employees.contracts.endEmploymentDate}: {latest.endDate}
-              </Typography>
+              <TextField
+                type="date"
+                label={t.employees.contracts.endEmploymentDate}
+                value={employmentEndDate}
+                onChange={(event) => {
+                  setEmploymentEndDate(event.target.value);
+                  setTerminationImpact(null);
+                }}
+                helperText={t.employees.contracts.endEmploymentDateHelp}
+                slotProps={{ inputLabel: { shrink: true } }}
+              />
               <TextField
                 label={t.employees.contracts.reason}
                 value={reason}
                 onChange={(event) => setReason(event.target.value)}
               />
+              {terminationImpact ? (
+                <ContractImpactAlert
+                  impact={terminationImpact}
+                  kind="termination"
+                />
+              ) : null}
               <Button
                 color="error"
                 variant="outlined"
-                disabled={busy || refreshing}
+                disabled={
+                  busy ||
+                  refreshing ||
+                  Boolean(terminationImpact?.lockedMonths.length)
+                }
                 onClick={() => void finishEmployment()}
               >
-                {t.employees.contracts.endEmployment}
+                {terminationImpact
+                  ? t.employees.contracts.confirmEmploymentEnd
+                  : t.employees.contracts.previewEmploymentEnd}
               </Button>
             </Stack>
           ) : null}
@@ -619,18 +676,22 @@ export function contractErrorMessage(
 function ContractImpactAlert({
   impact,
   cancellation = false,
+  kind,
 }: {
   impact: EmployeeContractImpact;
   cancellation?: boolean;
+  kind?: 'termination';
 }) {
   const t = useTranslations();
   const locked = impact.lockedMonths.length > 0;
   return (
     <Alert severity={locked ? 'error' : 'warning'}>
       <Typography variant="body2" sx={{ fontWeight: 700 }}>
-        {cancellation
-          ? t.employees.contracts.cancellationImpact
-          : t.employees.contracts.editImpact}
+        {kind === 'termination'
+          ? t.employees.contracts.terminationImpact
+          : cancellation
+            ? t.employees.contracts.cancellationImpact
+            : t.employees.contracts.editImpact}
       </Typography>
       <Typography variant="body2">
         {t.employees.contracts.openMonths}:{' '}
@@ -640,6 +701,13 @@ function ContractImpactAlert({
         {t.employees.contracts.lockedMonths}:{' '}
         {impact.lockedMonths.join(', ') || t.employees.contracts.none}
       </Typography>
+      {kind === 'termination' && 'cancelledFutureContractIds' in impact ? (
+        <Typography variant="body2">
+          {t.employees.contracts.futureContractsToCancel}:{' '}
+          {(impact as EmployeeTerminationImpact).cancelledFutureContractIds
+            .length || t.employees.contracts.none}
+        </Typography>
+      ) : null}
       <Typography variant="body2">
         {locked
           ? t.employees.contracts.unlockRequired

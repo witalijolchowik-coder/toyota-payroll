@@ -69,11 +69,13 @@ export function EmployeesPage() {
     addEmployee,
     editEmployee,
     setEmployeeInactive,
+    setEmployeeActive,
     addContract,
     editContract,
     cancelContract,
     previewContractEdit,
     previewContractCancellation,
+    previewEmploymentEnd,
     endEmployment,
     migrateLegacyContract,
     reloadEmployeeContracts,
@@ -107,10 +109,11 @@ export function EmployeesPage() {
     isDepartmentAssignmentImportOpen,
     setIsDepartmentAssignmentImportOpen,
   ] = useState(false);
-  const [deactivationTarget, setDeactivationTarget] = useState<Employee | null>(
-    null,
-  );
-  const [isDeactivating, setIsDeactivating] = useState(false);
+  const [activityTarget, setActivityTarget] = useState<{
+    employee: Employee;
+    action: 'deactivate' | 'reactivate';
+  } | null>(null);
+  const [isUpdatingActivity, setIsUpdatingActivity] = useState(false);
   const [accommodationState, setAccommodationState] = useState<{
     employee: Employee;
     currentAccommodation: EmployeeEntitlement | null;
@@ -163,26 +166,37 @@ export function EmployeesPage() {
     });
   };
 
-  const handleDeactivate = async () => {
-    if (!deactivationTarget) {
+  const handleActivityChange = async () => {
+    if (!activityTarget) {
       return;
     }
 
-    setIsDeactivating(true);
+    setIsUpdatingActivity(true);
     try {
-      await setEmployeeInactive(deactivationTarget.id);
-      setDeactivationTarget(null);
+      if (activityTarget.action === 'deactivate') {
+        await setEmployeeInactive(activityTarget.employee.id);
+      } else {
+        await setEmployeeActive(activityTarget.employee.id);
+      }
+      const action = activityTarget.action;
+      setActivityTarget(null);
       notify({
-        message: t.employees.notifications.deactivated,
+        message:
+          action === 'deactivate'
+            ? t.employees.notifications.deactivated
+            : t.employees.notifications.reactivated,
         severity: 'success',
       });
     } catch {
       notify({
-        message: t.employees.errors.deactivateFailed,
+        message:
+          activityTarget.action === 'deactivate'
+            ? t.employees.errors.deactivateFailed
+            : t.employees.errors.reactivateFailed,
         severity: 'error',
       });
     } finally {
-      setIsDeactivating(false);
+      setIsUpdatingActivity(false);
     }
   };
 
@@ -376,7 +390,12 @@ export function EmployeesPage() {
               setSort((current) => nextEmployeeSort(current, key))
             }
             onEdit={(employee) => setFormState({ mode: 'edit', employee })}
-            onDeactivate={setDeactivationTarget}
+            onDeactivate={(employee) =>
+              setActivityTarget({ employee, action: 'deactivate' })
+            }
+            onReactivate={(employee) =>
+              setActivityTarget({ employee, action: 'reactivate' })
+            }
             onContracts={(employee) => setContractsEmployeeId(employee.id)}
             entitlements={entitlements}
             onAccommodation={(employee, currentAccommodation) =>
@@ -427,6 +446,7 @@ export function EmployeesPage() {
           }
           onPreviewUpdate={previewContractEdit}
           onPreviewCancellation={previewContractCancellation}
+          onPreviewEmploymentEnd={previewEmploymentEnd}
           onEndEmployment={async (employeeId, input, revision) => {
             await endEmployment(employeeId, input, revision);
           }}
@@ -436,12 +456,13 @@ export function EmployeesPage() {
         />
       ) : null}
 
-      {deactivationTarget ? (
+      {activityTarget ? (
         <DeactivateEmployeeDialog
-          employee={deactivationTarget}
-          isSubmitting={isDeactivating}
-          onClose={() => setDeactivationTarget(null)}
-          onConfirm={handleDeactivate}
+          employee={activityTarget.employee}
+          action={activityTarget.action}
+          isSubmitting={isUpdatingActivity}
+          onClose={() => setActivityTarget(null)}
+          onConfirm={handleActivityChange}
         />
       ) : null}
 

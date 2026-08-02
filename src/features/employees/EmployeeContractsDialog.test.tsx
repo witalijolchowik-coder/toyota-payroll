@@ -75,11 +75,23 @@ function renderDialog(options: {
   onCreate?: ReturnType<typeof vi.fn>;
   onUpdate?: ReturnType<typeof vi.fn>;
   onCancelContract?: ReturnType<typeof vi.fn>;
+  onPreviewEmploymentEnd?: ReturnType<typeof vi.fn>;
+  onEndEmployment?: ReturnType<typeof vi.fn>;
 }) {
   const onCreate = options.onCreate ?? vi.fn(async () => undefined);
   const onUpdate = options.onUpdate ?? vi.fn(async () => undefined);
   const onCancelContract =
     options.onCancelContract ?? vi.fn(async () => undefined);
+  const onPreviewEmploymentEnd =
+    options.onPreviewEmploymentEnd ??
+    vi.fn(async () => ({
+      openMonths: [],
+      lockedMonths: [],
+      shortenedContractId: 'contract-1',
+      cancelledFutureContractIds: [],
+    }));
+  const onEndEmployment =
+    options.onEndEmployment ?? vi.fn(async () => undefined);
   render(
     <EmployeeContractsDialog
       employee={options.initial}
@@ -96,14 +108,63 @@ function renderDialog(options: {
         openMonths: [],
         lockedMonths: [],
       }))}
-      onEndEmployment={vi.fn(async () => undefined)}
+      onPreviewEmploymentEnd={
+        onPreviewEmploymentEnd as DialogProps['onPreviewEmploymentEnd']
+      }
+      onEndEmployment={onEndEmployment as DialogProps['onEndEmployment']}
       onBootstrapLegacy={vi.fn(async () => undefined)}
     />,
   );
-  return { onCreate, onUpdate, onCancelContract };
+  return {
+    onCreate,
+    onUpdate,
+    onCancelContract,
+    onPreviewEmploymentEnd,
+    onEndEmployment,
+  };
 }
 
 describe('EmployeeContractsDialog canonical contract session', () => {
+  it('allows early employment termination while the current contract is still open', async () => {
+    const current = employee([contract('current', '2026-06-01', null)]);
+    const onReload = vi.fn().mockResolvedValue(state(current));
+    const { onPreviewEmploymentEnd, onEndEmployment } = renderDialog({
+      initial: current,
+      onReload,
+    });
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Ostatni dzień zatrudnienia')).toBeEnabled(),
+    );
+    fireEvent.change(screen.getByLabelText('Ostatni dzień zatrudnienia'), {
+      target: { value: '2026-07-15' },
+    });
+    fireEvent.change(screen.getByLabelText('Powód zakończenia zatrudnienia'), {
+      target: { value: 'Rezygnacja pracownika' },
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Sprawdź skutki zakończenia' }),
+    );
+
+    await waitFor(() =>
+      expect(onPreviewEmploymentEnd).toHaveBeenCalledWith(
+        current.id,
+        {
+          sequenceId: 'legacy-sequence',
+          endDate: '2026-07-15',
+          reason: 'Rezygnacja pracownika',
+        },
+        state(current).revision,
+      ),
+    );
+    fireEvent.click(
+      screen.getByRole('button', {
+        name: 'Potwierdź zakończenie zatrudnienia',
+      }),
+    );
+    await waitFor(() => expect(onEndEmployment).toHaveBeenCalledTimes(1));
+  });
+
   it('edits an open-ended legacy contract and adds its continuation without reopening', async () => {
     const openEnded = employee([contract('legacy', '2026-04-24', null)]);
     const edited = employee([contract('legacy', '2026-04-24', '2026-05-31')]);

@@ -72,6 +72,13 @@ daty ostatniego dnia, notatki i aktora. Data musi być pokryta najnowszą umową
 i zwykle jest jej datą końcową. Po ostatnim dniu pracownik trafia do archiwum,
 ale pozostaje w historycznych rozliczeniach.
 
+Jawne zakończenie może również nastąpić przed planowanym końcem umowy albo dla
+umowy bezterminowej. Koordynator podaje faktyczny ostatni dzień zatrudnienia i
+powód. System w jednej operacji skraca umowę pokrywającą ten dzień, anuluje
+późniejsze planowane umowy tej samej sekwencji i tworzy zdarzenie zakończenia.
+Nie jest to anulowanie błędnej umowy: skrócona umowa pozostaje w historii jako
+rzeczywisty okres zatrudnienia.
+
 Jeżeli zakwaterowanie firmowe nadal trwa i kaucja jest zatrzymana, zakończenie
 zatrudnienia zwraca ją w końcowym miesiącu. Identyfikator epizodu zapobiega
 podwójnemu zwrotowi, a istniejące ręczne pomniejszenie zwrotu jest zachowane.
@@ -81,6 +88,11 @@ podwójnemu zwrotowi, a istniejące ręczne pomniejszenie zwrotu jest zachowane.
 Powrót nie tworzy drugiego pracownika. Nowa umowa rozpoczyna nową sekwencję,
 a poprzednie umowy, zdarzenia zakończenia, rozliczenia i epizody
 zakwaterowania pozostają w historii.
+
+Techniczne `is_active` służy wyłącznie bieżącej koordynacji. Ręczna
+dezaktywacja nie kończy umowy ani zatrudnienia i może zostać cofnięta bez
+zmiany historii umów. Pracownika z jawnym zdarzeniem zakończenia przywraca się
+przez nową umowę i nową sekwencję, a nie przez samo przełączenie statusu.
 
 ## Limit 18 miesięcy
 
