@@ -26,7 +26,7 @@ describe('monthly schedule planning', () => {
   });
 
   it('rotates three-shift departments weekly using department-local anchor', () => {
-    const metal = department('metal', 'Metal', 'THREE_SHIFT');
+    const metal = department('metal-402b', 'Metal 402B', 'THREE_SHIFT');
 
     expect(
       resolveRotatingShift({
@@ -52,7 +52,11 @@ describe('monthly schedule planning', () => {
   });
 
   it('rotates two-shift departments and rejects Blue in two-shift mode', () => {
-    const szwalnia = department('szwalnia', 'Szwalnia', 'TWO_SHIFT');
+    const szwalnia = department(
+      'szwalnia-toyota',
+      'Szwalnia Toyota',
+      'TWO_SHIFT',
+    );
 
     expect(
       resolveRotatingShift({
@@ -79,27 +83,27 @@ describe('monthly schedule planning', () => {
 
   it('uses effective-dated assignment transfers from the effective date', () => {
     const worker = employee({
-      departmentId: 'metal',
+      departmentId: 'metal-402b',
       shiftAssignment: 'RED',
       employmentStartDate: date('2026-06-01'),
     });
     const assignments: EmployeeAssignment[] = [
-      assignment(worker, 'metal', 'RED', '2026-06-01', '2026-06-14'),
-      assignment(worker, 'montaz', 'WHITE', '2026-06-15', null),
+      assignment(worker, 'metal-402b', 'RED', '2026-06-01', '2026-06-14'),
+      assignment(worker, 'montaz-toyota', 'WHITE', '2026-06-15', null),
     ];
 
     expect(
       resolveEffectiveAssignment(worker, '2026-06-14', assignments),
-    ).toEqual({ departmentId: 'metal', shiftAssignment: 'RED' });
+    ).toEqual({ departmentId: 'metal-402b', shiftAssignment: 'RED' });
     expect(
       resolveEffectiveAssignment(worker, '2026-06-15', assignments),
-    ).toEqual({ departmentId: 'montaz', shiftAssignment: 'WHITE' });
+    ).toEqual({ departmentId: 'montaz-toyota', shiftAssignment: 'WHITE' });
   });
 
   it('marks first two working days from employment start as BHP and skips holidays', () => {
     const worker = employee({
       employmentStartDate: date('2026-06-04'),
-      departmentId: 'metal',
+      departmentId: 'metal-402b',
       shiftAssignment: 'RED',
     });
     const days = createCalendarDays('2026-06', {
@@ -108,7 +112,7 @@ describe('monthly schedule planning', () => {
     const schedule = generateEmployeeMonthlySchedule({
       employee: worker,
       days,
-      departments: [department('metal', 'Metal', 'THREE_SHIFT')],
+      departments: [department('metal-402b', 'Metal 402B', 'THREE_SHIFT')],
       options: {
         publicHolidays: getPublicHolidaysForYear(2026),
         publicHolidayNames: getPublicHolidayNamesForYear(2026),
@@ -126,7 +130,7 @@ describe('monthly schedule planning', () => {
 
   it('applies manual schedule correction over automatic plan', () => {
     const worker = employee({
-      departmentId: 'metal',
+      departmentId: 'metal-402b',
       shiftAssignment: 'RED',
       employmentStartDate: date('2026-06-01'),
     });
@@ -139,7 +143,7 @@ describe('monthly schedule planning', () => {
     const schedule = generateEmployeeMonthlySchedule({
       employee: worker,
       days,
-      departments: [department('metal', 'Metal', 'THREE_SHIFT')],
+      departments: [department('metal-402b', 'Metal 402B', 'THREE_SHIFT')],
       options: { corrections },
     });
 
@@ -151,7 +155,7 @@ describe('monthly schedule planning', () => {
 
   it('does not produce blank relevant days', () => {
     const worker = employee({
-      departmentId: 'metal',
+      departmentId: 'metal-402b',
       shiftAssignment: 'RED',
       employmentStartDate: date('2026-06-01'),
     });
@@ -160,7 +164,7 @@ describe('monthly schedule planning', () => {
       days: createCalendarDays('2026-06', {
         publicHolidays: getPublicHolidaysForYear(2026),
       }),
-      departments: [department('metal', 'Metal', 'THREE_SHIFT')],
+      departments: [department('metal-402b', 'Metal 402B', 'THREE_SHIFT')],
     });
 
     expect(hasNoBlankRelevantScheduleDays(schedule)).toBe(true);

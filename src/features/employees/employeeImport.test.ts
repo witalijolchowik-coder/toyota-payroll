@@ -85,7 +85,7 @@ describe('employee import foundation', () => {
           firstName: 'Anna',
           lastName: 'Kowalska',
           tetaNumber: 'WT-001',
-          departmentName: 'METAL',
+          departmentName: 'Metal 402B',
           contractStartDate: date('2026-06-03'),
           contractEndDate: null,
         },
@@ -103,7 +103,7 @@ describe('employee import foundation', () => {
         },
       ],
       existingEmployees: [],
-      departments: [department('metal', 'Metal')],
+      departments: [department('metal-402b', 'Metal 402B')],
       accommodationVariants: [],
     });
 
@@ -112,7 +112,7 @@ describe('employee import foundation', () => {
       status: 'new',
       tetaNumber: 'WT-001',
       pesel: '81010112345',
-      departmentId: 'metal',
+      departmentId: 'metal-402b',
     });
     expect(preview[0].createInput).toMatchObject({
       tetaNumber: 'WT-001',
@@ -130,14 +130,14 @@ describe('employee import foundation', () => {
           firstName: 'Anna',
           lastName: 'Kowalska',
           tetaNumber: 'WT-001',
-          departmentName: 'METAL',
+          departmentName: 'Metal 402B',
           contractStartDate: date('2026-06-03'),
           contractEndDate: null,
         },
       ],
       sozRows: [],
       existingEmployees: [employee('existing-id', 'WT-001')],
-      departments: [department('metal', 'Metal')],
+      departments: [department('metal-402b', 'Metal 402B')],
       accommodationVariants: [],
     });
 
@@ -149,7 +149,7 @@ describe('employee import foundation', () => {
   it('blocks duplicated TETA numbers inside the import batch', () => {
     const common = {
       source: 'toyota' as const,
-      departmentName: 'METAL',
+      departmentName: 'Metal 402B',
       contractStartDate: date('2026-06-03'),
       contractEndDate: null,
     };
@@ -172,7 +172,7 @@ describe('employee import foundation', () => {
       ],
       sozRows: [],
       existingEmployees: [],
-      departments: [department('metal', 'Metal')],
+      departments: [department('metal-402b', 'Metal 402B')],
       accommodationVariants: [],
     });
 
@@ -191,14 +191,14 @@ describe('employee import foundation', () => {
           firstName: 'Anna',
           lastName: 'Kowalska',
           tetaNumber: '',
-          departmentName: 'METAL',
+          departmentName: 'Metal 402B',
           contractStartDate: null,
           contractEndDate: null,
         },
       ],
       sozRows: [],
       existingEmployees: [],
-      departments: [department('metal', 'Metal')],
+      departments: [department('metal-402b', 'Metal 402B')],
       accommodationVariants: [],
     });
 
@@ -224,7 +224,7 @@ describe('employee import foundation', () => {
       ],
       sozRows: [],
       existingEmployees: [],
-      departments: [department('metal', 'Metal')],
+      departments: [department('metal-402b', 'Metal 402B')],
       accommodationVariants: [],
     });
 
@@ -241,7 +241,7 @@ describe('employee import foundation', () => {
           firstName: 'Anna',
           lastName: 'Boiko',
           tetaNumber: 'WT-002',
-          departmentName: 'METAL',
+          departmentName: 'Metal 402B',
           contractStartDate: date('2026-06-03'),
           contractEndDate: null,
         },
@@ -259,7 +259,7 @@ describe('employee import foundation', () => {
         },
       ],
       existingEmployees: [],
-      departments: [department('metal', 'Metal')],
+      departments: [department('metal-402b', 'Metal 402B')],
       accommodationVariants: [],
     });
 

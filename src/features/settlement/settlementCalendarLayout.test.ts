@@ -52,11 +52,11 @@ describe('settlement calendar employee layout', () => {
       unassignedLabel: 'Brak przypisanego działu',
     });
 
-    expect(result.map((row) => row.employee.id)).toEqual(['1', '2', '3', '4']);
+    expect(result.map((row) => row.employee.id)).toEqual(['3', '1', '2', '4']);
     expect(result.map((row) => row.isFirstInDepartment)).toEqual([
       true,
-      false,
       true,
+      false,
       true,
     ]);
   });

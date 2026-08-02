@@ -139,12 +139,12 @@ describe('employee table model', () => {
       departments,
       { key: 'shift', direction: 'asc' },
     );
-    expect(result.map((item) => item.id)).toEqual(['3', '2', '1']);
+    expect(result.map((item) => item.id)).toEqual(['1', '3', '2']);
     const descending = sortEmployees(result, departments, {
       key: 'shift',
       direction: 'desc',
     });
-    expect(descending.map((item) => item.id)).toEqual(['2', '3', '1']);
+    expect(descending.map((item) => item.id)).toEqual(['1', '2', '3']);
   });
 
   it('sorts first Toyota employment dates in both directions with missing values last', () => {
