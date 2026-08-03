@@ -99,6 +99,19 @@ export function resolveDepartmentShiftCorrection(
   return preceding.at(-1) ?? active[0] ?? null;
 }
 
+export function findActiveDepartmentShiftCorrectionsAtDate(
+  corrections: readonly DepartmentShiftCorrection[],
+  departmentId: DepartmentId,
+  effectiveDate: IsoDate,
+): DepartmentShiftCorrection[] {
+  return corrections.filter(
+    (correction) =>
+      correction.status === 'ACTIVE' &&
+      correction.departmentId === departmentId &&
+      correction.effectiveDate === effectiveDate,
+  );
+}
+
 export function resolveDepartmentMode(
   departmentId: DepartmentId,
   date: IsoDate,

@@ -4,6 +4,7 @@ import type {
 } from '../../types/firestore';
 import {
   DEFAULT_SHIFT_HOURS,
+  findActiveDepartmentShiftCorrectionsAtDate,
   previewDepartmentRotation,
   resolveDepartmentRotationShift,
   resolveDepartmentShiftCorrection,
@@ -154,6 +155,35 @@ describe('department-local shift corrections', () => {
         corrections,
       }),
     ).toBe('SECOND');
+  });
+
+  it('finds the active headliner-bmw point that must be replaced for the same date', () => {
+    const corrections = [
+      correction({
+        id: 'headliner-current',
+        departmentId: 'headliner-bmw',
+        effectiveDate: '2026-07-06',
+      }),
+      correction({
+        id: 'headliner-cancelled',
+        departmentId: 'headliner-bmw',
+        effectiveDate: '2026-07-06',
+        status: 'CANCELLED',
+      }),
+      correction({
+        id: 'headliner-next',
+        departmentId: 'headliner-bmw',
+        effectiveDate: '2026-07-20',
+      }),
+    ];
+
+    expect(
+      findActiveDepartmentShiftCorrectionsAtDate(
+        corrections,
+        'headliner-bmw',
+        '2026-07-06',
+      ).map((item) => item.id),
+    ).toEqual(['headliner-current']);
   });
 
   it('previews the previous, selected and future ISO weeks', () => {

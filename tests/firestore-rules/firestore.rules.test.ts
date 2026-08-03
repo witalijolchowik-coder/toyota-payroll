@@ -2334,6 +2334,110 @@ describe('Firestore security rules', () => {
     );
   });
 
+  it('allows an approved user to replace a headliner-bmw correction atomically', async () => {
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const previous = doc(
+      firestore,
+      'departmentShiftCorrections',
+      'headliner-bmw-2026-07-06-original',
+    );
+    const replacement = doc(
+      firestore,
+      'departmentShiftCorrections',
+      'headliner-bmw-2026-07-06-replacement',
+    );
+    const originalPayload = {
+      department_id: 'headliner-bmw',
+      effective_date: '2026-07-06',
+      shift_mode: 'THREE_SHIFT',
+      group_assignments: { RED: 'FIRST', WHITE: 'SECOND', BLUE: 'NIGHT' },
+      status: 'ACTIVE',
+      note: null,
+      ...modificationMetadata(uid),
+    };
+
+    await assertSucceeds(setDoc(previous, originalPayload));
+
+    const batch = writeBatch(firestore);
+    batch.update(previous, {
+      status: 'CANCELLED',
+      updated_at: serverTimestamp(),
+      updated_by: uid,
+    });
+    batch.set(replacement, {
+      ...originalPayload,
+      group_assignments: { RED: 'SECOND', WHITE: 'NIGHT', BLUE: 'FIRST' },
+    });
+    batch.set(doc(collection(firestore, 'auditLog')), {
+      entity_path: `departmentShiftCorrections/${previous.id}`,
+      action: 'update',
+      actor_uid: uid,
+      occurred_at: serverTimestamp(),
+      changes: {
+        previous_status: 'ACTIVE',
+        new_status: 'CANCELLED',
+        replacement_correction_id: replacement.id,
+      },
+    });
+    batch.set(doc(collection(firestore, 'auditLog')), {
+      entity_path: `departmentShiftCorrections/${replacement.id}`,
+      action: 'create',
+      actor_uid: uid,
+      occurred_at: serverTimestamp(),
+      changes: {
+        department_id: 'headliner-bmw',
+        effective_date: '2026-07-06',
+        replaced_correction_ids: [previous.id],
+      },
+    });
+    await assertSucceeds(batch.commit());
+
+    expect((await getDoc(previous)).data()?.status).toBe('CANCELLED');
+    expect((await getDoc(replacement)).data()?.status).toBe('ACTIVE');
+  });
+
+  it('accepts every canonical department ID in shift corrections', async () => {
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const departmentIds = [
+      'montaz-toyota',
+      'headliner-bmw',
+      'pu-toyota',
+      'szwalnia-toyota',
+      'metal-402b',
+      'metal-936b',
+      'magazyn',
+    ];
+
+    await Promise.all(
+      departmentIds.map((departmentId) =>
+        assertSucceeds(
+          setDoc(
+            doc(
+              firestore,
+              'departmentShiftCorrections',
+              `${departmentId}-2026-07-06`,
+            ),
+            {
+              department_id: departmentId,
+              effective_date: '2026-07-06',
+              shift_mode: 'THREE_SHIFT',
+              group_assignments: {
+                RED: 'FIRST',
+                WHITE: 'SECOND',
+                BLUE: 'NIGHT',
+              },
+              status: 'ACTIVE',
+              note: null,
+              ...modificationMetadata(uid),
+            },
+          ),
+        ),
+      ),
+    );
+  });
+
   it('denies inactive users and deletion of historical shift configuration', async () => {
     await seedAppUser('inactive-user', { active: false });
     const inactive = testEnvironment

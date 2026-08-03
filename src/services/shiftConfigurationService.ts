@@ -15,6 +15,7 @@ import type {
   ShiftHoursVersionCreateInput,
 } from '../types/firestore';
 import {
+  findActiveDepartmentShiftCorrectionsAtDate,
   validateDepartmentShiftCorrection,
   validateShiftHours,
   type ShiftCorrectionImpactSummary,
@@ -27,10 +28,7 @@ import {
 import { getFirestoreRepositories } from './firestoreService';
 
 export type ShiftConfigurationServiceErrorCode =
-  | 'firebase-unavailable'
-  | 'authentication-required'
-  | 'invalid-input'
-  | 'duplicate-correction';
+  'firebase-unavailable' | 'authentication-required' | 'invalid-input';
 
 export class ShiftConfigurationServiceError extends Error {
   constructor(readonly code: ShiftConfigurationServiceErrorCode) {
@@ -121,18 +119,35 @@ export async function createDepartmentShiftCorrection(
   }
   const { repositories, uid } = await requireContext();
   const existing = await loadDepartmentShiftCorrections();
-  if (
-    existing.some(
-      (correction) =>
-        correction.status === 'ACTIVE' &&
-        correction.departmentId === input.departmentId &&
-        correction.effectiveDate === input.effectiveDate,
-    )
-  ) {
-    throw new ShiftConfigurationServiceError('duplicate-correction');
-  }
+  const replacedCorrections = findActiveDepartmentShiftCorrectionsAtDate(
+    existing,
+    input.departmentId,
+    input.effectiveDate,
+  );
   const reference = doc(repositories.departmentShiftCorrections);
   const batch = writeBatch(repositories.departmentShiftCorrections.firestore);
+  replacedCorrections.forEach((replacedCorrection) => {
+    batch.update(
+      doc(repositories.departmentShiftCorrections, replacedCorrection.id),
+      {
+        status: 'CANCELLED',
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      },
+    );
+    appendAuditEntryToBatch(batch, repositories, {
+      entityPath: `departmentShiftCorrections/${replacedCorrection.id}`,
+      action: 'update',
+      actorUid: uid,
+      changes: {
+        department_id: replacedCorrection.departmentId,
+        effective_date: replacedCorrection.effectiveDate,
+        previous_status: replacedCorrection.status,
+        new_status: 'CANCELLED',
+        replacement_correction_id: reference.id,
+      },
+    });
+  });
   batch.set(reference, {
     department_id: input.departmentId,
     effective_date: input.effectiveDate,
@@ -156,6 +171,9 @@ export async function createDepartmentShiftCorrection(
     actorUid: uid,
     changes: {
       correction_id: reference.id,
+      replaced_correction_ids: replacedCorrections.map(
+        (correction) => correction.id,
+      ),
       department_id: input.departmentId,
       effective_date: input.effectiveDate,
       shift_mode: input.shiftMode,
