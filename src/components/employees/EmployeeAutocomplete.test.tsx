@@ -92,9 +92,7 @@ describe('EmployeeAutocomplete', () => {
       />,
     );
 
-    fireEvent.click(
-      screen.getByRole('button', { name: pl.employeeSelector.clear }),
-    );
+    fireEvent.click(screen.getByTitle(pl.employeeSelector.clear));
     expect(onChange).toHaveBeenCalledWith(null);
   });
 });

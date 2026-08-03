@@ -53,7 +53,9 @@ describe('AbsenceFormDialog employee workflow', () => {
       />,
     );
 
-    const selector = screen.getByLabelText(pl.absences.form.employee);
+    const selector = screen.getByRole('combobox', {
+      name: new RegExp(pl.absences.form.employee),
+    });
     fireEvent.change(selector, { target: { value: 'zak anna' } });
     fireEvent.keyDown(selector, { key: 'ArrowDown' });
     fireEvent.keyDown(selector, { key: 'Enter' });
