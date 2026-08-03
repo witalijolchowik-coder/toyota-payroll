@@ -40,7 +40,9 @@ import type {
 } from '../types/firestore';
 import {
   mapAbsenceDocument,
+  mapEmployeeContractDocument,
   mapEmployeeDocument,
+  mapEmploymentEndEventDocument,
   mapMonthDocument,
 } from './firestore/mappers';
 import {
@@ -49,6 +51,7 @@ import {
 } from './firestoreService';
 import { appendAuditEntryToBatch } from './auditService';
 import { dailyValueDocumentId } from './firestore/paths';
+import { hydrateEmployeesWithEmploymentHistory } from './employeeHistoryHydration';
 
 export type AbsenceServiceErrorCode =
   | 'firebase-unavailable'
@@ -250,23 +253,41 @@ export async function loadAbsenceWorkspace(
   const { repositories } = requireContext();
   const currentMonthId = currentPayrollMonthId(new Date());
   const monthRepository = repositories.forMonth(selectedMonthId);
-  const [monthSnapshot, employeesSnapshot, absences, currentAbsences] =
-    await Promise.all([
-      getDoc(monthRepository.month),
-      getDocs(query(repositories.employees, orderBy('teta_number'))),
-      loadAbsencesOverlappingMonth(selectedMonthId),
-      selectedMonthId === currentMonthId
-        ? Promise.resolve(null)
-        : loadAbsencesOverlappingMonth(currentMonthId),
-    ]);
+  const [
+    monthSnapshot,
+    employeesSnapshot,
+    contractsSnapshot,
+    endEventsSnapshot,
+    absences,
+    currentAbsences,
+  ] = await Promise.all([
+    getDoc(monthRepository.month),
+    getDocs(query(repositories.employees, orderBy('teta_number'))),
+    getDocs(repositories.employeeContracts),
+    getDocs(repositories.employmentEndEvents),
+    loadAbsencesOverlappingMonth(selectedMonthId),
+    selectedMonthId === currentMonthId
+      ? Promise.resolve(null)
+      : loadAbsencesOverlappingMonth(currentMonthId),
+  ]);
+
+  const employees = hydrateEmployeesWithEmploymentHistory(
+    employeesSnapshot.docs.map((document) =>
+      mapEmployeeDocument(document.id, document.data()),
+    ),
+    contractsSnapshot.docs.map((document) =>
+      mapEmployeeContractDocument(document.id, document.data()),
+    ),
+    endEventsSnapshot.docs.map((document) =>
+      mapEmploymentEndEventDocument(document.id, document.data()),
+    ),
+  );
 
   return {
     month: monthSnapshot.exists()
       ? mapMonthDocument(selectedMonthId, monthSnapshot.data())
       : null,
-    employees: employeesSnapshot.docs.map((document) =>
-      mapEmployeeDocument(document.id, document.data()),
-    ),
+    employees,
     absences,
     currentAbsences: currentAbsences ?? absences,
   };

@@ -73,6 +73,28 @@ The Absences workspace shows current-day cards:
 
 The main Dashboard is unchanged in this block.
 
+## Selected-month workspace membership
+
+The Absences workspace is scoped to the selected month. Its table and employee
+selector include only employees whose canonical ACTIVE contract history
+overlaps that month:
+
+```text
+contract.start_date <= month_end
+AND
+(contract.end_date is null OR contract.end_date >= month_start)
+```
+
+Current `is_active` is not used for historical month membership. An absence
+owned by an earlier month remains visible when its range overlaps the selected
+month and the employee has at least one covered employment day in that month.
+Employees whose employment ended before the selected month are not shown.
+
+L4 status remains relative to today: an imported L4 covering today is active
+and shown in green; an imported historical L4 is inactive. Employment-boundary
+verification uses the complete canonical contract history rather than legacy
+single employment dates.
+
 ## Deferred work
 
 This block does not implement payroll amounts, final absence-hour

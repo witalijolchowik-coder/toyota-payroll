@@ -1,4 +1,5 @@
-import type { IsoDate } from '../../types/firestore';
+import type { Employee, IsoDate } from '../../types/firestore';
+import { employeeContractsOverlapRange } from '../employees';
 import type { EmploymentPeriod } from '../payroll';
 import { dateToIsoDate } from '../payroll';
 
@@ -148,6 +149,16 @@ export function absenceCoversDate(
   date: IsoDate,
 ): boolean {
   return absence.startDate <= date && absence.endDate >= date;
+}
+
+export function employeesParticipatingInAbsenceMonth(
+  employees: readonly Employee[],
+  monthStart: IsoDate,
+  monthEnd: IsoDate,
+): Employee[] {
+  return employees.filter((employee) =>
+    employeeContractsOverlapRange(employee, monthStart, monthEnd),
+  );
 }
 
 export function isL4Absence(

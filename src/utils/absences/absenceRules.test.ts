@@ -1,15 +1,48 @@
-import type { IsoDate } from '../../types/firestore';
+import type {
+  Employee,
+  EmployeeContract,
+  IsoDate,
+} from '../../types/firestore';
 import {
   absenceEmploymentIssue,
   absenceRangesOverlap,
   absenceRemovesVirtualDefault,
   countUniqueEmployeesOnConfirmedL4Today,
   deriveL4BusinessStatus,
+  employeesParticipatingInAbsenceMonth,
   findBlockingL4,
   resolveGoverningAbsence,
   validateAbsenceInput,
   type AbsenceRuleRecord,
 } from '.';
+
+function employee(id: string, contracts: EmployeeContract[]): Employee {
+  return {
+    id,
+    tetaNumber: `TETA-${id}`,
+    firstName: id,
+    lastName: 'Pracownik',
+    isActive: true,
+    contracts,
+  } as Employee;
+}
+
+function contract(
+  id: string,
+  startDate: IsoDate,
+  endDate: IsoDate | null,
+): EmployeeContract {
+  return {
+    id,
+    employeeId: 'employee',
+    tetaNumber: 'TETA',
+    sequenceId: 'sequence',
+    startDate,
+    endDate,
+    status: 'ACTIVE',
+    note: null,
+  } as EmployeeContract;
+}
 
 function absence(
   overrides: Partial<AbsenceRuleRecord> = {},
@@ -218,6 +251,26 @@ describe('absence overlap and L4 priority', () => {
 });
 
 describe('calendar and employment safety', () => {
+  it('selects month participants from canonical contract history', () => {
+    const juneOnly = employee('june', [
+      contract('june-contract', '2026-06-01', '2026-06-30'),
+    ]);
+    const julyFirstDay = employee('july-first-day', [
+      contract('cross-month-contract', '2026-06-15', '2026-07-01'),
+    ]);
+    const julyCurrent = employee('july-current', [
+      contract('current-contract', '2026-07-20', null),
+    ]);
+
+    expect(
+      employeesParticipatingInAbsenceMonth(
+        [juneOnly, julyFirstDay, julyCurrent],
+        '2026-07-01',
+        '2026-07-31',
+      ).map((item) => item.id),
+    ).toEqual(['july-first-day', 'july-current']);
+  });
+
   it('keeps an absence on a non-working day and removes the virtual default', () => {
     const resolution = resolveGoverningAbsence(
       [absence({ startDate: '2026-06-14', endDate: '2026-06-14' })],

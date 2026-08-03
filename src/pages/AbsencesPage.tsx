@@ -58,13 +58,18 @@ import {
   absenceCoversDate,
   countUniqueEmployeesOnConfirmedL4Today,
   deriveL4BusinessStatus,
+  employeesParticipatingInAbsenceMonth,
   normalizeAbsenceCode,
 } from '../utils/absences';
 import {
-  activeContracts,
+  isDateCoveredByContracts,
   isRangeFullyCoveredByContracts,
 } from '../utils/employees';
-import { currentPayrollMonthId } from '../utils/payroll';
+import {
+  currentPayrollMonthId,
+  dateToIsoDate,
+  getPayrollMonthDateRange,
+} from '../utils/payroll';
 import { routes } from '../utils/routes';
 
 type FormState = { mode: 'add' } | { mode: 'edit'; absence: Absence } | null;
@@ -106,13 +111,42 @@ export function AbsencesPage() {
     () => new Map(employees.map((employee) => [employee.id, employee])),
     [employees],
   );
+  const selectedMonthRange = useMemo(
+    () => getPayrollMonthDateRange(monthId),
+    [monthId],
+  );
+  const selectedMonthStart = dateToIsoDate(selectedMonthRange.start);
+  const selectedMonthEnd = dateToIsoDate(selectedMonthRange.end);
+  const participatingEmployees = useMemo(
+    () =>
+      employeesParticipatingInAbsenceMonth(
+        employees,
+        selectedMonthStart,
+        selectedMonthEnd,
+      ),
+    [employees, selectedMonthEnd, selectedMonthStart],
+  );
+  const participatingEmployeeIds = useMemo(
+    () => new Set(participatingEmployees.map((employee) => employee.id)),
+    [participatingEmployees],
+  );
+  const effectiveEmployeeFilter =
+    employeeFilter === 'all' || participatingEmployeeIds.has(employeeFilter)
+      ? employeeFilter
+      : 'all';
   const isWritable = Boolean(month && !month.isSettled);
 
   const today = localIsoDate();
   const filteredAbsences = useMemo(
     () =>
       absences.filter((absence) => {
-        if (employeeFilter !== 'all' && absence.employeeId !== employeeFilter) {
+        if (!participatingEmployeeIds.has(absence.employeeId)) {
+          return false;
+        }
+        if (
+          effectiveEmployeeFilter !== 'all' &&
+          absence.employeeId !== effectiveEmployeeFilter
+        ) {
           return false;
         }
         const normalizedCode = normalizeAbsenceCode(absence.absenceCode);
@@ -121,15 +155,26 @@ export function AbsencesPage() {
         }
         return matchesAbsenceStatusFilter(absence, statusFilter, today);
       }),
-    [absences, employeeFilter, statusFilter, today, typeFilter],
+    [
+      absences,
+      effectiveEmployeeFilter,
+      participatingEmployeeIds,
+      statusFilter,
+      today,
+      typeFilter,
+    ],
   );
 
-  const currentActive = currentAbsences.filter(
+  const currentEmployedAbsences = currentAbsences.filter((absence) => {
+    const employee = employeesById.get(absence.employeeId);
+    return Boolean(employee && isDateCoveredByContracts(employee, today));
+  });
+  const currentActive = currentEmployedAbsences.filter(
     (absence) =>
       absence.status === 'ACTIVE' && absenceCoversDate(absence, today),
   );
   const summary = {
-    l4: countUniqueEmployeesOnConfirmedL4Today(currentAbsences, today),
+    l4: countUniqueEmployeesOnConfirmedL4Today(currentEmployedAbsences, today),
     excused: countEmployees(currentActive, (code) =>
       EXCUSED_ABSENCE_CODES.has(code),
     ),
@@ -189,7 +234,7 @@ export function AbsencesPage() {
             <Button
               variant="contained"
               startIcon={<AddOutlined />}
-              disabled={!isWritable || employees.length === 0}
+              disabled={!isWritable || participatingEmployees.length === 0}
               onClick={() => setFormState({ mode: 'add' })}
             >
               {t.absences.page.add}
@@ -260,14 +305,19 @@ export function AbsencesPage() {
             type="month"
             label={t.absences.filters.month}
             value={monthId}
-            onChange={(event) => setMonthId(event.target.value)}
+            onChange={(event) => {
+              setMonthId(event.target.value);
+              setEmployeeFilter('all');
+            }}
             slotProps={{ inputLabel: { shrink: true } }}
           />
           <EmployeeAutocomplete
-            employees={employees}
+            employees={participatingEmployees}
             label={t.absences.filters.employee}
             placeholder={t.absences.filters.allEmployees}
-            value={employeeFilter === 'all' ? null : employeeFilter}
+            value={
+              effectiveEmployeeFilter === 'all' ? null : effectiveEmployeeFilter
+            }
             onChange={(employeeId) => setEmployeeFilter(employeeId ?? 'all')}
             allowClear
             size="small"
@@ -352,7 +402,7 @@ export function AbsencesPage() {
       {formState ? (
         <AbsenceFormDialog
           absence={formState.mode === 'edit' ? formState.absence : undefined}
-          employees={employees}
+          employees={participatingEmployees}
           defaultStartDate={
             monthId === currentPayrollMonthId(new Date())
               ? today
@@ -500,7 +550,7 @@ function AbsenceTable({
           {absences.map((absence) => {
             const employee = employeesById.get(absence.employeeId);
             const issue =
-              !employee || activeContracts(employee).length === 0
+              !employee || (employee.contracts?.length ?? 0) === 0
                 ? 'missing-employment-start'
                 : isRangeFullyCoveredByContracts(
                       employee,
