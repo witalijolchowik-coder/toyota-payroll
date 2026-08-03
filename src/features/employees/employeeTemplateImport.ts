@@ -1137,6 +1137,7 @@ function applyDepartmentUpdate(
   if (raw === EMPLOYEE_TEMPLATE_CLEAR_MARKER) {
     if (employee.departmentId) {
       updateInput.departmentId = null;
+      updateInput.assignmentEffectiveDate = currentLocalIsoDate();
       changes.push({
         field: 'departmentId',
         label: 'Dział',
@@ -1178,6 +1179,7 @@ function applyShiftUpdate(
   if (raw === EMPLOYEE_TEMPLATE_CLEAR_MARKER) {
     if (employee.shiftAssignment) {
       updateInput.shiftAssignment = null;
+      updateInput.assignmentEffectiveDate = currentLocalIsoDate();
       changes.push({
         field: 'shiftAssignment',
         label: 'Grupa zmianowa',

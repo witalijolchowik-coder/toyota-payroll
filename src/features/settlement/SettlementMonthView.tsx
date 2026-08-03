@@ -76,6 +76,7 @@ import {
 } from './monthUtils';
 import {
   generateEmployeeMonthlySchedule,
+  resolveEffectiveAssignment,
   resolveShiftInterval,
   type PlannedScheduleDay,
 } from '../../utils/schedule';
@@ -331,10 +332,22 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
     }
 
     if (
-      !employeeMatchesCalendarConstructorOrganizationFilters(employee, {
-        departmentId: departmentFilter,
-        shiftAssignment: shiftFilter,
-      })
+      !employeeMatchesCalendarConstructorOrganizationFilters(
+        employee,
+        {
+          departmentId: departmentFilter,
+          shiftAssignment: shiftFilter,
+        },
+        days
+          .filter((day) => isDayWithinEmployment(employee, day))
+          .map((day) =>
+            resolveEffectiveAssignment(
+              employee,
+              day.isoDate,
+              data.employeeAssignments,
+            ),
+          ),
+      )
     ) {
       return false;
     }

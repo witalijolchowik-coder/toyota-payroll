@@ -497,6 +497,8 @@ export const pl = {
       reactivateFailed:
         'Nie udało się przywrócić pracownika. Spróbuj ponownie.',
       duplicateTeta: 'Aktywny pracownik z tym numerem TETA już istnieje.',
+      assignmentBeforeEmployment:
+        'Data przypisania działu lub grupy nie może być wcześniejsza niż początek zatrudnienia.',
     },
     form: {
       addTitle: 'Dodaj pracownika',
@@ -541,10 +543,10 @@ export const pl = {
       department: 'Dział',
       shiftAssignment: 'Zmiana',
       assignmentEffectivePrompt:
-        'Zmieniasz dział lub grupę. Wskaż, od jakiej daty ta zmiana ma obowiązywać.',
+        'Wskaż datę, od której wybrany dział i grupa zmianowa mają obowiązywać.',
       assignmentEffectiveDate: 'Data obowiązywania zmiany',
       assignmentEffectiveHelper:
-        'Poprzednie dni zachowają dotychczasowe przypisanie w historii.',
+        'Poprzednie dni zachowają dotychczasowe przypisanie. Możesz podać datę przeszłą, dzisiejszą lub przyszłą.',
       initialContractStartDate: 'Pierwsza umowa — od',
       initialContractStartHelper:
         'Tworzy pierwszy wpis w historii umów pracownika.',

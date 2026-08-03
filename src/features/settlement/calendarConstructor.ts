@@ -48,6 +48,11 @@ export interface CalendarConstructorOrganizationFilters {
   shiftAssignment: EmployeeColorShift | 'all' | 'unassigned';
 }
 
+export interface EffectiveOrganizationAssignment {
+  departmentId: DepartmentId | null;
+  shiftAssignment: EmployeeColorShift | null;
+}
+
 export type CalendarConstructorBlockedReason =
   'settled-month' | 'outside-employment' | null;
 
@@ -164,24 +169,43 @@ export function isAbsenceCalendarTool(
 export function employeeMatchesCalendarConstructorOrganizationFilters(
   employee: Employee,
   filters: CalendarConstructorOrganizationFilters,
+  effectiveAssignments: readonly EffectiveOrganizationAssignment[] = [
+    {
+      departmentId: employee.departmentId,
+      shiftAssignment: employee.shiftAssignment,
+    },
+  ],
 ): boolean {
+  const assignments =
+    effectiveAssignments.length > 0
+      ? effectiveAssignments
+      : [
+          {
+            departmentId: employee.departmentId,
+            shiftAssignment: employee.shiftAssignment,
+          },
+        ];
   if (filters.departmentId === 'unassigned') {
-    if (employee.departmentId) {
+    if (!assignments.some((assignment) => !assignment.departmentId)) {
       return false;
     }
   } else if (
     filters.departmentId !== 'all' &&
-    employee.departmentId !== filters.departmentId
+    !assignments.some(
+      (assignment) => assignment.departmentId === filters.departmentId,
+    )
   ) {
     return false;
   }
 
   if (filters.shiftAssignment === 'unassigned') {
-    return !employee.shiftAssignment;
+    return assignments.some((assignment) => !assignment.shiftAssignment);
   }
 
   return (
     filters.shiftAssignment === 'all' ||
-    employee.shiftAssignment === filters.shiftAssignment
+    assignments.some(
+      (assignment) => assignment.shiftAssignment === filters.shiftAssignment,
+    )
   );
 }

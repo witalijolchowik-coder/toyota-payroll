@@ -391,6 +391,32 @@ describe('employee template import', () => {
     });
   });
 
+  it('turns clearing a shift group into an effective-dated history update', () => {
+    const existing = {
+      ...employee('employee-1', 'WT-001'),
+      departmentId: 'headliner-bmw',
+      shiftAssignment: 'RED' as const,
+    };
+    const preview = buildBulkEmployeeUpdatePreview(
+      updateCsv({
+        'Numer TETA': 'WT-001',
+        Imię: 'Anna',
+        Nazwisko: 'Kowalska',
+        'Grupa zmianowa': EMPLOYEE_TEMPLATE_CLEAR_MARKER,
+      }),
+      [existing],
+      [department('headliner-bmw', 'Headliner BMW')],
+    );
+
+    expect(preview[0].status).toBe('ready');
+    expect(preview[0].updateInput).toMatchObject({
+      shiftAssignment: null,
+    });
+    expect(preview[0].updateInput?.assignmentEffectiveDate).toMatch(
+      /^\d{4}-\d{2}-\d{2}$/,
+    );
+  });
+
   it('blocks update rows with unknown TETA', () => {
     const preview = buildBulkEmployeeUpdatePreview(
       csv([['WT-404', 'Anna', 'Kowalska', '81010112345']]),

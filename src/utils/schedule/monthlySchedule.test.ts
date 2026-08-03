@@ -294,6 +294,28 @@ describe('monthly schedule planning', () => {
     ).toMatchObject({ shiftAssignment: 'BLUE' });
   });
 
+  it('uses the latest explicit version when legacy records share an effective date', () => {
+    const worker = employee({
+      departmentId: 'headliner-bmw',
+      shiftAssignment: 'RED',
+      employmentStartDate: date('2026-01-01'),
+    });
+    const older = {
+      ...assignment(worker, 'headliner-bmw', 'RED', '2026-07-01', null),
+      id: 'older',
+      updatedAt: date('2026-07-01'),
+    };
+    const corrected = {
+      ...assignment(worker, 'headliner-bmw', 'BLUE', '2026-07-01', null),
+      id: 'corrected',
+      updatedAt: date('2026-07-02'),
+    };
+
+    expect(
+      resolveEffectiveAssignment(worker, '2026-07-15', [older, corrected]),
+    ).toMatchObject({ assignmentId: 'corrected', shiftAssignment: 'BLUE' });
+  });
+
   it('follows the exact Headliner correction sequence from 2026-07-06', () => {
     const headliner = department(
       'headliner-bmw',

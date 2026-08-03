@@ -23,7 +23,6 @@ import type {
   Employee,
   EmployeeCreateInput,
   EmployeeId,
-  EmployeeAssignment,
   EmployeeAssignmentCreateInput,
   IsoDate,
 } from '../types/firestore';
@@ -38,9 +37,16 @@ import { appendAuditEntryToBatch, recordAuditEntry } from './auditService';
 import { preserveFirstToyotaEmploymentDate } from '../utils/payroll';
 import { bootstrapLegacyEmployeeContract } from './employeeContractsService';
 import { hydrateEmployeesWithEmploymentHistory } from './employeeHistoryHydration';
+import {
+  isAssignmentDateOnOrAfterEmploymentStart,
+  planEmployeeAssignmentTransition,
+} from '../utils/employees/employeeAssignmentHistory';
 
 export type EmployeeServiceErrorCode =
-  'firebase-unavailable' | 'authentication-required' | 'duplicate-teta';
+  | 'firebase-unavailable'
+  | 'authentication-required'
+  | 'duplicate-teta'
+  | 'assignment-before-employment';
 
 export class EmployeeServiceError extends Error {
   constructor(readonly code: EmployeeServiceErrorCode) {
@@ -71,12 +77,6 @@ function timestampOrNull(value: Date | null) {
 
 function dateToIsoDate(value: Date): IsoDate {
   return value.toISOString().slice(0, 10);
-}
-
-function previousIsoDate(value: IsoDate): IsoDate {
-  const date = new Date(`${value}T00:00:00.000Z`);
-  date.setUTCDate(date.getUTCDate() - 1);
-  return dateToIsoDate(date);
 }
 
 function assignmentEffectiveDate(input: EmployeeCreateInput): IsoDate {
@@ -237,6 +237,14 @@ export async function createEmployee(
   const repositories = requireRepositories();
   const normalized = normalizeEmployeeInput(input);
 
+  if (
+    normalized.initialContract &&
+    assignmentEffectiveDate(normalized) <
+      dateToIsoDate(normalized.initialContract.startDate)
+  ) {
+    throw new EmployeeServiceError('assignment-before-employment');
+  }
+
   await assertUniqueActiveTeta(normalized);
 
   const employee = doc(repositories.employees);
@@ -347,12 +355,38 @@ export async function updateEmployee(
   const previousEmployee = previousEmployeeSnapshot.exists()
     ? mapEmployeeDocument(employeeId, previousEmployeeSnapshot.data())
     : null;
+  const effectiveDate = normalized.assignmentEffectiveDate;
+  if (effectiveDate) {
+    await assertAssignmentNotBeforeEmployment(employeeId, effectiveDate);
+  }
   const stableFirstToyotaEmploymentDate = preserveFirstToyotaEmploymentDate(
     previousEmployee?.firstToyotaEmploymentDate,
     normalized.firstToyotaEmploymentDate,
   );
 
   const batch = writeBatch(repositories.employees.firestore);
+  const assignmentPlan = effectiveDate
+    ? await appendEmployeeAssignmentReplacementToBatch(batch, {
+        employeeId,
+        tetaNumber: normalized.tetaNumber,
+        departmentId: normalized.departmentId,
+        shiftAssignment: normalized.shiftAssignment,
+        validFrom: effectiveDate,
+        validTo: null,
+        note: null,
+      })
+    : null;
+  const employeeMasterAssignment =
+    assignmentPlan?.effectiveToday ??
+    (previousEmployee
+      ? {
+          departmentId: previousEmployee.departmentId,
+          shiftAssignment: previousEmployee.shiftAssignment,
+        }
+      : {
+          departmentId: normalized.departmentId,
+          shiftAssignment: normalized.shiftAssignment,
+        });
   batch.update(repositories.employee(employeeId), {
     teta_number: normalized.tetaNumber,
     first_name: normalized.firstName,
@@ -371,29 +405,13 @@ export async function updateEmployee(
     ),
     medical_valid_until: timestampOrNull(normalized.medicalValidUntil ?? null),
     medical_examination_type: normalized.medicalExaminationType ?? null,
-    department_id: normalized.departmentId,
-    shift_assignment: normalized.shiftAssignment,
+    department_id: employeeMasterAssignment.departmentId,
+    shift_assignment: employeeMasterAssignment.shiftAssignment,
     // Contract dates are managed in employeeContracts. Legacy fields are a
     // derived compatibility snapshot and are not overwritten by profile edits.
     updated_at: serverTimestamp(),
     updated_by: actorUid,
   });
-
-  const assignmentChanged =
-    previousEmployee &&
-    (previousEmployee.departmentId !== normalized.departmentId ||
-      previousEmployee.shiftAssignment !== normalized.shiftAssignment);
-  if (assignmentChanged) {
-    await appendEmployeeAssignmentReplacementToBatch(batch, {
-      employeeId,
-      tetaNumber: normalized.tetaNumber,
-      departmentId: normalized.departmentId,
-      shiftAssignment: normalized.shiftAssignment,
-      validFrom: assignmentEffectiveDate(normalized),
-      validTo: null,
-      note: null,
-    });
-  }
 
   appendAuditEntryToBatch(batch, repositories, {
     entityPath: `employees/${employeeId}`,
@@ -433,6 +451,8 @@ export async function updateEmployee(
         medical_examination_type: normalized.medicalExaminationType ?? null,
         department_id: normalized.departmentId,
         shift_assignment: normalized.shiftAssignment,
+        assignment_effective_date: effectiveDate,
+        replaced_assignment_ids: assignmentPlan?.replacedAssignmentIds ?? [],
       },
     },
   });
@@ -480,7 +500,7 @@ export async function reactivateEmployee(
 async function appendEmployeeAssignmentReplacementToBatch(
   batch: ReturnType<typeof writeBatch>,
   input: EmployeeAssignmentCreateInput,
-): Promise<void> {
+): Promise<ReturnType<typeof planEmployeeAssignmentTransition>> {
   const actorUid = requireActorUid();
   const repositories = requireRepositories();
   const snapshot = await getDocs(
@@ -493,45 +513,61 @@ async function appendEmployeeAssignmentReplacementToBatch(
   const assignments = snapshot.docs.map((document) =>
     mapEmployeeAssignmentDocument(document.id, document.data()),
   );
-  const previousDay = previousIsoDate(input.validFrom);
-  const overlappingAssignments = assignments.filter((assignment) =>
-    overlapsAssignment(assignment, input.validFrom),
-  );
+  const plan = planEmployeeAssignmentTransition({
+    assignments,
+    selection: {
+      departmentId: input.departmentId,
+      shiftAssignment: input.shiftAssignment,
+      validFrom: input.validFrom,
+    },
+    today: dateToIsoDate(new Date()),
+  });
 
-  overlappingAssignments.forEach((assignment) => {
-    batch.update(repositories.employeeAssignment(assignment.id), {
-      valid_to:
-        assignment.validFrom < input.validFrom
-          ? previousDay
-          : assignment.validTo,
-      status: assignment.validFrom < input.validFrom ? 'ACTIVE' : 'CANCELLED',
+  plan.updates.forEach((update) => {
+    batch.update(repositories.employeeAssignment(update.assignmentId), {
+      valid_to: update.validTo,
+      status: update.status,
       updated_at: serverTimestamp(),
       updated_by: actorUid,
     });
   });
 
-  batch.set(doc(repositories.employeeAssignments), {
-    employee_id: input.employeeId,
-    teta_number: input.tetaNumber,
-    department_id: input.departmentId,
-    shift_assignment: input.shiftAssignment,
-    valid_from: input.validFrom,
-    valid_to: input.validTo,
-    status: 'ACTIVE',
-    note: input.note,
-    created_at: serverTimestamp(),
-    created_by: actorUid,
-    updated_at: serverTimestamp(),
-    updated_by: actorUid,
-  });
+  if (plan.create) {
+    batch.set(doc(repositories.employeeAssignments), {
+      employee_id: input.employeeId,
+      teta_number: input.tetaNumber,
+      department_id: plan.create.departmentId,
+      shift_assignment: plan.create.shiftAssignment,
+      valid_from: plan.create.validFrom,
+      valid_to: plan.create.validTo,
+      status: 'ACTIVE',
+      note: input.note,
+      created_at: serverTimestamp(),
+      created_by: actorUid,
+      updated_at: serverTimestamp(),
+      updated_by: actorUid,
+    });
+  }
+
+  return plan;
 }
 
-function overlapsAssignment(
-  assignment: EmployeeAssignment,
-  validFrom: IsoDate,
-): boolean {
-  return (
-    assignment.validFrom <= validFrom &&
-    (!assignment.validTo || assignment.validTo >= validFrom)
+async function assertAssignmentNotBeforeEmployment(
+  employeeId: EmployeeId,
+  effectiveDate: IsoDate,
+): Promise<void> {
+  const repositories = requireRepositories();
+  const snapshot = await getDocs(
+    query(
+      repositories.employeeContracts,
+      where('employee_id', '==', employeeId),
+      where('status', '==', 'ACTIVE'),
+    ),
   );
+  const contracts = snapshot.docs.map((document) =>
+    mapEmployeeContractDocument(document.id, document.data()),
+  );
+  if (!isAssignmentDateOnOrAfterEmploymentStart(contracts, effectiveDate)) {
+    throw new EmployeeServiceError('assignment-before-employment');
+  }
 }

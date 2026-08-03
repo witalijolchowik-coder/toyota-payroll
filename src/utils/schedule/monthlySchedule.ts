@@ -151,7 +151,13 @@ export function resolveEffectiveAssignment(
         assignment.validFrom <= date &&
         (!assignment.validTo || assignment.validTo >= date),
     )
-    .sort((first, second) => second.validFrom.localeCompare(first.validFrom));
+    .sort(
+      (first, second) =>
+        second.validFrom.localeCompare(first.validFrom) ||
+        second.updatedAt.getTime() - first.updatedAt.getTime() ||
+        second.createdAt.getTime() - first.createdAt.getTime() ||
+        second.id.localeCompare(first.id),
+    );
 
   const assignment = activeAssignments[0];
   if (assignment) {

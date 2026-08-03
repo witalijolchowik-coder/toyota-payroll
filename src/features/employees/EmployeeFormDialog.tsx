@@ -28,7 +28,6 @@ import type {
   EmployeeCreateInput,
 } from '../../types/firestore';
 import { deriveEmployeeMedicalStatus } from '../../utils/employees';
-import { activeContracts } from '../../utils/employees';
 import { isCanonicalExactDate } from '../../utils/forms/exactDateTimeInput';
 import {
   employeeInputFromForm,
@@ -52,7 +51,6 @@ function dateInputValue(value: Date | null): string {
 }
 
 function initialValues(employee?: Employee): EmployeeFormValues {
-  const firstContract = employee ? activeContracts(employee)[0] : null;
   return {
     tetaNumber: employee?.tetaNumber ?? '',
     firstName: employee?.firstName ?? '',
@@ -73,11 +71,7 @@ function initialValues(employee?: Employee): EmployeeFormValues {
     medicalExaminationType: employee?.medicalExaminationType ?? '',
     departmentId: employee?.departmentId ?? '',
     shiftAssignment: employee?.shiftAssignment ?? '',
-    assignmentEffectiveDate: dateInputValue(
-      firstContract
-        ? new Date(`${firstContract.startDate}T00:00:00.000Z`)
-        : new Date(),
-    ),
+    assignmentEffectiveDate: employee ? dateInputValue(new Date()) : '',
     initialContractStartDate: '',
     initialContractEndDate: '',
   };
@@ -94,11 +88,7 @@ export function EmployeeFormDialog({
   const [errors, setErrors] = useState<EmployeeValidationErrors>({});
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const assignmentChanged = Boolean(
-    employee &&
-    (employee.departmentId !== (values.departmentId || null) ||
-      employee.shiftAssignment !== (values.shiftAssignment || null)),
-  );
+  const [assignmentTouched, setAssignmentTouched] = useState(false);
 
   const messageForError = (
     code: EmployeeValidationCode | undefined,
@@ -136,6 +126,12 @@ export function EmployeeFormDialog({
       setSubmitError(null);
     };
 
+  const handleAssignmentValueChange =
+    (field: 'departmentId' | 'assignmentEffectiveDate') => (value: string) => {
+      setAssignmentTouched(true);
+      handleValueChange(field)(value);
+    };
+
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     const exactDateValues = [
@@ -154,7 +150,7 @@ export function EmployeeFormDialog({
       return;
     }
     const input = employeeInputFromForm(values, employee?.isActive ?? true);
-    if (!assignmentChanged) {
+    if (!employee || !assignmentTouched) {
       input.assignmentEffectiveDate = null;
     }
     const validationErrors = validateEmployeeInput(input, {
@@ -313,7 +309,11 @@ export function EmployeeFormDialog({
                 fullWidth
                 label={t.employees.form.department}
                 value={values.departmentId}
-                onChange={handleChange('departmentId')}
+                onChange={(event) =>
+                  handleAssignmentValueChange('departmentId')(
+                    event.target.value,
+                  )
+                }
               >
                 <MenuItem value="">
                   {t.organization.departments.unassigned}
@@ -335,13 +335,14 @@ export function EmployeeFormDialog({
                 fullWidth
                 label={t.employees.form.shiftAssignment}
                 value={values.shiftAssignment}
-                onChange={(event) =>
+                onChange={(event) => {
+                  setAssignmentTouched(true);
                   setValues((current) => ({
                     ...current,
                     shiftAssignment: event.target.value as
                       EmployeeColorShift | '',
-                  }))
-                }
+                  }));
+                }}
               >
                 <MenuItem value="">{t.organization.shifts.unassigned}</MenuItem>
                 <MenuItem value="RED">{t.organization.shifts.RED}</MenuItem>
@@ -421,7 +422,7 @@ export function EmployeeFormDialog({
                 {t.employees.form.medical.departmentMismatch}
               </Alert>
             ) : null}
-            {assignmentChanged ? (
+            {employee ? (
               <Alert severity="info">
                 <Stack spacing={1.5}>
                   <Typography>
@@ -432,7 +433,9 @@ export function EmployeeFormDialog({
                     fullWidth
                     label={t.employees.form.assignmentEffectiveDate}
                     value={values.assignmentEffectiveDate}
-                    onValueChange={handleValueChange('assignmentEffectiveDate')}
+                    onValueChange={handleAssignmentValueChange(
+                      'assignmentEffectiveDate',
+                    )}
                     error={Boolean(errors.assignmentEffectiveDate)}
                     helperText={
                       messageForError(errors.assignmentEffectiveDate) ??
@@ -518,6 +521,9 @@ function serviceErrorMessage(
   }
   if (code === 'authentication-required') {
     return t.employees.errors.authenticationRequired;
+  }
+  if (code === 'assignment-before-employment') {
+    return t.employees.errors.assignmentBeforeEmployment;
   }
   return t.employees.errors.saveFailed;
 }

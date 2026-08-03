@@ -231,6 +231,28 @@ describe('calendar constructor organization filters', () => {
     ).toBe(false);
   });
 
+  it('filters by the effective historical assignment instead of a stale master value', () => {
+    const staleMaster = employee({
+      departmentId: 'headliner-bmw',
+      shiftAssignment: 'BLUE',
+    });
+
+    expect(
+      employeeMatchesCalendarConstructorOrganizationFilters(
+        staleMaster,
+        { departmentId: 'headliner-bmw', shiftAssignment: 'RED' },
+        [{ departmentId: 'headliner-bmw', shiftAssignment: 'RED' }],
+      ),
+    ).toBe(true);
+    expect(
+      employeeMatchesCalendarConstructorOrganizationFilters(
+        staleMaster,
+        { departmentId: 'headliner-bmw', shiftAssignment: 'BLUE' },
+        [{ departmentId: 'headliner-bmw', shiftAssignment: 'RED' }],
+      ),
+    ).toBe(false);
+  });
+
   it('does not change payroll month participation based on department or shift', () => {
     const inactiveMetalBlue = employee({
       isActive: false,
