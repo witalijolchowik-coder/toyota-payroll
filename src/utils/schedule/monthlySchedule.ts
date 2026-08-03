@@ -65,6 +65,29 @@ export interface MonthlyScheduleOptions {
   shiftHoursVersions?: readonly ShiftHoursVersion[];
 }
 
+export type EffectiveAssignmentSource =
+  'assignment-history' | 'employee-master';
+
+export interface EffectiveAssignmentResolution {
+  departmentId: string | null;
+  shiftAssignment: EmployeeColorShift | null;
+  source: EffectiveAssignmentSource;
+  assignmentId: string | null;
+}
+
+export interface EffectiveAssignmentSegment extends EffectiveAssignmentResolution {
+  startDate: IsoDate;
+  endDate: IsoDate;
+}
+
+export interface EffectiveAssignmentPresentation {
+  kind: 'STABLE' | 'VARIABLE' | 'MISSING_SHIFT';
+  departmentId: string | null;
+  shiftAssignment: EmployeeColorShift | null;
+  hasMissingShift: boolean;
+  segments: EffectiveAssignmentSegment[];
+}
+
 export function generateEmployeeMonthlySchedule({
   employee,
   days,
@@ -119,7 +142,7 @@ export function resolveEffectiveAssignment(
   employee: Employee,
   date: IsoDate,
   assignments: readonly EmployeeAssignment[] = [],
-): Pick<EmployeeAssignment, 'departmentId' | 'shiftAssignment'> {
+): EffectiveAssignmentResolution {
   const activeAssignments = assignments
     .filter(
       (assignment) =>
@@ -135,12 +158,88 @@ export function resolveEffectiveAssignment(
     return {
       departmentId: assignment.departmentId,
       shiftAssignment: assignment.shiftAssignment,
+      source: 'assignment-history',
+      assignmentId: assignment.id,
     };
   }
 
   return {
     departmentId: employee.departmentId,
     shiftAssignment: employee.shiftAssignment,
+    source: 'employee-master',
+    assignmentId: null,
+  };
+}
+
+export function resolveEffectiveAssignmentPresentation({
+  employee,
+  dates,
+  assignments = [],
+}: {
+  employee: Employee;
+  dates: readonly IsoDate[];
+  assignments?: readonly EmployeeAssignment[];
+}): EffectiveAssignmentPresentation {
+  const resolutions = dates
+    .filter((date) => isDateCoveredByContracts(employee, date))
+    .map((date) => ({
+      date,
+      ...resolveEffectiveAssignment(employee, date, assignments),
+    }));
+
+  if (resolutions.length === 0) {
+    const fallback = resolveEffectiveAssignment(
+      employee,
+      dates[0] ?? ('1970-01-01' as IsoDate),
+      assignments,
+    );
+    return {
+      kind: fallback.shiftAssignment ? 'STABLE' : 'MISSING_SHIFT',
+      departmentId: fallback.departmentId,
+      shiftAssignment: fallback.shiftAssignment,
+      hasMissingShift: !fallback.shiftAssignment,
+      segments: [],
+    };
+  }
+
+  const segments: EffectiveAssignmentSegment[] = [];
+  resolutions.forEach(({ date, ...resolution }) => {
+    const previous = segments.at(-1);
+    if (
+      previous &&
+      previous.departmentId === resolution.departmentId &&
+      previous.shiftAssignment === resolution.shiftAssignment &&
+      previous.source === resolution.source &&
+      previous.assignmentId === resolution.assignmentId
+    ) {
+      previous.endDate = date;
+      return;
+    }
+    segments.push({ startDate: date, endDate: date, ...resolution });
+  });
+
+  const assignmentKeys = new Set(
+    resolutions.map(
+      (resolution) =>
+        `${resolution.departmentId ?? ''}:${resolution.shiftAssignment ?? ''}`,
+    ),
+  );
+  const first = resolutions[0]!;
+  const hasMissingShift = resolutions.some(
+    (resolution) => !resolution.shiftAssignment,
+  );
+
+  return {
+    kind:
+      assignmentKeys.size > 1
+        ? 'VARIABLE'
+        : hasMissingShift
+          ? 'MISSING_SHIFT'
+          : 'STABLE',
+    departmentId: assignmentKeys.size === 1 ? first.departmentId : null,
+    shiftAssignment: assignmentKeys.size === 1 ? first.shiftAssignment : null,
+    hasMissingShift,
+    segments,
   };
 }
 
@@ -245,6 +344,11 @@ function resolveAutomaticScheduleDay({
     });
   }
 
+  const assignment = resolveEffectiveAssignment(
+    employee,
+    day.isoDate,
+    assignments,
+  );
   const holidayName = publicHolidayNames?.get(day.isoDate) ?? null;
   if (!day.isWorkingDay) {
     return createScheduleDay(employee, day.isoDate, {
@@ -253,6 +357,8 @@ function resolveAutomaticScheduleDay({
       hours: 0,
       shift: null,
       label: holidayName ? 'Ś' : 'W',
+      departmentId: assignment.departmentId,
+      shiftAssignment: assignment.shiftAssignment,
       reason: holidayName,
       holidayName,
       plannedStartTime: null,
@@ -261,11 +367,6 @@ function resolveAutomaticScheduleDay({
     });
   }
 
-  const assignment = resolveEffectiveAssignment(
-    employee,
-    day.isoDate,
-    assignments,
-  );
   const department = assignment.departmentId
     ? departmentsById.get(assignment.departmentId)
     : null;
@@ -420,8 +521,12 @@ function createScheduleDay(
   return {
     employeeId: employee.id,
     date,
-    departmentId: values.departmentId ?? employee.departmentId,
-    shiftAssignment: values.shiftAssignment ?? employee.shiftAssignment,
+    departmentId: Object.hasOwn(values, 'departmentId')
+      ? (values.departmentId ?? null)
+      : employee.departmentId,
+    shiftAssignment: Object.hasOwn(values, 'shiftAssignment')
+      ? (values.shiftAssignment ?? null)
+      : employee.shiftAssignment,
     ...values,
   };
 }

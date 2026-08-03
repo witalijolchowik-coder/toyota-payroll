@@ -1,5 +1,6 @@
 import type {
   Department,
+  DepartmentShiftCorrection,
   Employee,
   EmployeeAssignment,
   ScheduleCorrection,
@@ -13,6 +14,7 @@ import {
   generateEmployeeMonthlySchedule,
   hasNoBlankRelevantScheduleDays,
   resolveEffectiveAssignment,
+  resolveEffectiveAssignmentPresentation,
   resolveRotatingShift,
 } from './monthlySchedule';
 
@@ -94,10 +96,219 @@ describe('monthly schedule planning', () => {
 
     expect(
       resolveEffectiveAssignment(worker, '2026-06-14', assignments),
-    ).toEqual({ departmentId: 'metal-402b', shiftAssignment: 'RED' });
+    ).toMatchObject({ departmentId: 'metal-402b', shiftAssignment: 'RED' });
     expect(
       resolveEffectiveAssignment(worker, '2026-06-15', assignments),
-    ).toEqual({ departmentId: 'montaz-toyota', shiftAssignment: 'WHITE' });
+    ).toMatchObject({
+      departmentId: 'montaz-toyota',
+      shiftAssignment: 'WHITE',
+    });
+  });
+
+  it('uses dated Red instead of master Blue for generation and presentation', () => {
+    const worker = employee({
+      departmentId: 'headliner-bmw',
+      shiftAssignment: 'BLUE',
+      employmentStartDate: date('2026-01-01'),
+    });
+    const assignments = [
+      assignment(worker, 'headliner-bmw', 'RED', '2026-07-01', null),
+    ];
+    const corrections = headlinerCorrections();
+    const days = createCalendarDays('2026-07');
+    const schedule = generateEmployeeMonthlySchedule({
+      employee: worker,
+      days,
+      departments: [
+        department('headliner-bmw', 'Headliner BMW', 'THREE_SHIFT'),
+      ],
+      options: { assignments, departmentShiftCorrections: corrections },
+    });
+    const presentation = resolveEffectiveAssignmentPresentation({
+      employee: worker,
+      dates: days.map((day) => day.isoDate),
+      assignments,
+    });
+
+    expect(presentation).toMatchObject({
+      kind: 'STABLE',
+      shiftAssignment: 'RED',
+      hasMissingShift: false,
+    });
+    expect(schedule.find((day) => day.date === '2026-07-06')).toMatchObject({
+      shiftAssignment: 'RED',
+      shift: 'NIGHT',
+      source: 'automatic',
+    });
+  });
+
+  it('exposes a missing dated group while retaining the First-shift fallback', () => {
+    const worker = employee({
+      departmentId: 'headliner-bmw',
+      shiftAssignment: 'BLUE',
+      employmentStartDate: date('2026-01-01'),
+    });
+    const assignments = [
+      assignment(worker, 'headliner-bmw', null, '2026-07-01', null),
+    ];
+    const days = createCalendarDays('2026-07');
+    const schedule = generateEmployeeMonthlySchedule({
+      employee: worker,
+      days,
+      departments: [
+        department('headliner-bmw', 'Headliner BMW', 'THREE_SHIFT'),
+      ],
+      options: {
+        assignments,
+        departmentShiftCorrections: headlinerCorrections(),
+      },
+    });
+    const presentation = resolveEffectiveAssignmentPresentation({
+      employee: worker,
+      dates: days.map((day) => day.isoDate),
+      assignments,
+    });
+
+    expect(presentation).toMatchObject({
+      kind: 'MISSING_SHIFT',
+      shiftAssignment: null,
+      hasMissingShift: true,
+    });
+    expect(schedule.find((day) => day.date === '2026-07-06')).toMatchObject({
+      shiftAssignment: null,
+      shift: 'FIRST',
+      source: 'automatic',
+    });
+  });
+
+  it('keeps two effective Blue employees on the same corrected rotation', () => {
+    const first = employee({
+      id: 'employee-blue-1',
+      departmentId: 'headliner-bmw',
+      shiftAssignment: 'BLUE',
+      employmentStartDate: date('2026-01-01'),
+    });
+    const second = employee({
+      id: 'employee-blue-2',
+      tetaNumber: 'WT-002',
+      departmentId: 'headliner-bmw',
+      shiftAssignment: 'BLUE',
+      employmentStartDate: date('2026-01-01'),
+    });
+    const days = createCalendarDays('2026-07');
+    const shifts = (worker: Employee) =>
+      generateEmployeeMonthlySchedule({
+        employee: worker,
+        days,
+        departments: [
+          department('headliner-bmw', 'Headliner BMW', 'THREE_SHIFT'),
+        ],
+        options: { departmentShiftCorrections: headlinerCorrections() },
+      }).map((day) => day.shift);
+
+    expect(shifts(first)).toEqual(shifts(second));
+  });
+
+  it('keeps the Blue baseline equal and overrides only one employee-day', () => {
+    const first = employee({
+      id: 'employee-blue-1',
+      departmentId: 'headliner-bmw',
+      shiftAssignment: 'BLUE',
+      employmentStartDate: date('2026-01-01'),
+    });
+    const second = employee({
+      id: 'employee-blue-2',
+      tetaNumber: 'WT-002',
+      departmentId: 'headliner-bmw',
+      shiftAssignment: 'BLUE',
+      employmentStartDate: date('2026-01-01'),
+    });
+    const days = createCalendarDays('2026-07');
+    const options = { departmentShiftCorrections: headlinerCorrections() };
+    const baseline = generateEmployeeMonthlySchedule({
+      employee: second,
+      days,
+      departments: [
+        department('headliner-bmw', 'Headliner BMW', 'THREE_SHIFT'),
+      ],
+      options,
+    });
+    const corrected = generateEmployeeMonthlySchedule({
+      employee: first,
+      days,
+      departments: [
+        department('headliner-bmw', 'Headliner BMW', 'THREE_SHIFT'),
+      ],
+      options: {
+        ...options,
+        corrections: [
+          correction(first, '2026-07-13', 'NIGHT_SHIFT', 'NIGHT', 8),
+        ],
+      },
+    });
+
+    expect(corrected.find((day) => day.date === '2026-07-13')).toMatchObject({
+      shift: 'NIGHT',
+      shiftAssignment: 'BLUE',
+      source: 'manual-correction',
+    });
+    expect(corrected.filter((day) => day.date !== '2026-07-13')).toEqual(
+      baseline.filter((day) => day.date !== '2026-07-13'),
+    );
+  });
+
+  it('marks a Red-to-Blue change as variable and resolves each side', () => {
+    const worker = employee({
+      departmentId: 'headliner-bmw',
+      shiftAssignment: 'RED',
+      employmentStartDate: date('2026-01-01'),
+    });
+    const assignments = [
+      assignment(worker, 'headliner-bmw', 'RED', '2026-07-01', '2026-07-19'),
+      assignment(worker, 'headliner-bmw', 'BLUE', '2026-07-20', null),
+    ];
+    const days = createCalendarDays('2026-07');
+    const presentation = resolveEffectiveAssignmentPresentation({
+      employee: worker,
+      dates: days.map((day) => day.isoDate),
+      assignments,
+    });
+
+    expect(presentation.kind).toBe('VARIABLE');
+    expect(
+      resolveEffectiveAssignment(worker, '2026-07-13', assignments),
+    ).toMatchObject({ shiftAssignment: 'RED' });
+    expect(
+      resolveEffectiveAssignment(worker, '2026-07-20', assignments),
+    ).toMatchObject({ shiftAssignment: 'BLUE' });
+  });
+
+  it('follows the exact Headliner correction sequence from 2026-07-06', () => {
+    const headliner = department(
+      'headliner-bmw',
+      'Headliner BMW',
+      'THREE_SHIFT',
+    );
+    const corrections = headlinerCorrections().slice(0, 1);
+    const expected = {
+      RED: ['NIGHT', 'SECOND', 'FIRST', 'NIGHT'],
+      WHITE: ['SECOND', 'FIRST', 'NIGHT', 'SECOND'],
+      BLUE: ['FIRST', 'NIGHT', 'SECOND', 'FIRST'],
+    } as const;
+
+    (Object.keys(expected) as Array<keyof typeof expected>).forEach((group) => {
+      expect(
+        ['2026-07-06', '2026-07-13', '2026-07-20', '2026-07-27'].map(
+          (dateValue) =>
+            resolveRotatingShift({
+              department: headliner,
+              shiftAssignment: group,
+              date: dateValue,
+              corrections,
+            }),
+        ),
+      ).toEqual(expected[group]);
+    });
   });
 
   it('marks first two working days from employment start as BHP and skips holidays', () => {
@@ -323,7 +534,7 @@ function department(
 function assignment(
   worker: Employee,
   departmentId: string,
-  shiftAssignment: NonNullable<Employee['shiftAssignment']>,
+  shiftAssignment: Employee['shiftAssignment'],
   validFrom: string,
   validTo: string | null,
 ): EmployeeAssignment {
@@ -345,6 +556,46 @@ function assignment(
   };
 }
 
+function headlinerCorrections(): DepartmentShiftCorrection[] {
+  const now = date('2026-08-03');
+  return [
+    {
+      id: 'headliner-bmw-2026-07-06',
+      departmentId: 'headliner-bmw',
+      effectiveDate: '2026-07-06',
+      shiftMode: 'THREE_SHIFT',
+      groupAssignments: {
+        RED: 'NIGHT',
+        WHITE: 'SECOND',
+        BLUE: 'FIRST',
+      },
+      status: 'ACTIVE',
+      note: null,
+      createdAt: now,
+      createdBy: 'test',
+      updatedAt: now,
+      updatedBy: 'test',
+    },
+    {
+      id: 'headliner-bmw-2026-07-20',
+      departmentId: 'headliner-bmw',
+      effectiveDate: '2026-07-20',
+      shiftMode: 'THREE_SHIFT',
+      groupAssignments: {
+        RED: 'FIRST',
+        WHITE: 'NIGHT',
+        BLUE: 'SECOND',
+      },
+      status: 'ACTIVE',
+      note: null,
+      createdAt: now,
+      createdBy: 'test',
+      updatedAt: now,
+      updatedBy: 'test',
+    },
+  ];
+}
+
 function correction(
   worker: Employee,
   correctionDate: string,
@@ -355,7 +606,7 @@ function correction(
   const now = date('2026-06-01');
   return {
     id: `${worker.id}-${correctionDate}`,
-    monthId: '2026-06',
+    monthId: correctionDate.slice(0, 7),
     employeeId: worker.id,
     tetaNumber: worker.tetaNumber,
     date: correctionDate,

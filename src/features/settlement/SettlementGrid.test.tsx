@@ -7,6 +7,7 @@ import type {
   DailyValue,
   Department,
   Employee,
+  EmployeeAssignment,
   ScheduleCorrection,
 } from '../../types/firestore';
 
@@ -72,6 +73,64 @@ describe('SettlementGrid', () => {
     expect(
       screen.getByTestId('settlement-department-group-montaz-toyota'),
     ).toHaveTextContent('1');
+  });
+
+  it('shows the dated effective group instead of the conflicting master group', () => {
+    const blueMaster = { ...employee, shiftAssignment: 'BLUE' as const };
+    render(
+      <SettlementGrid
+        employees={[blueMaster]}
+        departments={[department]}
+        employeeAssignments={[
+          assignment(blueMaster, 'RED', '2026-07-01', null),
+        ]}
+        days={createCalendarDays('2026-07')}
+        dailyValues={[]}
+      />,
+    );
+
+    expect(screen.getByText('Zmiana Red')).toBeInTheDocument();
+    expect(screen.queryByText('Zmiana Blue')).not.toBeInTheDocument();
+  });
+
+  it('shows the visible First-shift fallback when the dated group is missing', () => {
+    const blueMaster = { ...employee, shiftAssignment: 'BLUE' as const };
+    render(
+      <SettlementGrid
+        employees={[blueMaster]}
+        departments={[department]}
+        employeeAssignments={[assignment(blueMaster, null, '2026-07-01', null)]}
+        days={createCalendarDays('2026-07')}
+        dailyValues={[]}
+      />,
+    );
+
+    expect(
+      screen.getByText('Brak grupy · plan: pierwsza zmiana'),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByLabelText(
+        'Brak grupy zmianowej w obowiązującym przypisaniu. Plan automatyczny używa pierwszej zmiany.',
+      ),
+    ).toBeInTheDocument();
+    expect(screen.queryByText('Zmiana Blue')).not.toBeInTheDocument();
+  });
+
+  it('does not show one static group when the assignment changes in the month', () => {
+    render(
+      <SettlementGrid
+        employees={[employee]}
+        departments={[department]}
+        employeeAssignments={[
+          assignment(employee, 'RED', '2026-07-01', '2026-07-19'),
+          assignment(employee, 'BLUE', '2026-07-20', null),
+        ]}
+        days={createCalendarDays('2026-07')}
+        dailyValues={[]}
+      />,
+    );
+
+    expect(screen.getByText('Zmiana zmienna')).toBeInTheDocument();
   });
 
   it('collapses and expands a department group without changing its count', () => {
@@ -257,3 +316,23 @@ describe('SettlementGrid', () => {
     });
   });
 });
+
+function assignment(
+  worker: Employee,
+  shiftAssignment: EmployeeAssignment['shiftAssignment'],
+  validFrom: EmployeeAssignment['validFrom'],
+  validTo: EmployeeAssignment['validTo'],
+): EmployeeAssignment {
+  return {
+    id: `${worker.id}-${validFrom}-${shiftAssignment ?? 'none'}`,
+    employeeId: worker.id,
+    tetaNumber: worker.tetaNumber,
+    departmentId: worker.departmentId,
+    shiftAssignment,
+    validFrom,
+    validTo,
+    status: 'ACTIVE',
+    note: null,
+    ...metadata,
+  };
+}

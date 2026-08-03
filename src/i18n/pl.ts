@@ -2146,6 +2146,15 @@ export const pl = {
       actualInterval: 'Rzeczywiście: {{start}}–{{end}}',
       close: 'Zamknij',
     },
+    effectiveAssignment: {
+      variable: 'Zmiana zmienna',
+      missing: 'Brak grupy · plan: pierwsza zmiana',
+      segment: '{{start}}–{{end}}: {{department}} · {{shift}} ({{source}})',
+      historySource: 'historia przypisań',
+      masterSource: 'kartoteka pracownika',
+      missingWarning:
+        'Brak grupy zmianowej w obowiązującym przypisaniu. Plan automatyczny używa pierwszej zmiany.',
+    },
     settled: {
       title: 'Miesiąc został zamknięty',
       description:

@@ -70,6 +70,7 @@ import {
   type CalendarAppearancePalette,
 } from '../../utils/calendarAppearance';
 import { buildCalendarEmployeeRows } from './settlementCalendarLayout';
+import { EffectiveAssignmentLabel } from './EffectiveAssignmentLabel';
 
 interface SettlementGridProps {
   employees: Employee[];
@@ -269,9 +270,6 @@ export function SettlementGrid({
                 ? departmentsById.get(row.departmentId)
                 : null;
               const departmentLabel = department?.name ?? row.departmentLabel;
-              const shiftLabel = employee.shiftAssignment
-                ? t.organization.shifts[employee.shiftAssignment]
-                : t.organization.shifts.unassigned;
               const groupKey = departmentGroupKey(row.departmentId);
               const isDepartmentCollapsed = collapsedDepartments.has(groupKey);
 
@@ -333,14 +331,14 @@ export function SettlementGrid({
                             {employee.firstName} {employee.lastName}
                           </Typography>
                         </ButtonBase>
-                        <Typography
-                          variant="caption"
-                          color="text.secondary"
-                          noWrap
-                          sx={{ display: 'block' }}
-                        >
-                          {shiftLabel}
-                        </Typography>
+                        <Box sx={{ color: 'text.secondary', display: 'block' }}>
+                          <EffectiveAssignmentLabel
+                            employee={employee}
+                            dates={days.map((day) => day.isoDate)}
+                            assignments={employeeAssignments}
+                            departments={departments}
+                          />
+                        </Box>
                       </TableCell>
                       {days.map((day) => {
                         const persistedValue = dailyValuesByEmployeeAndDate.get(

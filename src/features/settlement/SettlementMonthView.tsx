@@ -940,6 +940,7 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
           dailyValues={participatingDailyValues}
           absences={participatingAbsences}
           departments={data.departments}
+          employeeAssignments={data.employeeAssignments}
           isSettled={data.month.isSettled}
           plannedSchedule={generateEmployeeMonthlySchedule({
             employee: focusedEmployee,

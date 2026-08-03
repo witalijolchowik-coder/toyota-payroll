@@ -21,6 +21,7 @@ import type {
   DailyValue,
   Department,
   Employee,
+  EmployeeAssignment,
 } from '../../types/firestore';
 import { resolveGoverningAbsence } from '../../utils/absences';
 import { resolveAttendanceWarnings } from '../../utils/attendance';
@@ -39,6 +40,7 @@ import {
   appearanceKeyForAbsence,
   appearanceKeyForPlannedDay,
 } from '../../utils/calendarAppearance';
+import { EffectiveAssignmentLabel } from './EffectiveAssignmentLabel';
 
 interface EmployeeCalendarDialogProps {
   employee: Employee;
@@ -47,6 +49,7 @@ interface EmployeeCalendarDialogProps {
   dailyValues: DailyValue[];
   absences: Absence[];
   departments: Department[];
+  employeeAssignments: EmployeeAssignment[];
   isSettled: boolean;
   onClose: () => void;
   onEditDay: (
@@ -73,6 +76,7 @@ export function EmployeeCalendarDialog({
   dailyValues,
   absences,
   departments,
+  employeeAssignments,
   isSettled,
   onClose,
   onEditDay,
@@ -101,16 +105,6 @@ export function EmployeeCalendarDialog({
     ...days.map((day) => ({ kind: 'day' as const, day, id: day.isoDate })),
   ];
   const employeeName = `${employee.lastName} ${employee.firstName}`;
-  const departmentsById = new Map(
-    departments.map((department) => [department.id, department]),
-  );
-  const departmentLabel = employee.departmentId
-    ? (departmentsById.get(employee.departmentId)?.name ??
-      employee.departmentId)
-    : t.organization.departments.unassigned;
-  const shiftLabel = employee.shiftAssignment
-    ? t.organization.shifts[employee.shiftAssignment]
-    : t.organization.shifts.unassigned;
   const employmentLabel = activeContracts(employee)
     .map((contract) =>
       interpolate(t.settlement.employeeCalendar.employment, {
@@ -156,13 +150,15 @@ export function EmployeeCalendarDialog({
             />
             <Chip
               variant="outlined"
-              label={interpolate(
-                t.settlement.employeeCalendar.departmentAndShift,
-                {
-                  department: departmentLabel,
-                  shift: shiftLabel,
-                },
-              )}
+              label={
+                <EffectiveAssignmentLabel
+                  employee={employee}
+                  dates={days.map((day) => day.isoDate)}
+                  assignments={employeeAssignments}
+                  departments={departments}
+                  showDepartment
+                />
+              }
             />
           </Stack>
 
