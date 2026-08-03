@@ -81,6 +81,33 @@ describe('EmployeeAutocomplete', () => {
     expect(screen.queryByRole('option', { name: /WT-10/ })).toBeNull();
   });
 
+  it('keeps a typed query when the parent rerenders with new options', async () => {
+    const { rerender } = render(
+      <EmployeeAutocomplete
+        employees={[adam, anna]}
+        value={null}
+        onChange={vi.fn()}
+      />,
+    );
+
+    const input = screen.getByLabelText(pl.employeeSelector.label);
+    fireEvent.change(input, { target: { value: 'adam kow' } });
+    expect(input).toHaveValue('adam kow');
+
+    rerender(
+      <EmployeeAutocomplete
+        employees={[adam, anna]}
+        value={null}
+        onChange={vi.fn()}
+      />,
+    );
+
+    expect(input).toHaveValue('adam kow');
+    expect(
+      await screen.findByRole('option', { name: 'Kowalski Adam (WT-10)' }),
+    ).toBeVisible();
+  });
+
   it('supports clearing where the parent allows it', () => {
     const onChange = vi.fn();
     render(

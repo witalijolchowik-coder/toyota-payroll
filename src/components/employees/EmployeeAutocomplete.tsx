@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Autocomplete,
   CircularProgress,
@@ -55,12 +55,44 @@ export function EmployeeAutocomplete({
     () => options.find((employee) => employee.id === value) ?? null,
     [options, value],
   );
+  const selectedLabel = selectedEmployee
+    ? formatEmployeeSelectorLabel(selectedEmployee)
+    : '';
+  const [inputState, setInputState] = useState(() => ({
+    selectedValue: value,
+    selectedLabel,
+    inputValue: selectedLabel,
+  }));
+  const inputValue =
+    inputState.selectedValue === value &&
+    inputState.selectedLabel === selectedLabel
+      ? inputState.inputValue
+      : selectedLabel;
 
   return (
     <Autocomplete
       options={options}
       value={selectedEmployee}
-      onChange={(_, employee) => onChange(employee?.id ?? null)}
+      inputValue={inputValue}
+      onChange={(_, employee) => {
+        const nextValue = employee?.id ?? null;
+        const nextLabel = employee ? formatEmployeeSelectorLabel(employee) : '';
+        setInputState({
+          selectedValue: nextValue,
+          selectedLabel: nextLabel,
+          inputValue: nextLabel,
+        });
+        onChange(nextValue);
+      }}
+      onInputChange={(_, nextInputValue, reason) => {
+        if (reason === 'input' || reason === 'clear') {
+          setInputState({
+            selectedValue: value,
+            selectedLabel,
+            inputValue: nextInputValue,
+          });
+        }
+      }}
       getOptionLabel={formatEmployeeSelectorLabel}
       isOptionEqualToValue={(option, selected) => option.id === selected.id}
       filterOptions={(availableOptions, state) =>
