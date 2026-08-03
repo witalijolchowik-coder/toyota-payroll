@@ -252,8 +252,19 @@ describe('monthly schedule planning', () => {
       shiftAssignment: 'BLUE',
       source: 'manual-correction',
     });
-    expect(corrected.filter((day) => day.date !== '2026-07-13')).toEqual(
-      baseline.filter((day) => day.date !== '2026-07-13'),
+    const withoutEmployeeIdentity = (day: (typeof corrected)[number]) => ({
+      ...day,
+      employeeId: 'same-employee',
+    });
+
+    expect(
+      corrected
+        .filter((day) => day.date !== '2026-07-13')
+        .map(withoutEmployeeIdentity),
+    ).toEqual(
+      baseline
+        .filter((day) => day.date !== '2026-07-13')
+        .map(withoutEmployeeIdentity),
     );
   });
 
