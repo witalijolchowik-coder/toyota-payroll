@@ -36,6 +36,7 @@ import {
   AbsenceOptionContent,
 } from '../components/absences/AbsenceOptionContent';
 import { ABSENCE_SELECT_MENU_PROPS } from '../components/absences/absenceSelect';
+import { EmployeeAutocomplete } from '../components/employees/EmployeeAutocomplete';
 import { PageHeader } from '../components/layout/PageHeader';
 import { AbsenceFormDialog } from '../features/absences/AbsenceFormDialog';
 import { L4ImportDialog } from '../features/absences/L4ImportDialog';
@@ -262,20 +263,16 @@ export function AbsencesPage() {
             onChange={(event) => setMonthId(event.target.value)}
             slotProps={{ inputLabel: { shrink: true } }}
           />
-          <TextField
-            select
+          <EmployeeAutocomplete
+            employees={employees}
             label={t.absences.filters.employee}
-            value={employeeFilter}
-            onChange={(event) => setEmployeeFilter(event.target.value)}
+            placeholder={t.absences.filters.allEmployees}
+            value={employeeFilter === 'all' ? null : employeeFilter}
+            onChange={(employeeId) => setEmployeeFilter(employeeId ?? 'all')}
+            allowClear
+            size="small"
             sx={{ minWidth: 220 }}
-          >
-            <MenuItem value="all">{t.absences.filters.allEmployees}</MenuItem>
-            {employees.map((employee) => (
-              <MenuItem key={employee.id} value={employee.id}>
-                {employee.tetaNumber} — {employee.lastName} {employee.firstName}
-              </MenuItem>
-            ))}
-          </TextField>
+          />
           <TextField
             select
             label={t.absences.filters.type}

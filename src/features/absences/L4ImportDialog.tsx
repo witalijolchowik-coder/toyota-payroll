@@ -10,7 +10,6 @@ import {
   DialogTitle,
   Divider,
   LinearProgress,
-  MenuItem,
   Stack,
   Table,
   TableBody,
@@ -18,10 +17,10 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from '@mui/material';
 
+import { EmployeeAutocomplete } from '../../components/employees/EmployeeAutocomplete';
 import { useTranslations } from '../../hooks/useTranslations';
 import { interpolate } from '../../i18n/pl';
 import {
@@ -284,33 +283,25 @@ export function L4ImportDialog({
                                   t.absences.l4Import.empty}
                               </Typography>
                               {canResolveEmployee(row) ? (
-                                <TextField
-                                  select
-                                  fullWidth
+                                <EmployeeAutocomplete
+                                  employees={employees}
                                   size="small"
                                   label={t.absences.l4Import.resolveEmployee}
-                                  value={row.employeeId ?? ''}
-                                  disabled={isBusy}
-                                  onChange={(event) =>
-                                    void handleResolveEmployee(
-                                      row,
-                                      event.target.value,
-                                    )
+                                  placeholder={
+                                    t.absences.l4Import.chooseEmployee
                                   }
-                                >
-                                  <MenuItem value="">
-                                    {t.absences.l4Import.chooseEmployee}
-                                  </MenuItem>
-                                  {employees.map((employee) => (
-                                    <MenuItem
-                                      key={employee.id}
-                                      value={employee.id}
-                                    >
-                                      {employee.tetaNumber} —{' '}
-                                      {employee.lastName} {employee.firstName}
-                                    </MenuItem>
-                                  ))}
-                                </TextField>
+                                  value={row.employeeId ?? null}
+                                  disabled={isBusy}
+                                  allowClear
+                                  onChange={(employeeId) =>
+                                    employeeId
+                                      ? void handleResolveEmployee(
+                                          row,
+                                          employeeId,
+                                        )
+                                      : undefined
+                                  }
+                                />
                               ) : null}
                             </Stack>
                           </TableCell>

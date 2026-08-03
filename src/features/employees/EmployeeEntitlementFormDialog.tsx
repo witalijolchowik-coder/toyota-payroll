@@ -11,6 +11,7 @@ import {
   TextField,
 } from '@mui/material';
 
+import { EmployeeAutocomplete } from '../../components/employees/EmployeeAutocomplete';
 import { ExactDateField } from '../../components/forms/ExactDateTimeField';
 import { useTranslations } from '../../hooks/useTranslations';
 import type {
@@ -118,21 +119,15 @@ export function EmployeeEntitlementFormDialog({
               {t.employees.entitlements.errors.saveFailed}
             </Alert>
           ) : null}
-          <TextField
-            select
+          <EmployeeAutocomplete
+            employees={employees}
             label={t.employees.entitlements.form.employee}
-            value={employeeId}
-            onChange={(event) => setEmployeeId(event.target.value)}
+            value={employeeId || null}
+            onChange={(nextEmployeeId) => setEmployeeId(nextEmployeeId ?? '')}
             disabled={Boolean(entitlement)}
             error={Boolean(validationMessage('employee-required'))}
             helperText={validationMessage('employee-required')}
-          >
-            {employees.map((employee) => (
-              <MenuItem key={employee.id} value={employee.id}>
-                {employee.tetaNumber} · {employee.lastName} {employee.firstName}
-              </MenuItem>
-            ))}
-          </TextField>
+          />
           <TextField
             select
             label={t.employees.entitlements.form.type}

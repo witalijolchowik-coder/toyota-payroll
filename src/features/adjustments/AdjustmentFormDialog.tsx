@@ -11,6 +11,7 @@ import {
   TextField,
 } from '@mui/material';
 
+import { EmployeeAutocomplete } from '../../components/employees/EmployeeAutocomplete';
 import type {
   Adjustment,
   AdjustmentCategory,
@@ -104,20 +105,13 @@ export function AdjustmentFormDialog({
               Nie udało się zapisać korekty. Miesiąc mógł zostać rozliczony.
             </Alert>
           ) : null}
-          <TextField
-            select
-            label="Pracownik"
-            value={employeeId}
-            onChange={(event) => setEmployeeId(event.target.value)}
+          <EmployeeAutocomplete
+            employees={employees}
+            value={employeeId || null}
+            onChange={(nextEmployeeId) => setEmployeeId(nextEmployeeId ?? '')}
             disabled={Boolean(adjustment)}
             error={showValidation && Boolean(validation.employeeId)}
-          >
-            {employees.map((item) => (
-              <MenuItem key={item.id} value={item.id}>
-                {item.lastName} {item.firstName} · {item.tetaNumber}
-              </MenuItem>
-            ))}
-          </TextField>
+          />
           <TextField
             select
             label="Kategoria"

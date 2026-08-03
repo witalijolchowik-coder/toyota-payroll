@@ -1,4 +1,13 @@
 export const pl = {
+  employeeSelector: {
+    label: 'Pracownik',
+    placeholder: 'Szukaj po nazwisku, imieniu lub numerze TETA',
+    noOptions: 'Nie znaleziono pracownika',
+    loading: 'Wczytywanie pracowników…',
+    clear: 'Wyczyść wybór pracownika',
+    open: 'Otwórz listę pracowników',
+    close: 'Zamknij listę pracowników',
+  },
   input: {
     exactDateInvalid: 'Wpisz poprawną datę, np. 25.07.2026, albo skrót DDMM.',
     exactTimeInvalid:

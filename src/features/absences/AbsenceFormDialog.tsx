@@ -7,7 +7,6 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
-  MenuItem,
   Stack,
   TextField,
   Typography,
@@ -18,6 +17,7 @@ import {
   AbsenceOptionContent,
 } from '../../components/absences/AbsenceOptionContent';
 import { ABSENCE_SELECT_MENU_PROPS } from '../../components/absences/absenceSelect';
+import { EmployeeAutocomplete } from '../../components/employees/EmployeeAutocomplete';
 import { ExactDateField } from '../../components/forms/ExactDateTimeField';
 import { useTranslations } from '../../hooks/useTranslations';
 import {
@@ -157,23 +157,26 @@ export function AbsenceFormDialog({
               {t.absences.form.description}
             </Typography>
             {submitError ? <Alert severity="error">{submitError}</Alert> : null}
-            <TextField
-              select
+            <EmployeeAutocomplete
+              employees={employees}
+              value={values.employeeId || null}
+              onChange={(employeeId) => {
+                setValues((current) => ({
+                  ...current,
+                  employeeId: employeeId ?? '',
+                }));
+                setErrors((current) => ({
+                  ...current,
+                  employeeId: undefined,
+                }));
+                setSubmitError(null);
+              }}
               required
               disabled={Boolean(absence)}
               label={t.absences.form.employee}
-              value={values.employeeId}
-              onChange={handleChange('employeeId')}
               error={Boolean(errors.employeeId)}
               helperText={messageFor(errors.employeeId)}
-            >
-              {employees.map((employee) => (
-                <MenuItem key={employee.id} value={employee.id}>
-                  {employee.tetaNumber} — {employee.lastName}{' '}
-                  {employee.firstName}
-                </MenuItem>
-              ))}
-            </TextField>
+            />
             <TextField
               select
               required
