@@ -108,6 +108,11 @@ export function DailyValueEditorDialog({
 }: DailyValueEditorDialogProps) {
   const t = useTranslations();
   const { palette } = useCalendarAppearance();
+  const isNormativeWorkingDay = plannedDay
+    ? plannedDay.status === 'WORKING' || plannedDay.status === 'BHP'
+    : day.isWorkingDay;
+  const isExtraWorkDay =
+    value.workTimeCorrection?.workContext === 'EXTRA' || !isNormativeWorkingDay;
   const plannedHours = plannedDay?.hours ?? (day.isWorkingDay ? 8 : 0);
   const defaultHours =
     value.kind === 'empty' ? plannedHours : (value.hours ?? plannedHours);
@@ -121,9 +126,12 @@ export function DailyValueEditorDialog({
   );
   const [plannedShift, setPlannedShift] = useState<ActualWorkingShift | ''>(
     () =>
-      activeScheduleCorrection
-        ? plannedShiftFromSchedule
-        : (value.workTimeCorrection?.plannedShift ?? plannedShiftFromSchedule),
+      isExtraWorkDay
+        ? ''
+        : activeScheduleCorrection
+          ? plannedShiftFromSchedule
+          : (value.workTimeCorrection?.plannedShift ??
+            plannedShiftFromSchedule),
   );
   const [actualStartTime, setActualStartTime] = useState(
     () =>
@@ -146,13 +154,14 @@ export function DailyValueEditorDialog({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const employeeName = `${employee.lastName} ${employee.firstName}`;
-  const plannedInterval = plannedShift ? shiftIntervals[plannedShift] : null;
+  const plannedInterval =
+    isNormativeWorkingDay && plannedShift ? shiftIntervals[plannedShift] : null;
   const selectedPlannedHours = plannedInterval
     ? intervalHours(plannedInterval)
     : plannedHours;
   const parsedHours = parseDailyHoursInput(input);
   const inferredActual =
-    plannedInterval && actualStartTime && actualEndTime
+    actualStartTime && actualEndTime
       ? {
           startTime: actualStartTime,
           endTime: actualEndTime,
@@ -168,23 +177,33 @@ export function DailyValueEditorDialog({
   const effectiveParsedHours = timeValidationError
     ? parsedHours
     : ({ kind: 'value', hours: actualTotal } as const);
+  const canResolveWorkTime =
+    Boolean(inferredActual) &&
+    !timeValidationError &&
+    (isExtraWorkDay || Boolean(plannedInterval && plannedShift));
   const workTimePreview =
-    inferredActual && plannedInterval && plannedShift && !timeValidationError
+    inferredActual && canResolveWorkTime
       ? resolveDailyWorkTimeDeviation({
-          planned: { shift: plannedShift, ...plannedInterval },
+          planned:
+            plannedInterval && plannedShift
+              ? { shift: plannedShift, ...plannedInterval }
+              : null,
           actual: inferredActual,
-          isWorkingDay: day.isWorkingDay,
+          isWorkingDay: isNormativeWorkingDay && !isExtraWorkDay,
           isSaturday: day.date.getUTCDay() === 6,
           isSunday: day.date.getUTCDay() === 0,
           isPublicHoliday: day.isHoliday,
         })
       : null;
   const outcomes =
-    inferredActual && plannedInterval && plannedShift && !timeValidationError
+    inferredActual && canResolveWorkTime
       ? resolvePlanToFactOutcomes({
-          planned: { shift: plannedShift, ...plannedInterval },
+          planned:
+            plannedInterval && plannedShift
+              ? { shift: plannedShift, ...plannedInterval }
+              : null,
           actual: inferredActual,
-          isWorkingDay: day.isWorkingDay,
+          isWorkingDay: isNormativeWorkingDay && !isExtraWorkDay,
           isSaturday: day.date.getUTCDay() === 6,
           isSunday: day.date.getUTCDay() === 0,
           isPublicHoliday: day.isHoliday,
@@ -281,7 +300,12 @@ export function DailyValueEditorDialog({
       setValidationError(effectiveParsedHours.code);
       return;
     }
-    if (timeValidationError || !plannedShift || !plannedInterval) return;
+    if (
+      timeValidationError ||
+      !inferredActual ||
+      (isNormativeWorkingDay && (!plannedShift || !plannedInterval))
+    )
+      return;
     const normalizedNote = note.trim() || null;
     let mutation = decideDailyValueMutation({
       parsed: effectiveParsedHours,
@@ -297,34 +321,44 @@ export function DailyValueEditorDialog({
           : value.fallbackHours,
     });
     const needsCorrection =
-      effectiveParsedHours.kind === 'value' &&
-      (effectiveParsedHours.hours !== selectedPlannedHours ||
-        actualStartTime !== plannedInterval.startTime ||
-        actualEndTime !== plannedInterval.endTime);
+      isExtraWorkDay ||
+      (effectiveParsedHours.kind === 'value' &&
+        plannedInterval &&
+        (effectiveParsedHours.hours !== selectedPlannedHours ||
+          actualStartTime !== plannedInterval.startTime ||
+          actualEndTime !== plannedInterval.endTime));
     const currentCorrection = value.workTimeCorrection;
     const correctionDetailsChanged = needsCorrection
       ? !currentCorrection ||
-        currentCorrection.plannedShift !== plannedShift ||
-        currentCorrection.plannedStartTime !== plannedInterval.startTime ||
-        currentCorrection.plannedEndTime !== plannedInterval.endTime ||
+        currentCorrection.workContext !==
+          (isExtraWorkDay ? 'EXTRA' : 'NORMATIVE') ||
+        currentCorrection.plannedShift !==
+          (isExtraWorkDay ? null : plannedShift || null) ||
+        currentCorrection.plannedStartTime !==
+          (plannedInterval?.startTime ?? null) ||
+        currentCorrection.plannedEndTime !==
+          (plannedInterval?.endTime ?? null) ||
         currentCorrection.actualStartTime !== actualStartTime ||
         currentCorrection.actualEndTime !== actualEndTime
       : Boolean(currentCorrection);
     if (
       mutation === 'none' &&
       correctionDetailsChanged &&
-      (value.kind === 'manual' || value.kind === 'imported-override')
+      (isExtraWorkDay ||
+        value.kind === 'manual' ||
+        value.kind === 'imported-override')
     ) {
       mutation = 'save';
     }
-    const scheduleNeedsSave = plannedShift !== plannedDay?.shift;
+    const scheduleNeedsSave =
+      isNormativeWorkingDay && plannedShift !== plannedDay?.shift;
     if (mutation === 'none' && !scheduleNeedsSave) return onClose();
     if (effectiveParsedHours.kind !== 'value' || !inferredActual) return;
 
     setIsSubmitting(true);
     setSubmitError(null);
     try {
-      if (scheduleNeedsSave) {
+      if (scheduleNeedsSave && plannedShift) {
         await onSaveScheduleCorrection(
           plannedShift,
           selectedPlannedHours,
@@ -339,9 +373,10 @@ export function DailyValueEditorDialog({
           normalizedNote,
           needsCorrection
             ? {
-                plannedShift,
-                plannedStartTime: plannedInterval.startTime,
-                plannedEndTime: plannedInterval.endTime,
+                workContext: isExtraWorkDay ? 'EXTRA' : 'NORMATIVE',
+                plannedShift: isExtraWorkDay ? null : plannedShift || null,
+                plannedStartTime: plannedInterval?.startTime ?? null,
+                plannedEndTime: plannedInterval?.endTime ?? null,
                 actualStartTime: inferredActual.startTime,
                 actualEndTime: inferredActual.endTime,
                 classificationOverride: null,
@@ -419,79 +454,85 @@ export function DailyValueEditorDialog({
                   </>
                 ) : null}
                 <Stack spacing={1.5}>
-                  {!plannedShift ? (
+                  {isExtraWorkDay ? (
+                    <Alert severity="info">
+                      {t.settlement.editor.workTime.extraWorkDay}
+                    </Alert>
+                  ) : !plannedShift ? (
                     <Alert severity="warning">
                       {t.settlement.editor.workTime.unresolvedShift}
                     </Alert>
                   ) : null}
-                  <Box
-                    sx={{
-                      bgcolor: 'grey.50',
-                      border: 1,
-                      borderColor: 'divider',
-                      borderRadius: 2,
-                      display: 'grid',
-                      gap: 1.25,
-                      gridTemplateColumns: {
-                        xs: '1fr',
-                        sm: 'minmax(220px, 0.8fr) minmax(0, 1fr)',
-                      },
-                      p: 1.5,
-                    }}
-                  >
-                    <TextField
-                      select
-                      size="small"
-                      label={t.settlement.editor.workTime.plannedShift}
-                      value={plannedShift}
-                      onChange={(event) => {
-                        const next = event.target.value as ActualWorkingShift;
-                        const previousInterval = plannedInterval;
-                        const followsPreviousPlan = Boolean(
-                          previousInterval &&
-                          actualStartTime === previousInterval.startTime &&
-                          actualEndTime === previousInterval.endTime,
-                        );
-                        const interval = shiftIntervals[next];
-                        setPlannedShift(next);
-                        if (!actualStartTime || followsPreviousPlan)
-                          setActualStartTime(interval.startTime);
-                        if (!actualEndTime || followsPreviousPlan)
-                          setActualEndTime(interval.endTime);
-                      }}
-                    >
-                      <MenuItem value="FIRST">
-                        {t.organization.actualWorkingShifts.FIRST}
-                      </MenuItem>
-                      <MenuItem value="SECOND">
-                        {t.organization.actualWorkingShifts.SECOND}
-                      </MenuItem>
-                      <MenuItem value="NIGHT">
-                        {t.organization.actualWorkingShifts.NIGHT}
-                      </MenuItem>
-                    </TextField>
+                  {isNormativeWorkingDay ? (
                     <Box
                       sx={{
-                        alignSelf: 'center',
-                        minWidth: 0,
-                        px: { xs: 0.25, sm: 1 },
+                        bgcolor: 'grey.50',
+                        border: 1,
+                        borderColor: 'divider',
+                        borderRadius: 2,
+                        display: 'grid',
+                        gap: 1.25,
+                        gridTemplateColumns: {
+                          xs: '1fr',
+                          sm: 'minmax(220px, 0.8fr) minmax(0, 1fr)',
+                        },
+                        p: 1.5,
                       }}
                     >
-                      <Typography
-                        variant="overline"
-                        color="text.secondary"
-                        sx={{ fontWeight: 700 }}
+                      <TextField
+                        select
+                        size="small"
+                        label={t.settlement.editor.workTime.plannedShift}
+                        value={plannedShift}
+                        onChange={(event) => {
+                          const next = event.target.value as ActualWorkingShift;
+                          const previousInterval = plannedInterval;
+                          const followsPreviousPlan = Boolean(
+                            previousInterval &&
+                            actualStartTime === previousInterval.startTime &&
+                            actualEndTime === previousInterval.endTime,
+                          );
+                          const interval = shiftIntervals[next];
+                          setPlannedShift(next);
+                          if (!actualStartTime || followsPreviousPlan)
+                            setActualStartTime(interval.startTime);
+                          if (!actualEndTime || followsPreviousPlan)
+                            setActualEndTime(interval.endTime);
+                        }}
                       >
-                        {t.settlement.editor.workTime.planSummary}
-                      </Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 700 }}>
-                        {plannedInterval
-                          ? `${plannedInterval.startTime}–${plannedInterval.endTime} · ${formatHours(selectedPlannedHours)} h`
-                          : '—'}
-                      </Typography>
+                        <MenuItem value="FIRST">
+                          {t.organization.actualWorkingShifts.FIRST}
+                        </MenuItem>
+                        <MenuItem value="SECOND">
+                          {t.organization.actualWorkingShifts.SECOND}
+                        </MenuItem>
+                        <MenuItem value="NIGHT">
+                          {t.organization.actualWorkingShifts.NIGHT}
+                        </MenuItem>
+                      </TextField>
+                      <Box
+                        sx={{
+                          alignSelf: 'center',
+                          minWidth: 0,
+                          px: { xs: 0.25, sm: 1 },
+                        }}
+                      >
+                        <Typography
+                          variant="overline"
+                          color="text.secondary"
+                          sx={{ fontWeight: 700 }}
+                        >
+                          {t.settlement.editor.workTime.planSummary}
+                        </Typography>
+                        <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                          {plannedInterval
+                            ? `${plannedInterval.startTime}–${plannedInterval.endTime} · ${formatHours(selectedPlannedHours)} h`
+                            : '—'}
+                        </Typography>
+                      </Box>
                     </Box>
-                  </Box>
-                  {activeScheduleCorrection ? (
+                  ) : null}
+                  {isNormativeWorkingDay && activeScheduleCorrection ? (
                     <Alert
                       severity="info"
                       action={
@@ -727,7 +768,8 @@ export function DailyValueEditorDialog({
             disabled={
               isSubmitting ||
               (tab === 'hours' &&
-                (!plannedShift ||
+                (!inferredActual ||
+                  (isNormativeWorkingDay && !plannedShift) ||
                   multiDayAbsence ||
                   confirmedImportedL4 ||
                   (hasGoverningAbsence && !replacementConfirmed))) ||

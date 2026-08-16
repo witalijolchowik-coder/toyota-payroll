@@ -238,18 +238,27 @@ export function EmployeeCalendarDialog({
                     });
               const workTimeBreakdown = value.workTimeCorrection
                 ? resolveDailyWorkTimeDeviation({
-                    planned: {
-                      shift: value.workTimeCorrection.plannedShift,
-                      startTime: value.workTimeCorrection.plannedStartTime,
-                      endTime: value.workTimeCorrection.plannedEndTime,
-                    },
+                    planned:
+                      value.workTimeCorrection.workContext !== 'EXTRA' &&
+                      value.workTimeCorrection.plannedShift &&
+                      value.workTimeCorrection.plannedStartTime &&
+                      value.workTimeCorrection.plannedEndTime
+                        ? {
+                            shift: value.workTimeCorrection.plannedShift,
+                            startTime:
+                              value.workTimeCorrection.plannedStartTime,
+                            endTime: value.workTimeCorrection.plannedEndTime,
+                          }
+                        : null,
                     actual: {
                       startTime: value.workTimeCorrection.actualStartTime,
                       endTime: value.workTimeCorrection.actualEndTime,
                     },
                     isWorkingDay:
-                      plannedDay?.status === 'WORKING' ||
-                      plannedDay?.status === 'BHP',
+                      value.workTimeCorrection.workContext === 'EXTRA'
+                        ? false
+                        : plannedDay?.status === 'WORKING' ||
+                          plannedDay?.status === 'BHP',
                     isSaturday: cell.day.date.getUTCDay() === 6,
                     isSunday: cell.day.date.getUTCDay() === 0,
                     isPublicHoliday: cell.day.isHoliday,
@@ -383,22 +392,31 @@ export function EmployeeCalendarDialog({
                             )}
                           </Typography>
                         ) : null}
-                        {workTimeBreakdown ? (
+                        {workTimeBreakdown && value.workTimeCorrection ? (
                           <Typography variant="caption" color="text.secondary">
                             {interpolate(
-                              t.settlement.editor.workTime.previewExtended,
+                              value.workTimeCorrection.plannedStartTime &&
+                                value.workTimeCorrection.plannedEndTime
+                                ? t.settlement.editor.workTime.previewExtended
+                                : t.settlement.editor.workTime.previewExtra,
                               {
-                                planned: intervalHours({
-                                  startTime:
-                                    value.workTimeCorrection!.plannedStartTime,
-                                  endTime:
-                                    value.workTimeCorrection!.plannedEndTime,
-                                }).toLocaleString('pl-PL'),
+                                planned:
+                                  value.workTimeCorrection.plannedStartTime &&
+                                  value.workTimeCorrection.plannedEndTime
+                                    ? intervalHours({
+                                        startTime:
+                                          value.workTimeCorrection
+                                            .plannedStartTime,
+                                        endTime:
+                                          value.workTimeCorrection
+                                            .plannedEndTime,
+                                      }).toLocaleString('pl-PL')
+                                    : '0',
                                 actual: intervalHours({
                                   startTime:
-                                    value.workTimeCorrection!.actualStartTime,
+                                    value.workTimeCorrection.actualStartTime,
                                   endTime:
-                                    value.workTimeCorrection!.actualEndTime,
+                                    value.workTimeCorrection.actualEndTime,
                                 }).toLocaleString('pl-PL'),
                                 private:
                                   workTimeBreakdown.privateTimeHours.toLocaleString(

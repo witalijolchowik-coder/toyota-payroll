@@ -298,6 +298,8 @@ export function mapDailyValueDocument(
       : null,
     workTimeCorrection: document.work_time_correction
       ? {
+          workContext:
+            document.work_time_correction.work_context ?? 'NORMATIVE',
           plannedShift: document.work_time_correction.planned_shift,
           plannedStartTime: document.work_time_correction.planned_start_time,
           plannedEndTime: document.work_time_correction.planned_end_time,

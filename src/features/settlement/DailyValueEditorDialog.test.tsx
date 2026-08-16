@@ -195,6 +195,7 @@ describe('DailyValueEditorDialog', () => {
       expect(onSaveScheduleCorrection).toHaveBeenCalledWith('NIGHT', 8, null),
     );
     expect(onSave).toHaveBeenCalledWith(10, null, {
+      workContext: 'NORMATIVE',
       plannedShift: 'NIGHT',
       plannedStartTime: '22:00',
       plannedEndTime: '06:00',
@@ -202,6 +203,53 @@ describe('DailyValueEditorDialog', () => {
       actualEndTime: '08:00',
       classificationOverride: null,
     });
+  });
+
+  it('saves actual extra work on a normatively free day without a planned shift', async () => {
+    const freeDay: PlannedScheduleDay = {
+      ...plannedDay,
+      status: 'DAY_OFF',
+      source: 'calendar',
+      hours: 0,
+      shift: null,
+      label: 'W',
+      plannedStartTime: null,
+      plannedEndTime: null,
+      plannedDuration: 0,
+    };
+    const { onSave, onSaveScheduleCorrection } = renderDialog({
+      plannedDay: freeDay,
+    });
+
+    expect(screen.queryByLabelText('Planowana zmiana')).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/wolny w normatywnym grafiku/i),
+    ).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Rzeczywisty start'), {
+      target: { value: '22:00' },
+    });
+    fireEvent.change(screen.getByLabelText('Rzeczywisty koniec'), {
+      target: { value: '06:00' },
+    });
+
+    expect(screen.getByTestId('overtime-100-hours')).toHaveTextContent('8 h');
+    expect(screen.getByTestId('overtime-50-hours')).toHaveTextContent('0 h');
+    expect(screen.getByTestId('night-hours')).toHaveTextContent('8 h');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Zapisz' }));
+    await waitFor(() =>
+      expect(onSave).toHaveBeenCalledWith(8, null, {
+        workContext: 'EXTRA',
+        plannedShift: null,
+        plannedStartTime: null,
+        plannedEndTime: null,
+        actualStartTime: '22:00',
+        actualEndTime: '06:00',
+        classificationOverride: null,
+      }),
+    );
+    expect(onSaveScheduleCorrection).not.toHaveBeenCalled();
   });
 
   it('resets an active daily schedule correction to the generated schedule', async () => {

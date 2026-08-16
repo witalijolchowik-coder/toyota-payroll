@@ -723,6 +723,7 @@ export function calculateEmployeeMonthlyDraft({
           const deviation = dailyWorkTimeDeviationFromValue({
             value: persistedValue,
             day,
+            plannedDay,
           });
           if (deviation) {
             recordWorkTimeDeviation(day.isoDate, deviation);
@@ -1174,26 +1175,41 @@ function plannedIntervalForScheduleDay(day?: PlannedScheduleDay) {
 function dailyWorkTimeDeviationFromValue({
   value,
   day,
+  plannedDay,
 }: {
   value: DailyValue;
   day: ReturnType<typeof createPayrollMonthCalendar>[number];
+  plannedDay?: PlannedScheduleDay;
 }): DailyWorkTimeDeviation | null {
   if (!value.workTimeCorrection) {
     return null;
   }
 
   const correction = value.workTimeCorrection;
+  const isWorkingDay =
+    correction.workContext === 'EXTRA'
+      ? false
+      : plannedDay
+        ? plannedDay.status === 'WORKING' || plannedDay.status === 'BHP'
+        : day.isWorkingDay;
+  const planned =
+    correction.workContext !== 'EXTRA' &&
+    correction.plannedShift &&
+    correction.plannedStartTime &&
+    correction.plannedEndTime
+      ? {
+          shift: correction.plannedShift,
+          startTime: correction.plannedStartTime,
+          endTime: correction.plannedEndTime,
+        }
+      : null;
   return resolveDailyWorkTimeDeviation({
-    planned: {
-      shift: correction.plannedShift,
-      startTime: correction.plannedStartTime,
-      endTime: correction.plannedEndTime,
-    },
+    planned,
     actual: {
       startTime: correction.actualStartTime,
       endTime: correction.actualEndTime,
     },
-    isWorkingDay: day.isWorkingDay,
+    isWorkingDay,
     isSaturday: day.date.getUTCDay() === 6,
     isSunday: day.date.getUTCDay() === 0,
     isPublicHoliday: day.isPublicHoliday,

@@ -256,17 +256,24 @@ export function meaningfulPlanChanged(
 
 function resolveStoredDeviation(value: DailyValue) {
   const correction = value.workTimeCorrection!;
+  const hasNormativePlan =
+    correction.workContext !== 'EXTRA' &&
+    correction.plannedShift &&
+    correction.plannedStartTime &&
+    correction.plannedEndTime;
   return resolveDailyWorkTimeDeviation({
-    planned: {
-      shift: correction.plannedShift,
-      startTime: correction.plannedStartTime,
-      endTime: correction.plannedEndTime,
-    },
+    planned: hasNormativePlan
+      ? {
+          shift: correction.plannedShift!,
+          startTime: correction.plannedStartTime!,
+          endTime: correction.plannedEndTime!,
+        }
+      : null,
     actual: {
       startTime: correction.actualStartTime,
       endTime: correction.actualEndTime,
     },
-    isWorkingDay: true,
+    isWorkingDay: Boolean(hasNormativePlan),
     classificationOverride: correction.classificationOverride,
   });
 }

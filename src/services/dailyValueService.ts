@@ -38,9 +38,18 @@ function workTimeCorrectionPayload(
   if (!input) {
     return null;
   }
+  const workContext = input.workContext ?? 'NORMATIVE';
   if (
-    !isValidClockTime(input.plannedStartTime) ||
-    !isValidClockTime(input.plannedEndTime) ||
+    (workContext === 'EXTRA' &&
+      (input.plannedShift !== null ||
+        input.plannedStartTime !== null ||
+        input.plannedEndTime !== null)) ||
+    (workContext === 'NORMATIVE' &&
+      (!input.plannedShift ||
+        !input.plannedStartTime ||
+        !isValidClockTime(input.plannedStartTime) ||
+        !input.plannedEndTime ||
+        !isValidClockTime(input.plannedEndTime))) ||
     !isValidClockTime(input.actualStartTime) ||
     !isValidClockTime(input.actualEndTime)
   ) {
@@ -48,6 +57,7 @@ function workTimeCorrectionPayload(
   }
 
   return {
+    work_context: workContext,
     planned_shift: input.plannedShift,
     planned_start_time: input.plannedStartTime,
     planned_end_time: input.plannedEndTime,
@@ -72,6 +82,7 @@ function auditWorkTimeCorrection(
 ) {
   if (!input) return null;
   return {
+    work_context: input.workContext ?? 'NORMATIVE',
     planned_shift: input.plannedShift,
     planned_start_time: input.plannedStartTime,
     planned_end_time: input.plannedEndTime,

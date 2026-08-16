@@ -1165,6 +1165,53 @@ describe('Firestore security rules', () => {
     );
   });
 
+  it('allows extra-work intervals without a planned shift and rejects mixed context', async () => {
+    await seedMonth('2026-07', false);
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const validExtraWork = {
+      employee_id: 'employee-1',
+      teta_number: 'TETA-1001',
+      date: '2026-07-18',
+      hours: 8,
+      source: 'manual',
+      import_id: null,
+      note: 'Praca dodatkowa',
+      work_time_correction: {
+        work_context: 'EXTRA',
+        planned_shift: null,
+        planned_start_time: null,
+        planned_end_time: null,
+        actual_start_time: '22:00',
+        actual_end_time: '06:00',
+        classification_override: null,
+      },
+      ...modificationMetadata(uid),
+    };
+
+    await assertSucceeds(
+      setDoc(
+        doc(firestore, 'months/2026-07/dailyValues/employee-1_2026-07-18'),
+        validExtraWork,
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(firestore, 'months/2026-07/dailyValues/employee-1_2026-07-19'),
+        {
+          ...validExtraWork,
+          date: '2026-07-19',
+          work_time_correction: {
+            ...validExtraWork.work_time_correction,
+            planned_shift: 'FIRST',
+            planned_start_time: '06:00',
+            planned_end_time: '14:00',
+          },
+        },
+      ),
+    );
+  });
+
   it('rejects non-canonical daily value document IDs', async () => {
     await seedMonth('2026-07', false);
     const uid = 'coordinator-1';

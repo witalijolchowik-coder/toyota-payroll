@@ -19,6 +19,7 @@ import type {
   PayrollSettingTaxType,
   SettlementReviewStatus,
   TetaNumber,
+  WorkTimeContext,
 } from './documents';
 
 export interface EmployeeCreateInput {
@@ -133,9 +134,10 @@ export interface WorkTimeClassificationOverrideInput {
 }
 
 export interface WorkTimeCorrectionInput {
-  plannedShift: ActualWorkingShift;
-  plannedStartTime: string;
-  plannedEndTime: string;
+  workContext?: WorkTimeContext;
+  plannedShift: ActualWorkingShift | null;
+  plannedStartTime: string | null;
+  plannedEndTime: string | null;
   actualStartTime: string;
   actualEndTime: string;
   classificationOverride?: WorkTimeClassificationOverrideInput | null;

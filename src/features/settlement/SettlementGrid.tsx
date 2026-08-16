@@ -832,19 +832,27 @@ function resolveGridWorkTimeBreakdown({
   if (!correction) return null;
 
   return resolveDailyWorkTimeDeviation({
-    planned: {
-      shift: correction.plannedShift,
-      startTime: correction.plannedStartTime,
-      endTime: correction.plannedEndTime,
-    },
+    planned:
+      correction.workContext !== 'EXTRA' &&
+      correction.plannedShift &&
+      correction.plannedStartTime &&
+      correction.plannedEndTime
+        ? {
+            shift: correction.plannedShift,
+            startTime: correction.plannedStartTime,
+            endTime: correction.plannedEndTime,
+          }
+        : null,
     actual: {
       startTime: correction.actualStartTime,
       endTime: correction.actualEndTime,
     },
     isWorkingDay:
-      plannedDay?.status === 'WORKING' ||
-      plannedDay?.status === 'BHP' ||
-      day.isWorkingDay,
+      correction.workContext === 'EXTRA'
+        ? false
+        : plannedDay
+          ? plannedDay.status === 'WORKING' || plannedDay.status === 'BHP'
+          : day.isWorkingDay,
     isSaturday: day.date.getUTCDay() === 6,
     isSunday: day.date.getUTCDay() === 0,
     isPublicHoliday: day.isHoliday,

@@ -514,6 +514,7 @@ service cloud.firestore {
             'classification_override'
           ])
           && data.work_time_correction.keys().hasOnly([
+            'work_context',
             'planned_shift',
             'planned_start_time',
             'planned_end_time',
@@ -521,13 +522,30 @@ service cloud.firestore {
             'actual_end_time',
             'classification_override'
           ])
-          && data.work_time_correction.planned_shift in [
-            'FIRST',
-            'SECOND',
-            'NIGHT'
-          ]
-          && isClockTime(data.work_time_correction.planned_start_time)
-          && isClockTime(data.work_time_correction.planned_end_time)
+          && (
+            !data.work_time_correction.keys().hasAny(['work_context'])
+            || data.work_time_correction.work_context in ['NORMATIVE', 'EXTRA']
+          )
+          && (
+            (
+              data.work_time_correction.keys().hasAny(['work_context'])
+              && data.work_time_correction.work_context == 'EXTRA'
+            )
+              ? (
+                  data.work_time_correction.planned_shift == null
+                  && data.work_time_correction.planned_start_time == null
+                  && data.work_time_correction.planned_end_time == null
+                )
+              : (
+                  data.work_time_correction.planned_shift in [
+                    'FIRST',
+                    'SECOND',
+                    'NIGHT'
+                  ]
+                  && isClockTime(data.work_time_correction.planned_start_time)
+                  && isClockTime(data.work_time_correction.planned_end_time)
+                )
+          )
           && isClockTime(data.work_time_correction.actual_start_time)
           && isClockTime(data.work_time_correction.actual_end_time)
           && data.work_time_correction.classification_override == null

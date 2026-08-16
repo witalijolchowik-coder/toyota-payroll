@@ -56,7 +56,9 @@ Plan zawiera kod zmiany, początek, koniec i czas trwania. Brak grupy nie kasuje
 
 Wspólny edytor dnia przyjmuje rzeczywisty początek i koniec. Koniec wcześniejszy od początku oznacza przejście przez północ. System wylicza czas normalny, nadgodziny 50%, nadgodziny 100%, godziny nocne oraz niedobór/czas prywatny, używając istniejących reguł odchyleń.
 
-Pełnodniowa nieobecność wyłącza wirtualny czas pracy. Potwierdzone L4 pozostaje chronione. Praca w dniu planowo wolnym zachowuje stan planu wolnego i jest klasyfikowana jako odchylenie, a nie zmiana stałego przypisania pracownika.
+Pełnodniowa nieobecność wyłącza wirtualny czas pracy. Potwierdzone L4 pozostaje chronione. Praca w dniu normatywnie wolnym zachowuje stan planu wolnego, nie zwiększa nominalu i nie tworzy niedoczasu. Edytor zapisuje ją jako kontekst `EXTRA` z rzeczywistym przedziałem bez planowanej zmiany. Pierwsze 8 godzin jest klasyfikowane jako 100%, a nadwyżka jako 50%; godziny nocne są naliczane niezależnie. Dla przedziału przez północ obowiązuje kontekst daty rozpoczęcia.
+
+Ręczna korekta Pierwszej, Drugiej lub Nocnej zmiany jest stosowana wyłącznie do dnia, który nie jest wolny w normatywnym grafiku. Historyczna korekta zmiany zapisana dla dnia wolnego nie zmienia już statusu tego dnia i wymaga osobnego cleanupu danych zamiast automatycznej migracji.
 
 ## Bezpieczeństwo i gotowość
 

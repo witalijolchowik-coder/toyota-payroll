@@ -494,18 +494,27 @@ export const dailyValueConverter = createConverter<DailyValueDocument>(
         : null,
       work_time_correction: workTimeCorrection
         ? {
-            planned_shift: readEnum(
+            work_context: readOptionalEnum(
               workTimeCorrection,
-              'planned_shift',
+              'work_context',
               `${path}.work_time_correction`,
-              ['FIRST', 'SECOND', 'NIGHT'] as const,
+              ['NORMATIVE', 'EXTRA'] as const,
             ),
-            planned_start_time: readNonEmptyString(
+            planned_shift:
+              workTimeCorrection.planned_shift === null
+                ? null
+                : readEnum(
+                    workTimeCorrection,
+                    'planned_shift',
+                    `${path}.work_time_correction`,
+                    ['FIRST', 'SECOND', 'NIGHT'] as const,
+                  ),
+            planned_start_time: readNullableString(
               workTimeCorrection,
               'planned_start_time',
               `${path}.work_time_correction`,
             ),
-            planned_end_time: readNonEmptyString(
+            planned_end_time: readNullableString(
               workTimeCorrection,
               'planned_end_time',
               `${path}.work_time_correction`,

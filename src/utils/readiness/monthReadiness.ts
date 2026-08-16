@@ -407,6 +407,27 @@ export function assessMonthReadiness({
       .forEach((value) => {
         const currentPlan = scheduleByDate.get(value.date);
         const storedPlan = value.workTimeCorrection!;
+        if (storedPlan.workContext === 'EXTRA') {
+          if (
+            currentPlan?.status === 'WORKING' ||
+            currentPlan?.status === 'BHP'
+          ) {
+            addIssue(summary, {
+              ...baseIssue,
+              code: 'shift-plan-manual-actual-review',
+              severity: 'warning',
+              target: 'settlement',
+              context: value.date,
+            });
+          }
+          return;
+        }
+        if (
+          !storedPlan.plannedShift ||
+          !storedPlan.plannedStartTime ||
+          !storedPlan.plannedEndTime
+        )
+          return;
         if (!currentPlan || !storedPlanDiffers(currentPlan, storedPlan)) return;
 
         addIssue(summary, {
@@ -661,6 +682,13 @@ function storedPlanDiffers(
   current: ReturnType<typeof generateEmployeeMonthlySchedule>[number],
   stored: NonNullable<DailyValue['workTimeCorrection']>,
 ): boolean {
+  if (
+    !stored.plannedShift ||
+    !stored.plannedStartTime ||
+    !stored.plannedEndTime
+  ) {
+    return false;
+  }
   return (
     current.shift !== stored.plannedShift ||
     current.plannedStartTime !== stored.plannedStartTime ||

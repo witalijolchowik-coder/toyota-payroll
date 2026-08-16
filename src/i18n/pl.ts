@@ -2285,6 +2285,8 @@ export const pl = {
         planSummary: 'Plan dnia',
         resultSummary: 'Podsumowanie czasu pracy',
         plannedShift: 'Planowana zmiana',
+        extraWorkDay:
+          'Dzień jest wolny w normatywnym grafiku. Wprowadź rzeczywisty czas pracy dodatkowej; zapis nie utworzy planowanej zmiany ani nie zwiększy nominalu.',
         scheduleCorrectionActive:
           'Dla tego dnia obowiązuje ręczna korekta grafiku. Ponowny przelicznik miesiąca jej nie zastąpi.',
         resetSchedule: 'Przywróć zmianę z grafiku',
@@ -2314,6 +2316,8 @@ export const pl = {
           'Rozbicie: praca normalna {{normal}} h, czas prywatny {{private}} h, nadgodziny 50% {{overtime50}} h, nadgodziny 100% {{overtime100}} h.',
         previewExtended:
           'Plan {{planned}} h, rzeczywiście {{actual}} h, czas prywatny {{private}} h, nadgodziny 50% {{overtime50}} h, nadgodziny 100% {{overtime100}} h, nocne {{night}} h.',
+        previewExtra:
+          'Praca dodatkowa {{actual}} h, nadgodziny 50% {{overtime50}} h, nadgodziny 100% {{overtime100}} h, nocne {{night}} h.',
         outcomes: {
           MATCHES_PLAN: 'Zgodne z planem',
           STARTED_EARLIER: 'Wcześniejsze rozpoczęcie',

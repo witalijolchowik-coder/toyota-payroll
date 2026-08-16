@@ -197,6 +197,7 @@ export interface SettlementReviewDocument
 }
 
 export type DailyValueSource = 'manual' | 'attendance_import';
+export type WorkTimeContext = 'NORMATIVE' | 'EXTRA';
 
 export interface WorkTimeClassificationOverrideDocument {
   private_time_hours: number | null;
@@ -209,9 +210,10 @@ export interface WorkTimeClassificationOverrideDocument {
 }
 
 export interface WorkTimeCorrectionDocument {
-  planned_shift: ActualWorkingShift;
-  planned_start_time: string;
-  planned_end_time: string;
+  work_context?: WorkTimeContext;
+  planned_shift: ActualWorkingShift | null;
+  planned_start_time: string | null;
+  planned_end_time: string | null;
   actual_start_time: string;
   actual_end_time: string;
   classification_override?: WorkTimeClassificationOverrideDocument | null;

@@ -55,16 +55,17 @@ The engine may preserve reasons internally for explanation and review.
 
 ## 100% overtime sources
 
-100% overtime includes:
+100% overtime on normative working days includes:
 
 - overtime during night time (`22:00-06:00`);
 - Saturday work;
 - Sunday work;
 - official public-holiday work.
 
-Saturday, Sunday and public holidays have `0h` nominal by default. Work on
-those dates is explicit 100% overtime and does not create an automatic `8h`
-missing-time problem.
+Any day that is free in the employee's normative schedule has `0h` nominal.
+Extra work on such a day does not create missing time: the first eight actual
+hours are classified as 100% overtime and hours above eight as 50% overtime.
+The rule uses the normative employee schedule rather than the weekday name.
 
 ## Public-holiday bonus
 
@@ -81,10 +82,13 @@ the final payroll aggregation.
 
 ## Night allowance boundary
 
-Night allowance `20%` exists for ordinary night hours, but it must not be added
-on top of overtime already classified as `nadgodziny 100%`.
+Night hours are an independent component. An hour may be classified as 50% or
+100% overtime and simultaneously count toward the night-hours total. The
+existing `22:00-06:00` night window remains unchanged.
 
-There is no payroll category `nadgodziny 100% + dodatek nocny 20%`.
+For an interval crossing midnight, payroll day context is determined by the
+start date. A Sunday `22:00-06:00` interval therefore remains Sunday extra work
+for all eight hours while retaining the real timestamps and night-hour total.
 
 ## Private time and niedoczas
 
@@ -137,6 +141,7 @@ dailyValues/{employeeId_YYYY-MM-DD}.work_time_correction
 stores:
 
 ```text
+work_context
 planned_shift
 planned_start_time
 planned_end_time
@@ -144,6 +149,11 @@ actual_start_time
 actual_end_time
 classification_override
 ```
+
+`work_context` is `NORMATIVE` for a plan-to-fact correction and `EXTRA` for
+work on a normatively free day. `EXTRA` stores no planned shift or planned
+interval; only the actual start and end are required. Legacy documents without
+`work_context` are read as `NORMATIVE`.
 
 `classification_override` is optional and audited. It can provide corrected
 private time, overtime 50%, overtime 100% or coverable NI hours when automatic

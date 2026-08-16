@@ -9,11 +9,13 @@ import type {
 import {
   calculateEmployeeMonthlyDraft,
   calculateMonthlyDrafts,
+  createPayrollMonthCalendar,
   resolveMonthlyEmployeeEntitlements,
   STANDARD_WORKING_DAY_HOURS,
   type PayrollCalendarOptions,
   type EmployeeSettlementEntitlements,
 } from '.';
+import type { PlannedScheduleDay } from '../schedule';
 
 const createdAt = new Date('2026-01-01T00:00:00.000Z');
 
@@ -203,6 +205,7 @@ function draft({
   adjustments = [],
   entitlements = null,
   calendarOptions = {},
+  plannedSchedule,
 }: {
   target?: Employee;
   dailyValues?: DailyValue[];
@@ -211,6 +214,7 @@ function draft({
   adjustments?: Adjustment[];
   entitlements?: EmployeeSettlementEntitlements | null;
   calendarOptions?: PayrollCalendarOptions;
+  plannedSchedule?: PlannedScheduleDay[];
 } = {}) {
   return calculateEmployeeMonthlyDraft({
     monthId: '2026-06',
@@ -221,6 +225,29 @@ function draft({
     adjustments,
     entitlements,
     calendarOptions,
+    plannedSchedule,
+  });
+}
+
+function normativeSchedule(): PlannedScheduleDay[] {
+  return createPayrollMonthCalendar('2026-06').map((day) => {
+    const working = day.isWorkingDay;
+    return {
+      employeeId: 'employee-1',
+      date: day.isoDate,
+      status: working ? 'WORKING' : 'DAY_OFF',
+      source: working ? 'automatic' : 'calendar',
+      hours: working ? 8 : 0,
+      shift: working ? 'FIRST' : null,
+      label: working ? '8 / 1' : 'W',
+      departmentId: null,
+      shiftAssignment: null,
+      reason: null,
+      holidayName: null,
+      plannedStartTime: working ? '06:00' : null,
+      plannedEndTime: working ? '14:00' : null,
+      plannedDuration: working ? 8 : 0,
+    };
   });
 }
 
@@ -260,6 +287,50 @@ describe('employee monthly calculation draft', () => {
       22 * STANDARD_WORKING_DAY_HOURS,
     );
     expect(result.totals.workedHours).toBe(22 * STANDARD_WORKING_DAY_HOURS);
+  });
+
+  it('keeps nominal unchanged when several normatively free days contain extra work', () => {
+    const result = draft({
+      plannedSchedule: normativeSchedule(),
+      dailyValues: [
+        dailyValue({
+          id: 'employee-1_2026-06-06',
+          date: '2026-06-06',
+          hours: 4,
+          workTimeCorrection: {
+            workContext: 'EXTRA',
+            plannedShift: null,
+            plannedStartTime: null,
+            plannedEndTime: null,
+            actualStartTime: '06:00',
+            actualEndTime: '10:00',
+            classificationOverride: null,
+          },
+        }),
+        dailyValue({
+          id: 'employee-1_2026-06-07',
+          date: '2026-06-07',
+          hours: 8.5,
+          workTimeCorrection: {
+            workContext: 'EXTRA',
+            plannedShift: null,
+            plannedStartTime: null,
+            plannedEndTime: null,
+            actualStartTime: '06:00',
+            actualEndTime: '14:30',
+            classificationOverride: null,
+          },
+        }),
+      ],
+    });
+
+    expect(result.totals.nominalHours).toBe(22 * STANDARD_WORKING_DAY_HOURS);
+    expect(result.workTime.normalWorkHours).toBe(
+      22 * STANDARD_WORKING_DAY_HOURS,
+    );
+    expect(result.workTime.overtime100Hours).toBe(12);
+    expect(result.workTime.overtime50Hours).toBe(0.5);
+    expect(result.workTime.niedoczasHours).toBe(0);
   });
 
   it('treats consecutive contracts as full-month coverage for monthly allowances', () => {

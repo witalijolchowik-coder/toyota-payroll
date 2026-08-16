@@ -126,7 +126,12 @@ export function generateEmployeeMonthlySchedule({
       shiftHoursVersions: options.shiftHoursVersions ?? [],
     });
 
-    if (!correction || base.status === 'OUTSIDE_EMPLOYMENT') {
+    if (
+      !correction ||
+      base.status === 'OUTSIDE_EMPLOYMENT' ||
+      base.status === 'DAY_OFF' ||
+      base.status === 'PUBLIC_HOLIDAY'
+    ) {
       return base;
     }
 

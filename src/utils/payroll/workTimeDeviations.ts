@@ -20,7 +20,7 @@ export interface WorkTimeClassificationOverride {
 }
 
 export interface DailyWorkTimeDeviationInput {
-  planned: PlannedWorkInterval;
+  planned?: PlannedWorkInterval | null;
   actual?: ClockInterval | null;
   isWorkingDay: boolean;
   isSaturday?: boolean;
@@ -128,23 +128,27 @@ export function resolveDailyWorkTimeDeviation({
   isPublicHoliday = false,
   classificationOverride = null,
 }: DailyWorkTimeDeviationInput): DailyWorkTimeDeviation {
-  const plannedInterval = normalizeInterval(planned);
-  const actualInterval = normalizeInterval(actual ?? planned, plannedInterval);
-  const actualNightHours = nightOverlapHours(
-    segment(actualInterval.start, actualInterval.end),
-  );
-  const dayIs100 = isSaturday || isSunday || isPublicHoliday;
-
   if (!isWorkingDay) {
-    const overtime100Hours = roundHours(
+    const sourceInterval = actual ?? planned;
+    if (!sourceInterval) {
+      throw new Error('Actual interval is required for extra work.');
+    }
+    const actualInterval = normalizeInterval(sourceInterval);
+    const actualHours = roundHours(
       (actualInterval.end - actualInterval.start) / 60,
     );
+    const overtime100Hours = roundHours(Math.min(8, actualHours));
+    const overtime50Hours = roundHours(Math.max(0, actualHours - 8));
+    const actualNightHours = nightOverlapHours(
+      segment(actualInterval.start, actualInterval.end),
+    );
+
     return applyClassificationOverride(
       {
         normalWorkHours: 0,
         privateTimeHours: 0,
-        extraHours: overtime100Hours,
-        overtime50Hours: 0,
+        extraHours: actualHours,
+        overtime50Hours,
         overtime100Hours,
         overtime100Reasons: nonWorkingReasons({
           isSaturday,
@@ -152,14 +156,24 @@ export function resolveDailyWorkTimeDeviation({
           isPublicHoliday,
         }),
         coverableNiHours: 0,
-        holidayWorkBonusEligible: isPublicHoliday && overtime100Hours > 0,
-        nightOvertimeHours: 0,
+        holidayWorkBonusEligible: isPublicHoliday && actualHours > 0,
+        nightOvertimeHours: actualNightHours,
         nightAllowanceHours: actualNightHours,
         unresolved: false,
       },
       classificationOverride,
     );
   }
+
+  if (!planned) {
+    throw new Error('Planned interval is required for a normative work day.');
+  }
+  const plannedInterval = normalizeInterval(planned);
+  const actualInterval = normalizeInterval(actual ?? planned, plannedInterval);
+  const actualNightHours = nightOverlapHours(
+    segment(actualInterval.start, actualInterval.end),
+  );
+  const dayIs100 = isSaturday || isSunday || isPublicHoliday;
 
   const overlap = intersectionHours(plannedInterval, actualInterval);
   const privateTimeHours = roundHours(
@@ -220,10 +234,19 @@ export function resolvePlanToFactOutcomes({
   'classificationOverride'
 >): PlanToFactOutcome[] {
   if (!actual) return ['MATCHES_PLAN'];
+  if (!isWorkingDay) {
+    return [
+      'PLANNED_DAY_OFF',
+      ...(isSaturday ? (['SATURDAY'] as const) : []),
+      ...(isSunday ? (['SUNDAY'] as const) : []),
+      ...(isPublicHoliday ? (['PUBLIC_HOLIDAY'] as const) : []),
+      'WORKED_MORE',
+    ];
+  }
+  if (!planned) return ['REQUIRES_REVIEW'];
   const plan = normalizeInterval(planned);
   const fact = normalizeInterval(actual, plan);
   const outcomes: PlanToFactOutcome[] = [];
-  if (!isWorkingDay) outcomes.push('PLANNED_DAY_OFF');
   if (isSaturday) outcomes.push('SATURDAY');
   if (isSunday) outcomes.push('SUNDAY');
   if (isPublicHoliday) outcomes.push('PUBLIC_HOLIDAY');

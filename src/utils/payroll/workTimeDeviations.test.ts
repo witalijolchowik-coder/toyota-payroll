@@ -110,6 +110,34 @@ describe('daily work-time deviations', () => {
     });
   });
 
+  it.each([
+    { hours: 4, endTime: '10:00', overtime100Hours: 4, overtime50Hours: 0 },
+    { hours: 8, endTime: '14:00', overtime100Hours: 8, overtime50Hours: 0 },
+    {
+      hours: 8.5,
+      endTime: '14:30',
+      overtime100Hours: 8,
+      overtime50Hours: 0.5,
+    },
+    { hours: 13, endTime: '19:00', overtime100Hours: 8, overtime50Hours: 5 },
+  ])(
+    'splits $hours hours of extra work at the eight-hour threshold',
+    ({ endTime, overtime100Hours, overtime50Hours }) => {
+      expect(
+        resolveDailyWorkTimeDeviation({
+          planned: null,
+          actual: { startTime: '06:00', endTime },
+          isWorkingDay: false,
+        }),
+      ).toMatchObject({
+        normalWorkHours: 0,
+        privateTimeHours: 0,
+        overtime100Hours,
+        overtime50Hours,
+      });
+    },
+  );
+
   it('classifies Sunday work as combined 100% overtime', () => {
     const result = resolveDailyWorkTimeDeviation({
       planned: plannedIntervalForShift('NIGHT'),
@@ -120,6 +148,8 @@ describe('daily work-time deviations', () => {
 
     expect(result.overtime100Hours).toBe(8);
     expect(result.overtime100Reasons).toEqual(['SUNDAY']);
+    expect(result.nightAllowanceHours).toBe(8);
+    expect(result.nightOvertimeHours).toBe(8);
   });
 
   it('marks public-holiday work as 100% and bonus eligible', () => {

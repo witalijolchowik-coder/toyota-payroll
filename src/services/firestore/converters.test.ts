@@ -331,6 +331,49 @@ describe('Firestore converters', () => {
     });
   });
 
+  it('maps extra work without inventing a planned shift', () => {
+    const document = dailyValueConverter.fromFirestore(
+      snapshot('months/2026-07/dailyValues/employee-1_2026-07-18', {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        date: '2026-07-18',
+        hours: 8,
+        source: 'manual',
+        import_id: null,
+        note: null,
+        manual_override: null,
+        work_time_correction: {
+          work_context: 'EXTRA',
+          planned_shift: null,
+          planned_start_time: null,
+          planned_end_time: null,
+          actual_start_time: '22:00',
+          actual_end_time: '06:00',
+          classification_override: null,
+        },
+        created_at: now,
+        created_by: 'coordinator-1',
+        updated_at: now,
+        updated_by: 'coordinator-1',
+      }),
+      {},
+    );
+
+    expect(
+      mapDailyValueDocument('employee-1_2026-07-18', '2026-07', document),
+    ).toMatchObject({
+      hours: 8,
+      workTimeCorrection: {
+        workContext: 'EXTRA',
+        plannedShift: null,
+        plannedStartTime: null,
+        plannedEndTime: null,
+        actualStartTime: '22:00',
+        actualEndTime: '06:00',
+      },
+    });
+  });
+
   it('does not accept a virtual default as a persisted daily value', () => {
     const invalid = {
       employee_id: 'employee-1',

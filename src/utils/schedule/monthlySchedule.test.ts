@@ -410,6 +410,42 @@ describe('monthly schedule planning', () => {
     expect(worker.shiftAssignment).toBe('RED');
   });
 
+  it('does not turn normatively free days into working days through shift corrections', () => {
+    const worker = employee({
+      departmentId: 'metal-402b',
+      shiftAssignment: 'RED',
+      employmentStartDate: date('2026-06-01'),
+    });
+    const publicHolidays = getPublicHolidaysForYear(2026);
+    const days = createCalendarDays('2026-06', { publicHolidays });
+    const schedule = generateEmployeeMonthlySchedule({
+      employee: worker,
+      days,
+      departments: [department('metal-402b', 'Metal 402B', 'THREE_SHIFT')],
+      options: {
+        publicHolidays,
+        publicHolidayNames: getPublicHolidayNamesForYear(2026),
+        corrections: [
+          correction(worker, '2026-06-06', 'FIRST_SHIFT', 'FIRST', 8),
+          correction(worker, '2026-06-04', 'NIGHT_SHIFT', 'NIGHT', 8),
+        ],
+      },
+    });
+
+    expect(schedule.find((day) => day.date === '2026-06-06')).toMatchObject({
+      status: 'DAY_OFF',
+      source: 'calendar',
+      hours: 0,
+      shift: null,
+    });
+    expect(schedule.find((day) => day.date === '2026-06-04')).toMatchObject({
+      status: 'PUBLIC_HOLIDAY',
+      source: 'calendar',
+      hours: 0,
+      shift: null,
+    });
+  });
+
   it('ignores a cancelled correction and restores the automatic brigade plan', () => {
     const worker = employee({
       departmentId: 'metal-402b',
