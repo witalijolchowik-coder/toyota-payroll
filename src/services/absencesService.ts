@@ -360,6 +360,7 @@ function assertValidInput(
       absenceCode: input.absenceCode,
       startDate: input.startDate,
       endDate: input.endDate,
+      overtimeTimeOff: input.overtimeTimeOff,
     },
     existingOwnerMonthId,
   );
@@ -403,6 +404,7 @@ export async function createAbsence(
   const normalized = {
     ...input,
     absenceCode: normalizeAbsenceCode(input.absenceCode),
+    overtimeTimeOff: input.overtimeTimeOff === true,
   };
   assertValidInput(normalized);
   const monthId = ownerMonthId(normalized.startDate);
@@ -422,6 +424,8 @@ export async function createAbsence(
       normalized.absenceCode === 'WZN'
         ? (normalized.linkedWorkDate ?? null)
         : null,
+    overtime_time_off:
+      normalized.absenceCode === 'NI' && normalized.overtimeTimeOff,
     source: 'manual',
     import_id: null,
     status: 'ACTIVE',
@@ -497,6 +501,7 @@ export async function applyL4ImportRows({
         endDate,
         hoursPerDay: null,
         linkedWorkDate: null,
+        overtimeTimeOff: false,
         note: null,
       });
       await assertWritableMonth(monthId);
@@ -580,6 +585,7 @@ export async function applyL4ImportRows({
             source: 'absence_import',
             import_id: importId,
             linked_work_date: null,
+            overtime_time_off: false,
             note: `L4 import: ${fileName}, wiersz ${row.rowNumber}`,
             updated_at: serverTimestamp(),
             updated_by: uid,
@@ -604,6 +610,7 @@ export async function applyL4ImportRows({
         end_date: endDate,
         hours_per_day: null,
         linked_work_date: null,
+        overtime_time_off: false,
         source: 'absence_import',
         import_id: importId,
         status: 'ACTIVE',
@@ -682,6 +689,9 @@ export async function updateAbsence(
       normalizeAbsenceCode(input.absenceCode) === 'WZN'
         ? (input.linkedWorkDate ?? null)
         : null,
+    overtimeTimeOff:
+      normalizeAbsenceCode(input.absenceCode) === 'NI' &&
+      input.overtimeTimeOff === true,
     note: input.note,
   };
   assertValidInput(normalized, absence.monthId);
@@ -696,6 +706,7 @@ export async function updateAbsence(
       end_date: normalized.endDate,
       hours_per_day: null,
       linked_work_date: normalized.linkedWorkDate ?? null,
+      overtime_time_off: normalized.overtimeTimeOff,
       note: normalized.note,
       updated_at: serverTimestamp(),
       updated_by: uid,
@@ -722,6 +733,7 @@ export async function saveDayAbsence({
   const normalized: AbsenceCreateInput = {
     ...input,
     absenceCode: normalizeAbsenceCode(input.absenceCode),
+    overtimeTimeOff: input.overtimeTimeOff === true,
   };
   assertValidInput(normalized, existingAbsence?.monthId);
   const monthId = ownerMonthId(normalized.startDate);
@@ -767,6 +779,8 @@ export async function saveDayAbsence({
         normalized.absenceCode === 'WZN'
           ? (normalized.linkedWorkDate ?? null)
           : null,
+      overtime_time_off:
+        normalized.absenceCode === 'NI' && normalized.overtimeTimeOff === true,
       source: 'manual',
       import_id: null,
       status: 'ACTIVE',

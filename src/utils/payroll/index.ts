@@ -9,3 +9,4 @@ export * from './virtualDefaults';
 export * from './employeeReadiness';
 export * from './allowances';
 export * from './workTimeDeviations';
+export * from './overtimeAllocation';

@@ -54,11 +54,11 @@ service cloud.firestore {
 
     function validCalendarColorMap(colors) {
       return colors is map
-        && colors.keys().size() == 30
+        && colors.keys().size() == 32
         && colors.keys().hasOnly([
           'worked', 'firstShift', 'secondShift', 'nightShift', 'bhp',
-          'l4Active', 'l4Inactive', 'l4Reported', 'uw', 'uz', 'nn', 'nu',
-          'ni', 'opd', 'krw', 'wzn', 'overtime50', 'overtime100',
+          'l4Active', 'l4Inactive', 'l4Reported', 'uw', 'ub', 'nn', 'nu',
+          'ni', 'op', 'uo', 'lo', 'o5', 'sr', 'overtime50', 'overtime100',
           'nightHours', 'shortage', 'privateTime', 'manualCorrection',
           'requiresReview', 'blocker', 'warning', 'dayOff', 'weekend',
           'publicHoliday', 'future', 'outsideEmployment'
@@ -608,6 +608,7 @@ service cloud.firestore {
           'end_date',
           'hours_per_day',
           'linked_work_date',
+          'overtime_time_off',
           'source',
           'import_id',
           'status',
@@ -621,10 +622,16 @@ service cloud.firestore {
         && data.absence_code in [
           'L4',
           'UW',
-          'UZ',
           'NN',
           'NU',
           'NI',
+          'UB',
+          'OP',
+          'UO',
+          'LO',
+          'O5',
+          'SR',
+          'UZ',
           'OPD',
           'KRW',
           'WZN'
@@ -646,6 +653,15 @@ service cloud.firestore {
           || !data.keys().hasAny(['linked_work_date'])
           || data.linked_work_date == null
         )
+        && (
+          !data.keys().hasAny(['overtime_time_off'])
+          || data.overtime_time_off is bool
+        )
+        && (
+          !data.keys().hasAny(['overtime_time_off'])
+          || data.overtime_time_off == false
+          || data.absence_code == 'NI'
+        )
         && data.source in ['manual', 'absence_import']
         && (
           (data.source == 'manual' && data.import_id == null)
@@ -654,6 +670,12 @@ service cloud.firestore {
         && data.status in ['ACTIVE', 'CANCELLED']
         && isNullableString(data.note)
         && hasModificationMetadata(data);
+    }
+
+    function hasCanonicalManualAbsenceCode(data) {
+      return data.absence_code in [
+        'NN', 'NU', 'NI', 'UW', 'UB', 'OP', 'UO', 'L4', 'LO', 'O5', 'SR'
+      ];
     }
 
     function validEmployeeEntitlement(data) {
@@ -1467,6 +1489,8 @@ service cloud.firestore {
         allow create: if isAuthenticated()
           && monthExistsAndIsOpen(monthId)
           && validAbsence(request.resource.data)
+          && (request.resource.data.source != 'manual'
+            || hasCanonicalManualAbsenceCode(request.resource.data))
           && hasCanonicalAbsenceOwner(monthId, request.resource.data)
           && request.resource.data.status == 'ACTIVE'
           && hasCreateMetadata(request.resource.data);
@@ -1480,12 +1504,14 @@ service cloud.firestore {
           && (
             (
               request.resource.data.status == 'ACTIVE'
+              && hasCanonicalManualAbsenceCode(request.resource.data)
               && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
                 'absence_code',
                 'start_date',
                 'end_date',
                 'hours_per_day',
                 'linked_work_date',
+                'overtime_time_off',
                 'note',
                 'updated_at',
                 'updated_by'
@@ -1504,6 +1530,7 @@ service cloud.firestore {
                 'source',
                 'import_id',
                 'linked_work_date',
+                'overtime_time_off',
                 'note',
                 'updated_at',
                 'updated_by'

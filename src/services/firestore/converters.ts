@@ -586,6 +586,10 @@ export const absenceConverter = createConverter<AbsenceDocument>(
       data.linked_work_date === undefined
         ? null
         : readNullableString(data, 'linked_work_date', path),
+    overtime_time_off:
+      data.overtime_time_off === undefined
+        ? false
+        : readBoolean(data, 'overtime_time_off', path),
     source: readEnum(data, 'source', path, [
       'manual',
       'absence_import',

@@ -4,28 +4,37 @@ import type { EmploymentPeriod } from '../payroll';
 import { dateToIsoDate } from '../payroll';
 
 export const ABSENCE_CODES = [
-  'L4',
-  'UW',
-  'UZ',
   'NN',
   'NU',
   'NI',
-  'OPD',
-  'KRW',
-  'WZN',
+  'UW',
+  'UB',
+  'OP',
+  'UO',
+  'L4',
+  'LO',
+  'O5',
+  'SR',
 ] as const;
 
 export type AbsenceCode = (typeof ABSENCE_CODES)[number];
 
 export const EXCUSED_ABSENCE_CODES = new Set<string>([
+  'NU',
+  'NI',
   'UW',
-  'UZ',
-  'OPD',
-  'KRW',
-  'WZN',
+  'UB',
+  'OP',
+  'UO',
+  'L4',
+  'LO',
+  'O5',
+  'SR',
 ]);
 
-export const UNEXPLAINED_ABSENCE_CODES = new Set<string>(['NN', 'NU', 'NI']);
+export const UNEXPLAINED_ABSENCE_CODES = new Set<string>(['NN']);
+
+export const LEGACY_ABSENCE_CODES = ['UZ', 'OPD', 'KRW', 'WZN'] as const;
 
 export interface AbsenceRuleRecord {
   id: string;
@@ -36,6 +45,10 @@ export interface AbsenceRuleRecord {
   status: 'ACTIVE' | 'CANCELLED';
   source?: 'manual' | 'absence_import';
   importId?: string | null;
+  hoursPerDay?: number | null;
+  linkedWorkDate?: IsoDate | null;
+  overtimeTimeOff?: boolean;
+  note?: string | null;
 }
 
 export type L4BusinessStatus =
@@ -53,6 +66,7 @@ export interface AbsenceValidationErrors {
   absenceCode?: AbsenceValidationCode;
   startDate?: AbsenceValidationCode;
   endDate?: AbsenceValidationCode;
+  overtimeTimeOff?: AbsenceValidationCode;
 }
 
 export interface AbsenceInputValues {
@@ -60,6 +74,7 @@ export interface AbsenceInputValues {
   absenceCode: string;
   startDate: string;
   endDate: string;
+  overtimeTimeOff?: boolean;
 }
 
 export type GoverningAbsenceResolution =
@@ -85,6 +100,35 @@ const ISO_DATE_PATTERN = /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/;
 
 export function normalizeAbsenceCode(value: string): string {
   return value.trim().toLocaleUpperCase('pl-PL').replace('UŻ', 'UZ');
+}
+
+export function canonicalAbsenceCode(value: string): string {
+  const normalized = normalizeAbsenceCode(value);
+  if (normalized === 'UZ') return 'UW';
+  if (normalized === 'OPD') return 'OP';
+  if (normalized === 'KRW') return 'NU';
+  return normalized;
+}
+
+export function isOvertimeTimeOffAbsence(
+  absence: Pick<
+    AbsenceRuleRecord,
+    'absenceCode' | 'overtimeTimeOff' | 'linkedWorkDate'
+  >,
+): boolean {
+  const code = normalizeAbsenceCode(absence.absenceCode);
+  return (code === 'NI' && absence.overtimeTimeOff === true) || code === 'WZN';
+}
+
+export function effectiveAbsenceCode(
+  absence: Pick<
+    AbsenceRuleRecord,
+    'absenceCode' | 'overtimeTimeOff' | 'linkedWorkDate'
+  >,
+): string {
+  const normalized = normalizeAbsenceCode(absence.absenceCode);
+  if (normalized === 'WZN') return 'NI';
+  return canonicalAbsenceCode(normalized);
 }
 
 export function isSupportedAbsenceCode(value: string): value is AbsenceCode {
@@ -116,6 +160,9 @@ export function validateAbsenceInput(
     errors.absenceCode = 'required';
   } else if (!isSupportedAbsenceCode(code)) {
     errors.absenceCode = 'unsupported-code';
+  }
+  if (input.overtimeTimeOff && code !== 'NI') {
+    errors.overtimeTimeOff = 'unsupported-code';
   }
   if (!isValidIsoDate(input.startDate)) {
     errors.startDate = input.startDate ? 'invalid-date' : 'required';
@@ -271,9 +318,7 @@ export function resolveGoverningAbsence(
   }
 
   const codes = [
-    ...new Set(
-      active.map((absence) => normalizeAbsenceCode(absence.absenceCode)),
-    ),
+    ...new Set(active.map((absence) => effectiveAbsenceCode(absence))),
   ];
   if (codes.length === 1) {
     return {

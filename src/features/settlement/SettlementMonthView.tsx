@@ -666,7 +666,7 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
                   <MenuItem value="all">
                     {t.settlement.constructor.filters.all}
                   </MenuItem>
-                  {(['L4', 'UW', 'UZ', 'NN'] as const).map((code) => (
+                  {(['L4', 'UW', 'NI', 'NN'] as const).map((code) => (
                     <AbsenceMenuItem
                       key={code}
                       value={code}

@@ -43,13 +43,15 @@ const calendarColorKeys = [
   'l4Inactive',
   'l4Reported',
   'uw',
-  'uz',
   'nn',
   'nu',
   'ni',
-  'opd',
-  'krw',
-  'wzn',
+  'ub',
+  'op',
+  'uo',
+  'lo',
+  'o5',
+  'sr',
   'overtime50',
   'overtime100',
   'nightHours',
@@ -1458,9 +1460,17 @@ describe('Firestore security rules', () => {
         ...modificationMetadata(uid),
       }),
     );
-    await assertSucceeds(
+    await assertFails(
       updateDoc(reference, {
         absence_code: 'UZ',
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(reference, {
+        absence_code: 'NI',
+        overtime_time_off: true,
         updated_at: serverTimestamp(),
         updated_by: uid,
       }),
@@ -1482,7 +1492,7 @@ describe('Firestore security rules', () => {
     await assertFails(deleteDoc(reference));
   });
 
-  it('allows a traceable WZN link and rejects that link on another absence type', async () => {
+  it('allows NI time off and rejects new legacy or linked manual records', async () => {
     await seedMonth('2026-06', false);
     const uid = 'coordinator-1';
     const firestore = testEnvironment.authenticatedContext(uid).firestore();
@@ -1492,7 +1502,6 @@ describe('Firestore security rules', () => {
       start_date: '2026-06-05',
       end_date: '2026-06-05',
       hours_per_day: null,
-      linked_work_date: '2026-06-07',
       source: 'manual',
       import_id: null,
       status: 'ACTIVE',
@@ -1501,7 +1510,14 @@ describe('Firestore security rules', () => {
     };
 
     await assertSucceeds(
-      setDoc(doc(firestore, 'months/2026-06/absences/wzn-linked'), {
+      setDoc(doc(firestore, 'months/2026-06/absences/ni-time-off'), {
+        ...base,
+        absence_code: 'NI',
+        overtime_time_off: true,
+      }),
+    );
+    await assertFails(
+      setDoc(doc(firestore, 'months/2026-06/absences/legacy-code'), {
         ...base,
         absence_code: 'WZN',
       }),
@@ -1510,6 +1526,7 @@ describe('Firestore security rules', () => {
       setDoc(doc(firestore, 'months/2026-06/absences/uw-linked'), {
         ...base,
         absence_code: 'UW',
+        linked_work_date: '2026-06-07',
       }),
     );
   });

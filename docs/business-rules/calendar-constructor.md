@@ -22,17 +22,18 @@ The constructor reuses existing entities:
 
 Constructor tools map to existing documents:
 
-| Tool       | Underlying operation                                     |
-| ---------- | -------------------------------------------------------- |
-| `Godziny`  | create/update manual `DailyValue` or imported override   |
-| `L4`       | create an `Absence` with `absence_code = L4`             |
-| `Urlop`    | create an `Absence` with `absence_code = UW`             |
-| `UŻ / UZ`  | create an `Absence` with `absence_code = UZ`             |
-| `NN`       | create an `Absence` with `absence_code = NN`             |
-| `Wyczyść`  | clear manual attendance only                             |
-| `Przegląd` | open employee-focused calendar without writing documents |
+| Tool         | Underlying operation                                     |
+| ------------ | -------------------------------------------------------- |
+| `Godziny`    | create/update manual `DailyValue` or imported override   |
+| `L4`         | create an `Absence` with `absence_code = L4`             |
+| `Urlop`      | create an `Absence` with `absence_code = UW`             |
+| absence code | create an `Absence` using a canonical selectable code    |
+| `NN`         | create an `Absence` with `absence_code = NN`             |
+| `Wyczyść`    | clear manual attendance only                             |
+| `Przegląd`   | open employee-focused calendar without writing documents |
 
-Absence tools use the existing absence service, validation, start-month
+The constructor exposes `NN`, `NU`, `NI`, `UW`, `UB`, `OP`, `UO`, `L4`, `LO`,
+`O5`, and `SR`. Absence tools use the existing absence service, validation, start-month
 ownership, L4 blocking, and ACTIVE/CANCELLED lifecycle rules.
 
 The clear tool does not delete imported base data. It deletes standalone manual

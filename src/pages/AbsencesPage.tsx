@@ -58,6 +58,7 @@ import {
   absenceCoversDate,
   countUniqueEmployeesOnConfirmedL4Today,
   deriveL4BusinessStatus,
+  effectiveAbsenceCode,
   employeesParticipatingInAbsenceMonth,
   normalizeAbsenceCode,
 } from '../utils/absences';
@@ -574,11 +575,7 @@ function AbsenceTable({
                     ? `${employee.lastName} ${employee.firstName}`
                     : t.absences.table.unknownEmployee}
                 </TableCell>
-                <TableCell>
-                  {absence.absenceCode === 'UZ'
-                    ? t.absences.types.UZ
-                    : absence.absenceCode}
-                </TableCell>
+                <TableCell>{effectiveAbsenceCode(absence)}</TableCell>
                 <TableCell>
                   {absence.startDate} – {absence.endDate}
                 </TableCell>

@@ -83,9 +83,9 @@ describe('calendar constructor tool mapping', () => {
       kind: 'absence',
       absenceCode: 'L4',
     });
-    expect(calendarToolOperation('UZ')).toEqual({
+    expect(calendarToolOperation('NI')).toEqual({
       kind: 'absence',
-      absenceCode: 'UZ',
+      absenceCode: 'NI',
     });
   });
 

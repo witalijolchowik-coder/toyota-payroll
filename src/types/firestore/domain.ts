@@ -242,6 +242,7 @@ export interface Absence extends ModificationMetadata {
   endDate: IsoDate;
   hoursPerDay: number | null;
   linkedWorkDate?: IsoDate | null;
+  overtimeTimeOff?: boolean;
   source: AbsenceSource;
   importId: string | null;
   status: AbsenceStatus;

@@ -1,6 +1,7 @@
 import type { Employee, MonthId } from '../../types/firestore';
 import type { EmployeeMonthlyCalculationDraft } from '../payroll';
 import * as XLSX from 'xlsx';
+import { absenceTypeName, type AbsenceExportRow } from './absenceWorkbook';
 
 export type SozWorkerGroup = 'polish' | 'foreign' | 'missing-identity';
 export type ExportReadinessWarningCode =
@@ -63,11 +64,22 @@ export interface SozOvertimeNoteEntry {
   shortageBeforeCompensationHours: number;
   sozOvertime50Hours: number;
   sozOvertime100Hours: number;
-  wznRelatedHours: number;
+  timeOffHours: number;
+  timeOffAllocatedHours: number;
+  timeOffUnresolvedHours: number;
   paidOvertime50Hours: number;
   paidOvertime100Hours: number;
   coveringNiedoczas50Hours: number;
   coveringNiedoczas100Hours: number;
+  timeOffEntries: {
+    date: string;
+    requiredHours: number;
+    allocatedHours: number;
+    unresolvedHours: number;
+    note: string;
+    sources: { date: string; rate: 50 | 100; hours: number }[];
+  }[];
+  ordinaryNiNotes: { startDate: string; endDate: string; note: string }[];
   note: string;
 }
 
@@ -94,6 +106,12 @@ export interface SettlementExportPackage {
     foreignCompensationWorkbook: Uint8Array | null;
     polishCompensationFileName: string | null;
     foreignCompensationFileName: string | null;
+  };
+  absences: {
+    plFileName: string;
+    foreignFileName: string;
+    polishRows: AbsenceExportRow[];
+    foreignRows: AbsenceExportRow[];
   };
   warnings: ExportReadinessWarning[];
 }
@@ -304,7 +322,11 @@ const sozColumn = {
   vacationHours: 15,
   unpaidVacationHours: 16,
   care188Hours: 17,
+  occasionalLeaveHours: 18,
   l4Hours: 19,
+  benefitLeaveHours: 20,
+  careLeaveHours: 21,
+  forceMajeureHours: 22,
   niedoczasHours: 23,
   companyHousingMediaAmount: 50,
   companyHousingMediaTax: 51,
@@ -401,14 +423,21 @@ export function prepareSettlementExportPackage({
   const incomplete = warnings.length > 0;
   const prefix = incomplete ? `ROZLICZENIE_NIEZAMKNIETE_${monthId}` : null;
 
-  const polishCompensation = noteEntries.filter((entry) =>
+  const compensationEntries = noteEntries.filter(
+    (entry) =>
+      entry.coveringNiedoczas50Hours +
+        entry.coveringNiedoczas100Hours +
+        entry.timeOffHours >
+      0,
+  );
+  const polishCompensation = compensationEntries.filter((entry) =>
     sortedRecords.some(
       (record) =>
         record.employee.tetaNumber === entry.tetaNumber &&
         record.employee.citizenship === 'PL',
     ),
   );
-  const foreignCompensation = noteEntries.filter((entry) =>
+  const foreignCompensation = compensationEntries.filter((entry) =>
     sortedRecords.some(
       (record) =>
         record.employee.tetaNumber === entry.tetaNumber &&
@@ -416,6 +445,13 @@ export function prepareSettlementExportPackage({
         Boolean(record.employee.citizenship),
     ),
   );
+  const absenceRows = sortedRecords.flatMap(mapAbsenceExportRows);
+  const polishAbsenceRows = absenceRows.filter((row) => row.group === 'polish');
+  const foreignAbsenceRows = absenceRows.filter(
+    (row) => row.group === 'foreign',
+  );
+  const [, numericMonth] = monthId.split('-').map(Number);
+  const absenceMonthName = polishMonthNames[(numericMonth ?? 1) - 1] ?? monthId;
 
   return {
     monthId,
@@ -461,6 +497,12 @@ export function prepareSettlementExportPackage({
       foreignCompensationFileName: foreignCompensation.length
         ? `Odróbka_niedoczasu_CUDZOZIEMCY_${monthId}.xlsx`
         : null,
+    },
+    absences: {
+      plFileName: `Absencja_TBPL_${absenceMonthName}_${monthId.slice(0, 4)}_PL.xlsx`,
+      foreignFileName: `Absencja_TBPL_${absenceMonthName}_${monthId.slice(0, 4)}_UA.xlsx`,
+      polishRows: polishAbsenceRows,
+      foreignRows: foreignAbsenceRows,
     },
     warnings,
   };
@@ -519,20 +561,55 @@ export function renderSozOvertimeNote(
   entries: readonly SozOvertimeNoteEntry[],
 ) {
   if (entries.length === 0) {
-    return 'Brak odróbek za niedoczas.\r\n';
+    return 'Brak odróbek za niedoczas, odbiorów wolnego i uwag do NI.\r\n';
   }
 
   return [
-    'Notatka do SOZ — nadgodziny i odróbka za niedoczas',
+    'Notatka do SOZ — nadgodziny, niedoczas i NI',
     '',
-    'SOZ CSV nie zawiera osobnej kolumny dla „odróbka za niedoczas”. Poniżej pokazano, która część nadgodzin ujętych w CSV ma zostać wypłacona, a która pokrywa niedoczas / czas prywatny.',
+    'W kolumnach 50% i 100% pliku SOZ pozostają dodatki do wypłaty po rozliczeniu niedoczasu i odbioru wolnego. Podstawowe wynagrodzenie za przepracowane nadgodziny pozostaje częścią czasu przepracowanego.',
     '',
-    ...entries.flatMap((entry) => [
-      `${entry.employeeLabel} — TETA ${entry.tetaNumber}:`,
-      `- 50% w SOZ: ${formatNumber(entry.sozOvertime50Hours)} h, w tym do wypłaty ${formatNumber(entry.paidOvertime50Hours)} h i na odróbkę ${formatNumber(entry.coveringNiedoczas50Hours)} h.`,
-      `- 100% w SOZ: ${formatNumber(entry.sozOvertime100Hours)} h, w tym do wypłaty ${formatNumber(entry.paidOvertime100Hours)} h i na odróbkę ${formatNumber(entry.coveringNiedoczas100Hours)} h.`,
-      '',
-    ]),
+    ...entries.flatMap((entry) => {
+      const lines = [`${entry.employeeLabel} — TETA ${entry.tetaNumber}:`];
+      if (
+        entry.coveringNiedoczas50Hours + entry.coveringNiedoczas100Hours >
+        0
+      ) {
+        lines.push(
+          `- Niedoczas przed rozliczeniem: ${formatNumber(entry.shortageBeforeCompensationHours)} h.`,
+          `- Pokrycie niedoczasu: 50% ${formatNumber(entry.coveringNiedoczas50Hours)} h; 100% ${formatNumber(entry.coveringNiedoczas100Hours)} h.`,
+          `- Dodatki pozostające w SOZ: 50% ${formatNumber(entry.paidOvertime50Hours)} h; 100% ${formatNumber(entry.paidOvertime100Hours)} h.`,
+        );
+      }
+      entry.timeOffEntries.forEach((timeOff) => {
+        const sources = timeOff.sources.length
+          ? timeOff.sources
+              .map(
+                (source) =>
+                  `${source.date} (${source.rate}%): ${formatNumber(source.hours)} h`,
+              )
+              .join(', ')
+          : 'brak dostępnych wcześniejszych nadgodzin';
+        lines.push(
+          `- NI ${timeOff.date}: odbiór wolnego ${formatNumber(timeOff.allocatedHours)} z ${formatNumber(timeOff.requiredHours)} h; źródła: ${sources}.`,
+        );
+        if (timeOff.unresolvedHours > 0) {
+          lines.push(
+            `  Nierozliczone: ${formatNumber(timeOff.unresolvedHours)} h — wymaga decyzji przed zamknięciem miesiąca.`,
+          );
+        }
+        if (timeOff.note) lines.push(`  Uwagi: ${timeOff.note}`);
+      });
+      entry.ordinaryNiNotes.forEach((absence) => {
+        const dateRange =
+          absence.startDate === absence.endDate
+            ? absence.startDate
+            : `${absence.startDate}–${absence.endDate}`;
+        lines.push(`- NI ${dateRange}: ${absence.note}`);
+      });
+      lines.push('');
+      return lines;
+    }),
   ].join('\r\n');
 }
 
@@ -544,14 +621,8 @@ function mapToyotaExportRow(
   const draft = record.draft;
   const paidOvertime50 = draft.workTime.paidOvertime50Hours;
   const paidOvertime100 = draft.workTime.paidOvertime100Hours;
-  const covering50 = Math.max(
-    0,
-    draft.workTime.overtime50Hours - paidOvertime50,
-  );
-  const covering100 = Math.max(
-    0,
-    draft.workTime.overtime100Hours - paidOvertime100,
-  );
+  const covering50 = draft.workTime.shortageCovered50Hours;
+  const covering100 = draft.workTime.shortageCovered100Hours;
   const [year, month] = monthId.split('-').map(Number);
   const absence = (code: string) =>
     draft.absences.groups.find((group) => group.code === code)?.nominalHours ??
@@ -591,17 +662,17 @@ function mapToyotaExportRow(
       formatNumber(absence('NI')),
       formatNumber(absence('UW')),
       formatNumber(absence('UB')),
-      formatNumber(absence('OPD')),
+      formatNumber(absence('OP')),
       formatNumber(absence('UO')),
       formatNumber(draft.absences.l4Hours),
-      formatNumber(absence('ZASILEK')),
+      formatNumber(absence('LO')),
       formatNumber(absence('O5')),
-      formatNumber(absence('SILA_WYZSZA')),
+      formatNumber(absence('SR')),
       formatNumber(draft.workTime.niedoczasHours),
       '0',
       '0',
       '0',
-      formatNumber(absence('WZN')),
+      formatNumber(draft.workTime.timeOffAllocatedHours),
       formatNumber(covering50 + covering100),
       formatNullableNumber(draft.components.frequencyBonusBrutto),
       draft.components.frequencyBonusBrutto === null ? '' : 'Brutto',
@@ -639,18 +710,29 @@ function mapSozExportRow(
       : 'Nie';
   cells[sozColumn.normalHours] = formatNumber(draft.workTime.normalWorkHours);
   cells[sozColumn.nightHours] = formatNumber(draft.workTime.nightHours);
-  cells[sozColumn.overtime50] = formatNumber(draft.workTime.overtime50Hours);
-  cells[sozColumn.overtime100] = formatNumber(draft.workTime.overtime100Hours);
+  cells[sozColumn.overtime50] = formatNumber(
+    draft.workTime.paidOvertime50Hours,
+  );
+  cells[sozColumn.overtime100] = formatNumber(
+    draft.workTime.paidOvertime100Hours,
+  );
   cells[sozColumn.employeeNominal] = formatNumber(draft.totals.nominalHours);
   cells[sozColumn.monthNominal] = formatNumber(monthNominalHours);
   cells[sozColumn.nnHours] = formatNumber(draft.absences.nnHours);
-  cells[sozColumn.nuHours] = '0';
-  cells[sozColumn.niHours] = formatNumber(draft.workTime.coverableNiHours);
-  cells[sozColumn.vacationHours] = formatNumber(draft.absences.vacationHours);
-  cells[sozColumn.unpaidVacationHours] = '0';
-  cells[sozColumn.care188Hours] = '0';
+  const absence = (code: string) =>
+    draft.absences.groups.find((absenceGroup) => absenceGroup.code === code)
+      ?.nominalHours ?? 0;
+  cells[sozColumn.nuHours] = formatNumber(absence('NU'));
+  cells[sozColumn.niHours] = formatNumber(absence('NI'));
+  cells[sozColumn.vacationHours] = formatNumber(absence('UW'));
+  cells[sozColumn.unpaidVacationHours] = formatNumber(absence('UB'));
+  cells[sozColumn.care188Hours] = formatNumber(absence('OP'));
+  cells[sozColumn.occasionalLeaveHours] = formatNumber(absence('UO'));
   cells[sozColumn.l4Hours] = formatNumber(draft.absences.l4Hours);
-  cells[sozColumn.niedoczasHours] = formatNumber(draft.workTime.niedoczasHours);
+  cells[sozColumn.benefitLeaveHours] = formatNumber(absence('LO'));
+  cells[sozColumn.careLeaveHours] = formatNumber(absence('O5'));
+  cells[sozColumn.forceMajeureHours] = formatNumber(absence('SR'));
+  cells[sozColumn.niedoczasHours] = formatNumber(draft.absences.gnHours);
   if (draft.components.companyAccommodationMediaDeduction > 0) {
     cells[sozColumn.companyHousingMediaAmount] = formatNumber(
       draft.components.companyAccommodationMediaDeduction,
@@ -712,16 +794,54 @@ function mapSozOvertimeNoteEntry(
   record: SettlementExportRecord,
 ): SozOvertimeNoteEntry | null {
   const draft = record.draft;
-  const coveringNiedoczas50Hours = Math.max(
-    0,
-    draft.workTime.overtime50Hours - draft.workTime.paidOvertime50Hours,
-  );
-  const coveringNiedoczas100Hours = Math.max(
-    0,
-    draft.workTime.overtime100Hours - draft.workTime.paidOvertime100Hours,
-  );
+  const coveringNiedoczas50Hours = draft.workTime.shortageCovered50Hours;
+  const coveringNiedoczas100Hours = draft.workTime.shortageCovered100Hours;
+  const timeOffEntries = draft.absences.periods
+    .filter((period) => period.code === 'NI' && period.overtimeTimeOff)
+    .flatMap((period) =>
+      period.workingDates.map((workingDate) => {
+        const demandId = `time-off:${period.id}:${workingDate.date}`;
+        const sources = draft.workTime.overtimeAllocations
+          .filter((allocation) => allocation.demandId === demandId)
+          .map((allocation) => ({
+            date: allocation.sourceDate,
+            rate: allocation.rate,
+            hours: allocation.hours,
+          }));
+        const allocatedHours = sources.reduce(
+          (total, source) => total + source.hours,
+          0,
+        );
+        return {
+          date: workingDate.date,
+          requiredHours: workingDate.hours,
+          allocatedHours,
+          unresolvedHours: Math.max(0, workingDate.hours - allocatedHours),
+          note: period.note ?? '',
+          sources,
+        };
+      }),
+    );
+  const ordinaryNiNotes = draft.absences.periods
+    .filter(
+      (period) =>
+        period.code === 'NI' &&
+        !period.overtimeTimeOff &&
+        Boolean(period.note?.trim()),
+    )
+    .map((period) => ({
+      startDate: period.startDate,
+      endDate: period.endDate,
+      note: period.note?.trim() ?? '',
+    }));
 
-  if (coveringNiedoczas50Hours + coveringNiedoczas100Hours <= 0) {
+  if (
+    coveringNiedoczas50Hours +
+      coveringNiedoczas100Hours +
+      timeOffEntries.length +
+      ordinaryNiNotes.length <=
+    0
+  ) {
     return null;
   }
 
@@ -737,16 +857,64 @@ function mapSozOvertimeNoteEntry(
       coveringNiedoczas100Hours,
     sozOvertime50Hours: draft.workTime.overtime50Hours,
     sozOvertime100Hours: draft.workTime.overtime100Hours,
-    wznRelatedHours: draft.workTime.wznCompensatedHours,
+    timeOffHours: draft.workTime.timeOffHours,
+    timeOffAllocatedHours: draft.workTime.timeOffAllocatedHours,
+    timeOffUnresolvedHours: draft.workTime.timeOffUnresolvedHours,
     paidOvertime50Hours: draft.workTime.paidOvertime50Hours,
     paidOvertime100Hours: draft.workTime.paidOvertime100Hours,
     coveringNiedoczas50Hours,
     coveringNiedoczas100Hours,
-    note:
-      draft.workTime.wznCompensatedHours > 0
-        ? `WZN: ${formatNumber(draft.workTime.wznCompensatedHours)} h pokryto z powiązanych godzin 100%.`
-        : '',
+    timeOffEntries,
+    ordinaryNiNotes,
+    note: timeOffEntries.length
+      ? `Odbiór wolnego: ${formatNumber(draft.workTime.timeOffAllocatedHours)} h rozliczono z wcześniejszych nadgodzin.`
+      : '',
   };
+}
+
+function mapAbsenceExportRows(record: SettlementExportRecord) {
+  const group = classifySozWorkerByCitizenship(record.employee.citizenship);
+  if (group === 'missing-identity') return [];
+
+  return record.draft.absences.periods.map((period) => {
+    const timeOffAllocations = period.overtimeTimeOff
+      ? record.draft.workTime.overtimeAllocations.filter((allocation) =>
+          allocation.demandId.startsWith(`time-off:${period.id}:`),
+        )
+      : [];
+    const sourceDescription = timeOffAllocations.length
+      ? timeOffAllocations
+          .map(
+            (allocation) =>
+              `${allocation.sourceDate} (${allocation.rate}%): ${formatNumber(allocation.hours)} h`,
+          )
+          .join(', ')
+      : '';
+    const noteParts = [
+      period.overtimeTimeOff ? 'Odbiór wolnego za nadgodziny' : '',
+      sourceDescription ? `Źródła: ${sourceDescription}` : '',
+      period.note?.trim() ?? '',
+    ].filter(Boolean);
+    return {
+      group,
+      lastName: record.employee.lastName,
+      firstName: record.employee.firstName,
+      passport:
+        record.identity?.passport?.trim() ||
+        record.identity?.foreignDocument?.trim() ||
+        '',
+      pesel: record.identity?.pesel?.trim() ?? '',
+      type: absenceTypeName(period.code),
+      code: period.code,
+      startDate: period.startDate,
+      endDate: period.endDate,
+      workingDayCount: period.workingDayCount,
+      workingHours: period.workingHours,
+      note: noteParts.join('; '),
+    } satisfies AbsenceExportRow & {
+      group: Exclude<SozWorkerGroup, 'missing-identity'>;
+    };
+  });
 }
 
 function identityValue(
@@ -845,7 +1013,9 @@ function renderCompensationWorkbook(entries: readonly SozOvertimeNoteEntry[]) {
     'Niedoczas przed odróbką',
     'Godziny 50 surowe',
     'Godziny 100 surowe',
-    'Godziny powiązane z WZN',
+    'Odbiór wolnego wymagany',
+    'Odbiór wolnego rozliczony',
+    'Odbiór wolnego nierozliczony',
     'Odróbka z 50%',
     'Odróbka z 100%',
     'Odróbka razem',
@@ -864,7 +1034,9 @@ function renderCompensationWorkbook(entries: readonly SozOvertimeNoteEntry[]) {
       formatNumber(entry.shortageBeforeCompensationHours),
       formatNumber(entry.sozOvertime50Hours),
       formatNumber(entry.sozOvertime100Hours),
-      formatNumber(entry.wznRelatedHours),
+      formatNumber(entry.timeOffHours),
+      formatNumber(entry.timeOffAllocatedHours),
+      formatNumber(entry.timeOffUnresolvedHours),
       formatNumber(entry.coveringNiedoczas50Hours),
       formatNumber(entry.coveringNiedoczas100Hours),
       formatNumber(

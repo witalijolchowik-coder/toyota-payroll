@@ -1,5 +1,9 @@
 import type { AbsenceRuleRecord } from '../absences';
-import { absenceRangesOverlap, normalizeAbsenceCode } from '../absences';
+import {
+  absenceRangesOverlap,
+  effectiveAbsenceCode,
+  isOvertimeTimeOffAbsence,
+} from '../absences';
 import type {
   FrequencyBonusThresholdScale,
   MonthId,
@@ -11,12 +15,16 @@ import { DEFAULT_FREQUENCY_BONUS_THRESHOLD_SCALE } from '../payroll/settings';
 export const FREQUENCY_BONUS_AMOUNTS = DEFAULT_FREQUENCY_BONUS_THRESHOLD_SCALE;
 
 export type FrequencyBonusReason =
-  'ELIGIBLE' | 'PARTIAL_EMPLOYMENT' | 'FOUR_OR_MORE_L4_DAYS';
+  | 'ELIGIBLE'
+  | 'PARTIAL_EMPLOYMENT'
+  | 'FOUR_OR_MORE_AFFECTING_DAYS'
+  | 'NN_ABSENCE';
 
 export interface FrequencyBonusResult {
   amount: number;
   l4RecordCount: number;
   l4MissedWorkingDayCount: number;
+  affectingAbsenceDayCount: number;
   hasNnAbsence: boolean;
   reason: FrequencyBonusReason;
 }
@@ -27,6 +35,7 @@ export interface FrequencyBonusInput {
   absences: readonly AbsenceRuleRecord[];
   plannedWorkingDates?: ReadonlySet<string>;
   thresholdScale?: FrequencyBonusThresholdScale | null;
+  fullConfiguredAmount?: number | null;
 }
 
 export function isEmployedForFullPayrollMonth(
@@ -55,12 +64,14 @@ export function calculateFrequencyBonus({
   absences,
   plannedWorkingDates,
   thresholdScale = DEFAULT_FREQUENCY_BONUS_THRESHOLD_SCALE,
+  fullConfiguredAmount = null,
 }: FrequencyBonusInput): FrequencyBonusResult {
   if (!isEmployedForFullPayrollMonth(monthId, employment)) {
     return {
       amount: 0,
       l4RecordCount: 0,
       l4MissedWorkingDayCount: 0,
+      affectingAbsenceDayCount: 0,
       hasNnAbsence: false,
       reason: 'PARTIAL_EMPLOYMENT',
     };
@@ -76,11 +87,24 @@ export function calculateFrequencyBonus({
       absence.status === 'ACTIVE' && absenceRangesOverlap(absence, monthRange),
   );
   const l4Absences = activeOverlapping.filter(
-    (absence) => normalizeAbsenceCode(absence.absenceCode) === 'L4',
+    (absence) => effectiveAbsenceCode(absence) === 'L4',
   );
   const l4RecordCount = new Set(l4Absences.map((absence) => absence.id)).size;
-  const l4MissedWorkingDayCount = countL4MissedWorkingDays({
+  const l4MissedWorkingDayCount = countAbsenceWorkingDays({
     absences: l4Absences,
+    monthStart: monthRange.startDate,
+    monthEnd: monthRange.endDate,
+    plannedWorkingDates,
+  });
+  const hasNnAbsence = activeOverlapping.some(
+    (absence) => effectiveAbsenceCode(absence) === 'NN',
+  );
+  const affectingAbsenceDayCount = countAbsenceWorkingDays({
+    absences: activeOverlapping.filter(
+      (absence) =>
+        ATTENDANCE_AFFECTING_CODES.has(effectiveAbsenceCode(absence)) &&
+        !isOvertimeTimeOffAbsence(absence),
+    ),
     monthStart: monthRange.startDate,
     monthEnd: monthRange.endDate,
     plannedWorkingDates,
@@ -88,29 +112,52 @@ export function calculateFrequencyBonus({
 
   const effectiveScale =
     thresholdScale ?? DEFAULT_FREQUENCY_BONUS_THRESHOLD_SCALE;
-  if (l4MissedWorkingDayCount >= 4) {
+  if (hasNnAbsence) {
+    return {
+      amount: 0,
+      l4RecordCount,
+      l4MissedWorkingDayCount,
+      affectingAbsenceDayCount,
+      hasNnAbsence,
+      reason: 'NN_ABSENCE',
+    };
+  }
+  if (affectingAbsenceDayCount >= 4) {
     return {
       amount: effectiveScale[4],
       l4RecordCount,
       l4MissedWorkingDayCount,
-      hasNnAbsence: false,
-      reason: 'FOUR_OR_MORE_L4_DAYS',
+      affectingAbsenceDayCount,
+      hasNnAbsence,
+      reason: 'FOUR_OR_MORE_AFFECTING_DAYS',
     };
   }
 
   return {
     amount:
-      effectiveScale[
-        l4MissedWorkingDayCount as keyof FrequencyBonusThresholdScale
-      ],
+      affectingAbsenceDayCount === 0 && fullConfiguredAmount !== null
+        ? fullConfiguredAmount
+        : effectiveScale[
+            affectingAbsenceDayCount as keyof FrequencyBonusThresholdScale
+          ],
     l4RecordCount,
     l4MissedWorkingDayCount,
-    hasNnAbsence: false,
+    affectingAbsenceDayCount,
+    hasNnAbsence,
     reason: 'ELIGIBLE',
   };
 }
 
-function countL4MissedWorkingDays({
+const ATTENDANCE_AFFECTING_CODES = new Set([
+  'NI',
+  'UB',
+  'OP',
+  'L4',
+  'O5',
+  'SR',
+]);
+
+function countAbsenceWorkingDays({
   absences,
   monthStart,
   monthEnd,

@@ -299,7 +299,7 @@ describe('DailyValueEditorDialog', () => {
     renderDialog({ onSaveAbsence: saveAbsence });
     fireEvent.click(screen.getByRole('tab', { name: 'Nieobecność' }));
     expect(screen.getByTestId('absence-code-L4')).toBeInTheDocument();
-    expect(screen.getByText('Zwolnienie lekarskie')).toBeInTheDocument();
+    expect(screen.getByText('Godziny chorobowe')).toBeInTheDocument();
     expect(screen.getByText(/zapisane jako „Zgłoszone”/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Zapisz' }));
     await waitFor(() => expect(saveAbsence).toHaveBeenCalledWith('L4', null));

@@ -16,8 +16,14 @@ certificates are not merged.
 
 ## Types and lifecycle
 
-The MVP supports `L4`, `UW`, `UZ` (displayed as UŻ / UZ), `NN`, `NU`, `NI`,
-`OPD`, `KRW`, and `WZN`.
+The canonical manually selectable catalog is `NN`, `NU`, `NI`, `UW`, `UB`,
+`OP`, `UO`, `L4`, `LO`, `O5`, and `SR`. `GN` is calculation-only and cannot
+be selected manually. Older stored codes remain readable and are normalized at
+the calculation boundary without rewriting closed or historical documents.
+
+`NI` may be marked as a full-day overtime time-off record. Such a record is
+allocated only from earlier overtime in the same month, after all shortage
+demands have been allocated. One overtime hour can be used only once.
 
 Every absence has lifecycle status `ACTIVE` or `CANCELLED`. Cancellation
 replaces deletion. Priority never changes lifecycle status and
@@ -68,8 +74,9 @@ calculation.
 The Absences workspace shows current-day cards:
 
 - `Na L4 dzisiaj`: `L4`;
-- `Na urlopie / usprawiedliwione`: `UW`, `UZ`, `OPD`, `KRW`, `WZN`;
-- `Nieobecności niewyjaśnione`: `NN`, `NU`, `NI`.
+- `Na urlopie / usprawiedliwione`: `NU`, `NI`, `UW`, `UB`, `OP`, `UO`, `LO`,
+  `O5`, `SR`;
+- `Nieobecności niewyjaśnione`: `NN`.
 
 The main Dashboard is unchanged in this block.
 

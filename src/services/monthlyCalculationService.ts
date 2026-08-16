@@ -25,6 +25,7 @@ const BLOCKING_WARNINGS = new Set([
   'unconfirmed-l4',
   'unresolved-work-time-classification',
   'unresolved-wzn-link',
+  'unresolved-time-off-allocation',
   'housing-entitlement-conflict',
   'company-accommodation-missing-variant',
   'unresolved-company-accommodation-variant',

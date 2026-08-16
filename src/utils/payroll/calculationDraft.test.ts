@@ -452,7 +452,7 @@ describe('employee monthly calculation draft', () => {
       ],
     });
 
-    expect(result.absences.periods).toEqual([
+    expect(result.absences.periods).toMatchObject([
       {
         id: 'l4-weekend-period',
         code: 'L4',
@@ -506,7 +506,7 @@ describe('employee monthly calculation draft', () => {
     expect(result.totals.frequencyBonusAmount).toBe(300);
   });
 
-  it('does not automatically reduce the frequency bonus for NN', () => {
+  it('sets the frequency bonus to zero for NN', () => {
     const result = draft({
       absences: [
         absence({
@@ -518,9 +518,9 @@ describe('employee monthly calculation draft', () => {
       ],
     });
 
-    expect(result.bonuses.frequency.hasNnAbsence).toBe(false);
-    expect(result.bonuses.frequency.reason).toBe('ELIGIBLE');
-    expect(result.totals.frequencyBonusAmount).toBe(400);
+    expect(result.bonuses.frequency.hasNnAbsence).toBe(true);
+    expect(result.bonuses.frequency.reason).toBe('NN_ABSENCE');
+    expect(result.totals.frequencyBonusAmount).toBe(0);
   });
 
   it('does not reduce the frequency bonus for approved absences', () => {
@@ -611,8 +611,8 @@ describe('employee monthly calculation draft', () => {
         absence({
           id: 'wzn-friday',
           absenceCode: 'WZN',
-          startDate: '2026-06-05',
-          endDate: '2026-06-05',
+          startDate: '2026-06-08',
+          endDate: '2026-06-08',
           linkedWorkDate: '2026-06-07',
         }),
       ],
@@ -639,7 +639,7 @@ describe('employee monthly calculation draft', () => {
 
     expect(result.workTime.wznUnresolvedHours).toBe(8);
     expect(result.warnings.map((item) => item.code)).toContain(
-      'unresolved-wzn-link',
+      'unresolved-time-off-allocation',
     );
   });
 

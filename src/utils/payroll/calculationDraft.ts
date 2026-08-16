@@ -8,8 +8,10 @@ import type {
   PayrollSetting,
 } from '../../types/firestore';
 import {
+  effectiveAbsenceCode,
   isImportedAbsence,
   isL4Absence,
+  isOvertimeTimeOffAbsence,
   normalizeAbsenceCode,
   resolveGoverningAbsence,
   type AbsenceRuleRecord,
@@ -30,11 +32,16 @@ import { baseSalaryForFirstToyotaEmploymentDate } from './employeeReadiness';
 import { resolveEffectivePayrollSetting } from './settings';
 import { getPayrollVirtualDefaultHours } from './virtualDefaults';
 import {
-  balanceMonthlyWorkTimeDeviations,
   plannedIntervalForShift,
   resolveDailyWorkTimeDeviation,
   type DailyWorkTimeDeviation,
 } from './workTimeDeviations';
+import {
+  allocateMonthlyOvertime,
+  sumAllocatedHours,
+  type OvertimeAllocation,
+  type OvertimeDemand,
+} from './overtimeAllocation';
 import type { PlannedScheduleDay } from '../schedule';
 import { calculateHousingDeposit } from './allowances';
 import {
@@ -60,7 +67,7 @@ export type PayrollDraftWarningCode =
   | 'unconfirmed-l4'
   | 'unresolved-frequency-bonus-setting'
   | 'unresolved-work-time-classification'
-  | 'unresolved-wzn-link'
+  | 'unresolved-time-off-allocation'
   | 'housing-entitlement-conflict'
   | 'company-accommodation-missing-variant'
   | 'unresolved-company-accommodation-variant'
@@ -88,6 +95,9 @@ export interface PayrollDraftAbsencePeriod {
   endDate: IsoDate;
   workingDayCount: number;
   workingHours: number;
+  workingDates: { date: IsoDate; hours: number }[];
+  note: string | null;
+  overtimeTimeOff: boolean;
 }
 
 export interface PayrollDraftAdjustmentEntry {
@@ -104,6 +114,7 @@ export interface PayrollDraftFrequencyBonus {
   configuredAmount: number | null;
   l4RecordCount: number;
   l4MissedWorkingDayCount: number;
+  affectingAbsenceDayCount: number;
   hasNnAbsence: boolean;
   reason: ReturnType<typeof calculateFrequencyBonus>['reason'];
 }
@@ -137,6 +148,7 @@ export interface EmployeeMonthlyCalculationDraft {
     otherAbsenceHours: number;
     nnHours: number;
     approvedOrJustifiedHours: number;
+    gnHours: number;
   };
   workDays: {
     eligibleWorkingDays: number;
@@ -155,6 +167,14 @@ export interface EmployeeMonthlyCalculationDraft {
     overtime100Hours: number;
     paidOvertime50Hours: number;
     paidOvertime100Hours: number;
+    overtimeAllocations: OvertimeAllocation[];
+    shortageCovered50Hours: number;
+    shortageCovered100Hours: number;
+    timeOffHours: number;
+    timeOffAllocatedHours: number;
+    timeOffUnresolvedHours: number;
+    timeOff50Hours: number;
+    timeOff100Hours: number;
     holidayWorkBonusEligible: boolean;
     wznCompensatedHours: number;
     wznUnresolvedHours: number;
@@ -232,8 +252,19 @@ export interface MonthlyCalculationDraftsInput extends Omit<
   depositReturnOverridesByEmployeeId?: ReadonlyMap<string, number | null>;
 }
 
-const APPROVED_ABSENCE_CODES = new Set(['UW', 'UZ', 'OPD', 'KRW', 'WZN']);
-const VACATION_ABSENCE_CODES = new Set(['UW', 'UZ']);
+const APPROVED_ABSENCE_CODES = new Set([
+  'NU',
+  'NI',
+  'UW',
+  'UB',
+  'OP',
+  'UO',
+  'L4',
+  'LO',
+  'O5',
+  'SR',
+]);
+const VACATION_ABSENCE_CODES = new Set(['UW']);
 
 function contractEmploymentForMonth(employee: Employee, monthId: MonthId) {
   const range = getPayrollMonthDateRange(monthId);
@@ -387,16 +418,21 @@ function calculateAbsencePeriods({
   employee,
   absences,
   calendarOptions,
+  plannedSchedule,
 }: {
   monthId: MonthId;
   employee: Employee;
   absences: readonly Absence[];
   calendarOptions: PayrollCalendarOptions;
+  plannedSchedule?: readonly PlannedScheduleDay[];
 }): PayrollDraftAbsencePeriod[] {
   const range = getPayrollMonthDateRange(monthId);
   const monthStart = dateToIsoDate(range.start);
   const monthEnd = dateToIsoDate(range.end);
   const calendar = createPayrollMonthCalendar(monthId, calendarOptions);
+  const plannedScheduleByDate = new Map(
+    (plannedSchedule ?? []).map((day) => [day.date, day]),
+  );
 
   return absences
     .map((absence) => {
@@ -409,22 +445,40 @@ function calculateAbsencePeriods({
       if (!overlap) {
         return null;
       }
-      const workingDays = calendar.filter(
-        (day) =>
-          day.isoDate >= overlap.start &&
-          day.isoDate <= overlap.end &&
-          day.isWorkingDay &&
-          isDateCoveredByContracts(employee, day.isoDate),
-      ).length;
+      const workingDates = calendar.flatMap((day) => {
+        const plannedDay = plannedScheduleByDate.get(day.isoDate);
+        const isWorkingDay = plannedDay
+          ? plannedDay.status === 'WORKING' || plannedDay.status === 'BHP'
+          : day.isWorkingDay;
+        if (
+          day.isoDate < overlap.start ||
+          day.isoDate > overlap.end ||
+          !isWorkingDay ||
+          !isDateCoveredByContracts(employee, day.isoDate)
+        ) {
+          return [];
+        }
+        return [
+          {
+            date: day.isoDate,
+            hours:
+              absence.hoursPerDay ??
+              plannedDay?.hours ??
+              STANDARD_WORKING_DAY_HOURS,
+          },
+        ];
+      });
 
       return {
         id: absence.id,
-        code: normalizeAbsenceCode(absence.absenceCode),
+        code: effectiveAbsenceCode(absence),
         startDate: absence.startDate,
         endDate: absence.endDate,
-        workingDayCount: workingDays,
-        workingHours:
-          workingDays * (absence.hoursPerDay ?? STANDARD_WORKING_DAY_HOURS),
+        workingDayCount: workingDates.length,
+        workingHours: workingDates.reduce((total, day) => total + day.hours, 0),
+        workingDates,
+        note: absence.note,
+        overtimeTimeOff: isOvertimeTimeOffAbsence(absence),
       };
     })
     .filter((period): period is PayrollDraftAbsencePeriod => period !== null)
@@ -818,16 +872,18 @@ export function calculateEmployeeMonthlyDraft({
         .map((day) => ('isoDate' in day ? day.isoDate : day.date)),
     ),
     thresholdScale: frequencySetting?.thresholdScale,
+    fullConfiguredAmount: frequencySetting?.amount,
   });
   if (!frequencySetting) {
     warnings.push(warning('unresolved-frequency-bonus-setting'));
   }
   const frequencyAmount = frequencySetting ? frequencyRule.amount : null;
-  const absencePeriods = calculateAbsencePeriods({
+  const baseAbsencePeriods = calculateAbsencePeriods({
     monthId,
     employee,
     absences: payrollEffectiveAbsences,
     calendarOptions,
+    plannedSchedule,
   });
   const eligibleWorkingDays = countEligibleWorkingDays({
     monthId,
@@ -855,9 +911,6 @@ export function calculateEmployeeMonthlyDraft({
   const manualDecreases = adjustmentEntries
     .filter((entry) => entry.direction === 'DECREASE')
     .reduce((total, entry) => total + entry.amount, 0);
-  const groups = [...absenceGroups.values()].sort((first, second) =>
-    first.code.localeCompare(second.code, 'pl-PL'),
-  );
   const workTimeBeforeBalance = workTimeDeviations.reduce(
     (total, deviation) => ({
       normalWorkHours: total.normalWorkHours + deviation.normalWorkHours,
@@ -879,48 +932,166 @@ export function calculateEmployeeMonthlyDraft({
       holidayWorkBonusEligible: false,
     },
   );
-  const remainingLinked100ByDate = new Map(
-    [...workTimeDeviationsByDate].map(([date, deviation]) => [
-      date,
-      deviation.overtime100Hours,
-    ]),
+  const overtimePools = [...workTimeDeviationsByDate].flatMap(
+    ([date, deviation]) => [
+      { date, rate: 50 as const, hours: deviation.overtime50Hours },
+      { date, rate: 100 as const, hours: deviation.overtime100Hours },
+    ],
   );
-  let wznCompensatedHours = 0;
-  let wznUnresolvedHours = 0;
-  activeAbsences
-    .filter((absence) => normalizeAbsenceCode(absence.absenceCode) === 'WZN')
-    .forEach((absence) => {
-      const requiredHours =
-        absencePeriods.find((period) => period.id === absence.id)
-          ?.workingHours ?? 0;
-      const linkedDate = absence.linkedWorkDate;
-      const availableHours = linkedDate
-        ? (remainingLinked100ByDate.get(linkedDate) ?? 0)
-        : 0;
-      const compensatedHours = Math.min(requiredHours, availableHours);
-      wznCompensatedHours += compensatedHours;
-      wznUnresolvedHours += Math.max(0, requiredHours - compensatedHours);
-      if (linkedDate) {
-        remainingLinked100ByDate.set(
-          linkedDate,
-          Math.max(0, availableHours - compensatedHours),
-        );
-      }
-    });
-  if (wznUnresolvedHours > 0) {
-    warnings.push(warning('unresolved-wzn-link'));
-  }
-  const workTimeBalance = balanceMonthlyWorkTimeDeviations({
-    ...workTimeBeforeBalance,
-    preferredOvertime100CoverageHours: wznCompensatedHours,
+  const shortageDemands: OvertimeDemand[] = [
+    ...workTimeDeviationsByDate,
+  ].flatMap(([date, deviation]) => [
+    ...(deviation.privateTimeHours > 0
+      ? [
+          {
+            id: `private:${date}`,
+            date,
+            hours: deviation.privateTimeHours,
+            kind: 'PRIVATE_TIME' as const,
+          },
+        ]
+      : []),
+    ...(deviation.coverableNiHours > 0
+      ? [
+          {
+            id: `coverable-ni:${date}`,
+            date,
+            hours: deviation.coverableNiHours,
+            kind: 'COVERABLE_NI' as const,
+          },
+        ]
+      : []),
+  ]);
+  const absencesById = new Map(
+    activeAbsences.map((absence) => [absence.id, absence]),
+  );
+  const timeOffDemands: OvertimeDemand[] = baseAbsencePeriods.flatMap(
+    (period) =>
+      period.overtimeTimeOff
+        ? period.workingDates.map(({ date, hours }) => {
+            const source = absencesById.get(period.id);
+            return {
+              id: `time-off:${period.id}:${date}`,
+              date,
+              hours,
+              kind: 'NI_TIME_OFF' as const,
+              sourceDates:
+                source && normalizeAbsenceCode(source.absenceCode) === 'WZN'
+                  ? source.linkedWorkDate
+                    ? [source.linkedWorkDate]
+                    : []
+                  : undefined,
+              allowNonEarlierSource:
+                source !== undefined &&
+                normalizeAbsenceCode(source.absenceCode) === 'WZN' &&
+                Boolean(source.linkedWorkDate),
+            };
+          })
+        : [],
+  );
+  const overtimeAllocation = allocateMonthlyOvertime({
+    pools: overtimePools,
+    shortageDemands,
+    timeOffDemands,
   });
+  const shortageAllocations = overtimeAllocation.allocations.filter(
+    (allocation) => allocation.demandKind !== 'NI_TIME_OFF',
+  );
+  const timeOffAllocations = overtimeAllocation.allocations.filter(
+    (allocation) => allocation.demandKind === 'NI_TIME_OFF',
+  );
+  const unresolvedShortageByDate = new Map<IsoDate, number>();
+  overtimeAllocation.demands
+    .filter(
+      (demand) => demand.kind !== 'NI_TIME_OFF' && demand.unresolvedHours > 0,
+    )
+    .forEach((demand) => {
+      unresolvedShortageByDate.set(
+        demand.date,
+        (unresolvedShortageByDate.get(demand.date) ?? 0) +
+          demand.unresolvedHours,
+      );
+    });
+  const gnPeriods: PayrollDraftAbsencePeriod[] = [
+    ...unresolvedShortageByDate,
+  ].map(([date, hours]) => ({
+    id: `gn:${date}`,
+    code: 'GN',
+    startDate: date,
+    endDate: date,
+    workingDayCount: 1,
+    workingHours: roundMoney(hours),
+    workingDates: [{ date, hours: roundMoney(hours) }],
+    note: null,
+    overtimeTimeOff: false,
+  }));
+  gnPeriods.forEach((period) =>
+    addAbsenceHours(absenceGroups, 'GN', period.workingHours),
+  );
+  const absencePeriods = [...baseAbsencePeriods, ...gnPeriods].sort(
+    (first, second) =>
+      first.startDate === second.startDate
+        ? first.id.localeCompare(second.id)
+        : first.startDate.localeCompare(second.startDate),
+  );
+  const groups = [...absenceGroups.values()].sort((first, second) =>
+    first.code.localeCompare(second.code, 'pl-PL'),
+  );
+  const shortageCovered50Hours = sumAllocatedHours(
+    shortageAllocations,
+    (allocation) => allocation.rate === 50,
+  );
+  const shortageCovered100Hours = sumAllocatedHours(
+    shortageAllocations,
+    (allocation) => allocation.rate === 100,
+  );
+  const timeOff50Hours = sumAllocatedHours(
+    timeOffAllocations,
+    (allocation) => allocation.rate === 50,
+  );
+  const timeOff100Hours = sumAllocatedHours(
+    timeOffAllocations,
+    (allocation) => allocation.rate === 100,
+  );
+  const timeOffHours = timeOffDemands.reduce(
+    (total, demand) => total + demand.hours,
+    0,
+  );
+  const timeOffAllocatedHours = timeOff50Hours + timeOff100Hours;
+  const timeOffUnresolvedHours = overtimeAllocation.demands
+    .filter((demand) => demand.kind === 'NI_TIME_OFF')
+    .reduce((total, demand) => total + demand.unresolvedHours, 0);
+  if (timeOffUnresolvedHours > 0) {
+    warnings.push(warning('unresolved-time-off-allocation'));
+  }
+  const paidOvertime50Hours = overtimeAllocation.remainingPools
+    .filter((pool) => pool.rate === 50)
+    .reduce((total, pool) => total + pool.hours, 0);
+  const paidOvertime100Hours = overtimeAllocation.remainingPools
+    .filter((pool) => pool.rate === 100)
+    .reduce((total, pool) => total + pool.hours, 0);
+  const privateTimeCoveredHours = sumAllocatedHours(
+    shortageAllocations,
+    (allocation) => allocation.demandKind === 'PRIVATE_TIME',
+  );
+  const coverableNiCoveredHours = sumAllocatedHours(
+    shortageAllocations,
+    (allocation) => allocation.demandKind === 'COVERABLE_NI',
+  );
+  const niedoczasHours = [...unresolvedShortageByDate.values()].reduce(
+    (total, hours) => total + hours,
+    0,
+  );
   const hoursForCodes = (codes: ReadonlySet<string>) =>
     groups
       .filter((group) => codes.has(group.code))
       .reduce((total, group) => total + group.nominalHours, 0);
   const otherAbsenceHours = groups
     .filter(
-      (group) => group.code !== 'L4' && !VACATION_ABSENCE_CODES.has(group.code),
+      (group) =>
+        group.code !== 'L4' &&
+        group.code !== 'GN' &&
+        !VACATION_ABSENCE_CODES.has(group.code),
     )
     .reduce((total, group) => total + group.nominalHours, 0);
   const holidaySetting = resolveEffectivePayrollSetting(
@@ -1067,6 +1238,7 @@ export function calculateEmployeeMonthlyDraft({
       otherAbsenceHours,
       nnHours: hoursForCodes(new Set(['NN'])),
       approvedOrJustifiedHours: hoursForCodes(APPROVED_ABSENCE_CODES),
+      gnHours: hoursForCodes(new Set(['GN'])),
     },
     workDays: {
       eligibleWorkingDays,
@@ -1075,21 +1247,35 @@ export function calculateEmployeeMonthlyDraft({
     workTime: {
       normalWorkHours: workTimeBeforeBalance.normalWorkHours,
       nightHours: workTimeBeforeBalance.nightHours,
-      privateTimeHours: workTimeBalance.privateTimeHours,
-      privateTimeCoveredHours: workTimeBalance.privateTimeCoveredHours,
-      uncoveredPrivateTimeHours: workTimeBalance.uncoveredPrivateTimeHours,
-      coverableNiHours: workTimeBalance.coverableNiHours,
-      coverableNiCoveredHours: workTimeBalance.coverableNiCoveredHours,
-      uncoveredCoverableNiHours: workTimeBalance.uncoveredCoverableNiHours,
-      overtime50Hours: workTimeBalance.overtime50Hours,
-      overtime100Hours: workTimeBalance.overtime100Hours,
-      paidOvertime50Hours: workTimeBalance.paidOvertime50Hours,
-      paidOvertime100Hours: workTimeBalance.paidOvertime100Hours,
+      privateTimeHours: workTimeBeforeBalance.privateTimeHours,
+      privateTimeCoveredHours,
+      uncoveredPrivateTimeHours: Math.max(
+        0,
+        workTimeBeforeBalance.privateTimeHours - privateTimeCoveredHours,
+      ),
+      coverableNiHours: workTimeBeforeBalance.coverableNiHours,
+      coverableNiCoveredHours,
+      uncoveredCoverableNiHours: Math.max(
+        0,
+        workTimeBeforeBalance.coverableNiHours - coverableNiCoveredHours,
+      ),
+      overtime50Hours: workTimeBeforeBalance.overtime50Hours,
+      overtime100Hours: workTimeBeforeBalance.overtime100Hours,
+      paidOvertime50Hours,
+      paidOvertime100Hours,
+      overtimeAllocations: overtimeAllocation.allocations,
+      shortageCovered50Hours,
+      shortageCovered100Hours,
+      timeOffHours,
+      timeOffAllocatedHours,
+      timeOffUnresolvedHours,
+      timeOff50Hours,
+      timeOff100Hours,
       holidayWorkBonusEligible: workTimeBeforeBalance.holidayWorkBonusEligible,
-      wznCompensatedHours: workTimeBalance.preferredOvertime100CoverageHours,
-      wznUnresolvedHours,
+      wznCompensatedHours: timeOffAllocatedHours,
+      wznUnresolvedHours: timeOffUnresolvedHours,
       unresolvedClassificationDays,
-      niedoczasHours: workTimeBalance.niedoczasHours,
+      niedoczasHours,
     },
     bonuses: {
       frequency: {
@@ -1098,6 +1284,7 @@ export function calculateEmployeeMonthlyDraft({
         configuredAmount: frequencySetting?.amount ?? null,
         l4RecordCount: frequencyRule.l4RecordCount,
         l4MissedWorkingDayCount: frequencyRule.l4MissedWorkingDayCount,
+        affectingAbsenceDayCount: frequencyRule.affectingAbsenceDayCount,
         hasNnAbsence: frequencyRule.hasNnAbsence,
         reason: frequencyRule.reason,
       },

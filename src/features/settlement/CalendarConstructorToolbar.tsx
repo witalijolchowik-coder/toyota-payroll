@@ -49,8 +49,15 @@ const toolIcons: Record<CalendarConstructorTool, ReactNode> = {
   hours: <TimelapseOutlined />,
   L4: <HealingOutlined />,
   UW: <EditCalendarOutlined />,
-  UZ: <EditCalendarOutlined />,
   NN: <EventBusyOutlined />,
+  NU: <EventBusyOutlined />,
+  NI: <EventBusyOutlined />,
+  UB: <EditCalendarOutlined />,
+  OP: <EditCalendarOutlined />,
+  UO: <EditCalendarOutlined />,
+  LO: <HealingOutlined />,
+  O5: <EditCalendarOutlined />,
+  SR: <EventBusyOutlined />,
   'clear-manual': <BackspaceOutlined />,
 };
 

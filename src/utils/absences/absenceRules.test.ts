@@ -76,11 +76,19 @@ describe('absence validation and record boundaries', () => {
     expect(
       validateAbsenceInput({
         employeeId: 'employee-1',
-        absenceCode: 'UŻ',
+        absenceCode: 'UO',
         startDate: '2026-06-10',
         endDate: '2026-06-12',
       }),
     ).toEqual({});
+    expect(
+      validateAbsenceInput({
+        employeeId: 'employee-1',
+        absenceCode: 'UZ',
+        startDate: '2026-06-10',
+        endDate: '2026-06-12',
+      }),
+    ).toEqual({ absenceCode: 'unsupported-code' });
     expect(
       validateAbsenceInput(
         {

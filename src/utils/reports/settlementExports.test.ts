@@ -103,7 +103,7 @@ describe('settlement export formats', () => {
     ).toHaveLength(2);
   });
 
-  it('keeps SOZ overtime 100% combined while the note explains covered niedoczas', () => {
+  it('keeps only payable overtime addons in SOZ and explains covered niedoczas', () => {
     const result = prepareSettlementExportPackage({
       monthId: '2026-06',
       monthNominalHours: 168,
@@ -115,18 +115,20 @@ describe('settlement export formats', () => {
           draft: draft({
             overtime100Hours: 5,
             paidOvertime100Hours: 2,
+            shortageCovered100Hours: 3,
             overtime50Hours: 4,
             paidOvertime50Hours: 1,
+            shortageCovered50Hours: 3,
           }),
         }),
       ],
     });
 
     const godziny100Index = SOZ_CSV_HEADERS.indexOf('Godziny 100');
-    expect(result.soz.foreignRows[0]?.cells[godziny100Index]).toBe('5');
+    expect(result.soz.foreignRows[0]?.cells[godziny100Index]).toBe('2');
     expect(result.soz.note).toContain('TETA T1');
-    expect(result.soz.note).toContain('do wypłaty 2 h');
-    expect(result.soz.note).toContain('na odróbkę 3 h');
+    expect(result.soz.note).toContain('100% 3 h');
+    expect(result.soz.note).toContain('100% 2 h');
   });
 
   it('separates paid overtime from overtime covering niedoczas for Toyota mapping', () => {
@@ -139,8 +141,10 @@ describe('settlement export formats', () => {
           draft: draft({
             overtime50Hours: 6,
             paidOvertime50Hours: 2,
+            shortageCovered50Hours: 4,
             overtime100Hours: 3,
             paidOvertime100Hours: 1,
+            shortageCovered100Hours: 2,
           }),
         }),
       ],
@@ -164,8 +168,10 @@ describe('settlement export formats', () => {
           draft: draft({
             overtime50Hours: 4,
             paidOvertime50Hours: 0,
+            shortageCovered50Hours: 4,
             overtime100Hours: 5,
             paidOvertime100Hours: 3,
+            shortageCovered100Hours: 2,
             wznCompensatedHours: 2,
           }),
         }),
@@ -185,14 +191,61 @@ describe('settlement export formats', () => {
       expect.arrayContaining([
         'TETA',
         'Nominał pracownika',
-        'Godziny powiązane z WZN',
+        'Odbiór wolnego wymagany',
+        'Odbiór wolnego rozliczony',
         'Wyjaśnienie',
       ]),
     );
   });
 
   it('renders an empty note when there are no odróbki za niedoczas', () => {
-    expect(renderSozOvertimeNote([])).toBe('Brak odróbek za niedoczas.\r\n');
+    expect(renderSozOvertimeNote([])).toBe(
+      'Brak odróbek za niedoczas, odbiorów wolnego i uwag do NI.\r\n',
+    );
+  });
+
+  it('exports canonical absence categories and ordinary NI notes', () => {
+    const employeeDraft = draft();
+    employeeDraft.absences.groups = [
+      { code: 'OP', dayCount: 1, nominalHours: 8 },
+      { code: 'UO', dayCount: 1, nominalHours: 8 },
+      { code: 'LO', dayCount: 1, nominalHours: 8 },
+      { code: 'O5', dayCount: 1, nominalHours: 8 },
+      { code: 'SR', dayCount: 1, nominalHours: 8 },
+      { code: 'GN', dayCount: 1, nominalHours: 2 },
+    ];
+    employeeDraft.absences.gnHours = 2;
+    employeeDraft.absences.periods = [
+      {
+        id: 'ni-note',
+        code: 'NI',
+        startDate: '2026-06-12',
+        endDate: '2026-06-12',
+        workingDayCount: 1,
+        workingHours: 8,
+        workingDates: [{ date: '2026-06-12', hours: 8 }],
+        note: 'Wizyta urzędowa',
+        overtimeTimeOff: false,
+      },
+    ];
+    const result = prepareSettlementExportPackage({
+      monthId: '2026-06',
+      monthNominalHours: 168,
+      records: [exportRecord({ id: '1', draft: employeeDraft })],
+    });
+    const row = result.soz.polishRows[0]?.cells;
+
+    expect(row?.[17]).toBe('8');
+    expect(row?.[18]).toBe('8');
+    expect(row?.[20]).toBe('8');
+    expect(row?.[21]).toBe('8');
+    expect(row?.[22]).toBe('8');
+    expect(row?.[23]).toBe('2');
+    expect(result.soz.note).toContain('NI 2026-06-12: Wizyta urzędowa');
+    expect(result.soz.polishCompensationWorkbook).toBeNull();
+    expect(result.absences.polishRows).toEqual([
+      expect.objectContaining({ code: 'NI', workingHours: 8 }),
+    ]);
   });
 
   it('preserves SOZ template-derived columns and excludes tax/net payroll concepts', () => {
@@ -331,6 +384,8 @@ function draft(
     overtime100Hours?: number;
     paidOvertime50Hours?: number;
     paidOvertime100Hours?: number;
+    shortageCovered50Hours?: number;
+    shortageCovered100Hours?: number;
     nightHours?: number;
     wznCompensatedHours?: number;
   } = {},
@@ -364,6 +419,7 @@ function draft(
       otherAbsenceHours: 0,
       nnHours: 0,
       approvedOrJustifiedHours: 0,
+      gnHours: 0,
     },
     workDays: {
       eligibleWorkingDays: 21,
@@ -382,6 +438,14 @@ function draft(
       overtime100Hours: overrides.overtime100Hours ?? 0,
       paidOvertime50Hours: overrides.paidOvertime50Hours ?? 0,
       paidOvertime100Hours: overrides.paidOvertime100Hours ?? 0,
+      overtimeAllocations: [],
+      shortageCovered50Hours: overrides.shortageCovered50Hours ?? 0,
+      shortageCovered100Hours: overrides.shortageCovered100Hours ?? 0,
+      timeOffHours: overrides.wznCompensatedHours ?? 0,
+      timeOffAllocatedHours: overrides.wznCompensatedHours ?? 0,
+      timeOffUnresolvedHours: 0,
+      timeOff50Hours: 0,
+      timeOff100Hours: overrides.wznCompensatedHours ?? 0,
       holidayWorkBonusEligible: false,
       wznCompensatedHours: overrides.wznCompensatedHours ?? 0,
       wznUnresolvedHours: 0,
@@ -395,6 +459,7 @@ function draft(
         configuredAmount: 400,
         l4RecordCount: 0,
         l4MissedWorkingDayCount: 0,
+        affectingAbsenceDayCount: 0,
         hasNnAbsence: false,
         reason: 'ELIGIBLE',
       },

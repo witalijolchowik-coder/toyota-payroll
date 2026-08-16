@@ -464,7 +464,7 @@ function buildAbsenceTrend(
       }
       if (resolution.code === 'L4' && resolution.confirmation === 'confirmed') {
         l4 += 1;
-      } else if (resolution.code === 'UW' || resolution.code === 'UZ') {
+      } else if (resolution.code === 'UW') {
         vacation += 1;
       }
     });

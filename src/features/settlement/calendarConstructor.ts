@@ -13,8 +13,15 @@ export const CALENDAR_CONSTRUCTOR_TOOLS = [
   'hours',
   'L4',
   'UW',
-  'UZ',
   'NN',
+  'NU',
+  'NI',
+  'UB',
+  'OP',
+  'UO',
+  'LO',
+  'O5',
+  'SR',
   'clear-manual',
 ] as const;
 
@@ -59,8 +66,15 @@ export type CalendarConstructorBlockedReason =
 const ABSENCE_TOOL_CODES = new Set<CalendarConstructorTool>([
   'L4',
   'UW',
-  'UZ',
   'NN',
+  'NU',
+  'NI',
+  'UB',
+  'OP',
+  'UO',
+  'LO',
+  'O5',
+  'SR',
 ]);
 
 export function isSupportedCalendarConstructorTool(

@@ -149,6 +149,7 @@ export interface AbsenceCreateInput extends EmployeeReferenceInput {
   endDate: IsoDate;
   hoursPerDay: number | null;
   linkedWorkDate?: IsoDate | null;
+  overtimeTimeOff?: boolean;
   note: string | null;
 }
 
@@ -159,6 +160,7 @@ export type AbsenceUpdateInput = Pick<
   | 'endDate'
   | 'hoursPerDay'
   | 'linkedWorkDate'
+  | 'overtimeTimeOff'
   | 'note'
 >;
 

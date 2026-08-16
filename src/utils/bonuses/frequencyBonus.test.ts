@@ -80,28 +80,53 @@ describe('frequency bonus', () => {
     },
   );
 
-  it('does not automatically reduce the bonus for NN', () => {
+  it('sets the bonus to zero for NN', () => {
     expect(
       calculateFrequencyBonus({
         monthId: '2026-07',
         employment: fullMonthEmployment,
         absences: [absence('nn-1', 'NN')],
       }),
-    ).toMatchObject({ amount: 400, hasNnAbsence: false, reason: 'ELIGIBLE' });
+    ).toMatchObject({ amount: 0, hasNnAbsence: true, reason: 'NN_ABSENCE' });
   });
 
-  it('does not reduce the bonus for approved leave', () => {
+  it('does not reduce the bonus for non-impacting leave and NI time off', () => {
     expect(
       calculateFrequencyBonus({
         monthId: '2026-07',
         employment: fullMonthEmployment,
         absences: [
           absence('vacation', 'UW'),
-          absence('justified', 'UZ'),
-          absence('care', 'OPD'),
+          absence('paid', 'NU'),
+          absence('occasional', 'UO'),
+          absence('benefit', 'LO'),
+          absence('time-off', 'NI', { overtimeTimeOff: true }),
         ],
       }),
     ).toMatchObject({ amount: 400, l4RecordCount: 0, reason: 'ELIGIBLE' });
+  });
+
+  it('counts unique working dates across impacting absence categories', () => {
+    const result = calculateFrequencyBonus({
+      monthId: '2026-07',
+      employment: fullMonthEmployment,
+      absences: [
+        absence('ni', 'NI', {
+          startDate: '2026-07-06',
+          endDate: '2026-07-07',
+        }),
+        absence('op', 'OP', {
+          startDate: '2026-07-07',
+          endDate: '2026-07-08',
+        }),
+      ],
+      plannedWorkingDates: new Set(['2026-07-06', '2026-07-07', '2026-07-08']),
+    });
+
+    expect(result).toMatchObject({
+      amount: 200,
+      affectingAbsenceDayCount: 3,
+    });
   });
 
   it('uses the threshold scale from the effective setting version', () => {
@@ -119,6 +144,17 @@ describe('frequency bonus', () => {
     });
 
     expect(result.amount).toBe(325);
+  });
+
+  it('uses the configured full amount when there are no impacting days', () => {
+    expect(
+      calculateFrequencyBonus({
+        monthId: '2026-07',
+        employment: fullMonthEmployment,
+        absences: [],
+        fullConfiguredAmount: 475,
+      }).amount,
+    ).toBe(475);
   });
 
   it('ignores cancelled and non-overlapping L4 records', () => {

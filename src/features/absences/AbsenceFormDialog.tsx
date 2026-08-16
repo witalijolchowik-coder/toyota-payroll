@@ -2,11 +2,13 @@ import { useState, type ChangeEvent, type FormEvent } from 'react';
 import {
   Alert,
   Button,
+  Checkbox,
   CircularProgress,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControlLabel,
   Stack,
   TextField,
   Typography,
@@ -31,6 +33,8 @@ import type {
 } from '../../types/firestore';
 import {
   ABSENCE_CODES,
+  effectiveAbsenceCode,
+  isOvertimeTimeOffAbsence,
   normalizeAbsenceCode,
   validateAbsenceInput,
   type AbsenceValidationCode,
@@ -50,7 +54,7 @@ interface FormValues {
   absenceCode: string;
   startDate: string;
   endDate: string;
-  linkedWorkDate: string;
+  overtimeTimeOff: boolean;
   note: string;
 }
 
@@ -64,10 +68,10 @@ export function AbsenceFormDialog({
   const t = useTranslations();
   const [values, setValues] = useState<FormValues>({
     employeeId: absence?.employeeId ?? '',
-    absenceCode: absence?.absenceCode ?? 'L4',
+    absenceCode: absence ? effectiveAbsenceCode(absence) : 'L4',
     startDate: absence?.startDate ?? defaultStartDate,
     endDate: absence?.endDate ?? defaultStartDate,
-    linkedWorkDate: absence?.linkedWorkDate ?? '',
+    overtimeTimeOff: absence ? isOvertimeTimeOffAbsence(absence) : false,
     note: absence?.note ?? '',
   });
   const [errors, setErrors] = useState<AbsenceValidationErrors>({});
@@ -82,7 +86,7 @@ export function AbsenceFormDialog({
     };
 
   const handleDateChange =
-    (field: 'startDate' | 'endDate' | 'linkedWorkDate') => (value: string) => {
+    (field: 'startDate' | 'endDate') => (value: string) => {
       setValues((current) => ({ ...current, [field]: value }));
       setErrors((current) => ({ ...current, [field]: undefined }));
       setSubmitError(null);
@@ -111,11 +115,10 @@ export function AbsenceFormDialog({
       startDate: values.startDate,
       endDate: values.endDate,
       hoursPerDay: null,
-      linkedWorkDate:
-        normalizeAbsenceCode(values.absenceCode) === 'WZN' &&
-        values.linkedWorkDate
-          ? values.linkedWorkDate
-          : null,
+      linkedWorkDate: null,
+      overtimeTimeOff:
+        normalizeAbsenceCode(values.absenceCode) === 'NI' &&
+        values.overtimeTimeOff,
       note: values.note.trim() || null,
     };
 
@@ -233,20 +236,30 @@ export function AbsenceFormDialog({
                 pickerLabel={t.input.openDatePicker}
               />
             </Stack>
-            {normalizeAbsenceCode(values.absenceCode) === 'WZN' ? (
-              <ExactDateField
-                label={t.absences.form.linkedWorkDate}
-                value={values.linkedWorkDate}
-                onValueChange={handleDateChange('linkedWorkDate')}
-                helperText={t.absences.form.linkedWorkDateHelper}
-                invalidMessage={t.input.exactDateInvalid}
-                pickerLabel={t.input.openDatePicker}
+            {normalizeAbsenceCode(values.absenceCode) === 'NI' ? (
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={values.overtimeTimeOff}
+                    onChange={(event) =>
+                      setValues((current) => ({
+                        ...current,
+                        overtimeTimeOff: event.target.checked,
+                      }))
+                    }
+                  />
+                }
+                label={t.absences.form.overtimeTimeOff}
               />
             ) : null}
             <TextField
               multiline
               minRows={2}
-              label={t.absences.form.note}
+              label={
+                normalizeAbsenceCode(values.absenceCode) === 'NI'
+                  ? t.absences.form.niNote
+                  : t.absences.form.note
+              }
               value={values.note}
               onChange={handleChange('note')}
             />

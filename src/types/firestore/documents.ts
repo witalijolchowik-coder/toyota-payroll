@@ -247,6 +247,7 @@ export interface AbsenceDocument
   end_date: IsoDate;
   hours_per_day: number | null;
   linked_work_date: IsoDate | null;
+  overtime_time_off?: boolean;
   source: AbsenceSource;
   import_id: string | null;
   status: AbsenceStatus;

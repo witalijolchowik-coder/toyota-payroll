@@ -17,7 +17,12 @@ known citizenship goes to the foreign file. Missing citizenship or the
 identity document required by the target file is a blocker; it is never
 guessed from a name, department or document format.
 
-The client workbook contains overtime remaining after shortage/WZN
-compensation. SOZ retains raw 50% and 100% hours. When compensation exists,
+The client workbook and SOZ contain overtime addons remaining after shortage
+and time-off allocation. Basic remuneration for worked overtime remains part
+of worked time. When compensation exists,
 the application additionally produces a citizenship-specific workbook that
 shows the allocation without changing the 138-column SOZ import schema.
+
+The application also creates separate `Absencja` workbooks for Polish and
+foreign workers. They reproduce the operational `Absencja` and `Słownik`
+sheets and include the canonical categories plus calculated `GN`.

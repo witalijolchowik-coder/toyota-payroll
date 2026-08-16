@@ -350,6 +350,7 @@ export function mapAbsenceDocument(
     endDate: document.end_date,
     hoursPerDay: document.hours_per_day,
     linkedWorkDate: document.linked_work_date,
+    overtimeTimeOff: document.overtime_time_off ?? false,
     source: document.source,
     importId: document.import_id,
     status: document.status,

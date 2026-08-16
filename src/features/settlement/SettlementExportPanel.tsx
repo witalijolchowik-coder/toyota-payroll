@@ -30,6 +30,7 @@ import {
 } from '../../utils/payroll';
 import {
   prepareSettlementExportPackage,
+  renderAbsenceWorkbook,
   type ExportReadinessWarningCode,
 } from '../../utils/reports';
 import {
@@ -263,6 +264,46 @@ export function SettlementExportPanel({
               variant="outlined"
               startIcon={<DownloadOutlined />}
               onClick={() =>
+                runExport('absence-pl-xlsx', () => {
+                  void renderAbsenceWorkbook(
+                    exportPackage.absences.polishRows,
+                    monthId,
+                  ).then((workbook) =>
+                    downloadBinaryFile(
+                      exportPackage.absences.plFileName,
+                      workbook,
+                      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    ),
+                  );
+                })
+              }
+            >
+              {t.settlement.export.downloadAbsencePl}
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<DownloadOutlined />}
+              onClick={() =>
+                runExport('absence-foreign-xlsx', () => {
+                  void renderAbsenceWorkbook(
+                    exportPackage.absences.foreignRows,
+                    monthId,
+                  ).then((workbook) =>
+                    downloadBinaryFile(
+                      exportPackage.absences.foreignFileName,
+                      workbook,
+                      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    ),
+                  );
+                })
+              }
+            >
+              {t.settlement.export.downloadAbsenceForeign}
+            </Button>
+            <Button
+              variant="outlined"
+              startIcon={<DownloadOutlined />}
+              onClick={() =>
                 runExport('soz-compensation-note', () =>
                   downloadTextFile(
                     exportPackage.soz.noteFileName,
@@ -324,6 +365,18 @@ export function SettlementExportPanel({
               variant="outlined"
               label={interpolate(t.settlement.export.counters.toyota, {
                 count: exportPackage.toyota.rows.length.toString(),
+              })}
+            />
+            <Chip
+              variant="outlined"
+              label={interpolate(t.settlement.export.counters.absencePl, {
+                count: exportPackage.absences.polishRows.length.toString(),
+              })}
+            />
+            <Chip
+              variant="outlined"
+              label={interpolate(t.settlement.export.counters.absenceForeign, {
+                count: exportPackage.absences.foreignRows.length.toString(),
               })}
             />
             <Chip
