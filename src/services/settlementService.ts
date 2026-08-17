@@ -1,5 +1,6 @@
 import {
   Timestamp,
+  doc,
   getDoc,
   getDocs,
   orderBy,
@@ -26,6 +27,9 @@ import type {
   ShiftHoursVersion,
   DepartmentShiftCorrection,
 } from '../types/firestore';
+import type { HousingDepositWithholdingEvidence } from '../utils/payroll';
+import { resolveCompanyAccommodationEpisodes } from '../utils/payroll';
+import { latestEmploymentEnd } from '../utils/employees';
 import { loadAbsencesOverlappingMonth } from './absencesService';
 import { canonicalDepartmentsFallback } from './departmentsService';
 import {
@@ -44,6 +48,8 @@ import {
   mapEmployeeContractDocument,
   mapEmploymentEndEventDocument,
 } from './firestore/mappers';
+import { employeeSettlementConverter } from './firestore/converters';
+import { firestorePaths } from './firestore/paths';
 import {
   getFirestoreClient,
   getFirestoreRepositories,
@@ -82,6 +88,10 @@ export interface SettlementMonthData {
   payrollSettings: PayrollSetting[];
   adjustments: Adjustment[];
   reviewStates: SettlementReviewState[];
+  depositWithholdingEvidenceByEpisodeId: Map<
+    string,
+    HousingDepositWithholdingEvidence
+  >;
   shiftHoursVersions: ShiftHoursVersion[];
   departmentShiftCorrections: DepartmentShiftCorrection[];
   sourceFailures: string[];
@@ -307,6 +317,67 @@ export async function loadSettlementMonth(
     ),
   ]);
 
+  const depositWithholdingEvidenceByEpisodeId = await optionalSettlementLayer(
+    async () => {
+      const firestore = getFirestoreClient();
+      if (!firestore) throw new Error('firebase-unavailable');
+      const evidence = new Map<string, HousingDepositWithholdingEvidence>();
+      const episodes = employees.flatMap((employee) => {
+        const companyEntitlements = employeeEntitlements.filter(
+          (entitlement) => entitlement.employeeId === employee.id,
+        );
+        const employmentEnd = latestEmploymentEnd(employee)?.endDate ?? null;
+        return resolveCompanyAccommodationEpisodes(companyEntitlements)
+          .filter(
+            (episode) =>
+              episode.start.slice(0, 7) < monthId &&
+              (episode.end?.slice(0, 7) === monthId ||
+                (!episode.end && employmentEnd?.slice(0, 7) === monthId)),
+          )
+          .map((episode) => ({ episode, employee }));
+      });
+      await Promise.all(
+        episodes.map(async ({ episode, employee }) => {
+          const startMonth = episode.start.slice(0, 7) as MonthId;
+          const [startMonthSnapshot, settlementSnapshot] = await Promise.all([
+            getDoc(repositories.forMonth(startMonth).month),
+            getDoc(
+              doc(
+                firestore,
+                firestorePaths.employeeSettlement(startMonth, employee.id),
+              ).withConverter(employeeSettlementConverter),
+            ),
+          ]);
+          if (
+            !startMonthSnapshot.exists() ||
+            !startMonthSnapshot.data().is_settled
+          ) {
+            return;
+          }
+          const result = settlementSnapshot.data()?.result;
+          const components = result?.components;
+          if (!components || typeof components !== 'object') return;
+          const values = components as Record<string, unknown>;
+          if (
+            values.housingDepositEpisodeId === episode.id &&
+            typeof values.housingDepositWithholding === 'number' &&
+            values.housingDepositWithholding > 0
+          ) {
+            evidence.set(episode.id, {
+              episodeId: episode.id,
+              amount: values.housingDepositWithholding,
+              monthId: startMonth,
+            });
+          }
+        }),
+      );
+      return evidence;
+    },
+    new Map<string, HousingDepositWithholdingEvidence>(),
+    'housingDepositHistory',
+    sourceFailures,
+  );
+
   return {
     month: mapMonthDocument(monthId, monthSnapshot.data()),
     employees,
@@ -319,6 +390,7 @@ export async function loadSettlementMonth(
     payrollSettings,
     adjustments,
     reviewStates,
+    depositWithholdingEvidenceByEpisodeId,
     shiftHoursVersions,
     departmentShiftCorrections,
     sourceFailures,

@@ -335,6 +335,74 @@ describe('settlement export formats', () => {
     expect(firstDataRow?.[131]).toBe('Brutto');
     expect(firstDataRow?.[132]).toBe('Ekwiwalent za prania');
   });
+
+  it('maps housing, deposit, UDT and holiday components to the historical 138-column SOZ contract', () => {
+    const result = prepareSettlementExportPackage({
+      monthId: '2026-06',
+      monthNominalHours: 168,
+      records: [
+        exportRecord({
+          id: '1',
+          draft: draft({
+            components: {
+              housingDepositWithholding: 99,
+              housingDepositReturn: 99,
+              ownHousingAllowanceBrutto: 300,
+              udtAllowanceBrutto: 300,
+              holidayWorkBonusBrutto: 300,
+              holidayWorkBonusSuggestedBrutto: 300,
+              holidayWorkBonusDecision: 'CONFIRMED',
+            },
+          }),
+        }),
+      ],
+    });
+    const cells = result.soz.polishRows[0]?.cells;
+
+    expect(cells).toHaveLength(138);
+    expect(cells?.slice(92, 101)).toEqual([
+      '99',
+      'Netto',
+      'Kaucja',
+      '99',
+      'Netto',
+      'Kaucja - Zwrot',
+      '300',
+      'Brutto',
+      'Dodatek za mieszkanie',
+    ]);
+    expect(cells?.slice(126, 129)).toEqual(['300', 'Brutto', 'Premia za UDT']);
+    expect(cells?.slice(134, 137)).toEqual([
+      '300',
+      'Brutto',
+      'Premia świąteczna ( za wykonania zleceń / pracy w świąteczne dni)',
+    ]);
+  });
+
+  it('blocks a lossy SOZ export when more than two additional premium components are present', () => {
+    const result = prepareSettlementExportPackage({
+      monthId: '2026-06',
+      monthNominalHours: 168,
+      records: [
+        exportRecord({
+          id: '1',
+          draft: draft({
+            components: {
+              udtAllowanceBrutto: 300,
+              holidayWorkBonusBrutto: 300,
+              manualIncreases: 100,
+            },
+          }),
+        }),
+      ],
+    });
+
+    expect(result.warnings).toContainEqual({
+      code: 'unsupported-columns',
+      employeeId: '1',
+      tetaNumber: 'T1',
+    });
+  });
 });
 
 function exportRecord({
@@ -388,6 +456,7 @@ function draft(
     shortageCovered100Hours?: number;
     nightHours?: number;
     wznCompensatedHours?: number;
+    components?: Partial<EmployeeMonthlyCalculationDraft['components']>;
   } = {},
 ): EmployeeMonthlyCalculationDraft {
   return {
@@ -473,6 +542,8 @@ function draft(
       baseSalaryBrutto: 5_160,
       frequencyBonusBrutto: 400,
       holidayWorkBonusBrutto: 0,
+      holidayWorkBonusSuggestedBrutto: 0,
+      holidayWorkBonusDecision: null,
       transportAllowanceNetto: 275,
       udtAllowanceBrutto: 0,
       laundryAllowanceBrutto: 40,
@@ -483,9 +554,13 @@ function draft(
       companyAccommodationMediaDeduction: 0,
       companyAccommodationRentDeduction: 0,
       housingDepositHeld: 0,
+      housingDepositEpisodeId: null,
       housingDepositWithholding: 0,
       housingDepositAutomaticReturn: 0,
       housingDepositReturn: 0,
+      housingDepositReturnDue: false,
+      housingDepositPriorWithholdingProven: false,
+      ...overrides.components,
     },
     warnings: [],
     totals: {

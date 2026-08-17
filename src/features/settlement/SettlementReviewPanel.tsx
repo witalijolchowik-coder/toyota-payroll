@@ -33,6 +33,7 @@ import { interpolate } from '../../i18n/pl';
 import type {
   Department,
   Employee,
+  HolidayWorkBonusDecision,
   SettlementReviewState,
   SettlementReviewStatus,
   SettlementReviewUpdateInput,
@@ -72,6 +73,12 @@ const reviewStatuses: SettlementReviewStatus[] = [
   'NEEDS_REVIEW',
   'NEEDS_CORRECTION',
   'CHECKED',
+];
+
+const holidayWorkBonusDecisions: HolidayWorkBonusDecision[] = [
+  'PENDING',
+  'CONFIRMED',
+  'REJECTED',
 ];
 
 export function SettlementReviewPanel({
@@ -320,6 +327,15 @@ function SettlementReviewDetailsDialog({
   const [depositNote, setDepositNote] = useState(
     item.reviewState?.depositReturnNote ?? '',
   );
+  const [holidayDecision, setHolidayDecision] =
+    useState<HolidayWorkBonusDecision | null>(
+      item.draft.workTime.holidayWorkBonusEligible
+        ? (item.reviewState?.holidayWorkBonusDecision ?? 'PENDING')
+        : null,
+    );
+  const [holidayNote, setHolidayNote] = useState(
+    item.reviewState?.holidayWorkBonusNote ?? '',
+  );
   const [isSaving, setIsSaving] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
   const employeeName = employee
@@ -347,6 +363,9 @@ function SettlementReviewDetailsDialog({
           ? Number(depositReturn.replace(',', '.'))
           : null,
         depositReturnNote: depositNote,
+        depositReturnEpisodeId: item.draft.components.housingDepositEpisodeId,
+        holidayWorkBonusDecision: holidayDecision,
+        holidayWorkBonusNote: holidayNote,
       });
       onClose();
     } catch {
@@ -537,6 +556,43 @@ function SettlementReviewDetailsDialog({
             </Stack>
           </ReviewSection>
 
+          {item.draft.workTime.holidayWorkBonusEligible ? (
+            <Stack spacing={1}>
+              <Alert
+                severity={holidayDecision === 'PENDING' ? 'warning' : 'info'}
+              >
+                {interpolate(t.settlement.review.details.holidayBonusInfo, {
+                  amount: currencyFormatter.format(
+                    item.draft.components.holidayWorkBonusSuggestedBrutto,
+                  ),
+                })}
+              </Alert>
+              <TextField
+                select
+                label={t.settlement.review.details.holidayBonusDecision}
+                value={holidayDecision ?? 'PENDING'}
+                onChange={(event) =>
+                  setHolidayDecision(
+                    event.target.value as HolidayWorkBonusDecision,
+                  )
+                }
+                disabled={isSettled}
+              >
+                {holidayWorkBonusDecisions.map((decision) => (
+                  <MenuItem key={decision} value={decision}>
+                    {t.settlement.review.holidayDecision[decision]}
+                  </MenuItem>
+                ))}
+              </TextField>
+              <TextField
+                label={t.settlement.review.details.holidayBonusNote}
+                value={holidayNote}
+                onChange={(event) => setHolidayNote(event.target.value)}
+                disabled={isSettled}
+              />
+            </Stack>
+          ) : null}
+
           <ReviewSection title={t.settlement.review.details.adjustments}>
             <Typography>
               {t.settlement.draft.totals.increases}:{' '}
@@ -599,7 +655,7 @@ function SettlementReviewDetailsDialog({
             minRows={2}
             disabled={isSettled}
           />
-          {item.draft.components.housingDepositAutomaticReturn > 0 ? (
+          {item.draft.components.housingDepositReturnDue ? (
             <Stack spacing={1}>
               <Alert severity="info">
                 {interpolate(t.settlement.review.details.depositInfo, {

@@ -433,6 +433,20 @@ export const settlementReviewConverter =
       readOptionalNullableNumber(data, 'deposit_return_override', path) ?? null,
     deposit_return_note:
       readOptionalNullableString(data, 'deposit_return_note', path) ?? '',
+    deposit_return_episode_id:
+      readOptionalNullableString(data, 'deposit_return_episode_id', path) ??
+      null,
+    holiday_work_bonus_decision:
+      data.holiday_work_bonus_decision === undefined ||
+      data.holiday_work_bonus_decision === null
+        ? null
+        : readEnum(data, 'holiday_work_bonus_decision', path, [
+            'PENDING',
+            'CONFIRMED',
+            'REJECTED',
+          ] as const),
+    holiday_work_bonus_note:
+      readOptionalNullableString(data, 'holiday_work_bonus_note', path) ?? '',
     ...metadata(data, path),
   }));
 

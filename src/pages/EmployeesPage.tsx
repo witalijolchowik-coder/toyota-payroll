@@ -94,6 +94,7 @@ export function EmployeesPage() {
     addEntitlement,
     editEntitlement,
     cancelEntitlement,
+    transitionHousing,
   } = useEmployeeEntitlements();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState<EmployeeStatusFilter>('active');
@@ -489,16 +490,24 @@ export function EmployeesPage() {
           accommodationVariants={accommodationVariants}
           onClose={() => setAccommodationState(null)}
           onMoveIn={async (input) => {
-            await addEntitlement(input);
+            await transitionHousing({
+              employeeId: input.employeeId,
+              tetaNumber: input.tetaNumber,
+              effectiveDate: input.validFrom,
+              target: 'COMPANY_ACCOMMODATION',
+              accommodationVariantKey: input.accommodationVariantKey,
+            });
             notify({
               message: t.employees.accommodation.moveInSaved,
               severity: 'success',
             });
           }}
           onMoveOut={async (entitlement, firstDayOutside) => {
-            await editEntitlement(entitlement.id, {
-              validTo: previousIsoDate(firstDayOutside),
-              note: entitlement.note,
+            await transitionHousing({
+              employeeId: entitlement.employeeId,
+              tetaNumber: entitlement.tetaNumber,
+              effectiveDate: firstDayOutside,
+              target: 'OWN_HOUSING_ALLOWANCE',
             });
             notify({
               message: t.employees.accommodation.moveOutSaved,
@@ -527,12 +536,6 @@ export function EmployeesPage() {
       ) : null}
     </Stack>
   );
-}
-
-function previousIsoDate(value: string): string {
-  const date = new Date(`${value}T00:00:00.000Z`);
-  date.setUTCDate(date.getUTCDate() - 1);
-  return date.toISOString().slice(0, 10);
 }
 
 function readErrorMessage(

@@ -504,10 +504,39 @@ export async function endEmployeeEmployment(
   if (!plan) {
     throw new EmployeeContractServiceError('invalid-employment-end');
   }
-  const impact = await monthImpactForTermination(plan, input.endDate);
+  const [impact, entitlementsSnapshot] = await Promise.all([
+    monthImpactForTermination(plan, input.endDate),
+    getDocs(
+      query(
+        repositories.employeeEntitlements,
+        where('employee_id', '==', employee.id),
+      ),
+    ),
+  ]);
   if (impact.locked.length > 0) {
     throw new EmployeeContractServiceError('locked-month', impact.locked);
   }
+  const currentCompanyAccommodation = entitlementsSnapshot.docs.filter(
+    (snapshot) => {
+      const data = snapshot.data();
+      return (
+        data.status === 'ACTIVE' &&
+        data.type === 'COMPANY_ACCOMMODATION' &&
+        data.valid_from <= input.endDate &&
+        (data.valid_to === null || data.valid_to > input.endDate)
+      );
+    },
+  );
+  const futureCompanyAccommodation = entitlementsSnapshot.docs.filter(
+    (snapshot) => {
+      const data = snapshot.data();
+      return (
+        data.status === 'ACTIVE' &&
+        data.type === 'COMPANY_ACCOMMODATION' &&
+        data.valid_from > input.endDate
+      );
+    },
+  );
   const reference = doc(repositories.employmentEndEvents);
   const batch = writeBatch(repositories.employmentEndEvents.firestore);
   batch.update(repositories.employeeContract(plan.targetContract.id), {
@@ -529,6 +558,20 @@ export async function endEmployeeEmployment(
       updated_by: uid,
     });
   }
+  currentCompanyAccommodation.forEach((snapshot) => {
+    batch.update(snapshot.ref, {
+      valid_to: input.endDate,
+      updated_at: serverTimestamp(),
+      updated_by: uid,
+    });
+  });
+  futureCompanyAccommodation.forEach((snapshot) => {
+    batch.update(snapshot.ref, {
+      status: 'CANCELLED',
+      updated_at: serverTimestamp(),
+      updated_by: uid,
+    });
+  });
   batch.set(reference, {
     employee_id: employee.id,
     teta_number: employee.tetaNumber,
@@ -573,6 +616,11 @@ export async function endEmployeeEmployment(
       cancelled_future_contract_ids: plan.futureContracts.map(
         (contract) => contract.id,
       ),
+      closed_company_accommodation_ids: currentCompanyAccommodation.map(
+        (snapshot) => snapshot.id,
+      ),
+      cancelled_future_company_accommodation_ids:
+        futureCompanyAccommodation.map((snapshot) => snapshot.id),
       deposit_return_required: true,
       affected_open_months: impact.open,
     },

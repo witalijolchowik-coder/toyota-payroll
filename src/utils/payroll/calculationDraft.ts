@@ -3,6 +3,7 @@ import type {
   Adjustment,
   DailyValue,
   Employee,
+  HolidayWorkBonusDecision,
   IsoDate,
   MonthId,
   PayrollSetting,
@@ -74,6 +75,10 @@ export type PayrollDraftWarningCode =
   | 'unresolved-own-housing-setting'
   | 'unresolved-payroll-setting'
   | 'unresolved-housing-deposit-setting'
+  | 'housing-status-missing'
+  | 'udt-entitlement-incomplete'
+  | 'housing-deposit-withholding-unproven'
+  | 'holiday-work-bonus-confirmation-required'
   | 'critical-read-failure';
 
 export interface PayrollDraftWarning {
@@ -193,6 +198,8 @@ export interface EmployeeMonthlyCalculationDraft {
     baseSalaryBrutto: number | null;
     frequencyBonusBrutto: number | null;
     holidayWorkBonusBrutto: number;
+    holidayWorkBonusSuggestedBrutto: number;
+    holidayWorkBonusDecision: HolidayWorkBonusDecision | null;
     transportAllowanceNetto: number;
     udtAllowanceBrutto: number;
     laundryAllowanceBrutto: number;
@@ -203,9 +210,12 @@ export interface EmployeeMonthlyCalculationDraft {
     companyAccommodationMediaDeduction: number;
     companyAccommodationRentDeduction: number;
     housingDepositHeld: number;
+    housingDepositEpisodeId: string | null;
     housingDepositWithholding: number;
     housingDepositAutomaticReturn: number;
     housingDepositReturn: number;
+    housingDepositReturnDue: boolean;
+    housingDepositPriorWithholdingProven: boolean;
   };
   warnings: PayrollDraftWarning[];
   totals: {
@@ -234,6 +244,14 @@ export interface MonthlyCalculationDraftInput {
   calendarOptions?: PayrollCalendarOptions;
   plannedSchedule?: readonly PlannedScheduleDay[];
   depositReturnOverride?: number | null;
+  holidayWorkBonusDecision?: HolidayWorkBonusDecision | null;
+  depositWithholdingEvidence?: HousingDepositWithholdingEvidence | null;
+}
+
+export interface HousingDepositWithholdingEvidence {
+  episodeId: string;
+  amount: number;
+  monthId: MonthId;
 }
 
 export interface MonthlyCalculationDraftsInput extends Omit<
@@ -250,6 +268,14 @@ export interface MonthlyCalculationDraftsInput extends Omit<
     readonly PlannedScheduleDay[]
   >;
   depositReturnOverridesByEmployeeId?: ReadonlyMap<string, number | null>;
+  holidayWorkBonusDecisionsByEmployeeId?: ReadonlyMap<
+    string,
+    HolidayWorkBonusDecision | null
+  >;
+  depositWithholdingEvidenceByEpisodeId?: ReadonlyMap<
+    string,
+    HousingDepositWithholdingEvidence
+  >;
 }
 
 const APPROVED_ABSENCE_CODES = new Set([
@@ -588,6 +614,8 @@ export function calculateEmployeeMonthlyDraft({
   calendarOptions = {},
   plannedSchedule,
   depositReturnOverride = null,
+  holidayWorkBonusDecision = null,
+  depositWithholdingEvidence = null,
 }: MonthlyCalculationDraftInput): EmployeeMonthlyCalculationDraft {
   const range = getPayrollMonthDateRange(monthId);
   const employment = contractEmploymentForMonth(employee, monthId);
@@ -771,7 +799,7 @@ export function calculateEmployeeMonthlyDraft({
           } else {
             importedOverrideHours += effective.hours;
           }
-          if (effective.hours > 0 && !hasPayrollGoverningAbsence) {
+          if (effective.hours > 0) {
             physicallyWorkedDates.add(day.isoDate);
           }
           const deviation = dailyWorkTimeDeviationFromValue({
@@ -1102,9 +1130,21 @@ export function calculateEmployeeMonthlyDraft({
   if (workTimeBeforeBalance.holidayWorkBonusEligible && !holidaySetting) {
     warnings.push(warning('unresolved-payroll-setting'));
   }
-  const holidayWorkBonusBrutto = workTimeBeforeBalance.holidayWorkBonusEligible
-    ? (holidaySetting?.amount ?? 0)
-    : 0;
+  const holidayWorkBonusSuggestedBrutto =
+    workTimeBeforeBalance.holidayWorkBonusEligible
+      ? (holidaySetting?.amount ?? 0)
+      : 0;
+  const effectiveHolidayDecision =
+    workTimeBeforeBalance.holidayWorkBonusEligible
+      ? (holidayWorkBonusDecision ?? 'PENDING')
+      : null;
+  if (effectiveHolidayDecision === 'PENDING') {
+    warnings.push(warning('holiday-work-bonus-confirmation-required'));
+  }
+  const holidayWorkBonusBrutto =
+    effectiveHolidayDecision === 'REJECTED'
+      ? 0
+      : holidayWorkBonusSuggestedBrutto;
   const transportSetting = resolveEffectivePayrollSetting(
     payrollSettings,
     'transport_allowance',
@@ -1140,6 +1180,9 @@ export function calculateEmployeeMonthlyDraft({
     entitlements?.udtEligible && fullCalendarMonth
       ? (udtSetting?.amount ?? 0)
       : 0;
+  if (entitlements?.udtCoverage === 'PARTIAL') {
+    warnings.push(warning('udt-entitlement-incomplete'));
+  }
   const ownHousingSetting = resolveEffectivePayrollSetting(
     payrollSettings,
     'own_housing_allowance',
@@ -1152,6 +1195,9 @@ export function calculateEmployeeMonthlyDraft({
     entitlements?.ownHousingAllowanceEligible && fullCalendarMonth
       ? (ownHousingSetting?.amount ?? 0)
       : 0;
+  if (fullCalendarMonth && entitlements?.housingCoverage === 'MISSING') {
+    warnings.push(warning('housing-status-missing'));
+  }
   const companyAccommodation = calculateCompanyAccommodationDeduction({
     monthId,
     employee,
@@ -1184,8 +1230,21 @@ export function calculateEmployeeMonthlyDraft({
       : null,
     employmentEnd: latestEmploymentEnd(employee)?.endDate ?? null,
     configuredAmount: depositSetting?.amount ?? null,
+    previouslyWithheldAmount:
+      depositWithholdingEvidence &&
+      depositWithholdingEvidence.episodeId ===
+        entitlements?.companyAccommodation?.episodeId
+        ? depositWithholdingEvidence.amount
+        : null,
     returnOverride: depositReturnOverride,
   });
+  if (
+    housingDeposit.returnDue &&
+    !housingDeposit.priorWithholdingProven &&
+    depositReturnOverride === null
+  ) {
+    warnings.push(warning('housing-deposit-withholding-unproven'));
+  }
   const bruttoAdditions = roundMoney(
     (frequencyAmount ?? 0) +
       holidayWorkBonusBrutto +
@@ -1298,6 +1357,8 @@ export function calculateEmployeeMonthlyDraft({
       baseSalaryBrutto,
       frequencyBonusBrutto: frequencyAmount,
       holidayWorkBonusBrutto,
+      holidayWorkBonusSuggestedBrutto,
+      holidayWorkBonusDecision: effectiveHolidayDecision,
       transportAllowanceNetto,
       udtAllowanceBrutto,
       laundryAllowanceBrutto,
@@ -1308,9 +1369,13 @@ export function calculateEmployeeMonthlyDraft({
       companyAccommodationMediaDeduction: companyAccommodation.media,
       companyAccommodationRentDeduction: companyAccommodation.rent,
       housingDepositHeld: housingDeposit.held,
+      housingDepositEpisodeId: housingDeposit.episodeId,
       housingDepositWithholding: housingDeposit.withheld,
       housingDepositAutomaticReturn: housingDeposit.automaticReturn,
       housingDepositReturn: housingDeposit.finalReturn,
+      housingDepositReturnDue: housingDeposit.returnDue,
+      housingDepositPriorWithholdingProven:
+        housingDeposit.priorWithholdingProven,
     },
     warnings,
     totals: {
@@ -1334,6 +1399,8 @@ export function calculateMonthlyDrafts({
   entitlementsByEmployeeId,
   plannedSchedulesByEmployeeId,
   depositReturnOverridesByEmployeeId,
+  holidayWorkBonusDecisionsByEmployeeId,
+  depositWithholdingEvidenceByEpisodeId,
   ...input
 }: MonthlyCalculationDraftsInput): EmployeeMonthlyCalculationDraft[] {
   return employees.map((employee) =>
@@ -1343,6 +1410,15 @@ export function calculateMonthlyDrafts({
       entitlements: entitlementsByEmployeeId?.get(employee.id) ?? null,
       depositReturnOverride:
         depositReturnOverridesByEmployeeId?.get(employee.id) ?? null,
+      holidayWorkBonusDecision:
+        holidayWorkBonusDecisionsByEmployeeId?.get(employee.id) ?? null,
+      depositWithholdingEvidence: (() => {
+        const episodeId = entitlementsByEmployeeId?.get(employee.id)
+          ?.companyAccommodation?.episodeId;
+        return episodeId
+          ? (depositWithholdingEvidenceByEpisodeId?.get(episodeId) ?? null)
+          : null;
+      })(),
       plannedSchedule: plannedSchedulesByEmployeeId?.get(employee.id),
     }),
   );

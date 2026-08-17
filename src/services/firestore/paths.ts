@@ -103,6 +103,12 @@ export const firestorePaths = {
   employeeSettlements(monthId: string) {
     return `${this.month(monthId)}/employeeSettlements`;
   },
+  employeeSettlement(monthId: string, employeeId: string) {
+    return `${this.employeeSettlements(monthId)}/${assertPathSegment(
+      employeeId,
+      'employeeId',
+    )}`;
+  },
   recoveryPoints(monthId: string) {
     return `${this.month(monthId)}/recoveryPoints`;
   },

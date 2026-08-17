@@ -80,8 +80,12 @@ Nie jest to anulowanie błędnej umowy: skrócona umowa pozostaje w historii jak
 rzeczywisty okres zatrudnienia.
 
 Jeżeli zakwaterowanie firmowe nadal trwa i kaucja jest zatrzymana, zakończenie
-zatrudnienia zwraca ją w końcowym miesiącu. Identyfikator epizodu zapobiega
-podwójnemu zwrotowi, a istniejące ręczne pomniejszenie zwrotu jest zachowane.
+zatrudnienia zamyka zakwaterowanie datą ostatniego dnia pracy i zwraca kaucję w
+końcowym miesiącu. Przyszłe zaplanowane zakwaterowanie firmowe zostaje
+anulowane w tej samej operacji. Identyfikator epizodu zapobiega podwójnemu
+zwrotowi, a istniejące ręczne pomniejszenie zwrotu jest zachowane. Samo
+wygaśnięcie umowy bez jawnego zdarzenia zakończenia nie zamyka zakwaterowania i
+nie uruchamia zwrotu.
 
 ## Powrót pracownika
 

@@ -269,6 +269,9 @@ export function mapSettlementReviewDocument(
     reviewedBy: document.reviewed_by,
     depositReturnOverride: document.deposit_return_override,
     depositReturnNote: document.deposit_return_note,
+    depositReturnEpisodeId: document.deposit_return_episode_id ?? null,
+    holidayWorkBonusDecision: document.holiday_work_bonus_decision ?? null,
+    holidayWorkBonusNote: document.holiday_work_bonus_note ?? '',
     ...modificationMetadata(document),
   };
 }

@@ -12,7 +12,10 @@ export type EntitlementResolutionWarningCode =
 
 export interface EmployeeSettlementEntitlements {
   udtEligible?: boolean;
+  udtCoverage?: 'FULL' | 'PARTIAL' | 'NONE';
   ownHousingAllowanceEligible?: boolean;
+  housingCoverage?:
+    'OWN_FULL' | 'COMPANY' | 'TRANSITION' | 'MISSING' | 'CONFLICT';
   companyAccommodation?: {
     variantKey?: string | null;
     contractStartDate?: Date | null;
@@ -176,6 +179,9 @@ export function resolveEmployeeSettlementEntitlements({
   const udtEligible = udtEntitlements.some((entitlement) =>
     employeeEntitlementCoversFullRange(entitlement, range),
   );
+  const udtOverlapsMonth = udtEntitlements.some((entitlement) =>
+    employeeEntitlementOverlapsRange(entitlement, range),
+  );
   const ownHousingAllowanceEligible = ownHousingEntitlements.some(
     (entitlement) => employeeEntitlementCoversFullRange(entitlement, range),
   );
@@ -219,9 +225,30 @@ export function resolveEmployeeSettlementEntitlements({
     warnings.add('company-accommodation-missing-variant');
   }
 
+  const ownHousingOverlapsMonth = ownHousingEntitlements.some((entitlement) =>
+    employeeEntitlementOverlapsRange(entitlement, range),
+  );
+  const companyAccommodationOverlapsMonth =
+    companyAccommodationEntitlements.some((entitlement) =>
+      employeeEntitlementOverlapsRange(entitlement, range),
+    );
+  const housingCoverage = overlappingOwnHousing
+    ? ('CONFLICT' as const)
+    : ownHousingAllowanceEligible && !companyAccommodationOverlapsMonth
+      ? ('OWN_FULL' as const)
+      : companyAccommodationOverlapsMonth && ownHousingOverlapsMonth
+        ? ('TRANSITION' as const)
+        : companyAccommodationOverlapsMonth
+          ? ('COMPANY' as const)
+          : ownHousingOverlapsMonth
+            ? ('TRANSITION' as const)
+            : ('MISSING' as const);
+
   return {
     udtEligible,
+    udtCoverage: udtEligible ? 'FULL' : udtOverlapsMonth ? 'PARTIAL' : 'NONE',
     ownHousingAllowanceEligible,
+    housingCoverage,
     companyAccommodation: companyAccommodation
       ? {
           variantKey: companyAccommodation.accommodationVariantKey,

@@ -96,6 +96,8 @@ function draft(
       baseSalaryBrutto: 5_160,
       frequencyBonusBrutto: 400,
       holidayWorkBonusBrutto: 0,
+      holidayWorkBonusSuggestedBrutto: 0,
+      holidayWorkBonusDecision: null,
       transportAllowanceNetto: 275,
       udtAllowanceBrutto: 0,
       laundryAllowanceBrutto: 40,
@@ -106,9 +108,12 @@ function draft(
       companyAccommodationMediaDeduction: 0,
       companyAccommodationRentDeduction: 0,
       housingDepositHeld: 0,
+      housingDepositEpisodeId: null,
       housingDepositWithholding: 0,
       housingDepositAutomaticReturn: 0,
       housingDepositReturn: 0,
+      housingDepositReturnDue: false,
+      housingDepositPriorWithholdingProven: false,
     },
     warnings: [],
     totals: {
@@ -142,6 +147,9 @@ function reviewState(
     reviewedBy: 'coordinator',
     depositReturnOverride: null,
     depositReturnNote: '',
+    depositReturnEpisodeId: null,
+    holidayWorkBonusDecision: null,
+    holidayWorkBonusNote: '',
     createdAt,
     createdBy: 'coordinator',
     updatedAt: createdAt,
@@ -208,6 +216,28 @@ describe('settlement review helpers', () => {
             warnings: [
               {
                 code: 'unresolved-company-accommodation-variant',
+                date: null,
+                message: 'test',
+              },
+            ],
+          }),
+        ],
+        reviewStates: [reviewState()],
+      }),
+    );
+
+    expect(summary.employeesWithUnresolvedComponents).toBe(1);
+    expect(summary.readyForFutureExport).toBe(false);
+  });
+
+  it('keeps readiness false while an automatic holiday bonus awaits confirmation', () => {
+    const summary = calculateSettlementReviewSummary(
+      buildSettlementReviewItems({
+        drafts: [
+          draft({
+            warnings: [
+              {
+                code: 'holiday-work-bonus-confirmation-required',
                 date: null,
                 message: 'test',
               },

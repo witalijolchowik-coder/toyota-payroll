@@ -65,23 +65,34 @@ describe('refundable housing deposit', () => {
 
   it('returns once in the move-out month and supports a bounded override', () => {
     expect(
-      calculateHousingDeposit({ monthId: '2026-08', ...episode }),
-    ).toMatchObject({ automaticReturn: 99, finalReturn: 99 });
+      calculateHousingDeposit({
+        monthId: '2026-08',
+        ...episode,
+        previouslyWithheldAmount: 99,
+      }),
+    ).toMatchObject({
+      returnDue: true,
+      priorWithholdingProven: true,
+      automaticReturn: 99,
+      finalReturn: 99,
+    });
     expect(
       calculateHousingDeposit({
         monthId: '2026-08',
         ...episode,
+        previouslyWithheldAmount: 99,
         returnOverride: 60,
       }),
     ).toMatchObject({ automaticReturn: 99, finalReturn: 60 });
   });
 
-  it('returns in the final employment month when employment ends first', () => {
+  it('returns in the final employment month when an explicit termination occurs first', () => {
     expect(
       calculateHousingDeposit({
         monthId: '2026-07',
         ...episode,
         employmentEnd: '2026-07-31',
+        previouslyWithheldAmount: 99,
       }),
     ).toMatchObject({ automaticReturn: 99, finalReturn: 99 });
   });
@@ -91,5 +102,38 @@ describe('refundable housing deposit', () => {
     expect(calculateHousingDeposit({ monthId: '2026-06', ...episode })).toEqual(
       first,
     );
+  });
+
+  it('does not create opposite components for an episode closed in its start month', () => {
+    expect(
+      calculateHousingDeposit({
+        monthId: '2026-06',
+        ...episode,
+        episodeEnd: '2026-06-25',
+      }),
+    ).toMatchObject({
+      withheld: 0,
+      returnDue: false,
+      automaticReturn: 0,
+      finalReturn: 0,
+    });
+  });
+
+  it('requires prior withholding evidence for an automatic return', () => {
+    expect(
+      calculateHousingDeposit({ monthId: '2026-08', ...episode }),
+    ).toMatchObject({
+      returnDue: true,
+      priorWithholdingProven: false,
+      automaticReturn: 0,
+      finalReturn: 0,
+    });
+    expect(
+      calculateHousingDeposit({
+        monthId: '2026-08',
+        ...episode,
+        returnOverride: 0,
+      }),
+    ).toMatchObject({ returnDue: true, finalReturn: 0 });
   });
 });

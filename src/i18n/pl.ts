@@ -1956,6 +1956,14 @@ export const pl = {
           'Brakuje aktywnej wersji ustawienia potrzebnego do obliczenia komponentu.',
         'unresolved-housing-deposit-setting':
           'Brakuje stawki kaucji obowiązującej w miesiącu rozpoczęcia zakwaterowania.',
+        'housing-status-missing':
+          'Brakuje ciągłej historii mieszkania własnego albo firmowego dla tego miesiąca.',
+        'udt-entitlement-incomplete':
+          'Uprawnienie UDT obejmuje tylko część miesiąca i nie daje prawa do miesięcznego dodatku.',
+        'housing-deposit-withholding-unproven':
+          'Epizod mieszkaniowy został zakończony, ale system nie ma potwierdzonego wcześniejszego potrącenia kaucji.',
+        'holiday-work-bonus-confirmation-required':
+          'Automatycznie wykryta premia świąteczna wymaga potwierdzenia koordynatora.',
         'critical-read-failure':
           'Nie udało się odczytać części danych źródłowych. Wartości zależne pozostają nierozstrzygnięte.',
       },
@@ -1981,6 +1989,11 @@ export const pl = {
         NEEDS_REVIEW: 'Wymaga sprawdzenia',
         NEEDS_CORRECTION: 'Wymaga korekty',
         CHECKED: 'Sprawdzone',
+      },
+      holidayDecision: {
+        PENDING: 'Wymaga potwierdzenia',
+        CONFIRMED: 'Potwierdzona',
+        REJECTED: 'Odrzucona',
       },
       table: {
         teta: 'TETA',
@@ -2026,6 +2039,10 @@ export const pl = {
         depositOverrideHelper:
           'Pozostaw puste, aby użyć pełnego zwrotu automatycznego.',
         depositNote: 'Powód korekty zwrotu kaucji',
+        holidayBonusInfo:
+          'Automatyczna sugestia premii świątecznej: {{amount}}. Sprawdź potwierdzenie klienta.',
+        holidayBonusDecision: 'Decyzja o premii świątecznej',
+        holidayBonusNote: 'Notatka do decyzji o premii świątecznej',
       },
       actions: {
         calendar: 'Otwórz kalendarz pracownika',

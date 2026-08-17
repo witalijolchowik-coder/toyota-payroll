@@ -279,11 +279,26 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
     adjustments: data.adjustments,
     entitlementsByEmployeeId,
     depositReturnOverridesByEmployeeId: new Map(
+      data.reviewStates.map((state) => {
+        const episodeId = entitlementsByEmployeeId.get(state.employeeId)
+          ?.companyAccommodation?.episodeId;
+        return [
+          state.employeeId,
+          !state.depositReturnEpisodeId ||
+          state.depositReturnEpisodeId === episodeId
+            ? state.depositReturnOverride
+            : null,
+        ];
+      }),
+    ),
+    holidayWorkBonusDecisionsByEmployeeId: new Map(
       data.reviewStates.map((state) => [
         state.employeeId,
-        state.depositReturnOverride,
+        state.holidayWorkBonusDecision,
       ]),
     ),
+    depositWithholdingEvidenceByEpisodeId:
+      data.depositWithholdingEvidenceByEpisodeId,
     plannedSchedulesByEmployeeId,
     calendarOptions: { publicHolidays },
   });
@@ -314,6 +329,10 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
     shiftHoursVersions: data.shiftHoursVersions,
     departmentShiftCorrections: data.departmentShiftCorrections,
     sourceFailures: data.sourceFailures,
+    reviewStates: data.reviewStates,
+    depositWithholdingEvidence: [
+      ...data.depositWithholdingEvidenceByEpisodeId.values(),
+    ],
   });
   const draftsByEmployeeId = new Map(
     calculationDrafts.map((draft) => [draft.employeeId, draft]),

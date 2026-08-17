@@ -32,6 +32,10 @@ const BLOCKING_WARNINGS = new Set([
   'unresolved-own-housing-setting',
   'unresolved-payroll-setting',
   'unresolved-housing-deposit-setting',
+  'housing-status-missing',
+  'udt-entitlement-incomplete',
+  'housing-deposit-withholding-unproven',
+  'holiday-work-bonus-confirmation-required',
   'critical-read-failure',
 ]);
 

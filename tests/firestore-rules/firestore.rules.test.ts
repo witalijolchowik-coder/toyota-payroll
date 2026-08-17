@@ -907,6 +907,9 @@ describe('Firestore security rules', () => {
         reviewed_by: uid,
         deposit_return_override: null,
         deposit_return_note: '',
+        deposit_return_episode_id: null,
+        holiday_work_bonus_decision: null,
+        holiday_work_bonus_note: '',
         ...modificationMetadata(uid),
       }),
     );
@@ -916,6 +919,9 @@ describe('Firestore security rules', () => {
         review_note: 'Sprawdzone',
         deposit_return_override: 60,
         deposit_return_note: 'Uszkodzenie wyposażenia',
+        deposit_return_episode_id: 'housing-episode-1',
+        holiday_work_bonus_decision: 'REJECTED',
+        holiday_work_bonus_note: 'Brak potwierdzenia klienta',
         reviewed_at: serverTimestamp(),
         reviewed_by: uid,
         updated_at: serverTimestamp(),
@@ -925,6 +931,17 @@ describe('Firestore security rules', () => {
     await assertFails(
       updateDoc(reviewState, {
         deposit_return_override: -1,
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await seedMonth('2026-07', true);
+    await assertFails(
+      updateDoc(reviewState, {
+        deposit_return_override: 0,
+        holiday_work_bonus_decision: 'CONFIRMED',
+        reviewed_at: serverTimestamp(),
+        reviewed_by: uid,
         updated_at: serverTimestamp(),
         updated_by: uid,
       }),
@@ -947,6 +964,9 @@ describe('Firestore security rules', () => {
       reviewed_by: uid,
       deposit_return_override: null,
       deposit_return_note: '',
+      deposit_return_episode_id: null,
+      holiday_work_bonus_decision: null,
+      holiday_work_bonus_note: '',
       ...modificationMetadata(uid),
     };
 
@@ -2100,6 +2120,36 @@ describe('Firestore security rules', () => {
       reason: 'Poprzednia decyzja',
       ...modificationMetadata(uid),
     });
+    const currentHousing = doc(
+      firestore,
+      'employeeEntitlements/early-current-housing',
+    );
+    const futureHousing = doc(
+      firestore,
+      'employeeEntitlements/early-future-housing',
+    );
+    await setDoc(currentHousing, {
+      employee_id: 'employee-1',
+      teta_number: 'TETA-1001',
+      type: 'COMPANY_ACCOMMODATION',
+      accommodation_variant_key: 'type-a',
+      valid_from: '2026-06-01',
+      valid_to: null,
+      status: 'ACTIVE',
+      note: null,
+      ...modificationMetadata(uid),
+    });
+    await setDoc(futureHousing, {
+      employee_id: 'employee-1',
+      teta_number: 'TETA-1001',
+      type: 'COMPANY_ACCOMMODATION',
+      accommodation_variant_key: 'type-b',
+      valid_from: '2026-09-01',
+      valid_to: null,
+      status: 'ACTIVE',
+      note: null,
+      ...modificationMetadata(uid),
+    });
 
     const batch = writeBatch(firestore);
     batch.update(current, {
@@ -2113,6 +2163,16 @@ describe('Firestore security rules', () => {
       updated_by: uid,
     });
     batch.update(previousEnd, {
+      status: 'CANCELLED',
+      updated_at: serverTimestamp(),
+      updated_by: uid,
+    });
+    batch.update(currentHousing, {
+      valid_to: '2026-07-15',
+      updated_at: serverTimestamp(),
+      updated_by: uid,
+    });
+    batch.update(futureHousing, {
       status: 'CANCELLED',
       updated_at: serverTimestamp(),
       updated_by: uid,
@@ -2151,6 +2211,8 @@ describe('Firestore security rules', () => {
         shortened_contract_id: 'early-current',
         replaced_employment_end_event_id: 'early-previous-end',
         cancelled_future_contract_ids: ['early-future'],
+        closed_company_accommodation_ids: ['early-current-housing'],
+        cancelled_future_company_accommodation_ids: ['early-future-housing'],
         affected_open_months: ['2026-07'],
       },
     });

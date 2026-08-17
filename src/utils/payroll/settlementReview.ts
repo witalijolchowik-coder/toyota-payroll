@@ -57,6 +57,10 @@ const unresolvedIssueCodes = new Set<SettlementReviewIssueCode>([
   'unresolved-own-housing-setting',
   'unresolved-payroll-setting',
   'unresolved-housing-deposit-setting',
+  'housing-status-missing',
+  'udt-entitlement-incomplete',
+  'housing-deposit-withholding-unproven',
+  'holiday-work-bonus-confirmation-required',
   'housing-entitlement-conflict',
   'uncovered-private-time',
   'uncovered-coverable-ni',
@@ -108,7 +112,9 @@ export function groupPayrollDraftWarning(
     warning.code === 'unresolved-company-accommodation-variant' ||
     warning.code === 'unresolved-own-housing-setting' ||
     warning.code === 'unresolved-payroll-setting' ||
-    warning.code === 'unresolved-housing-deposit-setting'
+    warning.code === 'unresolved-housing-deposit-setting' ||
+    warning.code === 'housing-status-missing' ||
+    warning.code === 'udt-entitlement-incomplete'
   ) {
     return 'configuration';
   }

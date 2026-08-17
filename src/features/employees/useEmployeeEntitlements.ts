@@ -5,6 +5,7 @@ import {
   cancelEmployeeEntitlement,
   createEmployeeEntitlement,
   loadEmployeeEntitlements,
+  transitionEmployeeHousing,
   updateEmployeeEntitlement,
 } from '../../services/employeeEntitlementsService';
 import type {
@@ -75,5 +76,8 @@ export function useEmployeeEntitlements() {
     ) => runMutation(() => updateEmployeeEntitlement(entitlementId, input)),
     cancelEntitlement: (entitlementId: string) =>
       runMutation(() => cancelEmployeeEntitlement(entitlementId)),
+    transitionHousing: (
+      input: Parameters<typeof transitionEmployeeHousing>[0],
+    ) => runMutation(() => transitionEmployeeHousing(input)),
   };
 }

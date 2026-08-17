@@ -46,6 +46,9 @@ function normalizeReviewInput(
     reviewNote: input.reviewNote.trim(),
     depositReturnOverride: input.depositReturnOverride ?? null,
     depositReturnNote: input.depositReturnNote?.trim() ?? '',
+    depositReturnEpisodeId: input.depositReturnEpisodeId?.trim() || null,
+    holidayWorkBonusDecision: input.holidayWorkBonusDecision ?? null,
+    holidayWorkBonusNote: input.holidayWorkBonusNote?.trim() ?? '',
   };
   if (!normalized.employeeId || !normalized.tetaNumber) {
     throw new SettlementReviewServiceError('invalid-input');
@@ -77,6 +80,9 @@ export async function saveSettlementReviewState(
       reviewed_by: uid,
       deposit_return_override: normalized.depositReturnOverride ?? null,
       deposit_return_note: normalized.depositReturnNote ?? '',
+      deposit_return_episode_id: normalized.depositReturnEpisodeId ?? null,
+      holiday_work_bonus_decision: normalized.holidayWorkBonusDecision ?? null,
+      holiday_work_bonus_note: normalized.holidayWorkBonusNote ?? '',
       updated_at: serverTimestamp(),
       updated_by: uid,
     });
@@ -91,6 +97,9 @@ export async function saveSettlementReviewState(
       reviewed_by: uid,
       deposit_return_override: normalized.depositReturnOverride ?? null,
       deposit_return_note: normalized.depositReturnNote ?? '',
+      deposit_return_episode_id: normalized.depositReturnEpisodeId ?? null,
+      holiday_work_bonus_decision: normalized.holidayWorkBonusDecision ?? null,
+      holiday_work_bonus_note: normalized.holidayWorkBonusNote ?? '',
       created_at: serverTimestamp(),
       created_by: uid,
       updated_at: serverTimestamp(),
@@ -112,6 +121,24 @@ export async function saveSettlementReviewState(
         old_value: previousOverride,
         new_value: normalized.depositReturnOverride,
         note: normalized.depositReturnNote,
+      },
+    });
+  }
+  const previousHolidayDecision = snapshot.exists()
+    ? (snapshot.data().holiday_work_bonus_decision ?? null)
+    : null;
+  if (previousHolidayDecision !== normalized.holidayWorkBonusDecision) {
+    await recordAuditEntry({
+      entityPath: `months/${monthId}/reviewStates/${normalized.employeeId}`,
+      action: 'update',
+      actorUid: uid,
+      changes: {
+        operation: 'holiday-work-bonus-decision-changed',
+        employee_id: normalized.employeeId,
+        teta_number: normalized.tetaNumber,
+        old_value: previousHolidayDecision,
+        new_value: normalized.holidayWorkBonusDecision,
+        note: normalized.holidayWorkBonusNote,
       },
     });
   }

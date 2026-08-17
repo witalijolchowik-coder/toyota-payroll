@@ -4,6 +4,7 @@ import type {
   DailyValue,
   Employee,
   EmployeeEntitlement,
+  HolidayWorkBonusDecision,
   PayrollSetting,
 } from '../../types/firestore';
 import {
@@ -14,6 +15,7 @@ import {
   STANDARD_WORKING_DAY_HOURS,
   type PayrollCalendarOptions,
   type EmployeeSettlementEntitlements,
+  type HousingDepositWithholdingEvidence,
 } from '.';
 import type { PlannedScheduleDay } from '../schedule';
 
@@ -206,6 +208,9 @@ function draft({
   entitlements = null,
   calendarOptions = {},
   plannedSchedule,
+  depositReturnOverride = null,
+  holidayWorkBonusDecision = null,
+  depositWithholdingEvidence = null,
 }: {
   target?: Employee;
   dailyValues?: DailyValue[];
@@ -215,6 +220,9 @@ function draft({
   entitlements?: EmployeeSettlementEntitlements | null;
   calendarOptions?: PayrollCalendarOptions;
   plannedSchedule?: PlannedScheduleDay[];
+  depositReturnOverride?: number | null;
+  holidayWorkBonusDecision?: HolidayWorkBonusDecision | null;
+  depositWithholdingEvidence?: HousingDepositWithholdingEvidence | null;
 } = {}) {
   return calculateEmployeeMonthlyDraft({
     monthId: '2026-06',
@@ -226,6 +234,9 @@ function draft({
     entitlements,
     calendarOptions,
     plannedSchedule,
+    depositReturnOverride,
+    holidayWorkBonusDecision,
+    depositWithholdingEvidence,
   });
 }
 
@@ -566,7 +577,49 @@ describe('employee monthly calculation draft', () => {
     expect(result.absences.vacationHours).toBe(8);
   });
 
-  it('combines all 100% overtime sources and pays the holiday bonus only once per month', () => {
+  it('uses the full-month nominal denominator for transport and laundry after a mid-month hire', () => {
+    const result = draft({
+      target: employee({ employmentStartDate: utcDate('2026-06-15') }),
+    });
+
+    expect(result.workDays.eligibleWorkingDays).toBe(12);
+    expect(result.workDays.physicallyWorkedDays).toBe(12);
+    expect(result.components.transportAllowanceNetto).toBe(150);
+    expect(result.components.laundryAllowanceBrutto).toBe(21.82);
+  });
+
+  it('counts explicit work on a free day but caps transport and laundry at their monthly maximum', () => {
+    const result = draft({
+      plannedSchedule: normativeSchedule(),
+      dailyValues: [
+        dailyValue({
+          id: 'employee-1_2026-06-06',
+          date: '2026-06-06',
+          hours: 4,
+        }),
+      ],
+    });
+
+    expect(result.workDays.physicallyWorkedDays).toBe(23);
+    expect(result.components.transportAllowanceNetto).toBe(275);
+    expect(result.components.laundryAllowanceBrutto).toBe(40);
+  });
+
+  it('counts explicit positive hours for allowances even when the same day has an absence conflict', () => {
+    const result = draft({
+      dailyValues: [dailyValue({ date: '2026-06-01', hours: 8 })],
+      absences: [absence({ startDate: '2026-06-01', endDate: '2026-06-01' })],
+    });
+
+    expect(result.workDays.physicallyWorkedDays).toBe(22);
+    expect(result.components.transportAllowanceNetto).toBe(275);
+    expect(result.components.laundryAllowanceBrutto).toBe(40);
+    expect(result.warnings.map((item) => item.code)).toContain(
+      'attendance-absence-conflict',
+    );
+  });
+
+  it('suggests the holiday bonus only once per month and requires a coordinator decision', () => {
     const result = draft({
       dailyValues: [
         dailyValue({
@@ -588,6 +641,44 @@ describe('employee monthly calculation draft', () => {
     expect(result.workTime.overtime100Hours).toBe(8);
     expect(result.workTime.paidOvertime100Hours).toBe(8);
     expect(result.components.holidayWorkBonusBrutto).toBe(300);
+    expect(result.components.holidayWorkBonusSuggestedBrutto).toBe(300);
+    expect(result.components.holidayWorkBonusDecision).toBe('PENDING');
+    expect(result.warnings.map((item) => item.code)).toContain(
+      'holiday-work-bonus-confirmation-required',
+    );
+  });
+
+  it('keeps the holiday suggestion but applies the coordinator confirmation or rejection', () => {
+    const input = {
+      dailyValues: [
+        dailyValue({
+          id: 'employee-1_2026-06-04',
+          date: '2026-06-04',
+          hours: 8,
+        }),
+      ],
+      calendarOptions: {
+        publicHolidays: new Set(['2026-06-04']),
+      },
+    };
+
+    const confirmed = draft({
+      ...input,
+      holidayWorkBonusDecision: 'CONFIRMED',
+    });
+    const rejected = draft({
+      ...input,
+      holidayWorkBonusDecision: 'REJECTED',
+    });
+
+    expect(confirmed.components.holidayWorkBonusBrutto).toBe(300);
+    expect(confirmed.components.holidayWorkBonusDecision).toBe('CONFIRMED');
+    expect(confirmed.warnings.map((item) => item.code)).not.toContain(
+      'holiday-work-bonus-confirmation-required',
+    );
+    expect(rejected.components.holidayWorkBonusSuggestedBrutto).toBe(300);
+    expect(rejected.components.holidayWorkBonusBrutto).toBe(0);
+    expect(rejected.components.holidayWorkBonusDecision).toBe('REJECTED');
   });
 
   it('uses explicitly linked Sunday 100% hours for WZN before ordinary balancing', () => {
@@ -667,10 +758,25 @@ describe('employee monthly calculation draft', () => {
 
     expect(
       draft({
+        target: employee({ employmentEndDate: utcDate('2026-06-29') }),
+        entitlements: { udtEligible: true },
+      }).components.udtAllowanceBrutto,
+    ).toBe(0);
+
+    expect(
+      draft({
         absences: [absence({ startDate: '2026-06-01' })],
         entitlements: { udtEligible: true },
       }).components.udtAllowanceBrutto,
     ).toBe(300);
+
+    const partial = draft({
+      entitlements: { udtEligible: false, udtCoverage: 'PARTIAL' },
+    });
+    expect(partial.components.udtAllowanceBrutto).toBe(0);
+    expect(partial.warnings.map((item) => item.code)).toContain(
+      'udt-entitlement-incomplete',
+    );
   });
 
   it('calculates company accommodation deduction by contract-validity days, not worked days', () => {
@@ -724,6 +830,90 @@ describe('employee monthly calculation draft', () => {
     );
   });
 
+  it('does not return the housing deposit when only the fixed-term contract expires', () => {
+    const result = draft({
+      target: employee({ employmentEndDate: utcDate('2026-06-30') }),
+      entitlements: {
+        companyAccommodation: {
+          variantKey: 'type-a',
+          contractStartDate: utcDate('2026-01-10'),
+          contractEndDate: null,
+          episodeId: 'housing-episode-1',
+        },
+      },
+      settings: [
+        ...defaultPayrollSettings(),
+        payrollSetting({
+          id: 'deposit',
+          settingKey: 'housing_deposit',
+          amount: 99,
+          taxType: 'NET',
+          validFrom: '2026-01',
+        }),
+      ],
+      depositWithholdingEvidence: {
+        episodeId: 'housing-episode-1',
+        amount: 99,
+        monthId: '2026-01',
+      },
+    });
+
+    expect(result.components.housingDepositReturnDue).toBe(false);
+    expect(result.components.housingDepositReturn).toBe(0);
+  });
+
+  it('returns the housing deposit in the final salary after an explicit coordinator termination', () => {
+    const target = employee({
+      employmentEndDate: utcDate('2026-06-30'),
+      employmentEndEvents: [
+        {
+          id: 'employment-end-1',
+          employeeId: 'employee-1',
+          tetaNumber: 'T001',
+          sequenceId: 'sequence-1',
+          endDate: '2026-06-30',
+          status: 'ACTIVE',
+          reason: 'Zakończenie współpracy',
+          createdAt,
+          createdBy: 'coordinator',
+          updatedAt: createdAt,
+          updatedBy: 'coordinator',
+        },
+      ],
+    });
+    const result = draft({
+      target,
+      entitlements: {
+        companyAccommodation: {
+          variantKey: 'type-a',
+          contractStartDate: utcDate('2026-01-10'),
+          contractEndDate: null,
+          episodeId: 'housing-episode-1',
+        },
+      },
+      settings: [
+        ...defaultPayrollSettings(),
+        payrollSetting({
+          id: 'deposit',
+          settingKey: 'housing_deposit',
+          amount: 99,
+          taxType: 'NET',
+          validFrom: '2026-01',
+        }),
+      ],
+      depositWithholdingEvidence: {
+        episodeId: 'housing-episode-1',
+        amount: 99,
+        monthId: '2026-01',
+      },
+    });
+
+    expect(result.components.housingDepositReturnDue).toBe(true);
+    expect(result.components.housingDepositPriorWithholdingProven).toBe(true);
+    expect(result.components.housingDepositReturn).toBe(99);
+    expect(result.totals.returns).toBe(99);
+  });
+
   it('pays own housing allowance only for full-month eligible employment', () => {
     const settings = [
       payrollSetting(),
@@ -743,6 +933,13 @@ describe('employee monthly calculation draft', () => {
     expect(
       draft({
         target: employee({ employmentStartDate: utcDate('2026-06-02') }),
+        settings,
+        entitlements: { ownHousingAllowanceEligible: true },
+      }).components.ownHousingAllowanceBrutto,
+    ).toBe(0);
+    expect(
+      draft({
+        target: employee({ employmentEndDate: utcDate('2026-06-29') }),
         settings,
         entitlements: { ownHousingAllowanceEligible: true },
       }).components.ownHousingAllowanceBrutto,

@@ -59,21 +59,21 @@ describe('employee entitlement resolver', () => {
   it('recognizes full-month UDT entitlement and ignores partial entitlement', () => {
     const target = employee();
 
-    expect(
-      resolveEmployeeSettlementEntitlements({
-        employee: target,
-        monthId: '2026-06',
-        entitlements: [entitlement()],
-      }).udtEligible,
-    ).toBe(true);
+    const full = resolveEmployeeSettlementEntitlements({
+      employee: target,
+      monthId: '2026-06',
+      entitlements: [entitlement()],
+    });
+    expect(full.udtEligible).toBe(true);
+    expect(full.udtCoverage).toBe('FULL');
 
-    expect(
-      resolveEmployeeSettlementEntitlements({
-        employee: target,
-        monthId: '2026-06',
-        entitlements: [entitlement({ validFrom: '2026-06-02' })],
-      }).udtEligible,
-    ).toBe(false);
+    const partial = resolveEmployeeSettlementEntitlements({
+      employee: target,
+      monthId: '2026-06',
+      entitlements: [entitlement({ validFrom: '2026-06-02' })],
+    });
+    expect(partial.udtEligible).toBe(false);
+    expect(partial.udtCoverage).toBe('PARTIAL');
   });
 
   it('recognizes full-month own housing allowance entitlement', () => {
@@ -144,6 +144,66 @@ describe('employee entitlement resolver', () => {
     });
 
     expect(result.reviewWarnings).toContain('housing-entitlement-conflict');
+  });
+
+  it('treats company-to-own housing as a transition month and the next month as full own housing', () => {
+    const entitlements = [
+      entitlement({
+        id: 'company',
+        type: 'COMPANY_ACCOMMODATION',
+        accommodationVariantKey: 'type-a',
+        validFrom: '2026-01-01',
+        validTo: '2026-06-14',
+      }),
+      entitlement({
+        id: 'own',
+        type: 'OWN_HOUSING_ALLOWANCE',
+        validFrom: '2026-06-15',
+        validTo: null,
+      }),
+    ];
+
+    const transition = resolveEmployeeSettlementEntitlements({
+      employee: employee(),
+      monthId: '2026-06',
+      entitlements,
+    });
+    const nextMonth = resolveEmployeeSettlementEntitlements({
+      employee: employee(),
+      monthId: '2026-07',
+      entitlements,
+    });
+
+    expect(transition.housingCoverage).toBe('TRANSITION');
+    expect(transition.ownHousingAllowanceEligible).toBe(false);
+    expect(nextMonth.housingCoverage).toBe('OWN_FULL');
+    expect(nextMonth.ownHousingAllowanceEligible).toBe(true);
+  });
+
+  it('treats own-to-company housing as a transition month without an own-housing allowance', () => {
+    const result = resolveEmployeeSettlementEntitlements({
+      employee: employee(),
+      monthId: '2026-06',
+      entitlements: [
+        entitlement({
+          id: 'own',
+          type: 'OWN_HOUSING_ALLOWANCE',
+          validFrom: '2026-01-01',
+          validTo: '2026-06-14',
+        }),
+        entitlement({
+          id: 'company',
+          type: 'COMPANY_ACCOMMODATION',
+          accommodationVariantKey: 'type-a',
+          validFrom: '2026-06-15',
+          validTo: null,
+        }),
+      ],
+    });
+
+    expect(result.housingCoverage).toBe('TRANSITION');
+    expect(result.ownHousingAllowanceEligible).toBe(false);
+    expect(result.companyAccommodation?.variantKey).toBe('type-a');
   });
 
   it('keeps effective-dated overlap helpers inclusive', () => {

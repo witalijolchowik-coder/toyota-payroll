@@ -75,6 +75,23 @@ and the reusable pure helper emits a warning if overlapping historical data is
 encountered. Future server-side hardening can enforce this in Cloud Functions if
 needed.
 
+## Coordinator housing workflow
+
+Housing is changed through one effective-dated transition operation:
+
+- moving into company accommodation closes the current own-housing period on
+  the preceding day and opens a company-accommodation period;
+- moving out closes company accommodation on the preceding day and opens an
+  own-housing period;
+- a direct transfer between company accommodation objects remains one deposit
+  episode when there is no day gap;
+- a real gap followed by a new company-accommodation period creates a new
+  deposit episode.
+
+The operation is atomic and audited. It is rejected when the resulting
+effective-dated change would alter a settled month. No hidden production data
+migration or destructive cleanup is performed.
+
 ## Monthly Settlement resolution
 
 For each employee in a payroll month:
@@ -86,15 +103,12 @@ For each employee in a payroll month:
 4. Calculate company accommodation proportionally by calendar-day overlap.
 5. Surface warnings for housing conflicts and missing accommodation
    variant/settings.
+6. Classify partial housing coverage as a transition month; do not pay a
+   proportional own-housing allowance.
 
 ## Current limitations
 
 - No ZUS, PIT, net salary or full payroll calculation is introduced here.
 - No payroll closing or immutable final settlement snapshot is introduced here.
-- Because entitlement documents are global effective-dated records, Firestore
-  rules cannot fully know whether a future edit affects a historically settled
-  month. The historical correctness strategy is:
-  - preserve effective dates and cancellation history;
-  - forbid hard deletes;
-  - later payroll closing must freeze the resolved month snapshot or block
-    retroactive changes that affect settled months.
+- The service checks affected settled months before changing effective-dated
+  housing history. A final immutable payroll snapshot remains Stage 4 work.

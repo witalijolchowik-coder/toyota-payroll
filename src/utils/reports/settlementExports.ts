@@ -337,6 +337,12 @@ const sozColumn = {
   otherDeductionAmount: 71,
   otherDeductionTax: 72,
   otherDeductionDescription: 73,
+  housingDepositWithholdingAmount: 92,
+  housingDepositWithholdingTax: 93,
+  housingDepositWithholdingDescription: 94,
+  housingDepositReturnAmount: 95,
+  housingDepositReturnTax: 96,
+  housingDepositReturnDescription: 97,
   ownHousingAmount: 98,
   ownHousingTax: 99,
   ownHousingDescription: 100,
@@ -352,7 +358,51 @@ const sozColumn = {
   laundryAmount: 130,
   laundryTax: 131,
   laundryDescription: 132,
+  additionalClientBonusAmount: 134,
+  additionalClientBonusTax: 135,
+  additionalClientBonusDescription: 136,
 } as const;
+
+interface SozPremiumComponent {
+  amount: number;
+  tax: 'Brutto';
+  description: string;
+}
+
+function additionalSozPremiums(
+  draft: EmployeeMonthlyCalculationDraft,
+): SozPremiumComponent[] {
+  return [
+    ...(draft.components.udtAllowanceBrutto > 0
+      ? [
+          {
+            amount: draft.components.udtAllowanceBrutto,
+            tax: 'Brutto' as const,
+            description: 'Premia za UDT',
+          },
+        ]
+      : []),
+    ...(draft.components.holidayWorkBonusBrutto > 0
+      ? [
+          {
+            amount: draft.components.holidayWorkBonusBrutto,
+            tax: 'Brutto' as const,
+            description:
+              'Premia świąteczna ( za wykonania zleceń / pracy w świąteczne dni)',
+          },
+        ]
+      : []),
+    ...(draft.components.manualIncreases > 0
+      ? [
+          {
+            amount: draft.components.manualIncreases,
+            tax: 'Brutto' as const,
+            description: 'Korekta ręczna',
+          },
+        ]
+      : []),
+  ];
+}
 
 const polishMonthNames = [
   'Styczeń',
@@ -531,6 +581,13 @@ export function buildExportReadinessWarnings(
     if ((record.unresolvedIssueCount ?? 0) > 0) {
       warnings.push({
         code: 'unresolved-issues',
+        employeeId: record.employee.id,
+        tetaNumber: record.employee.tetaNumber,
+      });
+    }
+    if (additionalSozPremiums(record.draft).length > 2) {
+      warnings.push({
+        code: 'unsupported-columns',
         employeeId: record.employee.id,
         tetaNumber: record.employee.tetaNumber,
       });
@@ -755,6 +812,20 @@ function mapSozExportRow(
     cells[sozColumn.otherDeductionTax] = 'Netto';
     cells[sozColumn.otherDeductionDescription] = 'Korekta ręczna';
   }
+  if (draft.components.housingDepositWithholding > 0) {
+    cells[sozColumn.housingDepositWithholdingAmount] = formatNumber(
+      draft.components.housingDepositWithholding,
+    );
+    cells[sozColumn.housingDepositWithholdingTax] = 'Netto';
+    cells[sozColumn.housingDepositWithholdingDescription] = 'Kaucja';
+  }
+  if (draft.components.housingDepositReturn > 0) {
+    cells[sozColumn.housingDepositReturnAmount] = formatNumber(
+      draft.components.housingDepositReturn,
+    );
+    cells[sozColumn.housingDepositReturnTax] = 'Netto';
+    cells[sozColumn.housingDepositReturnDescription] = 'Kaucja - Zwrot';
+  }
   if (draft.components.ownHousingAllowanceBrutto > 0) {
     cells[sozColumn.ownHousingAmount] = formatNumber(
       draft.components.ownHousingAllowanceBrutto,
@@ -772,15 +843,26 @@ function mapSozExportRow(
   );
   cells[sozColumn.frequencyBonusTax] = 'Brutto';
   cells[sozColumn.frequencyBonusDescription] = 'Premia frekwencyjna';
-  const clientPremium =
-    draft.components.holidayWorkBonusBrutto +
-    draft.components.udtAllowanceBrutto +
-    draft.components.manualIncreases;
-  if (clientPremium > 0) {
-    cells[sozColumn.clientBonusAmount] = formatNumber(clientPremium);
-    cells[sozColumn.clientBonusTax] = 'Brutto';
-    cells[sozColumn.clientBonusDescription] = 'Premia od klienta';
-  }
+  const premiumSlots = [
+    {
+      amount: sozColumn.clientBonusAmount,
+      tax: sozColumn.clientBonusTax,
+      description: sozColumn.clientBonusDescription,
+    },
+    {
+      amount: sozColumn.additionalClientBonusAmount,
+      tax: sozColumn.additionalClientBonusTax,
+      description: sozColumn.additionalClientBonusDescription,
+    },
+  ];
+  additionalSozPremiums(draft)
+    .slice(0, premiumSlots.length)
+    .forEach((premium, index) => {
+      const slot = premiumSlots[index]!;
+      cells[slot.amount] = formatNumber(premium.amount);
+      cells[slot.tax] = premium.tax;
+      cells[slot.description] = premium.description;
+    });
   cells[sozColumn.laundryAmount] = formatNumber(
     draft.components.laundryAllowanceBrutto,
   );

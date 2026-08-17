@@ -185,6 +185,15 @@ export const SETTLEMENT_REVIEW_STATUSES = [
 export type SettlementReviewStatus =
   (typeof SETTLEMENT_REVIEW_STATUSES)[number];
 
+export const HOLIDAY_WORK_BONUS_DECISIONS = [
+  'PENDING',
+  'CONFIRMED',
+  'REJECTED',
+] as const;
+
+export type HolidayWorkBonusDecision =
+  (typeof HOLIDAY_WORK_BONUS_DECISIONS)[number];
+
 export interface SettlementReviewDocument
   extends EmployeeReferenceDocument, ModificationMetadataDocument {
   month_id: MonthId;
@@ -194,6 +203,9 @@ export interface SettlementReviewDocument
   reviewed_by: string | null;
   deposit_return_override: number | null;
   deposit_return_note: string;
+  deposit_return_episode_id?: string | null;
+  holiday_work_bonus_decision?: HolidayWorkBonusDecision | null;
+  holiday_work_bonus_note?: string;
 }
 
 export type DailyValueSource = 'manual' | 'attendance_import';

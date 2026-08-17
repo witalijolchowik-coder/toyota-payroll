@@ -91,15 +91,18 @@ control whether the component is considered configured for a month.
 
 ## Holiday work bonus
 
-Official public-holiday work gives one `300 PLN brutto` component for the month
-when at least one public-holiday workday exists.
+Official public-holiday work creates one automatic `300 PLN brutto` suggestion
+for the month when at least one public-holiday workday exists.
 
 The bonus is not multiplied by the number of holiday workdays. Overtime from
 that day still contributes to the combined `nadgodziny 100%` hours bucket.
 
 The amount can be configured with payroll setting key `holiday_work_bonus`.
-Manual component override UI is not implemented in this block; coordinator
-corrections should currently use adjustments where needed.
+The suggestion remains a blocker until the coordinator marks it `CONFIRMED` or
+`REJECTED` after checking the client confirmation. Rejection keeps the detected
+eligibility and suggested amount in history but pays zero. The decision and
+note are audited, survive recalculation, and cannot be changed in a settled
+month.
 
 ## Transport allowance
 
@@ -112,13 +115,14 @@ It is proportional by physically worked days:
 transport amount / eligible working days × physically worked days
 ```
 
-Eligible working days are working days inside the employee employment period.
-Absence days such as L4, vacation, NN, NI and other absence types do not count
-as physically worked days.
+The denominator is the common number of nominal working days in the calendar
+month. It is not reduced for an employee who starts or ends employment during
+the month. The numerator is the number of dates with positive actual work
+hours, including EXTRA work on a nominally free day.
 
-Assumption for this foundation: explicit non-working day work can count as a
-physically worked day for the numerator, but the denominator remains working
-days inside employment.
+Absence days such as L4, vacation, NN, NI and other absence types do not count
+as physically worked days unless positive actual work hours are also recorded.
+The result is capped at the configured monthly maximum.
 
 The amount can be configured with payroll setting key `transport_allowance`.
 
@@ -128,16 +132,16 @@ UDT allowance is `300 PLN brutto` by default.
 
 Rules:
 
-- paid only when the employee is explicitly marked eligible in the future
-  entitlement/assignment model;
+- paid only when an active, effective-dated UDT entitlement covers the full
+  calendar month;
 - full calendar month employment is required;
 - partial month gives 0;
 - absences do not reduce it;
 - no proportional UDT is calculated.
 
-The employee model does not yet store UDT eligibility, so the production UI
-currently shows 0 unless a future entitlement source is connected. The amount
-can be configured with payroll setting key `udt_allowance`.
+Partial UDT coverage is shown as a local settlement warning rather than being
+silently treated as a full-month entitlement. The amount can be configured
+with payroll setting key `udt_allowance`.
 
 ## Laundry allowance
 
@@ -149,6 +153,9 @@ It is proportional by physically worked days:
 laundry amount / eligible working days × physically worked days
 ```
 
+It uses the same common calendar-month denominator and positive-actual-hours
+numerator as transport, with its own `40 PLN` cap and separate component.
+
 The amount can be configured with payroll setting key `laundry_allowance`.
 
 ## Housing
@@ -159,10 +166,11 @@ Two concepts are intentionally separate.
 
 Own housing allowance is paid only for a full month. Partial month gives 0.
 
-The employee model does not yet store own-housing eligibility, so the
-production UI currently shows 0 unless a future entitlement source is
-connected. The amount can be configured with payroll setting key
-`own_housing_allowance`.
+The effective-dated housing history is authoritative. A coordinator move-in or
+move-out operation closes the previous housing state and opens the next state
+in one workflow, so calculation does not require duplicate data entry. A
+transition inside the month gives zero; the first full own-housing calendar
+month may receive the configured `own_housing_allowance`.
 
 ### Company accommodation deduction
 
@@ -178,10 +186,9 @@ Defaults:
 - accommodation: 150 PLN.
 
 The media amount can be configured with payroll setting key
-`company_housing_media`. Accommodation rent can use the existing
-`accommodation_allowance` setting with variants. The employee model does not
-yet store company accommodation assignment, so the production UI currently
-shows 0 unless a future assignment source is connected.
+`company_housing_media`. Accommodation rent uses the existing
+`accommodation_allowance` setting with variants. Company accommodation is
+resolved from the same effective-dated housing history.
 
 ## Manual adjustments
 
@@ -207,7 +214,5 @@ total.
 - No payroll closing.
 - No payslip/PDF/Excel reports.
 - No import engine changes.
-- No UI for per-component override of holiday bonus, UDT, transport, laundry
-  or housing.
-- UDT, own housing and company accommodation require a future employee
-  entitlement/assignment source before production values can appear.
+- Legacy housing episodes without a provable settled-month deposit withholding
+  require an explicit coordinator decision before a return can be paid.

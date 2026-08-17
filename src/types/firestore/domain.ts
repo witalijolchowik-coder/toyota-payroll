@@ -23,6 +23,7 @@ import type {
   ImportStatus,
   ImportType,
   IsoDate,
+  HolidayWorkBonusDecision,
   MonthId,
   PayrollSettingKey,
   PayrollSettingTaxType,
@@ -195,6 +196,9 @@ export interface SettlementReviewState extends ModificationMetadata {
   reviewedBy: string | null;
   depositReturnOverride: number | null;
   depositReturnNote: string;
+  depositReturnEpisodeId: string | null;
+  holidayWorkBonusDecision: HolidayWorkBonusDecision | null;
+  holidayWorkBonusNote: string;
 }
 
 export interface DailyValue extends ModificationMetadata {

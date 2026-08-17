@@ -54,11 +54,21 @@ day gap form one continuous episode, even when the housing object changes.
 - move-in month: withhold once;
 - continuous middle months: keep held, with no new withholding;
 - move-out month: return once;
-- employment ending during an episode: return in the final employment month;
+- move-in and move-out in the same month: neither withhold nor return;
+- an explicit coordinator decision to end cooperation during an open housing
+  episode: return in the final employment month;
+- a fixed-term contract reaching `end_date` without an explicit
+  `/employmentEndEvents` decision: do not return the deposit, because the next
+  contract may be a continuation;
 - a later episode after a real gap: withhold a new deposit.
 
+An automatic return is created only when a prior settled calculation proves a
+positive withholding for the same episode. Legacy history without that proof
+is flagged for an explicit coordinator decision instead of inventing a return.
+
 The episode identity makes recalculation idempotent. A coordinator may reduce
-the return to a value from zero through the held amount and record a reason.
+the return to a value from zero through the proven held amount and record a
+reason.
 The override is stored with the employee-month review state, audited, preserved
 by recalculation, and protected by settled-month rules.
 

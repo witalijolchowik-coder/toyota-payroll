@@ -66,8 +66,7 @@ export function EmployeeAccommodationDialog({
           item.status === 'ACTIVE' &&
           item.validFrom <= '9999-12-31' &&
           (item.validTo ?? '9999-12-31') >= effectiveDate &&
-          (item.type === 'COMPANY_ACCOMMODATION' ||
-            item.type === 'OWN_HOUSING_ALLOWANCE'),
+          item.type === 'COMPANY_ACCOMMODATION',
       ),
     [effectiveDate, employee.id, entitlements, isMoveOut],
   );

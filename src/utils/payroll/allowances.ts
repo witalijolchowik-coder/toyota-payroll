@@ -123,6 +123,8 @@ export interface HousingDepositResult {
   episodeId: string | null;
   held: number;
   withheld: number;
+  returnDue: boolean;
+  priorWithholdingProven: boolean;
   automaticReturn: number;
   finalReturn: number;
 }
@@ -134,6 +136,7 @@ export function calculateHousingDeposit({
   episodeEnd,
   employmentEnd,
   configuredAmount,
+  previouslyWithheldAmount = null,
   returnOverride = null,
 }: {
   monthId: MonthId;
@@ -142,6 +145,7 @@ export function calculateHousingDeposit({
   episodeEnd: IsoDateString | null;
   employmentEnd: IsoDateString | null;
   configuredAmount: number | null;
+  previouslyWithheldAmount?: number | null;
   returnOverride?: number | null;
 }): HousingDepositResult {
   if (!episodeId || !episodeStart || configuredAmount === null) {
@@ -149,6 +153,8 @@ export function calculateHousingDeposit({
       episodeId,
       held: 0,
       withheld: 0,
+      returnDue: false,
+      priorWithholdingProven: false,
       automaticReturn: 0,
       finalReturn: 0,
     };
@@ -161,14 +167,32 @@ export function calculateHousingDeposit({
         : employmentEnd
       : (episodeEnd ?? employmentEnd);
   const returnMonth = effectiveEnd?.slice(0, 7) ?? null;
-  const held = configuredAmount;
-  const withheld = monthId === moveInMonth ? held : 0;
-  const automaticReturn = returnMonth === monthId ? held : 0;
-  const finalReturn =
-    automaticReturn > 0 && returnOverride !== null
-      ? Math.min(held, Math.max(0, returnOverride))
-      : automaticReturn;
-  return { episodeId, held, withheld, automaticReturn, finalReturn };
+  const sameMonthEpisode = returnMonth === moveInMonth;
+  const priorWithholdingProven =
+    previouslyWithheldAmount !== null && previouslyWithheldAmount > 0;
+  const held = priorWithholdingProven
+    ? previouslyWithheldAmount
+    : configuredAmount;
+  const withheld =
+    monthId === moveInMonth && !sameMonthEpisode ? configuredAmount : 0;
+  const returnDue =
+    returnMonth === monthId && moveInMonth !== monthId && !sameMonthEpisode;
+  const automaticReturn =
+    returnDue && priorWithholdingProven ? previouslyWithheldAmount : 0;
+  const finalReturn = returnDue
+    ? returnOverride === null
+      ? automaticReturn
+      : Math.min(held, Math.max(0, returnOverride))
+    : 0;
+  return {
+    episodeId,
+    held,
+    withheld,
+    returnDue,
+    priorWithholdingProven,
+    automaticReturn,
+    finalReturn,
+  };
 }
 
 type IsoDateString = `${number}-${number}-${number}` | string;

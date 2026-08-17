@@ -14,6 +14,7 @@ import type {
   EmployeeEntitlementType,
   ImportType,
   IsoDate,
+  HolidayWorkBonusDecision,
   MonthId,
   PayrollSettingKey,
   PayrollSettingTaxType,
@@ -182,6 +183,9 @@ export interface SettlementReviewUpdateInput extends EmployeeReferenceInput {
   reviewNote: string;
   depositReturnOverride?: number | null;
   depositReturnNote?: string;
+  depositReturnEpisodeId?: string | null;
+  holidayWorkBonusDecision?: HolidayWorkBonusDecision | null;
+  holidayWorkBonusNote?: string;
 }
 
 export interface PayrollSettingCreateInput {

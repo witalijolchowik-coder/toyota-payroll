@@ -138,6 +138,17 @@ immutable snapshots.
 | `Czas nominalny`                    | Common month nominal hours                 |
 | NN / NI / UW / L4 columns           | Current absence and work-time draft values |
 | Transport, frequency bonus, laundry | Current monthly draft components           |
+| `Kaucja` / `Kaucja - Zwrot`         | Deposit withholding / proven return        |
+| `Dodatek za mieszkanie`             | Full-month own-housing allowance           |
+| `Premia za UDT`                     | Full-month UDT entitlement                 |
+| `Premia świąteczna (...)`           | Confirmed holiday-work bonus               |
+
+The SOZ contract remains exactly 138 columns. Transport maps as `Netto`, while
+laundry, own housing, UDT and holiday work map as `Brutto`. Deposit withholding
+and return map as `Netto`. UDT, holiday work and manual increases preserve
+their separate origin; when more components exist than the two available
+additional client-premium slots, export readiness reports
+`unsupported-columns` instead of silently merging or dropping a component.
 
 ## Known limitations
 

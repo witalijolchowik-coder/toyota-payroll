@@ -742,6 +742,9 @@ service cloud.firestore {
           'reviewed_by',
           'deposit_return_override',
           'deposit_return_note',
+          'deposit_return_episode_id',
+          'holiday_work_bonus_decision',
+          'holiday_work_bonus_note',
           'created_at',
           'created_by',
           'updated_at',
@@ -757,6 +760,9 @@ service cloud.firestore {
           'reviewed_by',
           'deposit_return_override',
           'deposit_return_note',
+          'deposit_return_episode_id',
+          'holiday_work_bonus_decision',
+          'holiday_work_bonus_note',
           'created_at',
           'created_by',
           'updated_at',
@@ -779,6 +785,16 @@ service cloud.firestore {
           )
         )
         && data.deposit_return_note is string
+        && isNullableString(data.deposit_return_episode_id)
+        && (
+          data.holiday_work_bonus_decision == null
+          || data.holiday_work_bonus_decision in [
+            'PENDING',
+            'CONFIRMED',
+            'REJECTED'
+          ]
+        )
+        && data.holiday_work_bonus_note is string
         && data.reviewed_at is timestamp
         && data.reviewed_by == request.auth.uid
         && hasModificationMetadata(data);
@@ -1374,6 +1390,9 @@ service cloud.firestore {
             'reviewed_by',
             'deposit_return_override',
             'deposit_return_note',
+            'deposit_return_episode_id',
+            'holiday_work_bonus_decision',
+            'holiday_work_bonus_note',
             'updated_at',
             'updated_by'
           ]);
