@@ -15,15 +15,22 @@ import {
   DialogContent,
   DialogTitle,
   Stack,
+  TextField,
   Typography,
 } from '@mui/material';
 
 import { useTranslations } from '../../hooks/useTranslations';
 import { interpolate } from '../../i18n/pl';
+import { persistMonthlyCalculation } from '../../services/monthlyCalculationService';
 import {
-  persistMonthlyCalculation,
-  setMonthLock,
-} from '../../services/monthlyCalculationService';
+  closeSettlementMonth,
+  listSettlementVersions,
+  loadClosedSettlementVersion,
+  reopenSettlementMonth,
+  type ClosedSettlementVersion,
+  type SettlementVersionMetadata,
+} from '../../services/settlementVersionService';
+import { buildSettlementReadiness } from '../../services/settlementReadiness';
 import {
   ensureMonthlyRecoveryPoint,
   listMonthlyRecoveryPoints,
@@ -32,6 +39,7 @@ import {
 } from '../../services/monthlyRecoveryService';
 import type { MonthId, PayrollMonth } from '../../types/firestore';
 import type { EmployeeMonthlyCalculationDraft } from '../../utils/payroll';
+import type { SettlementExportPackage } from '../../utils/reports';
 
 export function MonthlyCalculationStatusPanel({
   monthId,
@@ -41,6 +49,7 @@ export function MonthlyCalculationStatusPanel({
   employeeCount,
   monthLabel,
   onReload,
+  finalExportPackage,
 }: {
   monthId: MonthId;
   month: PayrollMonth;
@@ -49,6 +58,7 @@ export function MonthlyCalculationStatusPanel({
   employeeCount: number;
   monthLabel: string;
   onReload: () => Promise<void>;
+  finalExportPackage: SettlementExportPackage;
 }) {
   const t = useTranslations();
   const [working, setWorking] = useState(false);
@@ -57,7 +67,16 @@ export function MonthlyCalculationStatusPanel({
     [],
   );
   const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const [reopenOpen, setReopenOpen] = useState(false);
+  const [reopenReason, setReopenReason] = useState('');
+  const [versions, setVersions] = useState<SettlementVersionMetadata[]>([]);
+  const [selectedVersion, setSelectedVersion] =
+    useState<ClosedSettlementVersion | null>(null);
   const lastAttempt = useRef<string | null>(null);
+  const readiness = buildSettlementReadiness({
+    drafts,
+    exportWarnings: finalExportPackage.warnings,
+  });
 
   const reloadRecoveryPoints = useCallback(async () => {
     setRecoveryPoints(await listMonthlyRecoveryPoints(monthId));
@@ -76,6 +95,12 @@ export function MonthlyCalculationStatusPanel({
       active = false;
     };
   }, [monthId]);
+
+  useEffect(() => {
+    void listSettlementVersions(monthId)
+      .then(setVersions)
+      .catch(() => setVersions([]));
+  }, [monthId, month.isSettled]);
 
   useEffect(() => {
     if (month.isSettled || lastAttempt.current === inputHash) return;
@@ -157,17 +182,37 @@ export function MonthlyCalculationStatusPanel({
     }
   };
 
-  const toggleLock = async () => {
+  const closeMonth = async () => {
     if (
-      month.isSettled &&
-      !window.confirm(t.settlement.calculation.unlockConfirmation)
-    ) {
+      readiness.warnings.length > 0 &&
+      !window.confirm(t.settlement.calculation.lockConfirmation)
+    )
       return;
-    }
     setWorking(true);
     setError(null);
     try {
-      await setMonthLock(monthId, !month.isSettled);
+      await closeSettlementMonth({
+        monthId,
+        drafts,
+        inputHash,
+        exportPackage: finalExportPackage,
+      });
+      lastAttempt.current = null;
+      await onReload();
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason));
+    } finally {
+      setWorking(false);
+    }
+  };
+
+  const reopenMonth = async () => {
+    setWorking(true);
+    setError(null);
+    try {
+      await reopenSettlementMonth(monthId, reopenReason);
+      setReopenOpen(false);
+      setReopenReason('');
       lastAttempt.current = null;
       await onReload();
     } catch (reason) {
@@ -214,6 +259,17 @@ export function MonthlyCalculationStatusPanel({
               />
               <Chip
                 size="small"
+                color={
+                  readiness.blockers.length
+                    ? 'error'
+                    : readiness.warnings.length
+                      ? 'warning'
+                      : 'success'
+                }
+                label={`BLOCKER: ${readiness.blockers.length} / WARNING: ${readiness.warnings.length}`}
+              />
+              <Chip
+                size="small"
                 variant="outlined"
                 label={interpolate(t.settlement.summary.calculationVersion, {
                   version: month.calculationVersion.toString(),
@@ -254,9 +310,11 @@ export function MonthlyCalculationStatusPanel({
                     (!month.isSettled &&
                       (month.calculationStatus !== 'completed' ||
                         month.calculationInputHash !== inputHash ||
-                        month.calculationBlockerCount > 0))
+                        readiness.blockers.length > 0))
                   }
-                  onClick={() => void toggleLock()}
+                  onClick={() =>
+                    month.isSettled ? setReopenOpen(true) : void closeMonth()
+                  }
                 >
                   {month.isSettled
                     ? t.settlement.calculation.unlock
@@ -276,6 +334,52 @@ export function MonthlyCalculationStatusPanel({
               <Alert severity="error" sx={{ py: 0 }}>
                 {t.settlement.calculation.writeFailed}
               </Alert>
+            ) : null}
+            {readiness.blockers.length ? (
+              <Alert severity="error" sx={{ py: 0 }}>
+                BLOCKER: {uniqueIssueCodes(readiness.blockers).join(', ')}
+              </Alert>
+            ) : null}
+            {readiness.warnings.length ? (
+              <Alert severity="warning" sx={{ py: 0 }}>
+                WARNING: {uniqueIssueCodes(readiness.warnings).join(', ')}
+              </Alert>
+            ) : null}
+            {versions.length ? (
+              <Stack
+                direction="row"
+                useFlexGap
+                spacing={0.5}
+                sx={{ flexWrap: 'wrap' }}
+              >
+                <Typography
+                  variant="caption"
+                  color="text.secondary"
+                  sx={{ alignSelf: 'center' }}
+                >
+                  Historia:
+                </Typography>
+                {versions.map((version) => (
+                  <Button
+                    key={version.id}
+                    size="small"
+                    variant="text"
+                    onClick={() =>
+                      void loadClosedSettlementVersion(monthId, version.id)
+                        .then(setSelectedVersion)
+                        .catch((reason: unknown) =>
+                          setError(
+                            reason instanceof Error
+                              ? reason.message
+                              : String(reason),
+                          ),
+                        )
+                    }
+                  >
+                    v{version.versionNumber}
+                  </Button>
+                ))}
+              </Stack>
             ) : null}
           </Stack>
         </CardContent>
@@ -340,6 +444,78 @@ export function MonthlyCalculationStatusPanel({
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Dialog
+        open={reopenOpen}
+        onClose={() => setReopenOpen(false)}
+        fullWidth
+        maxWidth="sm"
+      >
+        <DialogTitle>{t.settlement.calculation.unlock}</DialogTitle>
+        <DialogContent>
+          <TextField
+            autoFocus
+            fullWidth
+            multiline
+            minRows={2}
+            value={reopenReason}
+            onChange={(event) => setReopenReason(event.target.value)}
+            label="Powód ponownego otwarcia"
+            sx={{ mt: 1 }}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setReopenOpen(false)}>Anuluj</Button>
+          <Button
+            variant="contained"
+            color="warning"
+            disabled={!reopenReason.trim() || working}
+            onClick={() => void reopenMonth()}
+          >
+            {t.settlement.calculation.unlock}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(selectedVersion)}
+        onClose={() => setSelectedVersion(null)}
+        fullWidth
+        maxWidth="md"
+      >
+        <DialogTitle>
+          Historia rozliczenia · v{selectedVersion?.versionNumber}
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} sx={{ pt: 1 }}>
+            <Typography color="text.secondary">
+              Snapshot obliczeń: {selectedVersion?.employeeCount ?? 0}{' '}
+              pracowników · wersja kalkulacji{' '}
+              {selectedVersion?.calculationVersion ?? 0}
+            </Typography>
+            <Stack
+              direction="row"
+              useFlexGap
+              spacing={1}
+              sx={{ flexWrap: 'wrap' }}
+            >
+              {selectedVersion?.artifacts.map((artifact) => (
+                <Button
+                  key={artifact.id}
+                  variant="outlined"
+                  startIcon={<SaveOutlined />}
+                  onClick={() => downloadVersionArtifact(artifact)}
+                >
+                  {artifact.fileName}
+                </Button>
+              ))}
+            </Stack>
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setSelectedVersion(null)}>Zamknij</Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }
@@ -363,4 +539,24 @@ function formatRecoveryAge(
         minutes: minutes.toString(),
       })
     : interpolate(labels.hours, { count: hours.toString() });
+}
+
+function uniqueIssueCodes(issues: readonly { code: string }[]) {
+  return [...new Set(issues.map((issue) => issue.code))];
+}
+
+function downloadVersionArtifact(
+  artifact: ClosedSettlementVersion['artifacts'][number],
+) {
+  const bytes = new Uint8Array(artifact.content);
+  const href = URL.createObjectURL(
+    new Blob([bytes.buffer], { type: artifact.mimeType }),
+  );
+  const link = document.createElement('a');
+  link.href = href;
+  link.download = artifact.fileName;
+  document.body.append(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(href);
 }

@@ -226,6 +226,8 @@ export function mapMonthDocument(
     calculationWarningCount: document.calculation_warning_count ?? 0,
     settledAt: document.settled_at?.toDate() ?? null,
     settledBy: document.settled_by ?? null,
+    settlementVersionNumber: document.settlement_version_number ?? 0,
+    currentSettlementVersionId: document.current_settlement_version_id ?? null,
     ...modificationMetadata(document),
   };
 }

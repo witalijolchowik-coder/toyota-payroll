@@ -1836,10 +1836,12 @@ export const pl = {
       changed: 'Miesiąc zmieniony — oczekuje na przeliczenie',
       blocked: 'Rozliczenie zawiera blokery',
       failed: 'Przeliczenie nie powiodło się',
-      locked: 'Miesiąc zablokowany',
+      locked: 'Rozliczenie zamknięte',
       recalculate: 'Przelicz miesiąc',
-      lock: 'Zablokuj miesiąc',
-      unlock: 'Odblokuj miesiąc',
+      lock: 'Zamknij rozliczenie',
+      unlock: 'Otwórz ponownie',
+      lockConfirmation:
+        'Rozliczenie zawiera ostrzeżenia. Można je zaakceptować, ale przed zamknięciem warto je sprawdzić. Czy zamknąć rozliczenie?',
       writeFailed:
         'Nie udało się zapisać wyniku obliczenia. Dane źródłowe pozostały zapisane; użyj ponownego przeliczenia.',
       unlockConfirmation:

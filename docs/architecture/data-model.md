@@ -21,6 +21,10 @@ This is the final MVP shape. It supersedes the earlier enterprise collection hie
 
 /months/{monthId}
   /employeeSettlements/{employeeId}
+  /settlementVersions/{versionId}
+    /calculations/{employeeId}
+    /artifacts/{artifactId}
+      /chunks/{chunkId}
   /reviewStates/{employeeId}
   /dailyValues/{employeeId_YYYY-MM-DD}
   /scheduleCorrections/{correctionId}

@@ -1136,11 +1136,10 @@ export function calculateEmployeeMonthlyDraft({
       : 0;
   const effectiveHolidayDecision =
     workTimeBeforeBalance.holidayWorkBonusEligible
-      ? (holidayWorkBonusDecision ?? 'PENDING')
+      ? holidayWorkBonusDecision === 'REJECTED'
+        ? 'REJECTED'
+        : 'CONFIRMED'
       : null;
-  if (effectiveHolidayDecision === 'PENDING') {
-    warnings.push(warning('holiday-work-bonus-confirmation-required'));
-  }
   const holidayWorkBonusBrutto =
     effectiveHolidayDecision === 'REJECTED'
       ? 0

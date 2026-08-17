@@ -166,6 +166,8 @@ export interface PayrollMonth extends ModificationMetadata {
   calculationWarningCount: number;
   settledAt: Date | null;
   settledBy: string | null;
+  settlementVersionNumber: number;
+  currentSettlementVersionId: string | null;
 }
 
 export interface EmployeeSettlement {

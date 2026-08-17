@@ -5,6 +5,7 @@ import {
   type RulesTestEnvironment,
 } from '@firebase/rules-unit-testing';
 import {
+  Bytes,
   collection,
   deleteDoc,
   doc,
@@ -778,6 +779,111 @@ describe('Firestore security rules', () => {
         updated_at: serverTimestamp(),
         updated_by: uid,
       }),
+    );
+  });
+
+  it('atomically closes a month with an immutable version, calculation snapshot and artifact', async () => {
+    await seedMonth('2026-07', false);
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await updateDoc(doc(context.firestore(), 'months', '2026-07'), {
+        calculation_status: 'completed',
+        calculation_version: 3,
+        calculation_input_hash: 'v1-final',
+        calculation_blocker_count: 0,
+      });
+    });
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const batch = writeBatch(firestore);
+    batch.set(doc(firestore, 'months/2026-07/settlementVersions/v0001'), {
+      month_id: '2026-07',
+      version_number: 1,
+      calculation_version: 3,
+      calculation_input_hash: 'v1-final',
+      created_at: serverTimestamp(),
+      created_by: uid,
+      employee_count: 1,
+      blocker_count: 0,
+      warning_count: 1,
+      warning_codes: ['not-reviewed'],
+      artifact_count: 1,
+    });
+    batch.set(
+      doc(
+        firestore,
+        'months/2026-07/settlementVersions/v0001/calculations/employee-1',
+      ),
+      {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        result: { monthId: '2026-07', totals: { workedHours: 168 } },
+      },
+    );
+    batch.set(
+      doc(
+        firestore,
+        'months/2026-07/settlementVersions/v0001/artifacts/soz-pl',
+      ),
+      {
+        artifact_id: 'soz-pl',
+        file_name: 'SOZ_TBPL_PL_2026-07.csv',
+        mime_type: 'text/csv',
+        byte_size: 3,
+        chunk_count: 1,
+      },
+    );
+    batch.set(
+      doc(
+        firestore,
+        'months/2026-07/settlementVersions/v0001/artifacts/soz-pl/chunks/0000',
+      ),
+      {
+        chunk_index: 0,
+        content: Bytes.fromUint8Array(new Uint8Array([1, 2, 3])),
+      },
+    );
+    batch.update(doc(firestore, 'months', '2026-07'), {
+      is_settled: true,
+      settled_at: serverTimestamp(),
+      settled_by: uid,
+      settlement_version_number: 1,
+      current_settlement_version_id: 'v0001',
+      updated_at: serverTimestamp(),
+      updated_by: uid,
+    });
+    await assertSucceeds(batch.commit());
+
+    await assertFails(
+      updateDoc(doc(firestore, 'months/2026-07/settlementVersions/v0001'), {
+        warning_count: 0,
+      }),
+    );
+    await assertFails(
+      deleteDoc(doc(firestore, 'months/2026-07/settlementVersions/v0001')),
+    );
+    await assertSucceeds(
+      updateDoc(doc(firestore, 'months', '2026-07'), {
+        is_settled: false,
+        calculation_status: 'queued',
+        calculation_input_hash: null,
+        settled_at: null,
+        settled_by: null,
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertFails(
+      setDoc(
+        doc(
+          firestore,
+          'months/2026-07/settlementVersions/v0001/calculations/employee-2',
+        ),
+        {
+          employee_id: 'employee-2',
+          teta_number: 'TETA-1002',
+          result: { monthId: '2026-07' },
+        },
+      ),
     );
   });
 

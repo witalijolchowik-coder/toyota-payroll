@@ -109,6 +109,31 @@ export const firestorePaths = {
       'employeeId',
     )}`;
   },
+  settlementVersions(monthId: string) {
+    return `${this.month(monthId)}/settlementVersions`;
+  },
+  settlementVersion(monthId: string, versionId: string) {
+    return `${this.settlementVersions(monthId)}/${assertPathSegment(
+      versionId,
+      'versionId',
+    )}`;
+  },
+  settlementVersionCalculations(monthId: string, versionId: string) {
+    return `${this.settlementVersion(monthId, versionId)}/calculations`;
+  },
+  settlementVersionArtifacts(monthId: string, versionId: string) {
+    return `${this.settlementVersion(monthId, versionId)}/artifacts`;
+  },
+  settlementVersionArtifactChunks(
+    monthId: string,
+    versionId: string,
+    artifactId: string,
+  ) {
+    return `${this.settlementVersionArtifacts(monthId, versionId)}/${assertPathSegment(
+      artifactId,
+      'artifactId',
+    )}/chunks`;
+  },
   recoveryPoints(monthId: string) {
     return `${this.month(monthId)}/recoveryPoints`;
   },

@@ -12,6 +12,23 @@ import {
 } from './settlementExports';
 
 describe('settlement export formats', () => {
+  it('distinguishes unfinished previews from final close artifacts', () => {
+    const input = {
+      monthId: '2026-06' as const,
+      monthNominalHours: 168,
+      records: [exportRecord({ id: '1', tetaNumber: 'T1' })],
+    };
+    const preview = prepareSettlementExportPackage({
+      ...input,
+      mode: 'preview',
+    });
+    const final = prepareSettlementExportPackage({ ...input, mode: 'final' });
+
+    expect(preview.soz.plFileName).toContain('ROZLICZENIE_NIEZAMKNIETE');
+    expect(final.soz.plFileName).toBe('SOZ_TBPL_PL_2026-06.csv');
+    expect(final.toyota.fileName).not.toContain('NIEZAKOŃCZONE');
+  });
+
   it('keeps Toyota export as one combined worker list', () => {
     const result = prepareSettlementExportPackage({
       monthId: '2026-06',
@@ -69,6 +86,7 @@ describe('settlement export formats', () => {
     expect(result.soz.foreignRows).toHaveLength(0);
     expect(result.warnings).toContainEqual({
       code: 'missing-identity',
+      severity: 'BLOCKER',
       employeeId: '1',
       tetaNumber: 'T1',
     });
@@ -399,6 +417,7 @@ describe('settlement export formats', () => {
 
     expect(result.warnings).toContainEqual({
       code: 'unsupported-columns',
+      severity: 'BLOCKER',
       employeeId: '1',
       tetaNumber: 'T1',
     });

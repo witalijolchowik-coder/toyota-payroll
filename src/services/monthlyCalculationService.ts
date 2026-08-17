@@ -34,10 +34,12 @@ const BLOCKING_WARNINGS = new Set([
   'unresolved-housing-deposit-setting',
   'housing-status-missing',
   'udt-entitlement-incomplete',
-  'housing-deposit-withholding-unproven',
-  'holiday-work-bonus-confirmation-required',
   'critical-read-failure',
 ]);
+
+export function isMonthlyCalculationBlocker(code: string) {
+  return BLOCKING_WARNINGS.has(code);
+}
 
 export type CalculationPersistenceResult =
   'persisted' | 'current' | 'busy' | 'locked';
@@ -240,50 +242,6 @@ export async function persistMonthlyCalculation({
     });
     throw error;
   }
-}
-
-export async function setMonthLock(monthId: MonthId, locked: boolean) {
-  const firestore = getFirestoreClient();
-  const repositories = getFirestoreRepositories();
-  const actorUid = auth?.currentUser?.uid;
-  if (!firestore || !repositories || !actorUid)
-    throw new Error('calculation-unavailable');
-  const monthRef = repositories.forMonth(monthId).month;
-  await runTransaction(firestore, async (transaction) => {
-    const snapshot = await transaction.get(monthRef);
-    if (!snapshot.exists()) throw new Error('month-unavailable');
-    const month = snapshot.data();
-    if (
-      locked &&
-      (month.calculation_status !== 'completed' ||
-        (month.calculation_blocker_count ?? 0) > 0)
-    ) {
-      throw new Error('month-not-ready');
-    }
-    transaction.update(monthRef, {
-      is_settled: locked,
-      settled_at: locked ? serverTimestamp() : null,
-      settled_by: locked ? actorUid : null,
-      calculation_status: locked ? month.calculation_status : 'queued',
-      calculation_input_hash: locked
-        ? (month.calculation_input_hash ?? null)
-        : null,
-      updated_at: serverTimestamp(),
-      updated_by: actorUid,
-    });
-    transaction.set(doc(repositories.auditLog), {
-      entity_path: firestorePaths.month(monthId),
-      action: locked ? 'settle' : 'update',
-      actor_uid: actorUid,
-      occurred_at: serverTimestamp(),
-      changes: {
-        operation: locked ? 'month-locked' : 'month-unlocked',
-        month_id: monthId,
-        calculation_version: month.calculation_version,
-        calculation_input_hash: month.calculation_input_hash ?? null,
-      },
-    });
-  });
 }
 
 function serializeDraft(draft: EmployeeMonthlyCalculationDraft) {

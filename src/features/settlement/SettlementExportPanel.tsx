@@ -16,39 +16,18 @@ import { interpolate } from '../../i18n/pl';
 import { auth } from '../../config/firebase';
 import { recordAuditEntry } from '../../services/auditService';
 import { firestorePaths } from '../../services/firestore/paths';
-import type {
-  DailyValue,
-  Department,
-  Employee,
-  MonthId,
-  SettlementReviewState,
-} from '../../types/firestore';
 import {
-  buildSettlementReviewItems,
-  calculateMonthNominalHours,
-  type EmployeeMonthlyCalculationDraft,
-} from '../../utils/payroll';
-import {
-  prepareSettlementExportPackage,
   renderAbsenceWorkbook,
   type ExportReadinessWarningCode,
 } from '../../utils/reports';
+import type { SettlementVersionArtifact } from '../../services/settlementVersionService';
 import {
-  dailyValueLookupKey,
-  resolveSettlementCellValue,
-  type CalendarDay,
-} from './monthUtils';
-import { canonicalDepartmentOfficialName } from '../../utils/organization';
+  buildSettlementExportPackageForMonth,
+  type SettlementExportBuildInput,
+} from './settlementExportBuilder';
 
-interface SettlementExportPanelProps {
-  monthId: MonthId;
-  employees: Employee[];
-  departments: Department[];
-  days: CalendarDay[];
-  dailyValues: DailyValue[];
-  drafts: EmployeeMonthlyCalculationDraft[];
-  reviewStates: SettlementReviewState[];
-  publicHolidays: ReadonlySet<string>;
+interface SettlementExportPanelProps extends SettlementExportBuildInput {
+  finalArtifacts?: SettlementVersionArtifact[] | null;
 }
 
 export function SettlementExportPanel({
@@ -60,82 +39,82 @@ export function SettlementExportPanel({
   drafts,
   reviewStates,
   publicHolidays,
+  mode = 'preview',
+  finalArtifacts = null,
 }: SettlementExportPanelProps) {
   const t = useTranslations();
-  const exportPackage = useMemo(() => {
-    const departmentsById = new Map(
-      departments.map((department) => [department.id, department]),
-    );
-    const dailyValuesByEmployeeAndDate = new Map(
-      dailyValues.map((value) => [
-        dailyValueLookupKey(value.employeeId, value.date),
-        value,
-      ]),
-    );
-    const reviewItems = buildSettlementReviewItems({ drafts, reviewStates });
-    const reviewItemsByEmployeeId = new Map(
-      reviewItems.map((item) => [item.draft.employeeId, item]),
-    );
-    const employeesById = new Map(
-      employees.map((employee) => [employee.id, employee]),
-    );
-    const records = drafts.flatMap((draft) => {
-      const employee = employeesById.get(draft.employeeId);
-      if (!employee) {
-        return [];
-      }
-      const reviewItem = reviewItemsByEmployeeId.get(employee.id);
-      return [
-        {
-          employee,
-          departmentName:
-            canonicalDepartmentOfficialName(employee.departmentId) ??
-            (employee.departmentId
-              ? departmentsById.get(employee.departmentId)?.name
-              : null),
-          identity: {
-            pesel: employee.pesel,
-            passport: employee.passportNumber,
-            foreignDocument: employee.foreignDocumentNumber,
-          },
-          draft,
-          reviewStatus: reviewItem?.effectiveStatus,
-          unresolvedIssueCount: reviewItem?.unresolvedIssueCount ?? 0,
-          dailyCells: days.map((day) => {
-            const value = resolveSettlementCellValue({
-              employee,
-              day,
-              persistedValue: dailyValuesByEmployeeAndDate.get(
-                dailyValueLookupKey(employee.id, day.isoDate),
-              ),
-            });
-            return {
-              dayOfMonth: day.dayOfMonth,
-              hours: value.hours,
-            };
-          }),
-        },
-      ];
-    });
-
-    return prepareSettlementExportPackage({
-      monthId,
-      records,
-      monthNominalHours: calculateMonthNominalHours(monthId, {
+  const exportPackage = useMemo(
+    () =>
+      buildSettlementExportPackageForMonth({
+        monthId,
+        employees,
+        departments,
+        days,
+        dailyValues,
+        drafts,
+        reviewStates,
         publicHolidays,
+        mode,
       }),
-    });
-  }, [
-    dailyValues,
-    days,
-    departments,
-    drafts,
-    employees,
-    monthId,
-    publicHolidays,
-    reviewStates,
-  ]);
-  const warningCounts = countWarnings(exportPackage.warnings);
+    [
+      dailyValues,
+      days,
+      departments,
+      drafts,
+      employees,
+      monthId,
+      publicHolidays,
+      reviewStates,
+      mode,
+    ],
+  );
+  const blockerCounts = countWarnings(
+    exportPackage.warnings.filter((warning) => warning.severity === 'BLOCKER'),
+  );
+  const warningCounts = countWarnings(
+    exportPackage.warnings.filter((warning) => warning.severity === 'WARNING'),
+  );
+
+  if (finalArtifacts) {
+    return (
+      <Card>
+        <CardContent>
+          <Stack spacing={2}>
+            <Typography variant="h6">
+              Finalny pakiet zamkniętej wersji
+            </Typography>
+            <Alert severity="success">
+              Pliki poniżej są zapisanymi artefaktami wersji zamkniętej i nie są
+              generowane ponownie.
+            </Alert>
+            <Stack
+              direction="row"
+              useFlexGap
+              spacing={1}
+              sx={{ flexWrap: 'wrap' }}
+            >
+              {finalArtifacts.map((artifact) => (
+                <Button
+                  key={artifact.id}
+                  variant="outlined"
+                  startIcon={<DownloadOutlined />}
+                  onClick={() =>
+                    downloadBinaryFile(
+                      artifact.fileName,
+                      artifact.content,
+                      artifact.mimeType,
+                    )
+                  }
+                >
+                  {artifact.fileName}
+                </Button>
+              ))}
+            </Stack>
+          </Stack>
+        </CardContent>
+      </Card>
+    );
+  }
   const runExport = (outputType: string, download: () => void) => {
     const actorUid = auth?.currentUser?.uid;
     if (actorUid) {
@@ -177,7 +156,11 @@ export function SettlementExportPanel({
             </div>
             <Chip
               color={
-                exportPackage.warnings.length === 0 ? 'success' : 'warning'
+                Object.keys(blockerCounts).length
+                  ? 'error'
+                  : exportPackage.warnings.length === 0
+                    ? 'success'
+                    : 'warning'
               }
               variant="outlined"
               label={
@@ -190,9 +173,32 @@ export function SettlementExportPanel({
             />
           </Stack>
 
-          {exportPackage.warnings.length > 0 ? (
+          {Object.keys(blockerCounts).length > 0 ? (
+            <Alert severity="error">
+              <Stack spacing={0.5}>
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                  BLOCKER
+                </Typography>
+                {Object.entries(blockerCounts).map(([code, count]) => (
+                  <Typography key={code} variant="body2">
+                    {interpolate(
+                      t.settlement.export.warnings[
+                        code as ExportReadinessWarningCode
+                      ],
+                      { count: count.toString() },
+                    )}
+                  </Typography>
+                ))}
+              </Stack>
+            </Alert>
+          ) : null}
+
+          {Object.keys(warningCounts).length > 0 ? (
             <Alert severity="warning">
               <Stack spacing={0.5}>
+                <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                  WARNING
+                </Typography>
                 {Object.entries(warningCounts).map(([code, count]) => (
                   <Typography key={code} variant="body2">
                     {interpolate(

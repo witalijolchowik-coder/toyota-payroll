@@ -88,6 +88,7 @@ import {
 } from './publicHolidays';
 import { SettlementReviewPanel } from './SettlementReviewPanel';
 import { SettlementExportPanel } from './SettlementExportPanel';
+import { buildSettlementExportPackageForMonth } from './settlementExportBuilder';
 import { SettlementGrid } from './SettlementGrid';
 import { SettlementLegend } from './SettlementLegend';
 import { useSettlementMonth } from './useSettlementMonth';
@@ -270,39 +271,41 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
       }),
     ]),
   );
-  const calculationDraftsBase = calculateMonthlyDrafts({
-    monthId,
-    employees: participatingEmployees,
-    dailyValues: participatingDailyValues,
-    absences: participatingAbsences,
-    payrollSettings: data.payrollSettings,
-    adjustments: data.adjustments,
-    entitlementsByEmployeeId,
-    depositReturnOverridesByEmployeeId: new Map(
-      data.reviewStates.map((state) => {
-        const episodeId = entitlementsByEmployeeId.get(state.employeeId)
-          ?.companyAccommodation?.episodeId;
-        return [
-          state.employeeId,
-          !state.depositReturnEpisodeId ||
-          state.depositReturnEpisodeId === episodeId
-            ? state.depositReturnOverride
-            : null,
-        ];
-      }),
-    ),
-    holidayWorkBonusDecisionsByEmployeeId: new Map(
-      data.reviewStates.map((state) => [
-        state.employeeId,
-        state.holidayWorkBonusDecision,
-      ]),
-    ),
-    depositWithholdingEvidenceByEpisodeId:
-      data.depositWithholdingEvidenceByEpisodeId,
-    plannedSchedulesByEmployeeId,
-    calendarOptions: { publicHolidays },
-  });
-  const calculationDrafts = data.sourceFailures.length
+  const calculationDraftsBase = data.month.isSettled
+    ? []
+    : calculateMonthlyDrafts({
+        monthId,
+        employees: participatingEmployees,
+        dailyValues: participatingDailyValues,
+        absences: participatingAbsences,
+        payrollSettings: data.payrollSettings,
+        adjustments: data.adjustments,
+        entitlementsByEmployeeId,
+        depositReturnOverridesByEmployeeId: new Map(
+          data.reviewStates.map((state) => {
+            const episodeId = entitlementsByEmployeeId.get(state.employeeId)
+              ?.companyAccommodation?.episodeId;
+            return [
+              state.employeeId,
+              !state.depositReturnEpisodeId ||
+              state.depositReturnEpisodeId === episodeId
+                ? state.depositReturnOverride
+                : null,
+            ];
+          }),
+        ),
+        holidayWorkBonusDecisionsByEmployeeId: new Map(
+          data.reviewStates.map((state) => [
+            state.employeeId,
+            state.holidayWorkBonusDecision,
+          ]),
+        ),
+        depositWithholdingEvidenceByEpisodeId:
+          data.depositWithholdingEvidenceByEpisodeId,
+        plannedSchedulesByEmployeeId,
+        calendarOptions: { publicHolidays },
+      });
+  const dynamicCalculationDrafts = data.sourceFailures.length
     ? calculationDraftsBase.map((draft) => ({
         ...draft,
         warnings: [
@@ -315,6 +318,9 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
         ],
       }))
     : calculationDraftsBase;
+  const calculationDrafts = data.month.isSettled
+    ? (data.closedVersion?.drafts ?? [])
+    : dynamicCalculationDrafts;
   const calculationInputHash = createMonthlyCalculationInputHash({
     monthId,
     employees: participatingEmployees,
@@ -333,6 +339,17 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
     depositWithholdingEvidence: [
       ...data.depositWithholdingEvidenceByEpisodeId.values(),
     ],
+  });
+  const finalExportPackage = buildSettlementExportPackageForMonth({
+    monthId,
+    employees: participatingEmployees,
+    departments: data.departments,
+    days,
+    dailyValues: participatingDailyValues,
+    drafts: calculationDrafts,
+    reviewStates: data.reviewStates,
+    publicHolidays,
+    mode: 'final',
   });
   const draftsByEmployeeId = new Map(
     calculationDrafts.map((draft) => [draft.employeeId, draft]),
@@ -532,6 +549,14 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
         </Alert>
       ) : null}
 
+      {data.month.isSettled && !data.closedVersion ? (
+        <Alert severity="error">
+          To jest legacy zamknięty miesiąc bez wersjonowanego snapshotu. System
+          nie przelicza go aktualnym algorytmem; otwórz go ponownie i zamknij po
+          weryfikacji, aby utworzyć pierwszą trwałą wersję.
+        </Alert>
+      ) : null}
+
       {participation.missingContractHistory.length > 0 ? (
         <Alert severity="warning">
           <strong>
@@ -572,6 +597,7 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
             employeeCount={participatingEmployees.length}
             monthLabel={monthFormatter.format(range.start)}
             onReload={reload}
+            finalExportPackage={finalExportPackage}
           />
           <CalendarConstructorToolbar
             selectedTool={selectedTool}
@@ -792,6 +818,8 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
             drafts={calculationDrafts}
             reviewStates={data.reviewStates}
             publicHolidays={publicHolidays}
+            mode="preview"
+            finalArtifacts={data.closedVersion?.artifacts ?? null}
           />
           <PayrollDraftPanel
             drafts={filteredDrafts}

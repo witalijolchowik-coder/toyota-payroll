@@ -619,7 +619,7 @@ describe('employee monthly calculation draft', () => {
     );
   });
 
-  it('suggests the holiday bonus only once per month and requires a coordinator decision', () => {
+  it('automatically applies the holiday bonus once per month', () => {
     const result = draft({
       dailyValues: [
         dailyValue({
@@ -642,8 +642,8 @@ describe('employee monthly calculation draft', () => {
     expect(result.workTime.paidOvertime100Hours).toBe(8);
     expect(result.components.holidayWorkBonusBrutto).toBe(300);
     expect(result.components.holidayWorkBonusSuggestedBrutto).toBe(300);
-    expect(result.components.holidayWorkBonusDecision).toBe('PENDING');
-    expect(result.warnings.map((item) => item.code)).toContain(
+    expect(result.components.holidayWorkBonusDecision).toBe('CONFIRMED');
+    expect(result.warnings.map((item) => item.code)).not.toContain(
       'holiday-work-bonus-confirmation-required',
     );
   });

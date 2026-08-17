@@ -153,6 +153,8 @@ export interface MonthDocument extends ModificationMetadataDocument {
   calculation_warning_count?: number;
   settled_at?: Timestamp | null;
   settled_by?: string | null;
+  settlement_version_number?: number;
+  current_settlement_version_id?: string | null;
 }
 
 export interface SettlementTotalsDocument {

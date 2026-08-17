@@ -382,6 +382,15 @@ export const monthConverter = createConverter<MonthDocument>((data, path) => ({
       : readNumber(data, 'calculation_warning_count', path),
   settled_at: readOptionalNullableTimestamp(data, 'settled_at', path),
   settled_by: readOptionalNullableString(data, 'settled_by', path),
+  settlement_version_number:
+    data.settlement_version_number === undefined
+      ? 0
+      : readNumber(data, 'settlement_version_number', path),
+  current_settlement_version_id: readOptionalNullableString(
+    data,
+    'current_settlement_version_id',
+    path,
+  ),
   ...metadata(data, path),
 }));
 

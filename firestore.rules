@@ -1246,6 +1246,8 @@ service cloud.firestore {
               'calculation_warning_count',
               'settled_at',
               'settled_by',
+              'settlement_version_number',
+              'current_settlement_version_id',
               'updated_at',
               'updated_by'
             ])
@@ -1255,7 +1257,13 @@ service cloud.firestore {
               || (request.resource.data.calculation_status == 'completed'
                 && request.resource.data.calculation_blocker_count == 0
                 && request.resource.data.settled_at == request.time
-                && request.resource.data.settled_by == request.auth.uid))
+                && request.resource.data.settled_by == request.auth.uid
+                && request.resource.data.settlement_version_number
+                  == resource.data.get('settlement_version_number', 0) + 1
+                && isNonEmptyString(
+                  request.resource.data.current_settlement_version_id
+                )
+                && existsAfter(/databases/$(database)/documents/months/$(monthId)/settlementVersions/$(request.resource.data.current_settlement_version_id))))
           )
           || (
             resource.data.is_settled == true
@@ -1325,6 +1333,112 @@ service cloud.firestore {
           && request.resource.data.totals is map
           && request.resource.data.result is map;
         allow delete: if isAuthenticated() && monthExistsAndIsOpen(monthId);
+      }
+
+      match /settlementVersions/{versionId} {
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated()
+          && monthExistsAndIsOpen(monthId)
+          && request.resource.data.keys().hasAll([
+            'month_id',
+            'version_number',
+            'calculation_version',
+            'calculation_input_hash',
+            'created_at',
+            'created_by',
+            'employee_count',
+            'blocker_count',
+            'warning_count',
+            'warning_codes',
+            'artifact_count'
+          ])
+          && request.resource.data.keys().hasOnly([
+            'month_id',
+            'version_number',
+            'calculation_version',
+            'calculation_input_hash',
+            'created_at',
+            'created_by',
+            'employee_count',
+            'blocker_count',
+            'warning_count',
+            'warning_codes',
+            'artifact_count'
+          ])
+          && request.resource.data.month_id == monthId
+          && request.resource.data.version_number is int
+          && request.resource.data.version_number > 0
+          && request.resource.data.calculation_version is int
+          && isNonEmptyString(request.resource.data.calculation_input_hash)
+          && request.resource.data.created_at == request.time
+          && request.resource.data.created_by == request.auth.uid
+          && request.resource.data.employee_count is int
+          && request.resource.data.employee_count >= 0
+          && request.resource.data.blocker_count == 0
+          && request.resource.data.warning_count is int
+          && request.resource.data.warning_count >= 0
+          && request.resource.data.warning_codes is list
+          && request.resource.data.artifact_count is int
+          && request.resource.data.artifact_count > 0
+          && getAfter(/databases/$(database)/documents/months/$(monthId)).data.is_settled == true
+          && getAfter(/databases/$(database)/documents/months/$(monthId)).data.current_settlement_version_id == versionId
+          && getAfter(/databases/$(database)/documents/months/$(monthId)).data.settlement_version_number
+            == request.resource.data.version_number;
+        allow update, delete: if false;
+
+        match /calculations/{employeeId} {
+          allow read: if isAuthenticated();
+          allow create: if isAuthenticated()
+            && monthExistsAndIsOpen(monthId)
+            && !exists(/databases/$(database)/documents/months/$(monthId)/settlementVersions/$(versionId))
+            && existsAfter(/databases/$(database)/documents/months/$(monthId)/settlementVersions/$(versionId))
+            && request.resource.data.keys().hasAll([
+              'employee_id', 'teta_number', 'result'
+            ])
+            && request.resource.data.keys().hasOnly([
+              'employee_id', 'teta_number', 'result'
+            ])
+            && request.resource.data.employee_id == employeeId
+            && isNonEmptyString(request.resource.data.teta_number)
+            && request.resource.data.result is map;
+          allow update, delete: if false;
+        }
+
+        match /artifacts/{artifactId} {
+          allow read: if isAuthenticated();
+          allow create: if isAuthenticated()
+            && monthExistsAndIsOpen(monthId)
+            && !exists(/databases/$(database)/documents/months/$(monthId)/settlementVersions/$(versionId))
+            && existsAfter(/databases/$(database)/documents/months/$(monthId)/settlementVersions/$(versionId))
+            && request.resource.data.keys().hasAll([
+              'artifact_id', 'file_name', 'mime_type', 'byte_size', 'chunk_count'
+            ])
+            && request.resource.data.keys().hasOnly([
+              'artifact_id', 'file_name', 'mime_type', 'byte_size', 'chunk_count'
+            ])
+            && request.resource.data.artifact_id == artifactId
+            && isNonEmptyString(request.resource.data.file_name)
+            && isNonEmptyString(request.resource.data.mime_type)
+            && request.resource.data.byte_size is int
+            && request.resource.data.byte_size >= 0
+            && request.resource.data.chunk_count is int
+            && request.resource.data.chunk_count > 0;
+          allow update, delete: if false;
+
+          match /chunks/{chunkId} {
+            allow read: if isAuthenticated();
+            allow create: if isAuthenticated()
+              && monthExistsAndIsOpen(monthId)
+              && !exists(/databases/$(database)/documents/months/$(monthId)/settlementVersions/$(versionId))
+              && existsAfter(/databases/$(database)/documents/months/$(monthId)/settlementVersions/$(versionId))
+              && request.resource.data.keys().hasAll(['chunk_index', 'content'])
+              && request.resource.data.keys().hasOnly(['chunk_index', 'content'])
+              && request.resource.data.chunk_index is int
+              && request.resource.data.chunk_index >= 0
+              && request.resource.data.content is bytes;
+            allow update, delete: if false;
+          }
+        }
       }
 
       match /recoveryPoints/{recoveryPointId} {

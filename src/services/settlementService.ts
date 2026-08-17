@@ -55,6 +55,10 @@ import {
   getFirestoreRepositories,
 } from './firestoreService';
 import { hydrateEmployeesWithEmploymentHistory } from './employeeHistoryHydration';
+import {
+  loadClosedSettlementVersion,
+  type ClosedSettlementVersion,
+} from './settlementVersionService';
 
 export type SettlementServiceErrorCode =
   | 'firebase-unavailable'
@@ -95,6 +99,7 @@ export interface SettlementMonthData {
   shiftHoursVersions: ShiftHoursVersion[];
   departmentShiftCorrections: DepartmentShiftCorrection[];
   sourceFailures: string[];
+  closedVersion: ClosedSettlementVersion | null;
 }
 
 async function requireActorUid(): Promise<string> {
@@ -378,8 +383,17 @@ export async function loadSettlementMonth(
     sourceFailures,
   );
 
+  const month = mapMonthDocument(monthId, monthSnapshot.data());
+  const closedVersion =
+    month.isSettled && month.currentSettlementVersionId
+      ? await loadClosedSettlementVersion(
+          monthId,
+          month.currentSettlementVersionId,
+        )
+      : null;
+
   return {
-    month: mapMonthDocument(monthId, monthSnapshot.data()),
+    month,
     employees,
     employeeEntitlements,
     employeeAssignments,
@@ -394,6 +408,7 @@ export async function loadSettlementMonth(
     shiftHoursVersions,
     departmentShiftCorrections,
     sourceFailures,
+    closedVersion,
   };
 }
 

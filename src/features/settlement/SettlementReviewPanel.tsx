@@ -76,7 +76,6 @@ const reviewStatuses: SettlementReviewStatus[] = [
 ];
 
 const holidayWorkBonusDecisions: HolidayWorkBonusDecision[] = [
-  'PENDING',
   'CONFIRMED',
   'REJECTED',
 ];
@@ -330,7 +329,9 @@ function SettlementReviewDetailsDialog({
   const [holidayDecision, setHolidayDecision] =
     useState<HolidayWorkBonusDecision | null>(
       item.draft.workTime.holidayWorkBonusEligible
-        ? (item.reviewState?.holidayWorkBonusDecision ?? 'PENDING')
+        ? item.reviewState?.holidayWorkBonusDecision === 'REJECTED'
+          ? 'REJECTED'
+          : 'CONFIRMED'
         : null,
     );
   const [holidayNote, setHolidayNote] = useState(
@@ -558,9 +559,7 @@ function SettlementReviewDetailsDialog({
 
           {item.draft.workTime.holidayWorkBonusEligible ? (
             <Stack spacing={1}>
-              <Alert
-                severity={holidayDecision === 'PENDING' ? 'warning' : 'info'}
-              >
+              <Alert severity="error" variant="outlined">
                 {interpolate(t.settlement.review.details.holidayBonusInfo, {
                   amount: currencyFormatter.format(
                     item.draft.components.holidayWorkBonusSuggestedBrutto,
@@ -570,7 +569,7 @@ function SettlementReviewDetailsDialog({
               <TextField
                 select
                 label={t.settlement.review.details.holidayBonusDecision}
-                value={holidayDecision ?? 'PENDING'}
+                value={holidayDecision ?? 'CONFIRMED'}
                 onChange={(event) =>
                   setHolidayDecision(
                     event.target.value as HolidayWorkBonusDecision,

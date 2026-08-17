@@ -37,6 +37,7 @@ export interface SettlementExportRecord {
 
 export interface ExportReadinessWarning {
   code: ExportReadinessWarningCode;
+  severity: 'BLOCKER' | 'WARNING';
   employeeId: string | null;
   tetaNumber: string | null;
 }
@@ -445,10 +446,12 @@ export function prepareSettlementExportPackage({
   monthId,
   records,
   monthNominalHours,
+  mode = 'auto',
 }: {
   monthId: MonthId;
   records: readonly SettlementExportRecord[];
   monthNominalHours: number;
+  mode?: 'auto' | 'preview' | 'final';
 }): SettlementExportPackage {
   const sortedRecords = [...records].sort((first, second) =>
     employeeName(first).localeCompare(employeeName(second), 'pl-PL'),
@@ -470,7 +473,8 @@ export function prepareSettlementExportPackage({
     .map(mapSozOvertimeNoteEntry)
     .filter((entry): entry is SozOvertimeNoteEntry => entry !== null);
   const note = renderSozOvertimeNote(noteEntries);
-  const incomplete = warnings.length > 0;
+  const incomplete =
+    mode === 'preview' || (mode === 'auto' && warnings.length > 0);
   const prefix = incomplete ? `ROZLICZENIE_NIEZAMKNIETE_${monthId}` : null;
 
   const compensationEntries = noteEntries.filter(
@@ -565,6 +569,7 @@ export function buildExportReadinessWarnings(
   if (records.length === 0) {
     warnings.push({
       code: 'empty-export',
+      severity: 'BLOCKER',
       employeeId: null,
       tetaNumber: null,
     });
@@ -574,6 +579,7 @@ export function buildExportReadinessWarnings(
     if (record.reviewStatus !== 'CHECKED') {
       warnings.push({
         code: 'not-reviewed',
+        severity: 'WARNING',
         employeeId: record.employee.id,
         tetaNumber: record.employee.tetaNumber,
       });
@@ -581,6 +587,7 @@ export function buildExportReadinessWarnings(
     if ((record.unresolvedIssueCount ?? 0) > 0) {
       warnings.push({
         code: 'unresolved-issues',
+        severity: 'WARNING',
         employeeId: record.employee.id,
         tetaNumber: record.employee.tetaNumber,
       });
@@ -588,6 +595,7 @@ export function buildExportReadinessWarnings(
     if (additionalSozPremiums(record.draft).length > 2) {
       warnings.push({
         code: 'unsupported-columns',
+        severity: 'BLOCKER',
         employeeId: record.employee.id,
         tetaNumber: record.employee.tetaNumber,
       });
@@ -599,6 +607,7 @@ export function buildExportReadinessWarnings(
     ) {
       warnings.push({
         code: 'missing-identity',
+        severity: 'BLOCKER',
         employeeId: record.employee.id,
         tetaNumber: record.employee.tetaNumber,
       });
