@@ -22,6 +22,7 @@ import {
   hasCurrentStatusConflict,
   requiredEmployeeDocumentIssues,
   resolveDailyWorkTimeDeviation,
+  resolveEmployeeSettlementEntitlements,
 } from '../payroll';
 import {
   activeContracts,
@@ -509,6 +510,26 @@ export function assessMonthReadiness({
       employee,
       entitlements,
     );
+    const housingResolution = resolveEmployeeSettlementEntitlements({
+      employee,
+      monthId,
+      entitlements,
+    });
+    if (
+      housingResolution.ownHousingAllowanceEligible &&
+      !resolveEffectivePayrollSetting(
+        payrollSettings,
+        'own_housing_allowance',
+        monthId,
+      )
+    ) {
+      addIssue(summary, {
+        ...baseIssue,
+        code: 'own-housing-setting-missing',
+        severity: 'blocking',
+        target: 'settings',
+      });
+    }
     employeeEntitlements.forEach((first, index) => {
       employeeEntitlements.slice(index + 1).forEach((second) => {
         if (!employeeEntitlementsOverlap(first, second)) {
@@ -561,20 +582,6 @@ export function assessMonthReadiness({
 
     employeeEntitlements.filter(overlapsMonth).forEach((entitlement) => {
       if (entitlement.type === 'OWN_HOUSING_ALLOWANCE') {
-        if (
-          !resolveEffectivePayrollSetting(
-            payrollSettings,
-            'own_housing_allowance',
-            monthId,
-          )
-        ) {
-          addIssue(summary, {
-            ...baseIssue,
-            code: 'own-housing-setting-missing',
-            severity: 'blocking',
-            target: 'settings',
-          });
-        }
         return;
       }
       if (entitlement.type !== 'COMPANY_ACCOMMODATION') {

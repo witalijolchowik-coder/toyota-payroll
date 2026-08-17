@@ -5,6 +5,7 @@ import type {
   Employee,
   EmployeeEntitlement,
   HolidayWorkBonusDecision,
+  MonthId,
   PayrollSetting,
 } from '../../types/firestore';
 import {
@@ -65,6 +66,22 @@ function employee(overrides: Partial<Employee> = {}): Employee {
     pesel: overrides.pesel ?? null,
     passportNumber: overrides.passportNumber ?? null,
     foreignDocumentNumber: overrides.foreignDocumentNumber ?? null,
+  };
+}
+
+function explicitEmploymentEnd(endDate: string) {
+  return {
+    id: `employment-end-${endDate}`,
+    employeeId: 'employee-1',
+    tetaNumber: 'T001',
+    sequenceId: 'sequence-1',
+    endDate,
+    status: 'ACTIVE' as const,
+    reason: 'Zakończenie współpracy',
+    createdAt,
+    createdBy: 'test',
+    updatedAt: createdAt,
+    updatedBy: 'test',
   };
 }
 
@@ -200,6 +217,7 @@ function entitlement(
 }
 
 function draft({
+  monthId = '2026-06',
   target = employee(),
   dailyValues = [],
   absences = [],
@@ -212,6 +230,7 @@ function draft({
   holidayWorkBonusDecision = null,
   depositWithholdingEvidence = null,
 }: {
+  monthId?: MonthId;
   target?: Employee;
   dailyValues?: DailyValue[];
   absences?: Absence[];
@@ -225,7 +244,7 @@ function draft({
   depositWithholdingEvidence?: HousingDepositWithholdingEvidence | null;
 } = {}) {
   return calculateEmployeeMonthlyDraft({
-    monthId: '2026-06',
+    monthId,
     employee: target,
     dailyValues,
     absences,
@@ -383,7 +402,7 @@ describe('employee monthly calculation draft', () => {
     expect(result.totals.frequencyBonusAmount).toBe(400);
   });
 
-  it('preserves a real one-day gap between contracts', () => {
+  it('preserves a real gap between explicitly separated employment lifecycles', () => {
     const target = employee({
       contracts: [
         {
@@ -395,10 +414,12 @@ describe('employee monthly calculation draft', () => {
         {
           ...employee().contracts![0]!,
           id: 'second-half',
+          sequenceId: 'sequence-2',
           startDate: '2026-06-17',
           endDate: '2026-08-31',
         },
       ],
+      employmentEndEvents: [explicitEmploymentEnd('2026-06-15')],
     });
 
     expect(draft({ target }).employment.fullCalendarMonth).toBe(false);
@@ -758,7 +779,10 @@ describe('employee monthly calculation draft', () => {
 
     expect(
       draft({
-        target: employee({ employmentEndDate: utcDate('2026-06-29') }),
+        target: employee({
+          employmentEndDate: utcDate('2026-06-29'),
+          employmentEndEvents: [explicitEmploymentEnd('2026-06-29')],
+        }),
         entitlements: { udtEligible: true },
       }).components.udtAllowanceBrutto,
     ).toBe(0);
@@ -810,6 +834,164 @@ describe('employee monthly calculation draft', () => {
 
     expect(result.components.companyAccommodationMediaDeduction).toBe(250);
     expect(result.components.companyAccommodationRentDeduction).toBe(75);
+    expect(result.components.companyAccommodationDeduction).toBe(325);
+  });
+
+  it.each([
+    ['2026-02', 28],
+    ['2028-02', 29],
+    ['2026-04', 30],
+    ['2026-07', 31],
+  ] as const)(
+    'uses all %s calendar days as the housing denominator',
+    (monthId, daysInMonth) => {
+      const result = draft({
+        monthId,
+        entitlements: {
+          companyAccommodationPeriods: [
+            {
+              entitlementId: 'company',
+              episodeId: 'company',
+              variantKey: 'type-a',
+              validFrom: `${monthId}-01`,
+              validTo: `${monthId}-01`,
+            },
+          ],
+        },
+        settings: [
+          payrollSetting({
+            id: 'type-a',
+            settingKey: 'accommodation_allowance',
+            variantKey: 'type-a',
+            amount: 500,
+          }),
+          payrollSetting({
+            id: 'type-a-media',
+            settingKey: 'company_housing_media',
+            variantKey: 'type-a',
+            amount: 150,
+          }),
+        ],
+      });
+
+      expect(result.components.companyAccommodationDeduction).toBeCloseTo(
+        Math.round((500 / daysInMonth) * 100) / 100 +
+          Math.round((150 / daysInMonth) * 100) / 100,
+        2,
+      );
+    },
+  );
+
+  it('sums several company housing periods without charging the own-housing gap', () => {
+    const result = draft({
+      monthId: '2026-06',
+      entitlements: {
+        companyAccommodationPeriods: [
+          {
+            entitlementId: 'first',
+            episodeId: 'first',
+            variantKey: 'type-a',
+            validFrom: '2026-06-01',
+            validTo: '2026-06-10',
+          },
+          {
+            entitlementId: 'second',
+            episodeId: 'second',
+            variantKey: 'type-a',
+            validFrom: '2026-06-20',
+            validTo: '2026-06-30',
+          },
+        ],
+      },
+      settings: [
+        payrollSetting({
+          id: 'type-a',
+          settingKey: 'accommodation_allowance',
+          variantKey: 'type-a',
+          amount: 500,
+        }),
+        payrollSetting({
+          id: 'type-a-media',
+          settingKey: 'company_housing_media',
+          variantKey: 'type-a',
+          amount: 150,
+        }),
+      ],
+    });
+
+    expect(result.components.companyAccommodationDeduction).toBe(455);
+  });
+
+  it('keeps charging company housing after a fixed-term contract expiry without termination', () => {
+    const target = employee({
+      contracts: [
+        {
+          ...employee().contracts![0]!,
+          endDate: '2026-06-15',
+        },
+      ],
+    });
+    const result = draft({
+      target,
+      entitlements: {
+        companyAccommodation: {
+          variantKey: 'type-a',
+          contractStartDate: utcDate('2026-06-01'),
+          contractEndDate: null,
+        },
+      },
+      settings: [
+        payrollSetting({
+          id: 'type-a',
+          settingKey: 'accommodation_allowance',
+          variantKey: 'type-a',
+          amount: 500,
+        }),
+        payrollSetting({
+          id: 'type-a-media',
+          settingKey: 'company_housing_media',
+          variantKey: 'type-a',
+          amount: 150,
+        }),
+      ],
+    });
+
+    expect(result.components.companyAccommodationDeduction).toBe(650);
+  });
+
+  it('stops charging company housing on the explicit employment end date', () => {
+    const result = draft({
+      target: employee({
+        employmentEndDate: utcDate('2026-06-15'),
+        employmentEndEvents: [explicitEmploymentEnd('2026-06-15')],
+      }),
+      entitlements: {
+        companyAccommodationPeriods: [
+          {
+            entitlementId: 'company',
+            episodeId: 'company',
+            variantKey: 'type-a',
+            validFrom: '2026-06-01',
+            validTo: null,
+          },
+        ],
+      },
+      settings: [
+        payrollSetting({
+          id: 'type-a',
+          settingKey: 'accommodation_allowance',
+          variantKey: 'type-a',
+          amount: 500,
+        }),
+        payrollSetting({
+          id: 'type-a-media',
+          settingKey: 'company_housing_media',
+          variantKey: 'type-a',
+          amount: 150,
+        }),
+      ],
+    });
+
     expect(result.components.companyAccommodationDeduction).toBe(325);
   });
 
@@ -932,6 +1114,21 @@ describe('employee monthly calculation draft', () => {
     ).toBe(200);
     expect(
       draft({
+        absences: [
+          absence({ startDate: '2026-06-01', endDate: '2026-06-10' }),
+          absence({
+            id: 'uw-1',
+            absenceCode: 'UW',
+            startDate: '2026-06-11',
+            endDate: '2026-06-20',
+          }),
+        ],
+        settings,
+        entitlements: { ownHousingAllowanceEligible: true },
+      }).components.ownHousingAllowanceBrutto,
+    ).toBe(200);
+    expect(
+      draft({
         target: employee({ employmentStartDate: utcDate('2026-06-02') }),
         settings,
         entitlements: { ownHousingAllowanceEligible: true },
@@ -939,7 +1136,10 @@ describe('employee monthly calculation draft', () => {
     ).toBe(0);
     expect(
       draft({
-        target: employee({ employmentEndDate: utcDate('2026-06-29') }),
+        target: employee({
+          employmentEndDate: utcDate('2026-06-29'),
+          employmentEndEvents: [explicitEmploymentEnd('2026-06-29')],
+        }),
         settings,
         entitlements: { ownHousingAllowanceEligible: true },
       }).components.ownHousingAllowanceBrutto,
@@ -1068,20 +1268,12 @@ describe('employee monthly calculation draft', () => {
     expect(result?.employment.individualNominalHours).toBeGreaterThan(0);
   });
 
-  it('aggregates settlement components from effective-dated employee entitlements', () => {
+  it('automatically aggregates own housing without a manual entitlement', () => {
     const employees = [employee()];
     const entitlementsByEmployeeId = resolveMonthlyEmployeeEntitlements({
       monthId: '2026-06',
       employees,
-      entitlements: [
-        entitlement({ type: 'UDT' }),
-        entitlement({
-          id: 'own-housing',
-          type: 'OWN_HOUSING_ALLOWANCE',
-          validFrom: '2026-06-01',
-          validTo: '2026-06-30',
-        }),
-      ],
+      entitlements: [entitlement({ type: 'UDT' })],
     });
 
     const [result] = calculateMonthlyDrafts({

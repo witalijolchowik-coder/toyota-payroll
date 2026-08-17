@@ -11,7 +11,7 @@ import {
 const date = (value: string) => new Date(`${value}T00:00:00.000Z`);
 
 describe('employee readiness helpers', () => {
-  it('derives current status only from contract history', () => {
+  it('keeps employment active after contract expiry until an explicit end', () => {
     const employee = {
       contracts: [
         {
@@ -31,10 +31,38 @@ describe('employee readiness helpers', () => {
       ],
     };
     expect(isEmployeeActiveOnDate(employee, date('2026-07-10'))).toBe(true);
-    expect(isEmployeeActiveOnDate(employee, date('2026-07-11'))).toBe(false);
+    expect(isEmployeeActiveOnDate(employee, date('2026-07-11'))).toBe(true);
     expect(
       hasCurrentStatusConflict(
         { ...employee, isActive: true },
+        date('2026-07-11'),
+      ),
+    ).toBe(false);
+
+    const explicitlyEnded = {
+      ...employee,
+      employmentEndEvents: [
+        {
+          id: 'end-sequence-1',
+          employeeId: 'employee-1',
+          tetaNumber: 'WT-1',
+          sequenceId: 'sequence-1',
+          endDate: '2026-07-10',
+          status: 'ACTIVE' as const,
+          reason: null,
+          createdAt: date('2026-07-10'),
+          createdBy: 'test',
+          updatedAt: date('2026-07-10'),
+          updatedBy: 'test',
+        },
+      ],
+    };
+    expect(isEmployeeActiveOnDate(explicitlyEnded, date('2026-07-11'))).toBe(
+      false,
+    );
+    expect(
+      hasCurrentStatusConflict(
+        { ...explicitlyEnded, isActive: true },
         date('2026-07-11'),
       ),
     ).toBe(true);

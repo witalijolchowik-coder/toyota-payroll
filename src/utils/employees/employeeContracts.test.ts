@@ -235,7 +235,7 @@ describe('employee contract history', () => {
     expect(contractBreakDays(contracts[1]!, contracts[2]!)).toBe(4);
   });
 
-  it('uses the union of historical contracts for monthly and daily participation', () => {
+  it('keeps an open employment lifecycle through contract documentation gaps and expiry', () => {
     const value = employee([
       contract('june', '2026-06-02', '2026-07-02'),
       contract('july', '2026-07-10', '2026-07-31'),
@@ -244,22 +244,25 @@ describe('employee contract history', () => {
     expect(
       employeeContractsOverlapRange(value, '2026-06-01', '2026-06-30'),
     ).toBe(true);
-    expect(isDateCoveredByContracts(value, '2026-07-05')).toBe(false);
+    expect(isDateCoveredByContracts(value, '2026-07-05')).toBe(true);
     expect(isDateCoveredByContracts(value, '2026-07-20')).toBe(true);
     expect(
       employeeContractsOverlapRange(value, '2026-08-01', '2026-08-31'),
-    ).toBe(false);
+    ).toBe(true);
   });
 
-  it('treats next-day contracts as continuous coverage and preserves a real gap', () => {
+  it('treats next-day contracts as continuous and preserves a gap after explicit termination', () => {
     const continuous = employee([
       contract('first', '2026-06-01', '2026-06-15'),
       contract('second', '2026-06-16', '2026-06-30'),
     ]);
-    const withGap = employee([
-      contract('first', '2026-06-01', '2026-06-15'),
-      contract('second', '2026-06-17', '2026-06-30'),
-    ]);
+    const withGap = employee(
+      [
+        contract('first', '2026-06-01', '2026-06-15', 'sequence-1'),
+        contract('second', '2026-06-17', '2026-06-30', 'sequence-2'),
+      ],
+      [endEvent('sequence-1', '2026-06-15')],
+    );
 
     expect(
       isRangeFullyCoveredByContracts(continuous, '2026-06-01', '2026-06-30'),

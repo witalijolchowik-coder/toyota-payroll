@@ -194,6 +194,35 @@ describe('month readiness assessment', () => {
     );
   });
 
+  it('accepts default own housing without a manual entitlement and checks only its rate', () => {
+    const ready = assessMonthReadiness({
+      monthId: '2026-07',
+      month: {} as never,
+      employees: [employee()],
+      departments: [department()],
+      entitlements: [],
+      payrollSettings: allSettings,
+    });
+    expect(ready.issues.map((issue) => issue.code)).not.toContain(
+      'own-housing-setting-missing',
+    );
+
+    const missingRate = assessMonthReadiness({
+      monthId: '2026-07',
+      month: {} as never,
+      employees: [employee()],
+      departments: [department()],
+      entitlements: [],
+      payrollSettings: allSettings.filter(
+        (payrollSetting) =>
+          payrollSetting.settingKey !== 'own_housing_allowance',
+      ),
+    });
+    expect(missingRate.issues.map((issue) => issue.code)).toContain(
+      'own-housing-setting-missing',
+    );
+  });
+
   it('surfaces missing payroll settings for the selected month', () => {
     const readiness = assessMonthReadiness({
       monthId: '2026-07',

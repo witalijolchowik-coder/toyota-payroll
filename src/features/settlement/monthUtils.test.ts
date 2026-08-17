@@ -40,6 +40,7 @@ function employee(overrides: Partial<Employee> = {}): Employee {
     pesel: overrides.pesel ?? null,
     passportNumber: overrides.passportNumber ?? null,
     foreignDocumentNumber: overrides.foreignDocumentNumber ?? null,
+    employmentEndEvents: overrides.employmentEndEvents ?? [],
     contracts:
       overrides.contracts ??
       (start
@@ -98,7 +99,7 @@ describe('payroll-period employee participation', () => {
     ).toBe(true);
   });
 
-  it('excludes employment periods outside the selected month', () => {
+  it('excludes employment that starts later or was explicitly ended earlier', () => {
     expect(
       employeeParticipatesInMonth(
         employee({
@@ -111,6 +112,18 @@ describe('payroll-period employee participation', () => {
       employeeParticipatesInMonth(
         employee({
           employmentEndDate: new Date('2026-05-31T23:59:59.999Z'),
+          employmentEndEvents: [
+            {
+              id: 'end-sequence-1',
+              employeeId: 'employee-1',
+              tetaNumber: 'TETA-1001',
+              sequenceId: 'sequence-1',
+              endDate: '2026-05-31',
+              status: 'ACTIVE',
+              reason: null,
+              ...metadata,
+            },
+          ],
         }),
         june,
       ),

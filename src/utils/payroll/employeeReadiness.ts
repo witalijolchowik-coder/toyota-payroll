@@ -19,14 +19,14 @@ function isoDate(value: Date): IsoDate {
 }
 
 export function isEmployeeActiveOnDate(
-  employee: Pick<Employee, 'contracts'>,
+  employee: Pick<Employee, 'contracts' | 'employmentEndEvents'>,
   date: Date,
 ): boolean {
   return isDateCoveredByContracts(employee, isoDate(date));
 }
 
 export function hasCurrentStatusConflict(
-  employee: Pick<Employee, 'contracts' | 'isActive'>,
+  employee: Pick<Employee, 'contracts' | 'employmentEndEvents' | 'isActive'>,
   today: Date,
 ): boolean {
   return employee.isActive !== isEmployeeActiveOnDate(employee, today);

@@ -410,7 +410,9 @@ export function EmployeesPage() {
 
       <EmployeeEntitlementsPanel
         employees={employees}
-        entitlements={entitlements}
+        entitlements={entitlements.filter(
+          (entitlement) => entitlement.type === 'UDT',
+        )}
         accommodationVariants={accommodationVariants}
         isLoading={areEntitlementsLoading || arePayrollSettingsLoading}
         error={entitlementsError}

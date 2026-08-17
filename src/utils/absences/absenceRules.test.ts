@@ -1,6 +1,7 @@
 import type {
   Employee,
   EmployeeContract,
+  EmploymentEndEvent,
   IsoDate,
 } from '../../types/firestore';
 import {
@@ -16,7 +17,11 @@ import {
   type AbsenceRuleRecord,
 } from '.';
 
-function employee(id: string, contracts: EmployeeContract[]): Employee {
+function employee(
+  id: string,
+  contracts: EmployeeContract[],
+  employmentEndEvents: EmploymentEndEvent[] = [],
+): Employee {
   return {
     id,
     tetaNumber: `TETA-${id}`,
@@ -24,6 +29,7 @@ function employee(id: string, contracts: EmployeeContract[]): Employee {
     lastName: 'Pracownik',
     isActive: true,
     contracts,
+    employmentEndEvents,
   } as Employee;
 }
 
@@ -42,6 +48,22 @@ function contract(
     status: 'ACTIVE',
     note: null,
   } as EmployeeContract;
+}
+
+function employmentEnd(
+  employeeId: string,
+  sequenceId: string,
+  endDate: IsoDate,
+): EmploymentEndEvent {
+  return {
+    id: `end-${employeeId}`,
+    employeeId,
+    tetaNumber: `TETA-${employeeId}`,
+    sequenceId,
+    endDate,
+    status: 'ACTIVE',
+    reason: null,
+  } as EmploymentEndEvent;
 }
 
 function absence(
@@ -259,10 +281,15 @@ describe('absence overlap and L4 priority', () => {
 });
 
 describe('calendar and employment safety', () => {
-  it('selects month participants from canonical contract history', () => {
-    const juneOnly = employee('june', [
+  it('keeps expired contracts active until an explicit employment end', () => {
+    const juneExpired = employee('june-expired', [
       contract('june-contract', '2026-06-01', '2026-06-30'),
     ]);
+    const juneEnded = employee(
+      'june-ended',
+      [contract('june-ended-contract', '2026-06-01', '2026-06-30')],
+      [employmentEnd('june-ended', 'sequence', '2026-06-30')],
+    );
     const julyFirstDay = employee('july-first-day', [
       contract('cross-month-contract', '2026-06-15', '2026-07-01'),
     ]);
@@ -272,11 +299,11 @@ describe('calendar and employment safety', () => {
 
     expect(
       employeesParticipatingInAbsenceMonth(
-        [juneOnly, julyFirstDay, julyCurrent],
+        [juneExpired, juneEnded, julyFirstDay, julyCurrent],
         '2026-07-01',
         '2026-07-31',
       ).map((item) => item.id),
-    ).toEqual(['july-first-day', 'july-current']);
+    ).toEqual(['june-expired', 'july-first-day', 'july-current']);
   });
 
   it('keeps an absence on a non-working day and removes the virtual default', () => {

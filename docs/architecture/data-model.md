@@ -194,17 +194,22 @@ readiness warnings instead of inferred nationality.
 Settlement. It covers:
 
 - UDT entitlement;
-- own housing allowance entitlement;
 - company accommodation assignment and accommodation variant.
+
+Legacy own-housing entitlement documents remain readable, but new calculations
+derive own housing from an active employment lifecycle with no overlapping
+company-accommodation assignment. The normal workflow does not create new
+own-housing documents.
 
 Documents are effective-dated with `valid_from`, optional `valid_to`, and
 `ACTIVE`/`CANCELLED` lifecycle status. They store only `employee_id` and
 `teta_number`; employee names are resolved from `/employees`.
 
 Monthly Settlement resolves these documents for the selected month in memory.
-UDT and own housing require full-month entitlement and full-month employment.
-Company accommodation is calculated by calendar-day overlap with the selected
-month. Hard deletes are denied. Because these documents are global
+UDT requires full-month entitlement and employment. Own housing requires
+full-month employment and zero company-housing days. Company accommodation is
+calculated by calendar-day overlap with the selected month and employment
+lifecycle. Hard deletes are denied. Because these documents are global
 effective-dated records, future payroll closing must freeze resolved snapshots
 or block retroactive edits that would affect settled months.
 

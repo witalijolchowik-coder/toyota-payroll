@@ -19,6 +19,13 @@ export interface EmploymentCoveragePeriod {
   endDate: IsoDate;
 }
 
+export interface EmploymentLifecyclePeriod {
+  sequenceId: string;
+  startDate: IsoDate;
+  endDate: IsoDate | null;
+  contractIds: string[];
+}
+
 export interface LegacyContractMigrationPlan {
   contractId: string;
   sequenceId: string;
@@ -80,6 +87,42 @@ export function activeContracts(
     (contract) => contract.status === 'ACTIVE',
   );
   return [...contracts].sort((a, b) => a.startDate.localeCompare(b.startDate));
+}
+
+export function resolveEmploymentLifecyclePeriods(
+  employee: Pick<Employee, 'contracts' | 'employmentEndEvents'>,
+): EmploymentLifecyclePeriod[] {
+  const contractsBySequence = new Map<string, EmployeeContract[]>();
+  activeContracts(employee).forEach((contract) => {
+    const contracts = contractsBySequence.get(contract.sequenceId) ?? [];
+    contracts.push(contract);
+    contractsBySequence.set(contract.sequenceId, contracts);
+  });
+
+  return [...contractsBySequence.entries()]
+    .map(([sequenceId, contracts]) => {
+      const ordered = [...contracts].sort((first, second) =>
+        first.startDate.localeCompare(second.startDate),
+      );
+      const latestContract = ordered.at(-1)!;
+      const endEvent = (employee.employmentEndEvents ?? [])
+        .filter(
+          (event) =>
+            event.status === 'ACTIVE' &&
+            event.sequenceId === sequenceId &&
+            event.endDate >= latestContract.startDate,
+        )
+        .sort((first, second) =>
+          second.endDate.localeCompare(first.endDate),
+        )[0];
+      return {
+        sequenceId,
+        startDate: ordered[0]!.startDate,
+        endDate: endEvent?.endDate ?? null,
+        contractIds: ordered.map((contract) => contract.id),
+      };
+    })
+    .sort((first, second) => first.startDate.localeCompare(second.startDate));
 }
 
 export function planLegacyContractMigration(
@@ -210,40 +253,38 @@ export function mergeEmploymentCoverage(
 }
 
 export function isDateCoveredByContracts(
-  employee: Pick<Employee, 'contracts'>,
+  employee: Pick<Employee, 'contracts' | 'employmentEndEvents'>,
   date: IsoDate,
 ): boolean {
-  return activeContracts(employee).some(
-    (contract) =>
-      contract.startDate <= date &&
-      (!contract.endDate || contract.endDate >= date),
+  return resolveEmploymentLifecyclePeriods(employee).some(
+    (period) =>
+      period.startDate <= date && (!period.endDate || period.endDate >= date),
   );
 }
 
 export function employeeContractsOverlapRange(
-  employee: Pick<Employee, 'contracts'>,
+  employee: Pick<Employee, 'contracts' | 'employmentEndEvents'>,
   start: IsoDate,
   end: IsoDate,
 ): boolean {
-  return activeContracts(employee).some(
-    (contract) =>
-      contract.startDate <= end &&
-      (!contract.endDate || contract.endDate >= start),
+  return resolveEmploymentLifecyclePeriods(employee).some(
+    (period) =>
+      period.startDate <= end && (!period.endDate || period.endDate >= start),
   );
 }
 
 export function isRangeFullyCoveredByContracts(
-  employee: Pick<Employee, 'contracts'>,
+  employee: Pick<Employee, 'contracts' | 'employmentEndEvents'>,
   start: IsoDate,
   end: IsoDate,
 ): boolean {
   if (end < start) return false;
   let cursor = start;
-  for (const contract of activeContracts(employee)) {
-    if (contract.endDate && contract.endDate < cursor) continue;
-    if (contract.startDate > cursor) return false;
-    if (!contract.endDate || contract.endDate >= end) return true;
-    cursor = addDays(contract.endDate, 1);
+  for (const period of resolveEmploymentLifecyclePeriods(employee)) {
+    if (period.endDate && period.endDate < cursor) continue;
+    if (period.startDate > cursor) return false;
+    if (!period.endDate || period.endDate >= end) return true;
+    cursor = addDays(period.endDate, 1);
   }
   return false;
 }

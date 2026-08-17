@@ -35,11 +35,7 @@ interface EmployeeEntitlementFormDialogProps {
   onSubmit: (input: EmployeeEntitlementCreateInput) => Promise<void>;
 }
 
-const entitlementTypes: EmployeeEntitlementType[] = [
-  'UDT',
-  'OWN_HOUSING_ALLOWANCE',
-  'COMPANY_ACCOMMODATION',
-];
+const entitlementTypes: EmployeeEntitlementType[] = ['UDT'];
 
 export function EmployeeEntitlementFormDialog({
   entitlement,

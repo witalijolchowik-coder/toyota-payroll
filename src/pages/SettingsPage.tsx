@@ -322,7 +322,6 @@ export function SettingsPage() {
                     'udt_allowance',
                     'holiday_work_bonus',
                     'laundry_allowance',
-                    'own_housing_allowance',
                   ]
           }
           onClose={() => setSettingFormState(null)}

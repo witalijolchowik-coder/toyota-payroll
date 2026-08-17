@@ -51,6 +51,7 @@ import {
   isDateCoveredByContracts,
   latestEmploymentEnd,
   isRangeFullyCoveredByContracts,
+  resolveEmploymentLifecyclePeriods,
 } from '../employees';
 
 export type PayrollDraftWarningCode =
@@ -296,10 +297,9 @@ function contractEmploymentForMonth(employee: Employee, monthId: MonthId) {
   const range = getPayrollMonthDateRange(monthId);
   const start = dateToIsoDate(range.start);
   const end = dateToIsoDate(range.end);
-  const overlapping = activeContracts(employee).filter(
-    (contract) =>
-      contract.startDate <= end &&
-      (!contract.endDate || contract.endDate >= start),
+  const overlapping = resolveEmploymentLifecyclePeriods(employee).filter(
+    (period) =>
+      period.startDate <= end && (!period.endDate || period.endDate >= start),
   );
   return {
     employmentStart: overlapping.length
@@ -403,10 +403,6 @@ function prorateByWorkedDays({
   );
 }
 
-function isoDateToUtcDate(isoDate: IsoDate): Date {
-  return new Date(`${isoDate}T00:00:00.000Z`);
-}
-
 function overlapIsoRange(
   startDate: IsoDate,
   endDate: IsoDate,
@@ -416,12 +412,6 @@ function overlapIsoRange(
   const start = startDate > rangeStart ? startDate : rangeStart;
   const end = endDate < rangeEnd ? endDate : rangeEnd;
   return start <= end ? { start, end } : null;
-}
-
-function countCalendarDaysInclusive(startDate: IsoDate, endDate: IsoDate) {
-  const start = isoDateToUtcDate(startDate);
-  const end = isoDateToUtcDate(endDate);
-  return Math.floor((end.getTime() - start.getTime()) / 86_400_000) + 1;
 }
 
 function countEligibleWorkingDays({
@@ -526,81 +516,88 @@ function calculateCompanyAccommodationDeduction({
   settings: readonly PayrollSetting[];
   entitlements: EmployeeSettlementEntitlements | null;
 }) {
-  const assignment = entitlements?.companyAccommodation;
-  if (!assignment) {
+  const fallbackAssignment = entitlements?.companyAccommodation;
+  const assignments = entitlements?.companyAccommodationPeriods?.length
+    ? entitlements.companyAccommodationPeriods
+    : fallbackAssignment
+      ? [
+          {
+            entitlementId: fallbackAssignment.episodeId ?? 'legacy-housing',
+            episodeId: fallbackAssignment.episodeId ?? 'legacy-housing',
+            variantKey: fallbackAssignment.variantKey ?? null,
+            validFrom: dateToIsoDate(
+              fallbackAssignment.contractStartDate ??
+                getPayrollMonthDateRange(monthId).start,
+            ),
+            validTo: fallbackAssignment.contractEndDate
+              ? dateToIsoDate(fallbackAssignment.contractEndDate)
+              : null,
+          },
+        ]
+      : [];
+  if (assignments.length === 0) {
     return { media: 0, rent: 0, total: 0, warnings: [] };
-  }
-
-  if (!assignment.variantKey) {
-    return {
-      media: 0,
-      rent: 0,
-      total: 0,
-      warnings: ['company-accommodation-missing-variant'] as const,
-    };
   }
 
   const range = getPayrollMonthDateRange(monthId);
-  const monthStart = dateToIsoDate(range.start);
-  const monthEnd = dateToIsoDate(range.end);
-  const monthEmployment = contractEmploymentForMonth(employee, monthId);
-  const contractStart = dateToIsoDate(
-    assignment.contractStartDate ??
-      monthEmployment.employmentStart ??
-      range.start,
-  );
-  const contractEnd = assignment.contractEndDate
-    ? dateToIsoDate(assignment.contractEndDate)
-    : monthEmployment.employmentEnd
-      ? dateToIsoDate(monthEmployment.employmentEnd)
-      : monthEnd;
-  const overlap = overlapIsoRange(
-    contractStart,
-    contractEnd,
-    monthStart,
-    monthEnd,
-  );
-  if (!overlap) {
-    return { media: 0, rent: 0, total: 0, warnings: [] };
-  }
+  const monthDays = range.end.getUTCDate();
+  const daysByVariant = new Map<string, Set<IsoDate>>();
+  const warnings = new Set<
+    | 'housing-entitlement-conflict'
+    | 'company-accommodation-missing-variant'
+    | 'unresolved-company-accommodation-variant'
+  >();
 
-  const chargedDays = countCalendarDaysInclusive(overlap.start, overlap.end);
-  const monthDays = countCalendarDaysInclusive(monthStart, monthEnd);
-  const rentSetting = resolveEffectivePayrollSetting(
-    settings,
-    'accommodation_allowance',
-    monthId,
-    assignment.variantKey,
-  );
+  createPayrollMonthCalendar(monthId).forEach((day) => {
+    if (!isDateCoveredByContracts(employee, day.isoDate)) return;
+    const matching = assignments.filter(
+      (assignment) =>
+        assignment.validFrom <= day.isoDate &&
+        (!assignment.validTo || assignment.validTo >= day.isoDate),
+    );
+    if (matching.length === 0) return;
+    if (matching.length > 1) warnings.add('housing-entitlement-conflict');
+    const variantKey = matching.at(-1)?.variantKey?.trim();
+    if (!variantKey) {
+      warnings.add('company-accommodation-missing-variant');
+      return;
+    }
+    const days = daysByVariant.get(variantKey) ?? new Set<IsoDate>();
+    days.add(day.isoDate);
+    daysByVariant.set(variantKey, days);
+  });
 
-  if (!rentSetting) {
-    return {
-      media: 0,
-      rent: 0,
-      total: 0,
-      warnings: ['unresolved-company-accommodation-variant'] as const,
-    };
-  }
+  let media = 0;
+  let rent = 0;
+  daysByVariant.forEach((days, variantKey) => {
+    const rentSetting = resolveEffectivePayrollSetting(
+      settings,
+      'accommodation_allowance',
+      monthId,
+      variantKey,
+    );
+    const mediaMonthly = configuredAmount(
+      settings,
+      'company_housing_media',
+      monthId,
+      variantKey,
+    );
+    if (!rentSetting || mediaMonthly === null) {
+      warnings.add('unresolved-company-accommodation-variant');
+      return;
+    }
+    media += prorateMoney(mediaMonthly, days.size, monthDays);
+    rent += prorateMoney(rentSetting.amount, days.size, monthDays);
+  });
 
-  const mediaMonthly = configuredAmount(
-    settings,
-    'company_housing_media',
-    monthId,
-    assignment.variantKey,
-  );
-  if (mediaMonthly === null) {
-    return {
-      media: 0,
-      rent: 0,
-      total: 0,
-      warnings: ['unresolved-company-accommodation-variant'] as const,
-    };
-  }
-  const rentMonthly = rentSetting.amount;
-  const media = prorateMoney(mediaMonthly, chargedDays, monthDays);
-  const rent = prorateMoney(rentMonthly, chargedDays, monthDays);
-
-  return { media, rent, total: roundMoney(media + rent), warnings: [] };
+  const roundedMedia = roundMoney(media);
+  const roundedRent = roundMoney(rent);
+  return {
+    media: roundedMedia,
+    rent: roundedRent,
+    total: roundMoney(roundedMedia + roundedRent),
+    warnings: [...warnings],
+  };
 }
 
 export function calculateEmployeeMonthlyDraft({
@@ -1191,12 +1188,10 @@ export function calculateEmployeeMonthlyDraft({
     warnings.push(warning('unresolved-own-housing-setting'));
   }
   const ownHousingAllowanceBrutto =
-    entitlements?.ownHousingAllowanceEligible && fullCalendarMonth
+    entitlements?.ownHousingAllowanceEligible &&
+    (entitlements.housingEmploymentFullMonth ?? fullCalendarMonth)
       ? (ownHousingSetting?.amount ?? 0)
       : 0;
-  if (fullCalendarMonth && entitlements?.housingCoverage === 'MISSING') {
-    warnings.push(warning('housing-status-missing'));
-  }
   const companyAccommodation = calculateCompanyAccommodationDeduction({
     monthId,
     employee,

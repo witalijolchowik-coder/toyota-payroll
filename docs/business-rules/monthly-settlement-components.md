@@ -166,19 +166,21 @@ Two concepts are intentionally separate.
 
 Own housing allowance is paid only for a full month. Partial month gives 0.
 
-The effective-dated housing history is authoritative. A coordinator move-in or
-move-out operation closes the previous housing state and opens the next state
-in one workflow, so calculation does not require duplicate data entry. A
-transition inside the month gives zero; the first full own-housing calendar
-month may receive the configured `own_housing_allowance`.
+The effective-dated company-housing history is authoritative. While employment
+is active, every gap outside company housing is own housing by default. A
+coordinator move-in opens a company period and move-out closes it; neither action
+creates a manual own-housing entitlement. A transition inside the month gives
+zero; the first full own-housing calendar month may receive the configured
+`own_housing_allowance`.
 
 ### Company accommodation deduction
 
 Toyota is `umowa o pracę`; do not use the older UZ 1-15 / 16-31 rule.
 
-Company accommodation deduction is proportional by calendar days of contract
-validity in the month. It is independent of L4, vacation, NN and actual worked
-days.
+Company accommodation deduction is proportional by calendar days covered by
+both the employment lifecycle and company-housing history. A fixed-term contract
+expiry alone does not end that lifecycle. The charge is independent of L4,
+vacation, NN and actual worked days.
 
 Defaults:
 

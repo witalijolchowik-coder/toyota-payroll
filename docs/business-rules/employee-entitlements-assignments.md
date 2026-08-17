@@ -1,8 +1,9 @@
 # Employee Entitlements & Assignments
 
 This document defines employee-level facts used by `Rozliczenie miesięczne`.
-They are explicit coordinator-maintained records. They must not be inferred from
-department, shift, employee name or any unrelated field.
+UDT remains an explicit coordinator-maintained entitlement. Housing is resolved
+from the employment lifecycle and company-accommodation history managed through
+the house icon in `Pracownicy`.
 
 ## Concepts
 
@@ -21,13 +22,15 @@ department, shift, employee name or any unrelated field.
 
 - Own housing allowance is a brutto component for an employee's own
   accommodation.
-- It is not company accommodation.
+- Own housing is the default while an employment lifecycle is active and no
+  company-accommodation record covers the day.
 - It is paid only when:
-  - the employee has an active own-housing entitlement covering the full
-    calendar month;
   - the employee's employment covers the full calendar month;
+  - no company-accommodation record covers any day of the month;
   - an effective payroll setting exists for `own_housing_allowance`.
 - No proportional own-housing allowance is paid for a partial month.
+- No manual own-housing entitlement is required or created by the normal
+  workflow. Legacy records remain readable for diagnostics.
 
 ### Company accommodation assignment
 
@@ -47,7 +50,7 @@ department, shift, employee name or any unrelated field.
 
 ## Effective dating and history
 
-Entitlements and assignments are effective-dated:
+UDT entitlements and company-accommodation assignments are effective-dated:
 
 - `valid_from` is required.
 - `valid_to` is optional.
@@ -69,20 +72,20 @@ Employee names are not duplicated in entitlement documents.
 
 ## Mutual exclusivity
 
-Own housing allowance and company accommodation should not overlap for the same
-employee. In the MVP, the browser blocks this overlap during coordinator entry,
-and the reusable pure helper emits a warning if overlapping historical data is
-encountered. Future server-side hardening can enforce this in Cloud Functions if
-needed.
+Two company-accommodation periods must not overlap for the same employee.
+Legacy own-housing records that overlap company accommodation are retained but
+reported as diagnostics; they are not required to establish own-housing status.
 
 ## Coordinator housing workflow
 
 Housing is changed through one effective-dated transition operation:
 
-- moving into company accommodation closes the current own-housing period on
-  the preceding day and opens a company-accommodation period;
-- moving out closes company accommodation on the preceding day and opens an
-  own-housing period;
+- moving into company accommodation opens a company-accommodation period on the
+  selected first day;
+- moving out closes company accommodation on the day preceding the selected
+  first day outside company housing;
+- own-housing periods are derived from employment lifecycle gaps between
+  company-accommodation periods and are not stored as synthetic records;
 - a direct transfer between company accommodation objects remains one deposit
   episode when there is no day gap;
 - a real gap followed by a new company-accommodation period creates a new
@@ -97,8 +100,8 @@ migration or destructive cleanup is performed.
 For each employee in a payroll month:
 
 1. Load active employee entitlements/assignments.
-2. Resolve UDT and own-housing allowance only when the entitlement covers the
-   full month.
+2. Resolve UDT from its entitlement and own housing automatically from full-month
+   employment with no company-accommodation day.
 3. Resolve company accommodation when the assignment overlaps the month.
 4. Calculate company accommodation proportionally by calendar-day overlap.
 5. Surface warnings for housing conflicts and missing accommodation

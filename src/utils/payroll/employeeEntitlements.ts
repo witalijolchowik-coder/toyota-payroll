@@ -5,6 +5,11 @@ import type {
   IsoDate,
   MonthId,
 } from '../../types/firestore';
+import {
+  employeeContractsOverlapRange,
+  isRangeFullyCoveredByContracts,
+  resolveEmploymentLifecyclePeriods,
+} from '../employees';
 import { dateToIsoDate, getPayrollMonthDateRange } from './month';
 
 export type EntitlementResolutionWarningCode =
@@ -14,8 +19,10 @@ export interface EmployeeSettlementEntitlements {
   udtEligible?: boolean;
   udtCoverage?: 'FULL' | 'PARTIAL' | 'NONE';
   ownHousingAllowanceEligible?: boolean;
+  housingEmploymentFullMonth?: boolean;
   housingCoverage?:
     'OWN_FULL' | 'COMPANY' | 'TRANSITION' | 'MISSING' | 'CONFLICT';
+  companyAccommodationPeriods?: CompanyAccommodationPeriod[];
   companyAccommodation?: {
     variantKey?: string | null;
     contractStartDate?: Date | null;
@@ -23,6 +30,23 @@ export interface EmployeeSettlementEntitlements {
     episodeId?: string;
   } | null;
   reviewWarnings?: EntitlementResolutionWarningCode[];
+}
+
+export interface CompanyAccommodationPeriod {
+  entitlementId: string;
+  episodeId: string;
+  variantKey: string | null;
+  validFrom: IsoDate;
+  validTo: IsoDate | null;
+}
+
+export interface EmployeeHousingHistoryPeriod {
+  id: string;
+  type: 'OWN' | 'COMPANY';
+  validFrom: IsoDate;
+  validTo: IsoDate | null;
+  variantKey: string | null;
+  current: boolean;
 }
 
 export interface EmployeeEntitlementResolution {
@@ -51,6 +75,25 @@ function nextIsoDate(isoDate: IsoDate): IsoDate {
   const date = isoDateToUtcDate(isoDate);
   date.setUTCDate(date.getUTCDate() + 1);
   return date.toISOString().slice(0, 10) as IsoDate;
+}
+
+function previousIsoDate(isoDate: IsoDate): IsoDate {
+  const date = isoDateToUtcDate(isoDate);
+  date.setUTCDate(date.getUTCDate() - 1);
+  return date.toISOString().slice(0, 10) as IsoDate;
+}
+
+function maxIsoDate(first: IsoDate, second: IsoDate): IsoDate {
+  return first > second ? first : second;
+}
+
+function minIsoDate(
+  first: IsoDate | null,
+  second: IsoDate | null,
+): IsoDate | null {
+  if (!first) return second;
+  if (!second) return first;
+  return first < second ? first : second;
 }
 
 export interface CompanyAccommodationEpisode {
@@ -149,6 +192,96 @@ function activeEmployeeEntitlements(
     );
 }
 
+function entitlementsCoverFullRange(
+  entitlements: readonly EmployeeEntitlement[],
+  range: MonthIsoRange,
+): boolean {
+  let cursor = range.start;
+  for (const entitlement of [...entitlements].sort((first, second) =>
+    first.validFrom.localeCompare(second.validFrom),
+  )) {
+    if (entitlementEnd(entitlement) < cursor) continue;
+    if (entitlement.validFrom > cursor) return false;
+    if (entitlementEnd(entitlement) >= range.end) return true;
+    cursor = nextIsoDate(entitlementEnd(entitlement));
+  }
+  return false;
+}
+
+export function resolveEmployeeHousingHistory({
+  employee,
+  entitlements,
+  today = new Date().toISOString().slice(0, 10) as IsoDate,
+}: {
+  employee: Employee;
+  entitlements: readonly EmployeeEntitlement[];
+  today?: IsoDate;
+}): EmployeeHousingHistoryPeriod[] {
+  const companyAccommodation = activeEmployeeEntitlements(
+    employee,
+    entitlements,
+    'COMPANY_ACCOMMODATION',
+  );
+  const result: EmployeeHousingHistoryPeriod[] = [];
+
+  resolveEmploymentLifecyclePeriods(employee).forEach((lifecycle) => {
+    let ownStart: IsoDate | null = lifecycle.startDate;
+    const companyPeriods = companyAccommodation.filter(
+      (period) =>
+        period.validFrom <= (lifecycle.endDate ?? '9999-12-31') &&
+        entitlementEnd(period) >= lifecycle.startDate,
+    );
+
+    companyPeriods.forEach((period) => {
+      const companyStart = maxIsoDate(period.validFrom, lifecycle.startDate);
+      const companyEnd = minIsoDate(period.validTo, lifecycle.endDate);
+      if (ownStart && ownStart < companyStart) {
+        const ownEnd = previousIsoDate(companyStart);
+        result.push({
+          id: `own:${lifecycle.sequenceId}:${ownStart}`,
+          type: 'OWN',
+          validFrom: ownStart,
+          validTo: ownEnd,
+          variantKey: null,
+          current: ownStart <= today && ownEnd >= today,
+        });
+      }
+      result.push({
+        id: period.id,
+        type: 'COMPANY',
+        validFrom: companyStart,
+        validTo: companyEnd,
+        variantKey: period.accommodationVariantKey,
+        current: companyStart <= today && (!companyEnd || companyEnd >= today),
+      });
+      const nextOwnStart = companyEnd ? nextIsoDate(companyEnd) : null;
+      ownStart =
+        ownStart && nextOwnStart && ownStart > nextOwnStart
+          ? ownStart
+          : nextOwnStart;
+    });
+
+    if (ownStart && (!lifecycle.endDate || ownStart <= lifecycle.endDate)) {
+      result.push({
+        id: `own:${lifecycle.sequenceId}:${ownStart}`,
+        type: 'OWN',
+        validFrom: ownStart,
+        validTo: lifecycle.endDate,
+        variantKey: null,
+        current:
+          ownStart <= today &&
+          (!lifecycle.endDate || lifecycle.endDate >= today),
+      });
+    }
+  });
+
+  return result.sort((first, second) =>
+    first.validFrom === second.validFrom
+      ? first.type.localeCompare(second.type)
+      : first.validFrom.localeCompare(second.validFrom),
+  );
+}
+
 export function resolveEmployeeSettlementEntitlements({
   employee,
   monthId,
@@ -182,21 +315,49 @@ export function resolveEmployeeSettlementEntitlements({
   const udtOverlapsMonth = udtEntitlements.some((entitlement) =>
     employeeEntitlementOverlapsRange(entitlement, range),
   );
-  const ownHousingAllowanceEligible = ownHousingEntitlements.some(
-    (entitlement) => employeeEntitlementCoversFullRange(entitlement, range),
+  const housingEmploymentFullMonth = isRangeFullyCoveredByContracts(
+    employee,
+    range.start,
+    range.end,
   );
+  const housingEmploymentOverlapsMonth = employeeContractsOverlapRange(
+    employee,
+    range.start,
+    range.end,
+  );
+  const accommodationEpisodes = resolveCompanyAccommodationEpisodes(
+    companyAccommodationEntitlements,
+  );
+  const companyAccommodationPeriods = companyAccommodationEntitlements
+    .filter((entitlement) =>
+      employeeEntitlementOverlapsRange(entitlement, range),
+    )
+    .map((entitlement) => {
+      const episode = accommodationEpisodes.find((candidate) =>
+        candidate.entitlements.some((item) => item.id === entitlement.id),
+      );
+      return {
+        entitlementId: entitlement.id,
+        episodeId: episode?.id ?? entitlement.id,
+        variantKey: entitlement.accommodationVariantKey,
+        validFrom: entitlement.validFrom,
+        validTo: entitlement.validTo,
+      };
+    });
+  const companyAccommodationOverlapsMonth =
+    companyAccommodationPeriods.length > 0;
+  const ownHousingAllowanceEligible =
+    housingEmploymentFullMonth && !companyAccommodationOverlapsMonth;
   const companyAccommodation =
     companyAccommodationEntitlements
       .filter((entitlement) =>
         employeeEntitlementOverlapsRange(entitlement, range),
       )
       .at(-1) ?? null;
-  const accommodationEpisode = resolveCompanyAccommodationEpisodes(
-    companyAccommodationEntitlements,
-  ).find(
-    (episode) =>
-      episode.start <= range.end &&
-      (episode.end === null || episode.end >= range.start),
+  const accommodationEpisode = accommodationEpisodes.find((episode) =>
+    episode.entitlements.some(
+      (entitlement) => entitlement.id === companyAccommodation?.id,
+    ),
   );
 
   const overlappingOwnHousing = ownHousingEntitlements.some((ownHousing) =>
@@ -213,8 +374,19 @@ export function resolveEmployeeSettlementEntitlements({
         ),
     ),
   );
+  const overlappingCompanyAccommodation = companyAccommodationEntitlements.some(
+    (first, index) =>
+      companyAccommodationEntitlements
+        .slice(index + 1)
+        .some(
+          (second) =>
+            employeeEntitlementsOverlap(first, second) &&
+            employeeEntitlementOverlapsRange(first, range) &&
+            employeeEntitlementOverlapsRange(second, range),
+        ),
+  );
 
-  if (overlappingOwnHousing) {
+  if (overlappingOwnHousing || overlappingCompanyAccommodation) {
     warnings.add('housing-entitlement-conflict');
   }
   if (
@@ -225,30 +397,30 @@ export function resolveEmployeeSettlementEntitlements({
     warnings.add('company-accommodation-missing-variant');
   }
 
-  const ownHousingOverlapsMonth = ownHousingEntitlements.some((entitlement) =>
-    employeeEntitlementOverlapsRange(entitlement, range),
+  const companyAccommodationCoversFullMonth = entitlementsCoverFullRange(
+    companyAccommodationEntitlements,
+    range,
   );
-  const companyAccommodationOverlapsMonth =
-    companyAccommodationEntitlements.some((entitlement) =>
-      employeeEntitlementOverlapsRange(entitlement, range),
-    );
-  const housingCoverage = overlappingOwnHousing
-    ? ('CONFLICT' as const)
-    : ownHousingAllowanceEligible && !companyAccommodationOverlapsMonth
-      ? ('OWN_FULL' as const)
-      : companyAccommodationOverlapsMonth && ownHousingOverlapsMonth
-        ? ('TRANSITION' as const)
+  const housingCoverage =
+    overlappingOwnHousing || overlappingCompanyAccommodation
+      ? ('CONFLICT' as const)
+      : !housingEmploymentOverlapsMonth
+        ? ('MISSING' as const)
         : companyAccommodationOverlapsMonth
-          ? ('COMPANY' as const)
-          : ownHousingOverlapsMonth
-            ? ('TRANSITION' as const)
-            : ('MISSING' as const);
+          ? companyAccommodationCoversFullMonth
+            ? ('COMPANY' as const)
+            : ('TRANSITION' as const)
+          : housingEmploymentFullMonth
+            ? ('OWN_FULL' as const)
+            : ('TRANSITION' as const);
 
   return {
     udtEligible,
     udtCoverage: udtEligible ? 'FULL' : udtOverlapsMonth ? 'PARTIAL' : 'NONE',
     ownHousingAllowanceEligible,
+    housingEmploymentFullMonth,
     housingCoverage,
+    companyAccommodationPeriods,
     companyAccommodation: companyAccommodation
       ? {
           variantKey: companyAccommodation.accommodationVariantKey,

@@ -4,6 +4,7 @@ import {
   employeeEntitlementsOverlap,
   resolveEmployeeSettlementEntitlements,
   resolveCompanyAccommodationEpisodes,
+  resolveEmployeeHousingHistory,
 } from './employeeEntitlements';
 
 const createdAt = new Date('2026-01-01T00:00:00.000Z');
@@ -13,6 +14,8 @@ function utcDate(isoDate: string): Date {
 }
 
 function employee(overrides: Partial<Employee> = {}): Employee {
+  const employmentStartDate =
+    overrides.employmentStartDate ?? utcDate('2026-01-01');
   return {
     id: 'employee-1',
     tetaNumber: 'T001',
@@ -21,8 +24,25 @@ function employee(overrides: Partial<Employee> = {}): Employee {
     isActive: true,
     departmentId: null,
     shiftAssignment: null,
-    employmentStartDate: utcDate('2026-01-01'),
+    employmentStartDate,
     employmentEndDate: null,
+    contracts: overrides.contracts ?? [
+      {
+        id: 'contract-1',
+        employeeId: 'employee-1',
+        tetaNumber: 'T001',
+        sequenceId: 'sequence-1',
+        startDate: employmentStartDate.toISOString().slice(0, 10),
+        endDate: null,
+        status: 'ACTIVE',
+        note: null,
+        createdAt,
+        createdBy: 'test',
+        updatedAt: createdAt,
+        updatedBy: 'test',
+      },
+    ],
+    employmentEndEvents: overrides.employmentEndEvents ?? [],
     createdAt,
     createdBy: 'test',
     updatedAt: createdAt,
@@ -76,20 +96,15 @@ describe('employee entitlement resolver', () => {
     expect(partial.udtCoverage).toBe('PARTIAL');
   });
 
-  it('recognizes full-month own housing allowance entitlement', () => {
+  it('treats a full-month employee without housing records as own housing', () => {
     const result = resolveEmployeeSettlementEntitlements({
       employee: employee(),
       monthId: '2026-06',
-      entitlements: [
-        entitlement({
-          type: 'OWN_HOUSING_ALLOWANCE',
-          validFrom: '2026-06-01',
-          validTo: '2026-06-30',
-        }),
-      ],
+      entitlements: [],
     });
 
     expect(result.ownHousingAllowanceEligible).toBe(true);
+    expect(result.housingCoverage).toBe('OWN_FULL');
   });
 
   it('resolves company accommodation assignment overlapping the month', () => {
@@ -155,12 +170,6 @@ describe('employee entitlement resolver', () => {
         validFrom: '2026-01-01',
         validTo: '2026-06-14',
       }),
-      entitlement({
-        id: 'own',
-        type: 'OWN_HOUSING_ALLOWANCE',
-        validFrom: '2026-06-15',
-        validTo: null,
-      }),
     ];
 
     const transition = resolveEmployeeSettlementEntitlements({
@@ -186,12 +195,6 @@ describe('employee entitlement resolver', () => {
       monthId: '2026-06',
       entitlements: [
         entitlement({
-          id: 'own',
-          type: 'OWN_HOUSING_ALLOWANCE',
-          validFrom: '2026-01-01',
-          validTo: '2026-06-14',
-        }),
-        entitlement({
           id: 'company',
           type: 'COMPANY_ACCOMMODATION',
           accommodationVariantKey: 'type-a',
@@ -204,6 +207,86 @@ describe('employee entitlement resolver', () => {
     expect(result.housingCoverage).toBe('TRANSITION');
     expect(result.ownHousingAllowanceEligible).toBe(false);
     expect(result.companyAccommodation?.variantKey).toBe('type-a');
+  });
+
+  it('does not pay own housing in a partial first or final employment month', () => {
+    const startedMidMonth = employee({
+      employmentStartDate: utcDate('2026-06-15'),
+      contracts: [
+        {
+          ...employee().contracts![0]!,
+          startDate: '2026-06-15',
+        },
+      ],
+    });
+    expect(
+      resolveEmployeeSettlementEntitlements({
+        employee: startedMidMonth,
+        monthId: '2026-06',
+        entitlements: [],
+      }).ownHousingAllowanceEligible,
+    ).toBe(false);
+
+    const terminatedMidMonth = employee({
+      employmentEndEvents: [
+        {
+          id: 'end-1',
+          employeeId: 'employee-1',
+          tetaNumber: 'T001',
+          sequenceId: 'sequence-1',
+          endDate: '2026-06-20',
+          status: 'ACTIVE',
+          reason: 'Zakończenie współpracy',
+          createdAt,
+          createdBy: 'test',
+          updatedAt: createdAt,
+          updatedBy: 'test',
+        },
+      ],
+    });
+    expect(
+      resolveEmployeeSettlementEntitlements({
+        employee: terminatedMidMonth,
+        monthId: '2026-06',
+        entitlements: [],
+      }).ownHousingAllowanceEligible,
+    ).toBe(false);
+  });
+
+  it('derives readable own-company-own history without synthetic own records', () => {
+    const history = resolveEmployeeHousingHistory({
+      employee: employee(),
+      entitlements: [
+        entitlement({
+          id: 'company',
+          type: 'COMPANY_ACCOMMODATION',
+          accommodationVariantKey: 'premium',
+          validFrom: '2026-05-16',
+          validTo: '2026-07-31',
+        }),
+      ],
+      today: '2026-08-10',
+    });
+
+    expect(history).toEqual([
+      expect.objectContaining({
+        type: 'OWN',
+        validFrom: '2026-01-01',
+        validTo: '2026-05-15',
+      }),
+      expect.objectContaining({
+        type: 'COMPANY',
+        validFrom: '2026-05-16',
+        validTo: '2026-07-31',
+        variantKey: 'premium',
+      }),
+      expect.objectContaining({
+        type: 'OWN',
+        validFrom: '2026-08-01',
+        validTo: null,
+        current: true,
+      }),
+    ]);
   });
 
   it('keeps effective-dated overlap helpers inclusive', () => {

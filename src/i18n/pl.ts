@@ -694,6 +694,18 @@ export const pl = {
       cancel: 'Anuluj',
       confirmMoveIn: 'Zapisz zakwaterowanie',
       confirmMoveOut: 'Zapisz wykwaterowanie',
+      history: {
+        title: 'Historia zakwaterowania',
+        empty: 'Brak okresu zatrudnienia, dla którego można pokazać historię.',
+        period: 'Okres',
+        type: 'Zakwaterowanie',
+        category: 'Kategoria',
+        status: 'Status',
+        own: 'Własne',
+        company: 'Firmowe',
+        current: 'Aktualne',
+        openEnded: 'obecnie',
+      },
     },
     import: {
       open: 'Import pracowników',
@@ -993,7 +1005,7 @@ export const pl = {
     entitlements: {
       title: 'Uprawnienia i przypisania',
       description:
-        'Historyczne fakty pracownika używane w rozliczeniu miesięcznym: UDT, własne mieszkanie i mieszkanie firmowe.',
+        'Historyczne uprawnienia UDT używane w rozliczeniu miesięcznym. Zakwaterowaniem zarządza ikona domu przy pracowniku.',
       add: 'Dodaj uprawnienie',
       loadError: 'Nie udało się wczytać uprawnień i przypisań.',
       empty: 'Brak uprawnień i przypisań.',

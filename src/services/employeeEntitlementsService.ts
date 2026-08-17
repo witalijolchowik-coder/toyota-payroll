@@ -220,17 +220,42 @@ export async function transitionEmployeeHousing({
         data.type === 'COMPANY_ACCOMMODATION')
     );
   });
-  const currentHousing = employeeHousing.filter((snapshot) => {
+  const companyAccommodation = employeeHousing.filter(
+    (snapshot) => snapshot.data().type === 'COMPANY_ACCOMMODATION',
+  );
+  const currentCompanyAccommodation = companyAccommodation.filter(
+    (snapshot) => {
+      const data = snapshot.data();
+      return (
+        data.valid_from < normalized.validFrom &&
+        (data.valid_to === null || data.valid_to >= normalized.validFrom)
+      );
+    },
+  );
+  const currentLegacyOwnHousing = employeeHousing.filter((snapshot) => {
     const data = snapshot.data();
     return (
+      data.type === 'OWN_HOUSING_ALLOWANCE' &&
       data.valid_from <= normalized.validFrom &&
       (data.valid_to === null || data.valid_to >= normalized.validFrom)
     );
   });
   if (
-    employeeHousing.some(
-      (snapshot) => snapshot.data().valid_from >= normalized.validFrom,
-    )
+    target === 'COMPANY_ACCOMMODATION' &&
+    companyAccommodation.some((snapshot) => {
+      const data = snapshot.data();
+      return (
+        data.valid_from >= normalized.validFrom ||
+        (data.valid_from <= normalized.validFrom &&
+          (data.valid_to === null || data.valid_to >= normalized.validFrom))
+      );
+    })
+  ) {
+    throw new EmployeeEntitlementServiceError('invalid-input');
+  }
+  if (
+    target === 'OWN_HOUSING_ALLOWANCE' &&
+    currentCompanyAccommodation.length !== 1
   ) {
     throw new EmployeeEntitlementServiceError('invalid-input');
   }
@@ -243,42 +268,55 @@ export async function transitionEmployeeHousing({
     throw new EmployeeEntitlementServiceError('locked-month');
   }
 
-  const newReference = doc(repositories.employeeEntitlements);
-  const batch = writeBatch(newReference.firestore);
-  currentHousing.forEach((snapshot) => {
+  const batch = writeBatch(repositories.employeeEntitlements.firestore);
+  const closedEntitlements =
+    target === 'COMPANY_ACCOMMODATION'
+      ? currentLegacyOwnHousing
+      : currentCompanyAccommodation;
+  closedEntitlements.forEach((snapshot) => {
     batch.update(snapshot.ref, {
       valid_to: previousIsoDate(normalized.validFrom),
       updated_at: serverTimestamp(),
       updated_by: uid,
     });
   });
-  batch.set(newReference, {
-    employee_id: normalized.employeeId,
-    teta_number: normalized.tetaNumber,
-    type: normalized.type,
-    accommodation_variant_key: normalized.accommodationVariantKey,
-    valid_from: normalized.validFrom,
-    valid_to: null,
-    status: 'ACTIVE',
-    note: null,
-    created_at: serverTimestamp(),
-    created_by: uid,
-    updated_at: serverTimestamp(),
-    updated_by: uid,
-  });
+  const newReference =
+    target === 'COMPANY_ACCOMMODATION'
+      ? doc(repositories.employeeEntitlements)
+      : null;
+  if (newReference) {
+    batch.set(newReference, {
+      employee_id: normalized.employeeId,
+      teta_number: normalized.tetaNumber,
+      type: normalized.type,
+      accommodation_variant_key: normalized.accommodationVariantKey,
+      valid_from: normalized.validFrom,
+      valid_to: null,
+      status: 'ACTIVE',
+      note: null,
+      created_at: serverTimestamp(),
+      created_by: uid,
+      updated_at: serverTimestamp(),
+      updated_by: uid,
+    });
+  }
   await batch.commit();
+  const resultId = newReference?.id ?? currentCompanyAccommodation[0]!.id;
   await recordAuditEntry({
-    entityPath: `employeeEntitlements/${newReference.id}`,
-    action: 'create',
+    entityPath: `employeeEntitlements/${resultId}`,
+    action: newReference ? 'create' : 'update',
     actorUid: uid,
     changes: {
       operation: 'housing-status-transition',
       employee_id: normalized.employeeId,
       effective_date: normalized.validFrom,
-      target: normalized.type,
-      closed_entitlement_ids: currentHousing.map((snapshot) => snapshot.id),
+      target:
+        target === 'COMPANY_ACCOMMODATION'
+          ? 'COMPANY_ACCOMMODATION'
+          : 'OWN_HOUSING_DEFAULT',
+      closed_entitlement_ids: closedEntitlements.map((snapshot) => snapshot.id),
       accommodation_variant_key: normalized.accommodationVariantKey,
     },
   });
-  return newReference.id;
+  return resultId;
 }
