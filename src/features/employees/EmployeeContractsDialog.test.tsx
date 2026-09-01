@@ -209,7 +209,7 @@ describe('EmployeeContractsDialog canonical contract session', () => {
     const edited = employee([contract('legacy', '2026-04-24', '2026-05-31')]);
     const continued = employee([
       contract('legacy', '2026-04-24', '2026-05-31'),
-      contract('next', '2026-06-01', '2026-08-31'),
+      contract('next', '2026-06-01', '2099-08-31'),
     ]);
     const onReload = vi
       .fn()
@@ -249,14 +249,14 @@ describe('EmployeeContractsDialog canonical contract session', () => {
     );
     expect(screen.getByLabelText('Data od')).toHaveValue('2026-06-01');
     fireEvent.change(screen.getByLabelText('Data do'), {
-      target: { value: '2026-08-31' },
+      target: { value: '2099-08-31' },
     });
     fireEvent.click(screen.getByRole('button', { name: 'Zapisz umowę' }));
 
     await waitFor(() => expect(onCreate).toHaveBeenCalledTimes(1));
     expect(onCreate.mock.calls[0]?.[2]).toBe(state(edited).revision);
     await waitFor(() =>
-      expect(screen.getByText('2026-08-31')).toBeInTheDocument(),
+      expect(screen.getByText('2099-08-31')).toBeInTheDocument(),
     );
     expect(screen.getAllByText('Ciągłość zatrudnienia')).toHaveLength(2);
     expect(
