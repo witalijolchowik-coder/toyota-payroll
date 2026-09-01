@@ -1579,6 +1579,8 @@ describe('Firestore security rules', () => {
         start_date: '2026-06-28',
         end_date: '2026-07-05',
         hours_per_day: null,
+        linked_work_date: null,
+        overtime_time_off: false,
         source: 'manual',
         import_id: null,
         status: 'ACTIVE',
@@ -1617,6 +1619,39 @@ describe('Firestore security rules', () => {
     );
     await assertFails(deleteDoc(reference));
   });
+
+  it.each(['NN', 'NU', 'NI', 'UW', 'UB', 'OP', 'UO', 'L4', 'LO', 'O5', 'SR'])(
+    'allows the exact manual %s payload used by the application in an open month',
+    async (absenceCode) => {
+      await seedMonth('2026-08', false);
+      const uid = 'coordinator-1';
+      const firestore = testEnvironment.authenticatedContext(uid).firestore();
+
+      await assertSucceeds(
+        setDoc(
+          doc(
+            firestore,
+            `months/2026-08/absences/manual-${absenceCode.toLowerCase()}`,
+          ),
+          {
+            employee_id: 'employee-1',
+            teta_number: 'TETA-1001',
+            absence_code: absenceCode,
+            start_date: '2026-08-17',
+            end_date: '2026-08-17',
+            hours_per_day: null,
+            linked_work_date: null,
+            overtime_time_off: false,
+            source: 'manual',
+            import_id: null,
+            status: 'ACTIVE',
+            note: null,
+            ...modificationMetadata(uid),
+          },
+        ),
+      );
+    },
+  );
 
   it('allows NI time off and rejects new legacy or linked manual records', async () => {
     await seedMonth('2026-06', false);
@@ -1671,6 +1706,8 @@ describe('Firestore security rules', () => {
         start_date: '2026-07-08',
         end_date: '2026-07-10',
         hours_per_day: null,
+        linked_work_date: null,
+        overtime_time_off: false,
         source: 'absence_import',
         import_id: 'l4-test-batch',
         status: 'ACTIVE',
@@ -1694,6 +1731,8 @@ describe('Firestore security rules', () => {
         start_date: '2026-07-11',
         end_date: '2026-07-12',
         hours_per_day: null,
+        linked_work_date: null,
+        overtime_time_off: false,
         source: 'absence_import',
         import_id: null,
         status: 'ACTIVE',
@@ -1721,6 +1760,8 @@ describe('Firestore security rules', () => {
         start_date: '2026-07-08',
         end_date: '2026-07-10',
         hours_per_day: null,
+        linked_work_date: null,
+        overtime_time_off: false,
         source: 'manual',
         import_id: null,
         status: 'ACTIVE',
@@ -1733,6 +1774,8 @@ describe('Firestore security rules', () => {
         end_date: '2026-07-14',
         source: 'absence_import',
         import_id: 'l4-1780000000000',
+        linked_work_date: null,
+        overtime_time_off: false,
         note: 'L4 import: Raport L4_PS_12-07-2026.xlsx, wiersz 2',
         updated_at: serverTimestamp(),
         updated_by: uid,
@@ -1776,6 +1819,8 @@ describe('Firestore security rules', () => {
       start_date: '2026-07-08',
       end_date: '2026-08-14',
       hours_per_day: null,
+      linked_work_date: null,
+      overtime_time_off: false,
       source: 'absence_import',
       import_id: 'l4-1780000000000',
       status: 'ACTIVE',
@@ -1816,6 +1861,8 @@ describe('Firestore security rules', () => {
       start_date: '2026-07-08',
       end_date: '2026-08-14',
       hours_per_day: null,
+      linked_work_date: null,
+      overtime_time_off: false,
       source: 'absence_import',
       import_id: 'l4-1780000000000',
       status: 'ACTIVE',
