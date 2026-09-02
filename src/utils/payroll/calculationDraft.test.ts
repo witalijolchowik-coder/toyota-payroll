@@ -259,8 +259,8 @@ function draft({
   });
 }
 
-function normativeSchedule(): PlannedScheduleDay[] {
-  return createPayrollMonthCalendar('2026-06').map((day) => {
+function normativeSchedule(monthId: MonthId = '2026-06'): PlannedScheduleDay[] {
+  return createPayrollMonthCalendar(monthId).map((day) => {
     const working = day.isWorkingDay;
     return {
       employeeId: 'employee-1',
@@ -361,6 +361,96 @@ describe('employee monthly calculation draft', () => {
     expect(result.workTime.overtime100Hours).toBe(12);
     expect(result.workTime.overtime50Hours).toBe(0.5);
     expect(result.workTime.niedoczasHours).toBe(0);
+  });
+
+  it('settles 7 August day off, spanning L4, and actual work without a holiday bonus', () => {
+    const dayOffSchedule = normativeSchedule('2026-08').map((day) =>
+      day.date === '2026-08-07'
+        ? {
+            ...day,
+            status: 'DAY_OFF' as const,
+            source: 'manual-correction' as const,
+            hours: 0,
+            shift: null,
+            label: 'W',
+            reason: 'Wolne za święto',
+            plannedStartTime: null,
+            plannedEndTime: null,
+            plannedDuration: 0,
+          }
+        : day,
+    );
+    const withL4 = draft({
+      monthId: '2026-08',
+      plannedSchedule: dayOffSchedule,
+      absences: [
+        absence({
+          id: 'l4-over-day-off',
+          monthId: '2026-08',
+          startDate: '2026-08-06',
+          endDate: '2026-08-10',
+        }),
+      ],
+    });
+    const withEightHours = draft({
+      monthId: '2026-08',
+      plannedSchedule: dayOffSchedule,
+      dailyValues: [
+        dailyValue({
+          id: 'employee-1_2026-08-07',
+          monthId: '2026-08',
+          date: '2026-08-07',
+          hours: 8,
+          workTimeCorrection: {
+            workContext: 'EXTRA',
+            plannedShift: null,
+            plannedStartTime: null,
+            plannedEndTime: null,
+            actualStartTime: '06:00',
+            actualEndTime: '14:00',
+            classificationOverride: null,
+          },
+        }),
+      ],
+    });
+    const withTenHours = draft({
+      monthId: '2026-08',
+      plannedSchedule: dayOffSchedule,
+      dailyValues: [
+        dailyValue({
+          id: 'employee-1_2026-08-07',
+          monthId: '2026-08',
+          date: '2026-08-07',
+          hours: 10,
+          workTimeCorrection: {
+            workContext: 'EXTRA',
+            plannedShift: null,
+            plannedStartTime: null,
+            plannedEndTime: null,
+            actualStartTime: '06:00',
+            actualEndTime: '16:00',
+            classificationOverride: null,
+          },
+        }),
+      ],
+    });
+
+    expect(withL4.totals.nominalHours).toBe(160);
+    expect(withL4.absences.l4Hours).toBe(16);
+    expect(withL4.absences.periods[0]).toMatchObject({
+      startDate: '2026-08-06',
+      endDate: '2026-08-10',
+      workingDayCount: 2,
+      workingHours: 16,
+    });
+    expect(withEightHours.workTime.overtime100Hours).toBe(8);
+    expect(withEightHours.workTime.overtime50Hours).toBe(0);
+    expect(withEightHours.workTime.niedoczasHours).toBe(0);
+    expect(withEightHours.components.holidayWorkBonusBrutto).toBe(0);
+    expect(withTenHours.workTime.overtime100Hours).toBe(8);
+    expect(withTenHours.workTime.overtime50Hours).toBe(2);
+    expect(withTenHours.workTime.niedoczasHours).toBe(0);
+    expect(withTenHours.components.holidayWorkBonusBrutto).toBe(0);
   });
 
   it('treats consecutive contracts as full-month coverage for monthly allowances', () => {

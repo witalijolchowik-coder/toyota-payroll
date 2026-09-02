@@ -410,6 +410,56 @@ describe('monthly schedule planning', () => {
     expect(worker.shiftAssignment).toBe('RED');
   });
 
+  it('marks 7 August as a manual non-holiday day off without changing adjacent days', () => {
+    const worker = employee({
+      departmentId: 'metal-402b',
+      shiftAssignment: 'RED',
+      employmentStartDate: date('2026-01-01'),
+    });
+    const days = createCalendarDays('2026-08', {
+      publicHolidays: getPublicHolidaysForYear(2026),
+    });
+    const automaticSchedule = generateEmployeeMonthlySchedule({
+      employee: worker,
+      days,
+      departments: [department('metal-402b', 'Metal 402B', 'THREE_SHIFT')],
+    });
+    const schedule = generateEmployeeMonthlySchedule({
+      employee: worker,
+      days,
+      departments: [department('metal-402b', 'Metal 402B', 'THREE_SHIFT')],
+      options: {
+        corrections: [
+          correction(
+            worker,
+            '2026-08-07',
+            'DAY_OFF',
+            null,
+            0,
+            'Wolne za święto',
+          ),
+        ],
+      },
+    });
+
+    expect(schedule.find((day) => day.date === '2026-08-07')).toMatchObject({
+      status: 'DAY_OFF',
+      source: 'manual-correction',
+      hours: 0,
+      shift: null,
+      label: 'W',
+      reason: 'Wolne za święto',
+      holidayName: null,
+    });
+    expect(schedule.find((day) => day.date === '2026-08-06')).toEqual(
+      automaticSchedule.find((day) => day.date === '2026-08-06'),
+    );
+    expect(schedule.find((day) => day.date === '2026-08-10')).toEqual(
+      automaticSchedule.find((day) => day.date === '2026-08-10'),
+    );
+    expect(worker.shiftAssignment).toBe('RED');
+  });
+
   it('does not turn normatively free days into working days through shift corrections', () => {
     const worker = employee({
       departmentId: 'metal-402b',
@@ -671,6 +721,7 @@ function correction(
   kind: ScheduleCorrection['kind'],
   plannedShift: ScheduleCorrection['plannedShift'],
   plannedHours: number,
+  note = 'test',
 ): ScheduleCorrection {
   const now = date('2026-06-01');
   return {
@@ -682,7 +733,7 @@ function correction(
     kind,
     plannedShift,
     plannedHours,
-    note: 'test',
+    note,
     status: 'ACTIVE',
     createdAt: now,
     createdBy: 'test',
