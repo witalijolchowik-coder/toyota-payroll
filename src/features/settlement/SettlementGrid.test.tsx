@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import { vi } from 'vitest';
 
 import { SettlementGrid } from './SettlementGrid';
@@ -230,6 +230,50 @@ describe('SettlementGrid', () => {
     ).toBeInTheDocument();
   });
 
+  it('shows an active DAY_OFF correction as 0 h in hours mode', () => {
+    render(
+      <SettlementGrid
+        employees={[employee]}
+        departments={[department]}
+        days={createCalendarDays('2026-08')}
+        dailyValues={[]}
+        scheduleCorrections={[dayOffCorrection()]}
+        displayMode="hours"
+        onEditCell={vi.fn()}
+      />,
+    );
+
+    const dayCell = screen.getByRole('button', {
+      name: 'Edytuj dzień: Kowalski Jan, 2026-08-07',
+    });
+    expect(within(dayCell).getByText('0 h')).toBeInTheDocument();
+    expect(within(dayCell).queryByText('8 h')).not.toBeInTheDocument();
+  });
+
+  it('shows an active DAY_OFF correction as a day off in shifts mode', () => {
+    render(
+      <SettlementGrid
+        employees={[employee]}
+        departments={[department]}
+        days={createCalendarDays('2026-08')}
+        dailyValues={[]}
+        scheduleCorrections={[dayOffCorrection()]}
+        displayMode="shifts"
+        onEditCell={vi.fn()}
+      />,
+    );
+
+    const dayCell = screen.getByRole('button', {
+      name: 'Edytuj dzień: Kowalski Jan, 2026-08-07',
+    });
+    expect(within(dayCell).getByText('W')).toBeInTheDocument();
+    expect(
+      within(dayCell).getByLabelText(
+        'Ręczna korekta planu miesięcznego. Nie zmienia rzeczywistych godzin pracy.',
+      ),
+    ).toBeInTheDocument();
+  });
+
   it('keeps day cells read-only in a settled month', () => {
     render(
       <SettlementGrid
@@ -333,6 +377,22 @@ function assignment(
     validTo,
     status: 'ACTIVE',
     note: null,
+    ...metadata,
+  };
+}
+
+function dayOffCorrection(): ScheduleCorrection {
+  return {
+    id: `${employee.id}_2026-08-07`,
+    monthId: '2026-08',
+    employeeId: employee.id,
+    tetaNumber: employee.tetaNumber,
+    date: '2026-08-07',
+    kind: 'DAY_OFF',
+    plannedShift: null,
+    plannedHours: 0,
+    note: 'Wolne za święto',
+    status: 'ACTIVE',
     ...metadata,
   };
 }

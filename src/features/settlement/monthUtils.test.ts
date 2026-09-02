@@ -1,4 +1,5 @@
 import type { DailyValue, Employee } from '../../types/firestore';
+import type { PlannedScheduleDay } from '../../utils/schedule';
 import {
   createCalendarDays,
   currentMonthId,
@@ -280,6 +281,40 @@ describe('virtual daily values', () => {
       calendarState: 'working',
       hours: 8,
       fallbackHours: 8,
+      coordinatorNote: null,
+    });
+  });
+
+  it('uses an effective DAY_OFF plan instead of the generated working-day default', () => {
+    const workingDay = calendar.find((day) => day.isoDate === '2026-07-14')!;
+    const plannedDay = {
+      employeeId: employeeRecord.id,
+      date: workingDay.isoDate,
+      status: 'DAY_OFF',
+      source: 'manual-correction',
+      hours: 0,
+      shift: null,
+      label: 'W',
+      departmentId: null,
+      shiftAssignment: null,
+      reason: 'Wolne za święto',
+      holidayName: null,
+      plannedStartTime: null,
+      plannedEndTime: null,
+      plannedDuration: 0,
+    } satisfies PlannedScheduleDay;
+
+    expect(
+      resolveSettlementCellValue({
+        employee: employeeRecord,
+        day: workingDay,
+        plannedDay,
+      }),
+    ).toEqual({
+      kind: 'virtual-default',
+      calendarState: 'non-working',
+      hours: 0,
+      fallbackHours: 0,
       coordinatorNote: null,
     });
   });

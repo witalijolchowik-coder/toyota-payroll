@@ -199,6 +199,7 @@ export function EmployeeCalendarDialog({
                 employee,
                 day: cell.day,
                 persistedValue,
+                plannedDay,
               });
               const absenceResolution = resolveGoverningAbsence(
                 employeeAbsences,
@@ -223,7 +224,11 @@ export function EmployeeCalendarDialog({
               const warnings = resolveAttendanceWarnings({
                 hasExplicitValue: Boolean(persistedValue),
                 hasActiveAbsence: absenceResolution.kind !== 'none',
-                isWorkingDay: cell.day.isWorkingDay,
+                isWorkingDay:
+                  plannedDay === undefined
+                    ? cell.day.isWorkingDay
+                    : plannedDay.status === 'WORKING' ||
+                      plannedDay.status === 'BHP',
                 isWithinEmployment: isDayWithinEmployment(employee, cell.day),
               });
               const canEdit =

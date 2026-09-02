@@ -351,6 +351,7 @@ export function SettlementGrid({
                           employee,
                           day,
                           persistedValue,
+                          plannedDay,
                         });
                         const absenceResolution = resolveGoverningAbsence(
                           absencesByEmployee.get(employee.id) ?? [],
@@ -395,7 +396,11 @@ export function SettlementGrid({
                         const warnings = resolveAttendanceWarnings({
                           hasExplicitValue: Boolean(persistedValue),
                           hasActiveAbsence: hasGoverningAbsence,
-                          isWorkingDay: day.isWorkingDay,
+                          isWorkingDay:
+                            plannedDay === undefined
+                              ? day.isWorkingDay
+                              : plannedDay.status === 'WORKING' ||
+                                plannedDay.status === 'BHP',
                           isWithinEmployment:
                             value.calendarState !== 'outside-employment',
                         });

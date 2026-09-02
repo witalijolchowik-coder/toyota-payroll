@@ -18,6 +18,7 @@ import {
   isDateCoveredByContracts,
   validateEmployeeContract,
 } from '../../utils/employees';
+import type { PlannedScheduleDay } from '../../utils/schedule';
 
 export type ParsedMonthId = ParsedPayrollMonth;
 export type MonthDateRange = PayrollMonthDateRange;
@@ -155,19 +156,34 @@ export function resolveSettlementCellValue({
   employee,
   day,
   persistedValue,
+  plannedDay,
 }: {
   employee: Employee;
   day: CalendarDay;
   persistedValue?: DailyValue;
+  plannedDay?: PlannedScheduleDay;
 }): SettlementCellValue {
   const isWithinEmployment = isDayWithinEmployment(employee, day);
+  const isEffectiveWorkingDay = plannedDay
+    ? plannedDay.status === 'WORKING' || plannedDay.status === 'BHP'
+    : day.isWorkingDay;
   const calendarState: SettlementCalendarState = !isWithinEmployment
     ? 'outside-employment'
     : day.isFuture
       ? 'future'
-      : day.isWorkingDay
+      : isEffectiveWorkingDay
         ? 'working'
         : 'non-working';
+  const virtualHours = plannedDay
+    ? !isWithinEmployment || day.isFuture
+      ? null
+      : plannedDay.hours
+    : getUiVirtualDefaultHours({
+        isWorkingDay: day.isWorkingDay,
+        isWithinEmployment,
+        hasGoverningValue: false,
+        isFuture: day.isFuture,
+      });
 
   if (persistedValue) {
     const effective = resolveEffectiveAttendanceValue(persistedValue);
@@ -178,12 +194,7 @@ export function resolveSettlementCellValue({
       fallbackHours:
         persistedValue.source === 'attendance_import'
           ? persistedValue.hours
-          : getUiVirtualDefaultHours({
-              isWorkingDay: day.isWorkingDay,
-              isWithinEmployment,
-              hasGoverningValue: false,
-              isFuture: day.isFuture,
-            }),
+          : virtualHours,
       coordinatorNote: effective.kind === 'imported' ? null : effective.note,
       ...(persistedValue.workTimeCorrection
         ? { workTimeCorrection: persistedValue.workTimeCorrection }
@@ -191,12 +202,6 @@ export function resolveSettlementCellValue({
     };
   }
 
-  const virtualHours = getUiVirtualDefaultHours({
-    isWorkingDay: day.isWorkingDay,
-    isWithinEmployment,
-    hasGoverningValue: false,
-    isFuture: day.isFuture,
-  });
   if (virtualHours !== null) {
     return {
       kind: 'virtual-default',
