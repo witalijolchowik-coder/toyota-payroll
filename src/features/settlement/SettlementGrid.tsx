@@ -1080,6 +1080,7 @@ function buildTooltip({
       parts.push(t.settlement.grid.scheduleUnresolved);
     } else if (plannedDay.source === 'manual-correction') {
       parts.push(t.settlement.grid.scheduleManualCorrection);
+      if (plannedDay.reason) parts.push(plannedDay.reason);
     } else if (plannedDay.status === 'BHP') {
       parts.push(t.settlement.grid.scheduleBhp);
     } else if (plannedDay.status === 'PUBLIC_HOLIDAY') {

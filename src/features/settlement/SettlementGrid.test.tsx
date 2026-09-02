@@ -250,7 +250,7 @@ describe('SettlementGrid', () => {
     expect(within(dayCell).queryByText('8 h')).not.toBeInTheDocument();
   });
 
-  it('shows an active DAY_OFF correction as a day off in shifts mode', () => {
+  it('shows an active DAY_OFF correction as a described day off in shifts mode', async () => {
     render(
       <SettlementGrid
         employees={[employee]}
@@ -272,6 +272,10 @@ describe('SettlementGrid', () => {
         'Ręczna korekta planu miesięcznego. Nie zmienia rzeczywistych godzin pracy.',
       ),
     ).toBeInTheDocument();
+    fireEvent.mouseOver(dayCell);
+    expect(await screen.findByRole('tooltip')).toHaveTextContent(
+      'Wolne za święto',
+    );
   });
 
   it('keeps day cells read-only in a settled month', () => {
