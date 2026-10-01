@@ -34,6 +34,17 @@ describe('authoritative Balance quantity and source precedence', () => {
       unresolved: true,
     });
     expect(result.issues).toContain('UNCONFIRMED_SHORTAGE_REVIEW');
+    const partialPunch = resolveBalanceCalendarDeviation(
+      balanceFacts({
+        credited_hours: 0,
+        actual_start_time: '06:00',
+        actual_end_time: '06:20',
+        absence_hours: 16,
+      }),
+      '2026-09-10',
+      false,
+    );
+    expect(partialPunch.deviation.privateTimeHours).toBe(0);
   });
   it('A: credits normal 8 h without punch-derived overtime', () => {
     const result = resolveBalanceCalendarDeviation(

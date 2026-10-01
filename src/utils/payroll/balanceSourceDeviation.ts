@@ -55,7 +55,10 @@ export function resolveBalanceSourceDeviation(
   );
   const eligibleShortage = Math.min(
     shortage,
-    Math.max(confirmedPrivate, analyzed?.privateTimeHours ?? 0),
+    Math.max(
+      confirmedPrivate,
+      normal > 0 ? (analyzed?.privateTimeHours ?? 0) : 0,
+    ),
   );
   if (shortage - eligibleShortage > tolerance)
     issues.push('UNCONFIRMED_SHORTAGE_REVIEW');
