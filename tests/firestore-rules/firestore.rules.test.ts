@@ -193,11 +193,32 @@ describe('Firestore security rules', () => {
       import_id: facts.import_id,
       note: null,
       manual_override: null,
-      work_time_correction: null,
+      work_time_correction: {
+        work_context: 'NORMATIVE',
+        planned_shift: 'FIRST',
+        planned_start_time: '06:00',
+        planned_end_time: '14:00',
+        actual_start_time: '06:00',
+        actual_end_time: '14:00',
+        classification_override: null,
+      },
       balance_source_facts: facts,
       ...modificationMetadata(uid),
     };
-    await assertSucceeds(setDoc(reference, payload));
+    const importBatch = writeBatch(firestore);
+    importBatch.set(reference, payload);
+    importBatch.set(doc(firestore, 'auditLog/balance-synthetic-create'), {
+      entity_path: reference.path,
+      action: 'create',
+      actor_uid: uid,
+      occurred_at: serverTimestamp(),
+      changes: {
+        change_kind: 'balance-source-import',
+        import_id: facts.import_id,
+        new_source_facts: facts,
+      },
+    });
+    await assertSucceeds(importBatch.commit());
     await assertFails(
       updateDoc(reference, {
         balance_source_facts: { ...facts, extra_hours: 25 },

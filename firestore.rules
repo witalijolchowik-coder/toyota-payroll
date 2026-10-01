@@ -517,7 +517,7 @@ service cloud.firestore {
       let f = data.balance_source_facts;
       let importPath = /databases/$(database)/documents/months/$(monthId)/imports/$(f.import_id);
       return f is map
-        && f.keys().hasAll(['version','import_id','worksheet','row','planned_start_time','planned_end_time','actual_start_time','actual_end_time','planned_hours','credited_hours','extra_hours','night_hours','presence_hours','absence_hours','private_time_hours','private_time_repaid_hours','private_time_balance_hours','client_overtime_50_hours','client_overtime_100_hours','client_time_off_hours','client_time_off_due_hours','client_day_off','client_day_off_due'])
+        && f.keys().size() == 23
         && f.keys().hasOnly(['version','import_id','worksheet','row','planned_start_time','planned_end_time','actual_start_time','actual_end_time','planned_hours','credited_hours','extra_hours','night_hours','presence_hours','absence_hours','private_time_hours','private_time_repaid_hours','private_time_balance_hours','client_overtime_50_hours','client_overtime_100_hours','client_time_off_hours','client_time_off_due_hours','client_day_off','client_day_off_due'])
         && f.version == 1
         && isNonEmptyString(f.import_id)
@@ -1564,7 +1564,11 @@ service cloud.firestore {
           && request.resource.data.hours == request.resource.data.balance_source_facts.credited_hours
           && employeeReferenceExists(request.resource.data)
           && hasCanonicalDailyValueIdentity(monthId,dailyValueId,request.resource.data)
-          && hasCreateMetadata(request.resource.data);
+          // validDailyValue already checks metadata types/nonempty identities.
+          && request.resource.data.created_at == request.time
+          && request.resource.data.updated_at == request.time
+          && request.resource.data.created_by == request.auth.uid
+          && request.resource.data.updated_by == request.auth.uid;
         allow update: if request.resource.data.diff(resource.data).affectedKeys().hasAny(['balance_source_facts'])
           && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hours','import_id','balance_source_facts','work_time_correction','updated_at','updated_by'])
           && isAuthenticated()
