@@ -11,6 +11,7 @@ import type {
   AdjustmentDocument,
   AuditLogDocument,
   CalendarAppearanceDocument,
+  BalanceSourceFactsDocument,
   DailyValueDocument,
   DepartmentDocument,
   EmployeeDocument,
@@ -101,6 +102,61 @@ function metadata(data: DocumentData, path: string) {
     created_by: readNonEmptyString(data, 'created_by', path),
     updated_at: readTimestamp(data, 'updated_at', path),
     updated_by: readNonEmptyString(data, 'updated_by', path),
+  };
+}
+
+function balanceSourceFacts(
+  data: DocumentData,
+  path: string,
+): BalanceSourceFactsDocument | null {
+  if (data.balance_source_facts == null) return null;
+  const value = readObject(data, 'balance_source_facts', path);
+  if (readNumber(value, 'version', path) !== 1)
+    throw Error('Unsupported Balance source version');
+  return {
+    version: 1,
+    import_id: readNonEmptyString(value, 'import_id', path),
+    worksheet: readNonEmptyString(value, 'worksheet', path),
+    row: readNumber(value, 'row', path),
+    planned_start_time: readNullableString(value, 'planned_start_time', path),
+    planned_end_time: readNullableString(value, 'planned_end_time', path),
+    actual_start_time: readNullableString(value, 'actual_start_time', path),
+    actual_end_time: readNullableString(value, 'actual_end_time', path),
+    planned_hours: readNumber(value, 'planned_hours', path),
+    credited_hours: readNumber(value, 'credited_hours', path),
+    extra_hours: readNumber(value, 'extra_hours', path),
+    night_hours: readNumber(value, 'night_hours', path),
+    presence_hours: readNumber(value, 'presence_hours', path),
+    absence_hours: readNumber(value, 'absence_hours', path),
+    private_time_hours: readNumber(value, 'private_time_hours', path),
+    private_time_repaid_hours: readNumber(
+      value,
+      'private_time_repaid_hours',
+      path,
+    ),
+    private_time_balance_hours: readNumber(
+      value,
+      'private_time_balance_hours',
+      path,
+    ),
+    client_overtime_50_hours: readNumber(
+      value,
+      'client_overtime_50_hours',
+      path,
+    ),
+    client_overtime_100_hours: readNumber(
+      value,
+      'client_overtime_100_hours',
+      path,
+    ),
+    client_time_off_hours: readNumber(value, 'client_time_off_hours', path),
+    client_time_off_due_hours: readNumber(
+      value,
+      'client_time_off_due_hours',
+      path,
+    ),
+    client_day_off: readNumber(value, 'client_day_off', path),
+    client_day_off_due: readNumber(value, 'client_day_off_due', path),
   };
 }
 
@@ -485,6 +541,7 @@ export const dailyValueConverter = createConverter<DailyValueDocument>(
       ...employeeReference(data, path),
       date: readNonEmptyString(data, 'date', path),
       hours: readNumber(data, 'hours', path),
+      balance_source_facts: balanceSourceFacts(data, path),
       source: readEnum(data, 'source', path, [
         'manual',
         'attendance_import',

@@ -42,6 +42,7 @@ import type {
   IsoDate,
 } from '../../types/firestore';
 import { resolveEmploymentCoveredAbsence } from '../../utils/absences';
+import { resolveBalanceCalendarDeviation } from '../../utils/payroll/balanceSourceDeviation';
 import {
   resolveAttendanceWarnings,
   type AttendanceWarning,
@@ -396,7 +397,7 @@ export function SettlementGrid({
                         const hasGoverningAbsence =
                           absenceResolution.kind !== 'none';
                         const warnings = resolveAttendanceWarnings({
-                          hasExplicitValue: Boolean(persistedValue),
+                          hasExplicitValue: (value.hours ?? 0) > 0,
                           hasActiveAbsence: hasGoverningAbsence,
                           isWorkingDay:
                             plannedDay === undefined
@@ -835,6 +836,13 @@ function resolveGridWorkTimeBreakdown({
   day: CalendarDay;
   plannedDay?: PlannedScheduleDay;
 }): DailyWorkTimeDeviation | null {
+  if (value.balanceSourceFacts)
+    return resolveBalanceCalendarDeviation(
+      value.balanceSourceFacts,
+      day.isoDate,
+      day.isHoliday,
+      plannedDay,
+    ).deviation;
   const correction = value.workTimeCorrection;
   if (!correction) return null;
 

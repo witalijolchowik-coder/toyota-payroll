@@ -468,6 +468,7 @@ service cloud.firestore {
           'note',
           'manual_override',
           'work_time_correction',
+          'balance_source_facts',
           'created_at',
           'created_by',
           'updated_at',
@@ -498,6 +499,44 @@ service cloud.firestore {
           )
         )
         && hasModificationMetadata(data);
+    }
+
+    function balanceHours(value) {
+      return value is number && value >= 0 && value <= 24;
+    }
+
+    function balanceControlHours(value) {
+      return value is number && value >= 0 && value <= 744;
+    }
+
+    function balanceClock(value) {
+      return value == null || isClockTime(value);
+    }
+
+    function validBalanceSourceFacts(data, monthId) {
+      let f = data.balance_source_facts;
+      let importPath = /databases/$(database)/documents/months/$(monthId)/imports/$(f.import_id);
+      return f is map
+        && f.keys().hasAll(['version','import_id','worksheet','row','planned_start_time','planned_end_time','actual_start_time','actual_end_time','planned_hours','credited_hours','extra_hours','night_hours','presence_hours','absence_hours','private_time_hours','private_time_repaid_hours','private_time_balance_hours','client_overtime_50_hours','client_overtime_100_hours','client_time_off_hours','client_time_off_due_hours','client_day_off','client_day_off_due'])
+        && f.keys().hasOnly(['version','import_id','worksheet','row','planned_start_time','planned_end_time','actual_start_time','actual_end_time','planned_hours','credited_hours','extra_hours','night_hours','presence_hours','absence_hours','private_time_hours','private_time_repaid_hours','private_time_balance_hours','client_overtime_50_hours','client_overtime_100_hours','client_time_off_hours','client_time_off_due_hours','client_day_off','client_day_off_due'])
+        && f.version == 1
+        && isNonEmptyString(f.import_id)
+        && f.import_id.matches('^balance-[a-f0-9]{64}$')
+        && exists(importPath)
+        && get(importPath).data.import_type == 'attendance'
+        && isNonEmptyString(f.worksheet) && f.worksheet.size() <= 200
+        && f.row is int && f.row > 0 && f.row <= 1000000
+        && balanceClock(f.planned_start_time) && balanceClock(f.planned_end_time)
+        && balanceClock(f.actual_start_time) && balanceClock(f.actual_end_time)
+        && balanceHours(f.planned_hours) && balanceHours(f.credited_hours)
+        && balanceHours(f.extra_hours)
+        && balanceHours(f.night_hours)
+        && balanceHours(f.presence_hours) && balanceControlHours(f.absence_hours)
+        && balanceControlHours(f.private_time_hours) && balanceControlHours(f.private_time_repaid_hours)
+        && f.private_time_balance_hours is number && f.private_time_balance_hours >= -744 && f.private_time_balance_hours <= 744
+        && balanceControlHours(f.client_overtime_50_hours) && balanceControlHours(f.client_overtime_100_hours)
+        && balanceControlHours(f.client_time_off_hours) && balanceControlHours(f.client_time_off_due_hours)
+        && balanceControlHours(f.client_day_off) && balanceControlHours(f.client_day_off_due);
     }
 
     function validWorkTimeCorrection(data) {
@@ -1518,7 +1557,37 @@ service cloud.firestore {
         allow create: if isAuthenticated()
           && monthExistsAndIsOpen(monthId)
           && validDailyValue(request.resource.data)
+          && request.resource.data.source == 'attendance_import'
+          && request.resource.data.manual_override == null
+          && validBalanceSourceFacts(request.resource.data,monthId)
+          && request.resource.data.import_id == request.resource.data.balance_source_facts.import_id
+          && request.resource.data.hours == request.resource.data.balance_source_facts.credited_hours
+          && employeeReferenceExists(request.resource.data)
+          && hasCanonicalDailyValueIdentity(monthId,dailyValueId,request.resource.data)
+          && hasCreateMetadata(request.resource.data);
+        allow update: if isAuthenticated()
+          && monthExistsAndIsOpen(monthId)
+          && hasUpdateMetadata(request.resource.data)
+          && hasCanonicalDailyValueIdentity(monthId,dailyValueId,request.resource.data)
+          && validBalanceSourceFacts(request.resource.data,monthId)
+          && request.resource.data.source == resource.data.source
+          && request.resource.data.get('manual_override',null) == resource.data.get('manual_override',null)
+          && validWorkTimeCorrection(request.resource.data)
+          && (
+            (resource.data.source == 'manual'
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['balance_source_facts','updated_at','updated_by']))
+            || (resource.data.source == 'attendance_import'
+              && request.resource.data.import_id == request.resource.data.balance_source_facts.import_id
+              && request.resource.data.hours == request.resource.data.balance_source_facts.credited_hours
+              && (resource.data.get('manual_override',null) == null || request.resource.data.get('work_time_correction',null) == resource.data.get('work_time_correction',null))
+              && (resource.data.keys().hasAny(['balance_source_facts']) || resource.data.get('work_time_correction',null) == null || request.resource.data.get('work_time_correction',null) == resource.data.get('work_time_correction',null))
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hours','import_id','balance_source_facts','work_time_correction','updated_at','updated_by']))
+          );
+        allow create: if isAuthenticated()
+          && monthExistsAndIsOpen(monthId)
+          && validDailyValue(request.resource.data)
           && request.resource.data.source == 'manual'
+          && (!request.resource.data.keys().hasAny(['balance_source_facts']) || request.resource.data.balance_source_facts == null)
           && hasCanonicalDailyValueIdentity(
             monthId,
             dailyValueId,

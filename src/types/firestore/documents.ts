@@ -213,6 +213,34 @@ export interface SettlementReviewDocument
 export type DailyValueSource = 'manual' | 'attendance_import';
 export type WorkTimeContext = 'NORMATIVE' | 'EXTRA';
 
+/** Immutable Balance source quantities, not manual payroll classification. */
+export interface BalanceSourceFactsDocument {
+  version: 1;
+  import_id: string;
+  worksheet: string;
+  row: number;
+  planned_start_time: string | null;
+  planned_end_time: string | null;
+  actual_start_time: string | null;
+  actual_end_time: string | null;
+  planned_hours: number;
+  credited_hours: number;
+  extra_hours: number;
+  night_hours: number;
+  presence_hours: number;
+  absence_hours: number;
+  private_time_hours: number;
+  private_time_repaid_hours: number;
+  private_time_balance_hours: number;
+  // Diagnostic only. Never instructions for our payroll allocation.
+  client_overtime_50_hours: number;
+  client_overtime_100_hours: number;
+  client_time_off_hours: number;
+  client_time_off_due_hours: number;
+  client_day_off: number;
+  client_day_off_due: number;
+}
+
 export interface WorkTimeClassificationOverrideDocument {
   private_time_hours: number | null;
   overtime_50_hours: number | null;
@@ -244,6 +272,7 @@ export interface DailyValueDocument
   extends EmployeeReferenceDocument, ModificationMetadataDocument {
   date: IsoDate;
   hours: number;
+  balance_source_facts?: BalanceSourceFactsDocument | null;
   source: DailyValueSource;
   import_id: string | null;
   note: string | null;

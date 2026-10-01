@@ -21,6 +21,7 @@ import {
   writeBatch,
 } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
+import { balanceFacts } from '../../src/utils/attendance/balanceFixtures.test-support';
 
 const projectId = 'toyota-payroll-rules-test';
 let testEnvironment: RulesTestEnvironment;
@@ -159,6 +160,202 @@ afterAll(async () => {
 });
 
 describe('Firestore security rules', () => {
+  it('allows typed Balance imports, preserves overrides, and rejects malformed or locked writes', async () => {
+    await seedMonth('2026-09', false);
+    await seedEmployee('employee-1');
+    const uid = 'coordinator-1',
+      firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const facts = balanceFacts();
+    const imported = doc(
+      firestore,
+      `months/2026-09/imports/${facts.import_id}`,
+    );
+    await assertSucceeds(
+      setDoc(imported, {
+        import_type: 'attendance',
+        file_name: 'Synthetic.xls',
+        storage_path: `attendance/2026-09/${facts.import_id}`,
+        status: 'pending',
+        uploaded_at: serverTimestamp(),
+        uploaded_by: uid,
+      }),
+    );
+    const reference = doc(
+      firestore,
+      'months/2026-09/dailyValues/employee-1_2026-09-10',
+    );
+    const payload = {
+      employee_id: 'employee-1',
+      teta_number: 'TETA-1001',
+      date: '2026-09-10',
+      hours: 8,
+      source: 'attendance_import',
+      import_id: facts.import_id,
+      note: null,
+      manual_override: null,
+      work_time_correction: null,
+      balance_source_facts: facts,
+      ...modificationMetadata(uid),
+    };
+    await assertSucceeds(setDoc(reference, payload));
+    await assertFails(
+      updateDoc(reference, {
+        balance_source_facts: { ...facts, extra_hours: 25 },
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertFails(
+      setDoc(
+        doc(firestore, 'months/2026-09/dailyValues/non-canonical'),
+        payload,
+      ),
+    );
+    await assertFails(
+      setDoc(
+        doc(firestore, 'months/2026-09/dailyValues/employee-1_2026-09-11'),
+        { ...payload, date: '2026-09-11', teta_number: 'OTHER' },
+      ),
+    );
+    await assertFails(
+      updateDoc(reference, {
+        balance_source_facts: { ...facts, unknown_field: 1 },
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(reference, {
+        manual_override: {
+          hours: 6,
+          note: 'operator',
+          actor_uid: uid,
+          updated_at: serverTimestamp(),
+        },
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(reference, {
+        hours: 10,
+        balance_source_facts: { ...facts, credited_hours: 10, extra_hours: 2 },
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    expect((await getDoc(reference)).data()?.manual_override.hours).toBe(6);
+    await assertFails(
+      updateDoc(reference, {
+        hours: 11,
+        balance_source_facts: { ...facts, credited_hours: 11, extra_hours: 3 },
+        manual_override: null,
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertFails(
+      updateDoc(reference, {
+        work_time_correction: {
+          work_context: 'NORMATIVE',
+          planned_shift: 'FIRST',
+          planned_start_time: '06:00',
+          planned_end_time: '14:00',
+          actual_start_time: '06:00',
+          actual_end_time: '16:00',
+          classification_override: {
+            private_time_hours: null,
+            overtime_50_hours: 2,
+            overtime_100_hours: 0,
+            coverable_ni_hours: null,
+            note: null,
+            actor_uid: uid,
+            updated_at: serverTimestamp(),
+          },
+        },
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    // Raw source night can be contradictory without being silently discarded.
+    await assertSucceeds(
+      setDoc(
+        doc(firestore, 'months/2026-09/dailyValues/employee-1_2026-09-12'),
+        {
+          ...payload,
+          date: '2026-09-12',
+          hours: 0,
+          balance_source_facts: { ...facts, credited_hours: 0, night_hours: 8 },
+        },
+      ),
+    );
+    await testEnvironment.withSecurityRulesDisabled(async (context) =>
+      updateDoc(doc(context.firestore(), 'months/2026-09'), {
+        is_settled: true,
+      }),
+    );
+    await assertFails(
+      updateDoc(reference, {
+        hours: 12,
+        balance_source_facts: { ...facts, credited_hours: 12 },
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+  });
+
+  it('attaches raw Balance facts to a protected manual value without replacing it', async () => {
+    await seedMonth('2026-09', false);
+    await seedEmployee('employee-1');
+    const uid = 'coordinator-1',
+      firestore = testEnvironment.authenticatedContext(uid).firestore(),
+      facts = balanceFacts();
+    await assertSucceeds(
+      setDoc(doc(firestore, `months/2026-09/imports/${facts.import_id}`), {
+        import_type: 'attendance',
+        file_name: 'Synthetic.xls',
+        storage_path: 'attendance/synthetic',
+        status: 'pending',
+        uploaded_at: serverTimestamp(),
+        uploaded_by: uid,
+      }),
+    );
+    const reference = doc(
+      firestore,
+      'months/2026-09/dailyValues/employee-1_2026-09-10',
+    );
+    await assertSucceeds(
+      setDoc(reference, {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        date: '2026-09-10',
+        hours: 6,
+        source: 'manual',
+        import_id: null,
+        note: 'operator',
+        manual_override: null,
+        work_time_correction: null,
+        ...modificationMetadata(uid),
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(reference, {
+        balance_source_facts: facts,
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertFails(
+      updateDoc(reference, {
+        hours: 8,
+        balance_source_facts: { ...facts, row: 11 },
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    expect((await getDoc(reference)).data()?.hours).toBe(6);
+  });
+
   it('denies public access', async () => {
     const firestore = testEnvironment.unauthenticatedContext().firestore();
     await assertFails(getDoc(doc(firestore, 'employees', 'employee-1')));

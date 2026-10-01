@@ -1,4 +1,5 @@
 import type {
+  BalanceSourceFactsDocument,
   AdjustmentCategory,
   AdjustmentDirection,
   AdjustmentStatus,
@@ -204,6 +205,7 @@ export interface SettlementReviewState extends ModificationMetadata {
 }
 
 export interface DailyValue extends ModificationMetadata {
+  balanceSourceFacts?: BalanceSourceFactsDocument | null;
   id: string;
   monthId: MonthId;
   employeeId: EmployeeId;

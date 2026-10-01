@@ -290,6 +290,7 @@ export function mapDailyValueDocument(
     tetaNumber: document.teta_number,
     date: document.date,
     hours: document.hours,
+    balanceSourceFacts: document.balance_source_facts ?? null,
     source: document.source,
     importId: document.import_id,
     note: document.note,

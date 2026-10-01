@@ -12,6 +12,7 @@ import {
   type ParsedPayrollMonth,
 } from '../../utils/payroll';
 import { resolveEffectiveAttendanceValue } from '../../utils/attendance';
+import { hasEffectiveBalanceSource } from '../../utils/payroll/balanceSourceDeviation';
 import {
   activeContracts,
   employeeContractsOverlapRange,
@@ -46,6 +47,7 @@ export interface SettlementCellValue {
   fallbackHours: number | null;
   coordinatorNote: string | null;
   workTimeCorrection?: DailyValue['workTimeCorrection'] | null;
+  balanceSourceFacts?: DailyValue['balanceSourceFacts'];
 }
 
 export interface MonthlyEmployeeParticipation {
@@ -205,6 +207,9 @@ export function resolveSettlementCellValue({
           ? persistedValue.hours
           : virtualHours,
       coordinatorNote: effective.kind === 'imported' ? null : effective.note,
+      ...(hasEffectiveBalanceSource(persistedValue)
+        ? { balanceSourceFacts: persistedValue.balanceSourceFacts }
+        : {}),
       ...(persistedValue.workTimeCorrection
         ? { workTimeCorrection: persistedValue.workTimeCorrection }
         : {}),

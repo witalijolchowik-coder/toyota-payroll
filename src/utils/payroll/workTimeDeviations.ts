@@ -9,7 +9,7 @@ export interface ClockInterval {
 }
 
 export interface PlannedWorkInterval extends ClockInterval {
-  shift: ActualWorkingShift;
+  shift: ActualWorkingShift | null;
 }
 
 export interface WorkTimeClassificationOverride {

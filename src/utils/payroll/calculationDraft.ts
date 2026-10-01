@@ -21,6 +21,10 @@ import {
   resolveAttendanceWarnings,
   resolveEffectiveAttendanceValue,
 } from '../attendance';
+import {
+  hasEffectiveBalanceSource,
+  resolveBalanceCalendarDeviation,
+} from './balanceSourceDeviation';
 import { calculateFrequencyBonus } from '../bonuses';
 import {
   createPayrollMonthCalendar,
@@ -768,7 +772,7 @@ export function calculateEmployeeMonthlyDraft({
       if (persistedValue) {
         const effective = resolveEffectiveAttendanceValue(persistedValue);
         const attendanceWarnings = resolveAttendanceWarnings({
-          hasExplicitValue: true,
+          hasExplicitValue: effective.hours > 0,
           hasActiveAbsence: hasPayrollGoverningAbsence,
           isWorkingDay: isPlannedWorkingDay,
           isWithinEmployment,
@@ -809,6 +813,12 @@ export function calculateEmployeeMonthlyDraft({
           });
           if (deviation) {
             recordWorkTimeDeviation(day.isoDate, deviation);
+            if (deviation.unresolved) {
+              unresolvedClassificationDays.push(day.isoDate);
+              warnings.push(
+                warning('unresolved-work-time-classification', day.isoDate),
+              );
+            }
           } else if (effective.hours > 0 && !hasPayrollGoverningAbsence) {
             if (!isPlannedWorkingDay) {
               recordWorkTimeDeviation(
@@ -1441,6 +1451,14 @@ function dailyWorkTimeDeviationFromValue({
   day: ReturnType<typeof createPayrollMonthCalendar>[number];
   plannedDay?: PlannedScheduleDay;
 }): DailyWorkTimeDeviation | null {
+  if (hasEffectiveBalanceSource(value) && value.balanceSourceFacts) {
+    return resolveBalanceCalendarDeviation(
+      value.balanceSourceFacts,
+      day.isoDate,
+      day.isPublicHoliday,
+      plannedDay,
+    ).deviation;
+  }
   if (!value.workTimeCorrection) {
     return null;
   }

@@ -24,6 +24,7 @@ import type {
   EmployeeAssignment,
 } from '../../types/firestore';
 import { resolveEmploymentCoveredAbsence } from '../../utils/absences';
+import { resolveBalanceCalendarDeviation } from '../../utils/payroll/balanceSourceDeviation';
 import { resolveAttendanceWarnings } from '../../utils/attendance';
 import {
   intervalHours,
@@ -223,7 +224,7 @@ export function EmployeeCalendarDialog({
                     )
                   : appearanceKeyForPlannedDay(plannedDay);
               const warnings = resolveAttendanceWarnings({
-                hasExplicitValue: Boolean(persistedValue),
+                hasExplicitValue: (value.hours ?? 0) > 0,
                 hasActiveAbsence: absenceResolution.kind !== 'none',
                 isWorkingDay:
                   plannedDay === undefined
@@ -242,34 +243,41 @@ export function EmployeeCalendarDialog({
                   : interpolate(t.settlement.grid.hours, {
                       hours: value.hours.toLocaleString('pl-PL'),
                     });
-              const workTimeBreakdown = value.workTimeCorrection
-                ? resolveDailyWorkTimeDeviation({
-                    planned:
-                      value.workTimeCorrection.workContext !== 'EXTRA' &&
-                      value.workTimeCorrection.plannedShift &&
-                      value.workTimeCorrection.plannedStartTime &&
-                      value.workTimeCorrection.plannedEndTime
-                        ? {
-                            shift: value.workTimeCorrection.plannedShift,
-                            startTime:
-                              value.workTimeCorrection.plannedStartTime,
-                            endTime: value.workTimeCorrection.plannedEndTime,
-                          }
-                        : null,
-                    actual: {
-                      startTime: value.workTimeCorrection.actualStartTime,
-                      endTime: value.workTimeCorrection.actualEndTime,
-                    },
-                    isWorkingDay:
-                      value.workTimeCorrection.workContext === 'EXTRA'
-                        ? false
-                        : plannedDay?.status === 'WORKING' ||
-                          plannedDay?.status === 'BHP',
-                    isSaturday: cell.day.date.getUTCDay() === 6,
-                    isSunday: cell.day.date.getUTCDay() === 0,
-                    isPublicHoliday: cell.day.isHoliday,
-                  })
-                : null;
+              const workTimeBreakdown = value.balanceSourceFacts
+                ? resolveBalanceCalendarDeviation(
+                    value.balanceSourceFacts,
+                    cell.day.isoDate,
+                    cell.day.isHoliday,
+                    plannedDay,
+                  ).deviation
+                : value.workTimeCorrection
+                  ? resolveDailyWorkTimeDeviation({
+                      planned:
+                        value.workTimeCorrection.workContext !== 'EXTRA' &&
+                        value.workTimeCorrection.plannedShift &&
+                        value.workTimeCorrection.plannedStartTime &&
+                        value.workTimeCorrection.plannedEndTime
+                          ? {
+                              shift: value.workTimeCorrection.plannedShift,
+                              startTime:
+                                value.workTimeCorrection.plannedStartTime,
+                              endTime: value.workTimeCorrection.plannedEndTime,
+                            }
+                          : null,
+                      actual: {
+                        startTime: value.workTimeCorrection.actualStartTime,
+                        endTime: value.workTimeCorrection.actualEndTime,
+                      },
+                      isWorkingDay:
+                        value.workTimeCorrection.workContext === 'EXTRA'
+                          ? false
+                          : plannedDay?.status === 'WORKING' ||
+                            plannedDay?.status === 'BHP',
+                      isSaturday: cell.day.date.getUTCDay() === 6,
+                      isSunday: cell.day.date.getUTCDay() === 0,
+                      isPublicHoliday: cell.day.isHoliday,
+                    })
+                  : null;
 
               return (
                 <Tooltip
