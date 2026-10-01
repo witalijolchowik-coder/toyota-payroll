@@ -1554,10 +1554,10 @@ service cloud.firestore {
 
       match /dailyValues/{dailyValueId} {
         allow read: if isAuthenticated();
-        allow create: if isAuthenticated()
+        allow create: if request.resource.data.source == 'attendance_import'
+          && isAuthenticated()
           && monthExistsAndIsOpen(monthId)
           && validDailyValue(request.resource.data)
-          && request.resource.data.source == 'attendance_import'
           && request.resource.data.manual_override == null
           && validBalanceSourceFacts(request.resource.data,monthId)
           && request.resource.data.import_id == request.resource.data.balance_source_facts.import_id
@@ -1565,7 +1565,9 @@ service cloud.firestore {
           && employeeReferenceExists(request.resource.data)
           && hasCanonicalDailyValueIdentity(monthId,dailyValueId,request.resource.data)
           && hasCreateMetadata(request.resource.data);
-        allow update: if isAuthenticated()
+        allow update: if request.resource.data.diff(resource.data).affectedKeys().hasAny(['balance_source_facts'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hours','import_id','balance_source_facts','work_time_correction','updated_at','updated_by'])
+          && isAuthenticated()
           && monthExistsAndIsOpen(monthId)
           && hasUpdateMetadata(request.resource.data)
           && hasCanonicalDailyValueIdentity(monthId,dailyValueId,request.resource.data)
@@ -1583,10 +1585,10 @@ service cloud.firestore {
               && (resource.data.keys().hasAny(['balance_source_facts']) || resource.data.get('work_time_correction',null) == null || request.resource.data.get('work_time_correction',null) == resource.data.get('work_time_correction',null))
               && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hours','import_id','balance_source_facts','work_time_correction','updated_at','updated_by']))
           );
-        allow create: if isAuthenticated()
+        allow create: if request.resource.data.source == 'manual'
+          && isAuthenticated()
           && monthExistsAndIsOpen(monthId)
           && validDailyValue(request.resource.data)
-          && request.resource.data.source == 'manual'
           && (!request.resource.data.keys().hasAny(['balance_source_facts']) || request.resource.data.balance_source_facts == null)
           && hasCanonicalDailyValueIdentity(
             monthId,
@@ -1594,7 +1596,8 @@ service cloud.firestore {
             request.resource.data
           )
           && hasCreateMetadata(request.resource.data);
-        allow update: if isAuthenticated()
+        allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hours','note','work_time_correction','updated_at','updated_by'])
+          && isAuthenticated()
           && monthExistsAndIsOpen(monthId)
           && resource.data.source == 'manual'
           && request.resource.data.source == 'manual'
@@ -1611,7 +1614,8 @@ service cloud.firestore {
             'updated_at',
             'updated_by'
           ]);
-        allow update: if isAuthenticated()
+        allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['manual_override','work_time_correction','updated_at','updated_by'])
+          && isAuthenticated()
           && monthExistsAndIsOpen(monthId)
           && resource.data.source == 'attendance_import'
           && request.resource.data.source == 'attendance_import'
