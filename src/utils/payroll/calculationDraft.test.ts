@@ -19,6 +19,10 @@ import {
   type HousingDepositWithholdingEvidence,
 } from '.';
 import type { PlannedScheduleDay } from '../schedule';
+import {
+  resolveEmploymentCoveredAbsence,
+  resolveGoverningAbsence,
+} from '../absences';
 
 const createdAt = new Date('2026-01-01T00:00:00.000Z');
 
@@ -716,15 +720,15 @@ describe('employee monthly calculation draft', () => {
     expect(result.components.laundryAllowanceBrutto).toBe(40);
   });
 
-  it('counts explicit positive hours for allowances even when the same day has an absence conflict', () => {
+  it('keeps conflicting hours as source facts but excludes them from work-day allowances', () => {
     const result = draft({
       dailyValues: [dailyValue({ date: '2026-06-01', hours: 8 })],
       absences: [absence({ startDate: '2026-06-01', endDate: '2026-06-01' })],
     });
 
-    expect(result.workDays.physicallyWorkedDays).toBe(22);
-    expect(result.components.transportAllowanceNetto).toBe(275);
-    expect(result.components.laundryAllowanceBrutto).toBe(40);
+    expect(result.workDays.physicallyWorkedDays).toBe(21);
+    expect(result.components.transportAllowanceNetto).toBe(262.5);
+    expect(result.components.laundryAllowanceBrutto).toBe(38.18);
     expect(result.warnings.map((item) => item.code)).toContain(
       'attendance-absence-conflict',
     );
@@ -1261,7 +1265,7 @@ describe('employee monthly calculation draft', () => {
     expect(result.totals.preliminaryGrossDeductions).toBe(40);
   });
 
-  it('reports conflict and non-working warnings without hiding explicit hours', () => {
+  it('reports source conflicts but excludes absence-conflicting hours from payable attendance', () => {
     const result = draft({
       dailyValues: [
         dailyValue({ date: '2026-06-01', hours: 7 }),
@@ -1275,13 +1279,147 @@ describe('employee monthly calculation draft', () => {
     });
 
     expect(result.attendance.conflictDays).toEqual(['2026-06-01']);
-    expect(result.attendance.explicitHours).toBe(12);
+    expect(result.attendance.explicitHours).toBe(5);
     expect(result.warnings.map((item) => item.code)).toEqual(
       expect.arrayContaining([
         'attendance-absence-conflict',
         'explicit-non-working-day',
       ]),
     );
+  });
+
+  it('case A: keeps L4 ending before termination effective for its complete source period', () => {
+    const target = employee({
+      employmentStartDate: utcDate('2026-09-01'),
+      employmentEndDate: utcDate('2026-09-30'),
+      employmentEndEvents: [explicitEmploymentEnd('2026-09-30')],
+    });
+    const source = absence({
+      monthId: '2026-09',
+      startDate: '2026-09-10',
+      endDate: '2026-09-12',
+    });
+    const before = structuredClone(source);
+    const result = draft({ monthId: '2026-09', target, absences: [source] });
+    for (const date of ['2026-09-10', '2026-09-11', '2026-09-12']) {
+      expect(resolveEmploymentCoveredAbsence(target, [source], date).kind).toBe(
+        'governed',
+      );
+    }
+    expect(result.absences.l4Hours).toBe(16);
+    expect(source).toEqual(before);
+  });
+
+  it('case B: clips effective L4 at termination while preserving the full report period', () => {
+    const target = employee({
+      employmentStartDate: utcDate('2026-09-01'),
+      employmentEndDate: utcDate('2026-09-16'),
+      employmentEndEvents: [explicitEmploymentEnd('2026-09-16')],
+    });
+    const source = absence({
+      monthId: '2026-09',
+      startDate: '2026-09-15',
+      endDate: '2026-09-20',
+    });
+    const before = structuredClone(source);
+    const result = draft({ monthId: '2026-09', target, absences: [source] });
+    expect(result.absences.l4Hours).toBe(16);
+    expect(
+      result.absences.periods
+        .find((p) => p.id === source.id)
+        ?.workingDates.map((d) => d.date),
+    ).toEqual(['2026-09-15', '2026-09-16']);
+    expect(
+      resolveEmploymentCoveredAbsence(target, [source], '2026-09-16').kind,
+    ).toBe('governed');
+    expect(
+      resolveEmploymentCoveredAbsence(target, [source], '2026-09-17').kind,
+    ).toBe('none');
+    expect(resolveGoverningAbsence([source], '2026-09-20').kind).toBe(
+      'governed',
+    );
+    expect(source).toEqual(before);
+  });
+
+  it('case C: imported L4 suppresses conflicting Balance work and overtime without changing either fact', () => {
+    const target = employee({ employmentStartDate: utcDate('2026-09-01') });
+    const source = absence({
+      monthId: '2026-09',
+      startDate: '2026-09-10',
+      endDate: '2026-09-12',
+    });
+    const attendance = dailyValue({
+      monthId: '2026-09',
+      date: '2026-09-11',
+      hours: 10,
+      source: 'attendance_import',
+      importId: 'balance-import',
+      workTimeCorrection: {
+        plannedShift: 'FIRST',
+        plannedStartTime: '06:00',
+        plannedEndTime: '14:00',
+        actualStartTime: '06:00',
+        actualEndTime: '16:00',
+        classificationOverride: null,
+      },
+    });
+    const before = structuredClone({ source, attendance });
+    const baseline = draft({ monthId: '2026-09', target, absences: [source] });
+    const result = draft({
+      monthId: '2026-09',
+      target,
+      absences: [source],
+      dailyValues: [attendance],
+    });
+    expect(result.attendance.explicitHours).toBe(0);
+    expect(result.attendance.workedHoursTotal).toBe(
+      baseline.attendance.workedHoursTotal,
+    );
+    expect(result.absences.l4Hours).toBe(16);
+    expect(result.workTime.overtime50Hours).toBe(0);
+    expect(result.workTime.overtime100Hours).toBe(0);
+    expect(result.workDays.physicallyWorkedDays).toBe(
+      baseline.workDays.physicallyWorkedDays,
+    );
+    expect(result.attendance.conflictDays).toEqual(['2026-09-11']);
+    expect({ source, attendance }).toEqual(before);
+  });
+
+  it('case D: Balance attendance after termination remains a raw fact with no payable work or overtime', () => {
+    const target = employee({
+      employmentStartDate: utcDate('2026-09-01'),
+      employmentEndDate: utcDate('2026-09-16'),
+      employmentEndEvents: [explicitEmploymentEnd('2026-09-16')],
+    });
+    const attendance = dailyValue({
+      monthId: '2026-09',
+      date: '2026-09-17',
+      hours: 10,
+      source: 'attendance_import',
+      importId: 'balance-import',
+      workTimeCorrection: {
+        plannedShift: 'FIRST',
+        plannedStartTime: '06:00',
+        plannedEndTime: '14:00',
+        actualStartTime: '06:00',
+        actualEndTime: '16:00',
+        classificationOverride: null,
+      },
+    });
+    const before = structuredClone(attendance);
+    const result = draft({
+      monthId: '2026-09',
+      target,
+      dailyValues: [attendance],
+    });
+    expect(result.employment.participatesInMonth).toBe(true);
+    expect(result.attendance.explicitHours).toBe(0);
+    expect(result.attendance.outsideEmploymentValueDays).toEqual([
+      '2026-09-17',
+    ]);
+    expect(result.workTime.overtime50Hours).toBe(0);
+    expect(result.workTime.overtime100Hours).toBe(0);
+    expect(attendance).toEqual(before);
   });
 
   it('warns and excludes explicit values outside employment from worked hours', () => {

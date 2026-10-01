@@ -14,7 +14,7 @@ import {
   isL4Absence,
   isOvertimeTimeOffAbsence,
   normalizeAbsenceCode,
-  resolveGoverningAbsence,
+  resolveEmploymentCoveredAbsence,
   type AbsenceRuleRecord,
 } from '../absences';
 import {
@@ -738,7 +738,8 @@ export function calculateEmployeeMonthlyDraft({
         day.isoDate,
       );
       const persistedValue = dailyValuesByDate.get(day.isoDate);
-      const absenceResolution = resolveGoverningAbsence(
+      const absenceResolution = resolveEmploymentCoveredAbsence(
+        employee,
         activeAbsences,
         day.isoDate,
       );
@@ -787,7 +788,9 @@ export function calculateEmployeeMonthlyDraft({
           }
         });
 
-        if (isWithinEmployment) {
+        // Preserve the attendance source fact and conflict warning, but do
+        // not pay work/overtime or work-day allowances on an absence day.
+        if (isWithinEmployment && !hasPayrollGoverningAbsence) {
           explicitHours += effective.hours;
           if (effective.kind === 'manual') {
             manualHours += effective.hours;

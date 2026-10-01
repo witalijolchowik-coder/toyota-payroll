@@ -23,7 +23,7 @@ import type {
   Employee,
   EmployeeAssignment,
 } from '../../types/firestore';
-import { resolveGoverningAbsence } from '../../utils/absences';
+import { resolveEmploymentCoveredAbsence } from '../../utils/absences';
 import { resolveAttendanceWarnings } from '../../utils/attendance';
 import {
   intervalHours,
@@ -201,7 +201,8 @@ export function EmployeeCalendarDialog({
                 persistedValue,
                 plannedDay,
               });
-              const absenceResolution = resolveGoverningAbsence(
+              const absenceResolution = resolveEmploymentCoveredAbsence(
+                employee,
                 employeeAbsences,
                 cell.day.isoDate,
               );

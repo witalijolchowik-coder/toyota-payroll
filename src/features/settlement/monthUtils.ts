@@ -174,6 +174,15 @@ export function resolveSettlementCellValue({
       : isEffectiveWorkingDay
         ? 'working'
         : 'non-working';
+  if (!isWithinEmployment) {
+    return {
+      kind: 'empty',
+      calendarState,
+      hours: null,
+      fallbackHours: null,
+      coordinatorNote: null,
+    };
+  }
   const virtualHours = plannedDay
     ? !isWithinEmployment || day.isFuture
       ? null

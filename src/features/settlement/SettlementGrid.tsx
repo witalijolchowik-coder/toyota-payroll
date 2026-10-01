@@ -41,7 +41,7 @@ import type {
   ShiftHoursVersion,
   IsoDate,
 } from '../../types/firestore';
-import { resolveGoverningAbsence } from '../../utils/absences';
+import { resolveEmploymentCoveredAbsence } from '../../utils/absences';
 import {
   resolveAttendanceWarnings,
   type AttendanceWarning,
@@ -353,10 +353,12 @@ export function SettlementGrid({
                           persistedValue,
                           plannedDay,
                         });
-                        const absenceResolution = resolveGoverningAbsence(
-                          absencesByEmployee.get(employee.id) ?? [],
-                          day.isoDate,
-                        );
+                        const absenceResolution =
+                          resolveEmploymentCoveredAbsence(
+                            employee,
+                            absencesByEmployee.get(employee.id) ?? [],
+                            day.isoDate,
+                          );
                         const absenceLabel =
                           absenceResolution.kind === 'governed'
                             ? absenceResolution.code === 'L4' &&
@@ -1027,7 +1029,7 @@ function buildTooltip({
 }: {
   value: ReturnType<typeof resolveSettlementCellValue>;
   plannedDay?: PlannedScheduleDay;
-  absenceResolution: ReturnType<typeof resolveGoverningAbsence>;
+  absenceResolution: ReturnType<typeof resolveEmploymentCoveredAbsence>;
   warnings: AttendanceWarning[];
   isSettled: boolean;
   workTimeBreakdown: DailyWorkTimeDeviation | null;

@@ -122,7 +122,17 @@ export function resolveEmploymentLifecyclePeriods(
         contractIds: ordered.map((contract) => contract.id),
       };
     })
-    .sort((first, second) => first.startDate.localeCompare(second.startDate));
+    .sort((first, second) => first.startDate.localeCompare(second.startDate))
+    .map((period, index, periods) => {
+      const next = periods[index + 1];
+      // Historical imports may have assigned a separate sequence id to an
+      // earlier contract. Its undocumented end must not keep coverage open
+      // beyond a later sequence (and that sequence's explicit termination).
+      // Keep expiry alone non-authoritative for the latest employment period.
+      return period.endDate === null && next
+        ? { ...period, endDate: addDays(next.startDate, -1) }
+        : period;
+    });
 }
 
 export function planLegacyContractMigration(

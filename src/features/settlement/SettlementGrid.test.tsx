@@ -9,6 +9,7 @@ import type {
   Employee,
   EmployeeAssignment,
   ScheduleCorrection,
+  Absence,
 } from '../../types/firestore';
 
 const metadata = {
@@ -56,6 +57,77 @@ const department: Department = {
 };
 
 describe('SettlementGrid', () => {
+  it('shows L4 only inside employment and hides raw Balance work after termination', () => {
+    const target: Employee = {
+      ...employee,
+      isActive: false,
+      contracts: [
+        {
+          ...employee.contracts![0]!,
+          startDate: '2026-09-01',
+          endDate: '2026-09-16',
+        },
+      ],
+      employmentEndEvents: [
+        {
+          id: 'end-1',
+          employeeId: employee.id,
+          tetaNumber: employee.tetaNumber,
+          sequenceId: 'sequence-1',
+          endDate: '2026-09-16',
+          status: 'ACTIVE',
+          reason: null,
+          ...metadata,
+        },
+      ],
+    };
+    const source: Absence = {
+      id: 'source-l4',
+      employeeId: employee.id,
+      tetaNumber: employee.tetaNumber,
+      monthId: '2026-09',
+      absenceCode: 'L4',
+      startDate: '2026-09-15',
+      endDate: '2026-09-20',
+      hoursPerDay: null,
+      source: 'absence_import',
+      importId: 'zus-import',
+      status: 'ACTIVE',
+      note: null,
+      ...metadata,
+    };
+    const attendance: DailyValue = {
+      id: 'source-work',
+      employeeId: employee.id,
+      tetaNumber: employee.tetaNumber,
+      monthId: '2026-09',
+      date: '2026-09-17',
+      hours: 10,
+      source: 'attendance_import',
+      importId: 'balance-import',
+      manualOverride: null,
+      note: null,
+      ...metadata,
+    };
+    render(
+      <SettlementGrid
+        employees={[target]}
+        departments={[department]}
+        days={createCalendarDays('2026-09', {
+          today: new Date('2026-10-01'),
+        }).filter((d) => ['2026-09-15', '2026-09-17'].includes(d.isoDate))}
+        dailyValues={[attendance]}
+        absences={[source]}
+      />,
+    );
+    const row = screen.getByText('Jan Kowalski').closest('tr')!;
+    const cells = within(row).getAllByRole('cell');
+    expect(cells[1]).toHaveTextContent('L4');
+    expect(cells[2]).not.toHaveTextContent('L4');
+    expect(cells[2]).not.toHaveTextContent('10 h');
+    expect(source.endDate).toBe('2026-09-20');
+    expect(attendance.hours).toBe(10);
+  });
   it('shows compact employee context without a separate TETA column', () => {
     render(
       <SettlementGrid

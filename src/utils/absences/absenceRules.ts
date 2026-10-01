@@ -1,5 +1,8 @@
 import type { Employee, IsoDate } from '../../types/firestore';
-import { employeeContractsOverlapRange } from '../employees';
+import {
+  employeeContractsOverlapRange,
+  isDateCoveredByContracts,
+} from '../employees';
 import type { EmploymentPeriod } from '../payroll';
 import { dateToIsoDate } from '../payroll';
 
@@ -331,6 +334,21 @@ export function resolveGoverningAbsence(
   }
 
   return { kind: 'ambiguous', code: null, records: active, codes };
+}
+
+/** Payroll/calendar projection only; source absence periods remain intact. */
+export function resolveEmploymentCoveredAbsence(
+  employee: Pick<Employee, 'id' | 'contracts' | 'employmentEndEvents'>,
+  absences: readonly AbsenceRuleRecord[],
+  date: IsoDate,
+): GoverningAbsenceResolution {
+  if (!isDateCoveredByContracts(employee, date)) {
+    return { kind: 'none', code: null, records: [] };
+  }
+  return resolveGoverningAbsence(
+    absences.filter((absence) => absence.employeeId === employee.id),
+    date,
+  );
 }
 
 export function absenceEmploymentIssue(

@@ -251,6 +251,25 @@ describe('employee contract history', () => {
     ).toBe(true);
   });
 
+  it('does not let an imported historical sequence bypass a later explicit termination', () => {
+    const value = employee(
+      [
+        contract('imported', '2026-05-08', '2026-06-07', 'import-sequence'),
+        contract('latest', '2026-06-08', '2026-09-07', 'legacy-sequence'),
+      ],
+      [endEvent('legacy-sequence', '2026-09-07')],
+      false,
+    );
+
+    expect(isDateCoveredByContracts(value, '2026-06-07')).toBe(true);
+    expect(isDateCoveredByContracts(value, '2026-06-08')).toBe(true);
+    expect(isDateCoveredByContracts(value, '2026-09-07')).toBe(true);
+    expect(isDateCoveredByContracts(value, '2026-09-08')).toBe(false);
+    expect(
+      employeeContractsOverlapRange(value, '2026-10-01', '2026-10-31'),
+    ).toBe(false);
+  });
+
   it('treats next-day contracts as continuous and preserves a gap after explicit termination', () => {
     const continuous = employee([
       contract('first', '2026-06-01', '2026-06-15'),
