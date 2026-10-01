@@ -46,7 +46,23 @@ export function balanceEmployee(endDate: string | null = null): Employee {
     shiftAssignment: null,
     employmentStartDate: new Date('2026-09-01T00:00:00Z'),
     employmentEndDate: endDate ? new Date(`${endDate}T00:00:00Z`) : null,
-    employmentEndEvents: [],
+    employmentEndEvents: endDate
+      ? [
+          {
+            id: 'end-1',
+            employeeId: 'employee-1',
+            tetaNumber: 'TETA-1001',
+            sequenceId: 'sequence-1',
+            endDate,
+            status: 'ACTIVE',
+            reason: 'Synthetic termination',
+            createdAt: now,
+            createdBy: 'test',
+            updatedAt: now,
+            updatedBy: 'test',
+          },
+        ]
+      : [],
     contracts: [
       {
         id: 'contract-1',
