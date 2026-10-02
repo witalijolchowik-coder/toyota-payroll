@@ -193,15 +193,7 @@ describe('Firestore security rules', () => {
       import_id: facts.import_id,
       note: null,
       manual_override: null,
-      work_time_correction: {
-        work_context: 'NORMATIVE',
-        planned_shift: 'FIRST',
-        planned_start_time: '06:00',
-        planned_end_time: '14:00',
-        actual_start_time: '06:00',
-        actual_end_time: '14:00',
-        classification_override: null,
-      },
+      work_time_correction: null,
       balance_source_facts: facts,
       ...modificationMetadata(uid),
     };
@@ -219,6 +211,40 @@ describe('Firestore security rules', () => {
       },
     });
     await assertSucceeds(importBatch.commit());
+    // Automatic source facts cannot manufacture an operator correction.
+    await assertFails(
+      setDoc(
+        doc(firestore, 'months/2026-09/dailyValues/employee-1_2026-09-13'),
+        {
+          ...payload,
+          date: '2026-09-13',
+          work_time_correction: {
+            work_context: 'NORMATIVE',
+            planned_shift: 'FIRST',
+            planned_start_time: '06:00',
+            planned_end_time: '14:00',
+            actual_start_time: '06:00',
+            actual_end_time: '14:00',
+            classification_override: null,
+          },
+        },
+      ),
+    );
+    await assertSucceeds(
+      updateDoc(reference, {
+        work_time_correction: {
+          work_context: 'NORMATIVE',
+          planned_shift: 'FIRST',
+          planned_start_time: '06:00',
+          planned_end_time: '14:00',
+          actual_start_time: '06:00',
+          actual_end_time: '12:00',
+          classification_override: null,
+        },
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
     await assertFails(
       updateDoc(reference, {
         balance_source_facts: { ...facts, extra_hours: 25 },
@@ -266,6 +292,9 @@ describe('Firestore security rules', () => {
       }),
     );
     expect((await getDoc(reference)).data()?.manual_override.hours).toBe(6);
+    expect(
+      (await getDoc(reference)).data()?.work_time_correction.actual_end_time,
+    ).toBe('12:00');
     await assertFails(
       updateDoc(reference, {
         hours: 11,

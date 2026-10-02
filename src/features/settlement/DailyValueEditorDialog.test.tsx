@@ -8,7 +8,8 @@ import type {
 } from '../../types/firestore';
 import type { AbsenceCode } from '../../utils/absences';
 import type { PlannedScheduleDay } from '../../utils/schedule';
-import { createCalendarDays } from './monthUtils';
+import { createCalendarDays, type SettlementCellValue } from './monthUtils';
+import { balanceFacts } from '../../utils/attendance/balanceFixtures.test-support';
 import { DailyValueEditorDialog } from './DailyValueEditorDialog';
 
 const employee = {
@@ -67,6 +68,7 @@ const activeScheduleCorrection: ScheduleCorrection = {
 
 function renderDialog(
   overrides: {
+    value?: SettlementCellValue;
     plannedDay?: PlannedScheduleDay;
     activeScheduleCorrection?: ScheduleCorrection | null;
     onSaveAbsence?: (code: AbsenceCode, note: string | null) => Promise<void>;
@@ -94,7 +96,7 @@ function renderDialog(
     <DailyValueEditorDialog
       employee={employee}
       day={day}
-      value={value}
+      value={overrides.value ?? value}
       hasGoverningAbsence={false}
       plannedDay={overrides.plannedDay ?? plannedDay}
       shiftIntervals={shiftIntervals}
@@ -118,6 +120,38 @@ function renderDialog(
 }
 
 describe('DailyValueEditorDialog', () => {
+  it('shows Balance punches but keeps credited hours and extra pool on an unchanged save', async () => {
+    const { onSave, onSaveScheduleCorrection } = renderDialog({
+      value: {
+        ...value,
+        kind: 'imported',
+        hours: 10,
+        balanceSourceFacts: balanceFacts({
+          actual_end_time: '16:30',
+          credited_hours: 10,
+          extra_hours: 2,
+        }),
+      },
+    });
+    expect(screen.getByLabelText('Rzeczywisty koniec')).toHaveValue('16:30');
+    expect(screen.getByTestId('worked-hours')).toHaveTextContent('10 h');
+    expect(screen.getByTestId('overtime-50-hours')).toHaveTextContent('2 h');
+    fireEvent.click(screen.getByRole('button', { name: 'Zapisz' }));
+    await waitFor(() => expect(onSave).not.toHaveBeenCalled());
+    expect(onSaveScheduleCorrection).not.toHaveBeenCalled();
+  });
+  it('does not fabricate a missing Balance punch from the brigade plan', () => {
+    renderDialog({
+      value: {
+        ...value,
+        kind: 'imported',
+        balanceSourceFacts: balanceFacts({ actual_end_time: null }),
+      },
+    });
+    expect(screen.getByLabelText('Rzeczywisty koniec')).toHaveValue('');
+    expect(screen.getByTestId('worked-hours')).toHaveTextContent('8 h');
+    expect(screen.getByRole('button', { name: 'Zapisz' })).toBeDisabled();
+  });
   it('shows the plan once and separates the work-time metrics', () => {
     renderDialog();
 

@@ -1559,6 +1559,7 @@ service cloud.firestore {
           && monthExistsAndIsOpen(monthId)
           && validDailyValue(request.resource.data)
           && request.resource.data.manual_override == null
+          && request.resource.data.get('work_time_correction',null) == null
           && validBalanceSourceFacts(request.resource.data,monthId)
           && request.resource.data.import_id == request.resource.data.balance_source_facts.import_id
           && request.resource.data.hours == request.resource.data.balance_source_facts.credited_hours
@@ -1570,7 +1571,7 @@ service cloud.firestore {
           && request.resource.data.created_by == request.auth.uid
           && request.resource.data.updated_by == request.auth.uid;
         allow update: if request.resource.data.diff(resource.data).affectedKeys().hasAny(['balance_source_facts'])
-          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hours','import_id','balance_source_facts','work_time_correction','updated_at','updated_by'])
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hours','import_id','balance_source_facts','updated_at','updated_by'])
           && isAuthenticated()
           && monthExistsAndIsOpen(monthId)
           && hasUpdateMetadata(request.resource.data)
@@ -1578,16 +1579,15 @@ service cloud.firestore {
           && validBalanceSourceFacts(request.resource.data,monthId)
           && request.resource.data.source == resource.data.source
           && request.resource.data.get('manual_override',null) == resource.data.get('manual_override',null)
-          && validWorkTimeCorrection(request.resource.data)
+          // Source refresh cannot edit any already validated operator correction.
+          && request.resource.data.get('work_time_correction',null) == resource.data.get('work_time_correction',null)
           && (
             (resource.data.source == 'manual'
               && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['balance_source_facts','updated_at','updated_by']))
             || (resource.data.source == 'attendance_import'
               && request.resource.data.import_id == request.resource.data.balance_source_facts.import_id
               && request.resource.data.hours == request.resource.data.balance_source_facts.credited_hours
-              && (resource.data.get('manual_override',null) == null || request.resource.data.get('work_time_correction',null) == resource.data.get('work_time_correction',null))
-              && (resource.data.keys().hasAny(['balance_source_facts']) || resource.data.get('work_time_correction',null) == null || request.resource.data.get('work_time_correction',null) == resource.data.get('work_time_correction',null))
-              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hours','import_id','balance_source_facts','work_time_correction','updated_at','updated_by']))
+              && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['hours','import_id','balance_source_facts','updated_at','updated_by']))
           );
         allow create: if request.resource.data.source == 'manual'
           && isAuthenticated()

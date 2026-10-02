@@ -48,6 +48,10 @@ import {
   resolvePlanToFactOutcomes,
 } from '../../utils/payroll';
 import type { PlannedScheduleDay } from '../../utils/schedule';
+import {
+  balancePlannedInterval,
+  resolveBalanceSourceDeviation,
+} from '../../utils/payroll/balanceSourceDeviation';
 import type { CalendarAppearanceColors } from '../../utils/calendarAppearance';
 import {
   decideDailyValueMutation,
@@ -108,12 +112,20 @@ export function DailyValueEditorDialog({
 }: DailyValueEditorDialogProps) {
   const t = useTranslations();
   const { palette } = useCalendarAppearance();
-  const isNormativeWorkingDay = plannedDay
-    ? plannedDay.status === 'WORKING' || plannedDay.status === 'BHP'
-    : day.isWorkingDay;
+  const facts = value.balanceSourceFacts;
+  const sourcePlan = facts ? balancePlannedInterval(facts) : null;
+  const isNormativeWorkingDay =
+    facts && !activeScheduleCorrection
+      ? facts.planned_hours > 0
+      : plannedDay
+        ? plannedDay.status === 'WORKING' || plannedDay.status === 'BHP'
+        : day.isWorkingDay;
   const isExtraWorkDay =
     value.workTimeCorrection?.workContext === 'EXTRA' || !isNormativeWorkingDay;
-  const plannedHours = plannedDay?.hours ?? (day.isWorkingDay ? 8 : 0);
+  const plannedHours =
+    facts && !activeScheduleCorrection
+      ? facts.planned_hours
+      : (plannedDay?.hours ?? (day.isWorkingDay ? 8 : 0));
   const defaultHours =
     value.kind === 'empty' ? plannedHours : (value.hours ?? plannedHours);
   const plannedShiftFromSchedule = plannedDay?.shift ?? '';
@@ -124,27 +136,29 @@ export function DailyValueEditorDialog({
   const [note, setNote] = useState(
     () => value.coordinatorNote ?? governingAbsence?.note ?? '',
   );
+  const initialPlannedShift = isExtraWorkDay
+    ? ''
+    : activeScheduleCorrection
+      ? plannedShiftFromSchedule
+      : (value.workTimeCorrection?.plannedShift ??
+        (facts ? (sourcePlan?.shift ?? '') : plannedShiftFromSchedule));
   const [plannedShift, setPlannedShift] = useState<ActualWorkingShift | ''>(
-    () =>
-      isExtraWorkDay
-        ? ''
-        : activeScheduleCorrection
-          ? plannedShiftFromSchedule
-          : (value.workTimeCorrection?.plannedShift ??
-            plannedShiftFromSchedule),
+    initialPlannedShift,
   );
-  const [actualStartTime, setActualStartTime] = useState(
-    () =>
-      value.workTimeCorrection?.actualStartTime ??
-      plannedDay?.plannedStartTime ??
-      '',
-  );
-  const [actualEndTime, setActualEndTime] = useState(
-    () =>
-      value.workTimeCorrection?.actualEndTime ??
-      plannedDay?.plannedEndTime ??
-      '',
-  );
+  const initialStart =
+    value.workTimeCorrection?.actualStartTime ??
+    (facts
+      ? (facts.actual_start_time ?? '')
+      : (plannedDay?.plannedStartTime ?? ''));
+  const initialEnd =
+    value.workTimeCorrection?.actualEndTime ??
+    (facts
+      ? (facts.actual_end_time ?? '')
+      : (plannedDay?.plannedEndTime ?? ''));
+  const [actualStartTime, setActualStartTime] = useState(initialStart);
+  const [actualEndTime, setActualEndTime] = useState(initialEnd);
+  const sourceTimesUnchanged =
+    !!facts && actualStartTime === initialStart && actualEndTime === initialEnd;
   const [absenceCode, setAbsenceCode] = useState<AbsenceCode>(
     () => (governingAbsence?.absenceCode as AbsenceCode | undefined) ?? 'L4',
   );
@@ -155,7 +169,11 @@ export function DailyValueEditorDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const employeeName = `${employee.lastName} ${employee.firstName}`;
   const plannedInterval =
-    isNormativeWorkingDay && plannedShift ? shiftIntervals[plannedShift] : null;
+    isNormativeWorkingDay && plannedShift
+      ? shiftIntervals[plannedShift]
+      : sourceTimesUnchanged
+        ? sourcePlan
+        : null;
   const selectedPlannedHours = plannedInterval
     ? intervalHours(plannedInterval)
     : plannedHours;
@@ -172,8 +190,11 @@ export function DailyValueEditorDialog({
     (!isValidClockTime(inferredActual.startTime) ||
       !isValidClockTime(inferredActual.endTime)),
   );
-  const actualTotal =
-    inferredActual && !timeValidationError ? intervalHours(inferredActual) : 0;
+  const actualTotal = sourceTimesUnchanged
+    ? facts!.credited_hours
+    : inferredActual && !timeValidationError
+      ? intervalHours(inferredActual)
+      : 0;
   const effectiveParsedHours = timeValidationError
     ? parsedHours
     : ({ kind: 'value', hours: actualTotal } as const);
@@ -181,8 +202,18 @@ export function DailyValueEditorDialog({
     Boolean(inferredActual) &&
     !timeValidationError &&
     (isExtraWorkDay || Boolean(plannedInterval && plannedShift));
-  const workTimePreview =
-    inferredActual && canResolveWorkTime
+  const workTimePreview = sourceTimesUnchanged
+    ? resolveBalanceSourceDeviation(facts!, {
+        planned: plannedInterval
+          ? { ...plannedInterval, shift: plannedShift || null }
+          : null,
+        plannedHours: selectedPlannedHours,
+        isWorkingDay: isNormativeWorkingDay && !isExtraWorkDay,
+        isSaturday: day.date.getUTCDay() === 6,
+        isSunday: day.date.getUTCDay() === 0,
+        isPublicHoliday: day.isHoliday,
+      }).deviation
+    : inferredActual && canResolveWorkTime
       ? resolveDailyWorkTimeDeviation({
           planned:
             plannedInterval && plannedShift
@@ -321,12 +352,13 @@ export function DailyValueEditorDialog({
           : value.fallbackHours,
     });
     const needsCorrection =
-      isExtraWorkDay ||
-      (effectiveParsedHours.kind === 'value' &&
-        plannedInterval &&
-        (effectiveParsedHours.hours !== selectedPlannedHours ||
-          actualStartTime !== plannedInterval.startTime ||
-          actualEndTime !== plannedInterval.endTime));
+      !sourceTimesUnchanged &&
+      (isExtraWorkDay ||
+        (effectiveParsedHours.kind === 'value' &&
+          plannedInterval &&
+          (effectiveParsedHours.hours !== selectedPlannedHours ||
+            actualStartTime !== plannedInterval.startTime ||
+            actualEndTime !== plannedInterval.endTime)));
     const currentCorrection = value.workTimeCorrection;
     const correctionDetailsChanged = needsCorrection
       ? !currentCorrection ||
@@ -344,14 +376,15 @@ export function DailyValueEditorDialog({
     if (
       mutation === 'none' &&
       correctionDetailsChanged &&
-      (isExtraWorkDay ||
+      ((!!facts && !sourceTimesUnchanged) ||
+        isExtraWorkDay ||
         value.kind === 'manual' ||
         value.kind === 'imported-override')
     ) {
       mutation = 'save';
     }
     const scheduleNeedsSave =
-      isNormativeWorkingDay && plannedShift !== plannedDay?.shift;
+      isNormativeWorkingDay && plannedShift !== initialPlannedShift;
     if (mutation === 'none' && !scheduleNeedsSave) return onClose();
     if (effectiveParsedHours.kind !== 'value' || !inferredActual) return;
 
@@ -494,9 +527,12 @@ export function DailyValueEditorDialog({
                           );
                           const interval = shiftIntervals[next];
                           setPlannedShift(next);
-                          if (!actualStartTime || followsPreviousPlan)
+                          if (
+                            !facts &&
+                            (!actualStartTime || followsPreviousPlan)
+                          )
                             setActualStartTime(interval.startTime);
-                          if (!actualEndTime || followsPreviousPlan)
+                          if (!facts && (!actualEndTime || followsPreviousPlan))
                             setActualEndTime(interval.endTime);
                         }}
                       >

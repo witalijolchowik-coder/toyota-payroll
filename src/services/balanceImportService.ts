@@ -9,9 +9,7 @@ import type {
   BalanceSourceFactsDocument,
   DailyValueDocument,
   MonthId,
-  WorkTimeCorrectionDocument,
 } from '../types/firestore';
-import { balancePlannedInterval } from '../utils/payroll/balanceSourceDeviation';
 
 export interface BalanceDailyValueInput {
   employeeId: string;
@@ -21,25 +19,6 @@ export interface BalanceDailyValueInput {
 }
 export type BalanceUpsertResult =
   'inserted' | 'updated' | 'unchanged' | 'manual-preserved';
-
-export function balanceWorkTimeCorrection(
-  facts: BalanceSourceFactsDocument,
-): WorkTimeCorrectionDocument | null {
-  if (!facts.actual_start_time || !facts.actual_end_time) return null;
-  const planned = balancePlannedInterval(facts);
-  if (facts.planned_hours > 0 && !planned?.shift) return null;
-  return {
-    work_context: facts.planned_hours > 0 ? 'NORMATIVE' : 'EXTRA',
-    planned_shift: facts.planned_hours > 0 ? (planned?.shift ?? null) : null,
-    planned_start_time:
-      facts.planned_hours > 0 ? (planned?.startTime ?? null) : null,
-    planned_end_time:
-      facts.planned_hours > 0 ? (planned?.endTime ?? null) : null,
-    actual_start_time: facts.actual_start_time,
-    actual_end_time: facts.actual_end_time,
-    classification_override: null,
-  };
-}
 
 /** Source refresh never replaces an intentional operator value/correction. */
 export function planBalanceDailyValueUpsert(
@@ -57,16 +36,10 @@ export function planBalanceDailyValueUpsert(
       Object.keys(aa).every((k) => equal(aa[k], bb[k]))
     );
   };
-  const sameCorrection =
-    existing?.balance_source_facts &&
-    equal(
-      existing.work_time_correction,
-      balanceWorkTimeCorrection(existing.balance_source_facts),
-    );
   const protectedManual =
     existing?.source === 'manual' ||
     !!existing?.manual_override ||
-    (!!existing?.work_time_correction && !sameCorrection);
+    !!existing?.work_time_correction;
   const patch =
     existing?.source === 'manual'
       ? { balance_source_facts: input.facts }
@@ -74,9 +47,6 @@ export function planBalanceDailyValueUpsert(
           hours: input.facts.credited_hours,
           import_id: input.facts.import_id,
           balance_source_facts: input.facts,
-          ...(!protectedManual
-            ? { work_time_correction: balanceWorkTimeCorrection(input.facts) }
-            : {}),
         };
   const unchanged =
     existing &&
@@ -149,7 +119,8 @@ export async function upsertBalanceDailyValue(
         import_id: input.facts.import_id,
         note: null,
         manual_override: null,
-        work_time_correction: balanceWorkTimeCorrection(input.facts),
+        // Raw punches live only in typed facts, never in an operator correction.
+        work_time_correction: null,
         balance_source_facts: input.facts,
         created_at: serverTimestamp(),
         created_by: uid,

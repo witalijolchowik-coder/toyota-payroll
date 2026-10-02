@@ -1,9 +1,6 @@
 import { Timestamp } from 'firebase/firestore';
 import { balanceFacts } from '../utils/attendance/balanceFixtures.test-support';
-import {
-  balanceWorkTimeCorrection,
-  planBalanceDailyValueUpsert,
-} from './balanceImportService';
+import { planBalanceDailyValueUpsert } from './balanceImportService';
 import type { DailyValueDocument } from '../types/firestore';
 import { dailyValueConverter } from './firestore/converters';
 import { mapDailyValueDocument } from './firestore/mappers';
@@ -25,7 +22,7 @@ const existing: DailyValueDocument = {
   import_id: facts.import_id,
   note: null,
   manual_override: null,
-  work_time_correction: balanceWorkTimeCorrection(facts),
+  work_time_correction: null,
   balance_source_facts: facts,
   created_at: Timestamp.now(),
   created_by: 'test',
@@ -76,33 +73,32 @@ describe('Balance typed source upsert', () => {
       ...existing,
       balance_source_facts: null,
       work_time_correction: {
-        ...existing.work_time_correction!,
+        work_context: 'NORMATIVE' as const,
+        planned_shift: 'FIRST' as const,
+        planned_start_time: '06:00',
+        planned_end_time: '14:00',
+        actual_start_time: '06:00',
         actual_end_time: '12:00',
+        classification_override: null,
       },
     };
     const result = planBalanceDailyValueUpsert(legacy, input);
     expect(result.result).toBe('manual-preserved');
     expect(result.patch).not.toHaveProperty('work_time_correction');
   });
-  it('omits work_time_correction for missing punches and noncanonical planned intervals', () => {
-    expect(
-      balanceWorkTimeCorrection(balanceFacts({ actual_end_time: null })),
-    ).toBeNull();
-    expect(
-      balanceWorkTimeCorrection(
-        balanceFacts({
-          planned_start_time: '07:00',
-          planned_end_time: '15:00',
-        }),
-      ),
-    ).toBeNull();
-    expect(
-      balanceWorkTimeCorrection(balanceFacts({ planned_hours: 0 })),
-    ).toMatchObject({
-      work_context: 'EXTRA',
-      planned_shift: null,
-      planned_start_time: null,
-      classification_override: null,
-    });
+  it('never duplicates automatic punches in operator corrections', () => {
+    for (const source of [
+      facts,
+      balanceFacts({ actual_end_time: null }),
+      balanceFacts({ planned_start_time: '07:00', planned_end_time: '15:00' }),
+      balanceFacts({ planned_hours: 0 }),
+    ]) {
+      const result = planBalanceDailyValueUpsert(null, {
+        ...input,
+        facts: source,
+      });
+      expect(result.patch.balance_source_facts).toEqual(source);
+      expect(result.patch).not.toHaveProperty('work_time_correction');
+    }
   });
 });

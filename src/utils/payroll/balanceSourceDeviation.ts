@@ -233,27 +233,12 @@ export function hasEffectiveBalanceSource(
     'source' | 'manualOverride' | 'balanceSourceFacts' | 'workTimeCorrection'
   >,
 ): boolean {
-  if (
-    value.source !== 'attendance_import' ||
-    value.manualOverride ||
-    !value.balanceSourceFacts
-  )
-    return false;
-  const correction = value.workTimeCorrection,
-    facts = value.balanceSourceFacts;
-  if (!correction) return true;
-  const planned = balancePlannedInterval(facts),
-    normative = facts.planned_hours > 0;
-  // A later operator interval edit (or a protected legacy correction) must not
-  // be superseded merely because raw source facts are attached to the record.
+  // Any operator interval is protected, even when it matches the source times.
+  // Automatic punches have a single persisted home in balanceSourceFacts.
   return (
-    correction.actualStartTime === facts.actual_start_time &&
-    correction.actualEndTime === facts.actual_end_time &&
-    (correction.workContext ?? 'NORMATIVE') ===
-      (normative ? 'NORMATIVE' : 'EXTRA') &&
-    correction.plannedShift === (normative ? planned?.shift : null) &&
-    correction.plannedStartTime === (normative ? planned?.startTime : null) &&
-    correction.plannedEndTime === (normative ? planned?.endTime : null) &&
-    !correction.classificationOverride
+    value.source === 'attendance_import' &&
+    !value.manualOverride &&
+    !value.workTimeCorrection &&
+    !!value.balanceSourceFacts
   );
 }
