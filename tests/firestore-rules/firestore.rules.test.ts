@@ -19,6 +19,7 @@ import {
   updateDoc,
   where,
   writeBatch,
+  runTransaction,
 } from 'firebase/firestore';
 import { readFileSync } from 'node:fs';
 import { balanceFacts } from '../../src/utils/attendance/balanceFixtures.test-support';
@@ -160,6 +161,199 @@ afterAll(async () => {
 });
 
 describe('Firestore security rules', () => {
+  it.each([false, true])(
+    'permits manual absence replacement over immutable Balance (override=%s)',
+    async (withOverride) => {
+      await seedMonth('2026-09', false);
+      await seedEmployee('employee-1');
+      const uid = 'coordinator-1';
+      const firestore = testEnvironment.authenticatedContext(uid).firestore();
+      const facts = balanceFacts();
+      const daily = doc(
+        firestore,
+        'months/2026-09/dailyValues/employee-1_2026-09-10',
+      );
+      const absence = doc(firestore, 'months/2026-09/absences/manual-uw');
+      const priorOverride = withOverride
+        ? {
+            hours: 6,
+            note: 'prior decision',
+            actor_uid: uid,
+            updated_at: new Date('2026-10-01'),
+          }
+        : null;
+      const priorTimes = withOverride
+        ? {
+            work_context: 'NORMATIVE',
+            planned_shift: 'FIRST',
+            planned_start_time: '06:00',
+            planned_end_time: '14:00',
+            actual_start_time: '06:00',
+            actual_end_time: '12:00',
+            classification_override: null,
+          }
+        : null;
+      await testEnvironment.withSecurityRulesDisabled(async (context) => {
+        await setDoc(doc(context.firestore(), daily.path), {
+          employee_id: 'employee-1',
+          teta_number: 'TETA-1001',
+          date: '2026-09-10',
+          hours: 8,
+          source: 'attendance_import',
+          import_id: facts.import_id,
+          balance_source_facts: facts,
+          manual_override: priorOverride,
+          work_time_correction: priorTimes,
+          note: null,
+          ...modificationMetadata(uid),
+        });
+      });
+      const original = (await getDoc(daily)).data()!;
+      await assertSucceeds(
+        runTransaction(firestore, async (transaction) => {
+          const source = await transaction.get(daily);
+          await transaction.get(doc(firestore, 'months/2026-09'));
+          if (withOverride) {
+            transaction.update(daily, {
+              manual_override: null,
+              work_time_correction: null,
+              updated_at: serverTimestamp(),
+              updated_by: uid,
+            });
+            transaction.set(doc(firestore, 'auditLog/cleared-attendance'), {
+              entity_path: daily.path,
+              action: 'update',
+              actor_uid: uid,
+              occurred_at: serverTimestamp(),
+              changes: {
+                change_kind: 'attendance-override-replaced-by-absence',
+                previous_manual_override: source.data()?.manual_override,
+                previous_work_time_correction: priorTimes,
+                new_manual_override: null,
+                new_work_time_correction: null,
+                balance_source_preserved: true,
+              },
+            });
+          }
+          transaction.set(absence, {
+            employee_id: 'employee-1',
+            teta_number: 'TETA-1001',
+            absence_code: 'UW',
+            start_date: '2026-09-10',
+            end_date: '2026-09-10',
+            hours_per_day: null,
+            linked_work_date: null,
+            overtime_time_off: false,
+            source: 'manual',
+            import_id: null,
+            status: 'ACTIVE',
+            note: null,
+            ...modificationMetadata(uid),
+          });
+          transaction.set(doc(firestore, 'auditLog/absence-decision'), {
+            entity_path: absence.path,
+            action: 'update',
+            actor_uid: uid,
+            occurred_at: serverTimestamp(),
+            changes: {
+              change_kind: 'hours-to-absence',
+              imported_attendance_preserved: true,
+              previous_manual_override: source.data()?.manual_override,
+            },
+          });
+        }),
+      );
+      expect((await getDoc(absence)).data()?.status).toBe('ACTIVE');
+      const stored = (await getDoc(daily)).data()!;
+      expect(stored.balance_source_facts).toEqual(
+        original.balance_source_facts,
+      );
+      expect(stored.hours).toBe(8);
+      expect(stored.import_id).toBe(original.import_id);
+      expect(stored.manual_override).toBeNull();
+      expect(stored.work_time_correction).toBeNull();
+      await assertSucceeds(
+        updateDoc(absence, {
+          status: 'CANCELLED',
+          updated_at: serverTimestamp(),
+          updated_by: uid,
+        }),
+      );
+      expect((await getDoc(daily)).data()?.balance_source_facts).toEqual(facts);
+      await assertFails(deleteDoc(daily));
+      await seedMonth('2026-09', true);
+      await assertFails(
+        updateDoc(daily, {
+          manual_override: {
+            hours: 7,
+            note: null,
+            actor_uid: uid,
+            updated_at: serverTimestamp(),
+          },
+          updated_at: serverTimestamp(),
+          updated_by: uid,
+        }),
+      );
+    },
+  );
+  it('rejects tampering with raw Balance facts when clearing an operator override, atomically', async () => {
+    await seedMonth('2026-09', false);
+    await seedEmployee('employee-1');
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const facts = balanceFacts();
+    const daily = doc(
+      firestore,
+      'months/2026-09/dailyValues/employee-1_2026-09-10',
+    );
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), daily.path), {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        date: '2026-09-10',
+        hours: 8,
+        source: 'attendance_import',
+        import_id: facts.import_id,
+        balance_source_facts: facts,
+        manual_override: {
+          hours: 6,
+          note: null,
+          actor_uid: uid,
+          updated_at: new Date('2026-10-01'),
+        },
+        work_time_correction: null,
+        note: null,
+        ...modificationMetadata(uid),
+      });
+    });
+    await assertFails(
+      runTransaction(firestore, async (transaction) => {
+        await transaction.get(daily);
+        transaction.update(daily, {
+          hours: 7,
+          balance_source_facts: { ...facts, credited_hours: 7 },
+          manual_override: null,
+          work_time_correction: null,
+          updated_at: serverTimestamp(),
+          updated_by: uid,
+        });
+        transaction.set(doc(firestore, 'auditLog/forbidden-source-change'), {
+          entity_path: daily.path,
+          action: 'update',
+          actor_uid: uid,
+          occurred_at: serverTimestamp(),
+          changes: {},
+        });
+      }),
+    );
+    expect((await getDoc(daily)).data()?.balance_source_facts).toEqual(facts);
+    expect((await getDoc(daily)).data()?.manual_override.hours).toBe(6);
+    expect(
+      (
+        await getDoc(doc(firestore, 'auditLog/forbidden-source-change'))
+      ).exists(),
+    ).toBe(false);
+  });
   it('allows typed Balance imports, preserves overrides, and rejects malformed or locked writes', async () => {
     await seedMonth('2026-09', false);
     await seedEmployee('employee-1');

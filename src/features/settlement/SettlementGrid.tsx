@@ -45,6 +45,7 @@ import { resolveEmploymentCoveredAbsence } from '../../utils/absences';
 import { resolveBalanceCalendarDeviation } from '../../utils/payroll/balanceSourceDeviation';
 import {
   resolveAttendanceWarnings,
+  manualAbsenceOverridesImportedAttendance,
   type AttendanceWarning,
 } from '../../utils/attendance';
 import {
@@ -399,6 +400,11 @@ export function SettlementGrid({
                         const warnings = resolveAttendanceWarnings({
                           hasExplicitValue: (value.hours ?? 0) > 0,
                           hasActiveAbsence: hasGoverningAbsence,
+                          manualAbsenceOverridesImport:
+                            manualAbsenceOverridesImportedAttendance(
+                              persistedValue,
+                              absenceResolution,
+                            ),
                           isWorkingDay:
                             plannedDay === undefined
                               ? day.isWorkingDay

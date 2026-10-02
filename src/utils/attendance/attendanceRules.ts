@@ -1,4 +1,5 @@
 import type { DailyValue } from '../../types/firestore';
+import type { GoverningAbsenceResolution } from '../absences/absenceRules';
 
 export type ExplicitAttendanceKind =
   'manual' | 'imported' | 'imported-override';
@@ -44,13 +45,15 @@ export function resolveAttendanceWarnings({
   hasActiveAbsence,
   isWorkingDay,
   isWithinEmployment,
+  manualAbsenceOverridesImport = false,
 }: {
   hasExplicitValue: boolean;
   hasActiveAbsence: boolean;
   isWorkingDay: boolean;
   isWithinEmployment: boolean;
+  manualAbsenceOverridesImport?: boolean;
 }): AttendanceWarning[] {
-  if (!hasExplicitValue) {
+  if (!hasExplicitValue || (hasActiveAbsence && manualAbsenceOverridesImport)) {
     return [];
   }
 
@@ -65,6 +68,19 @@ export function resolveAttendanceWarnings({
     warnings.push('outside-employment');
   }
   return warnings;
+}
+
+/** A coordinator's absence is a payroll decision, not conflicting raw work. */
+export function manualAbsenceOverridesImportedAttendance(
+  value: Pick<DailyValue, 'source'> | undefined,
+  absence: GoverningAbsenceResolution,
+): boolean {
+  return (
+    value?.source === 'attendance_import' &&
+    absence.kind === 'governed' &&
+    absence.records.length > 0 &&
+    absence.records.every((record) => record.source === 'manual')
+  );
 }
 
 export function isValidWorkedHours(hours: number): boolean {

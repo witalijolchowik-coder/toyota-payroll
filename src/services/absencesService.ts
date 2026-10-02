@@ -736,6 +736,9 @@ export async function saveDayAbsence({
     overtimeTimeOff: input.overtimeTimeOff === true,
   };
   assertValidInput(normalized, existingAbsence?.monthId);
+  if (normalized.startDate !== normalized.endDate) {
+    throw new AbsenceServiceError('invalid-input');
+  }
   const monthId = ownerMonthId(normalized.startDate);
   await assertWritableMonth(monthId);
   await assertNoBlockingL4(normalized, existingAbsence?.id);
@@ -749,15 +752,44 @@ export async function saveDayAbsence({
     dailyValueDocumentId(normalized.employeeId, normalized.startDate),
   );
   const auditReference = doc(repositories.auditLog);
+  const attendanceAuditReference = doc(repositories.auditLog);
 
   await runTransaction(firestore, async (transaction) => {
-    const dailyValueSnapshot = await transaction.get(dailyValueReference);
+    const [dailyValueSnapshot, monthSnapshot, previousAbsenceSnapshot] =
+      await Promise.all([
+        transaction.get(dailyValueReference),
+        transaction.get(repositories.forMonth(monthId).month),
+        previousAbsenceReference
+          ? transaction.get(previousAbsenceReference)
+          : null,
+      ]);
+    if (!monthSnapshot.exists())
+      throw new AbsenceServiceError('month-unavailable');
+    if (monthSnapshot.data().is_settled)
+      throw new AbsenceServiceError('month-settled');
     if (
-      dailyValueSnapshot.exists() &&
-      dailyValueSnapshot.data().source !== 'manual'
+      previousAbsenceSnapshot &&
+      (!previousAbsenceSnapshot.exists() ||
+        previousAbsenceSnapshot.data().source !== 'manual' ||
+        previousAbsenceSnapshot.data().status !== 'ACTIVE' ||
+        previousAbsenceSnapshot.data().employee_id !== normalized.employeeId ||
+        previousAbsenceSnapshot.data().start_date !== normalized.startDate ||
+        previousAbsenceSnapshot.data().end_date !== normalized.endDate)
     ) {
       throw new AbsenceServiceError('read-only-record');
     }
+    const attendance = dailyValueSnapshot.exists()
+      ? dailyValueSnapshot.data()
+      : null;
+    const importedAttendance = attendance?.source === 'attendance_import';
+    // Balance is immutable source evidence; only operator decisions are cleared.
+    // Legacy imported timestamps without typed facts are not treated as manual.
+    const clearAttendanceOverride =
+      importedAttendance &&
+      Boolean(
+        attendance.manual_override ||
+        (attendance.balance_source_facts && attendance.work_time_correction),
+      );
     if (previousAbsenceReference) {
       transaction.update(previousAbsenceReference, {
         status: 'CANCELLED',
@@ -765,8 +797,34 @@ export async function saveDayAbsence({
         updated_by: uid,
       });
     }
-    if (dailyValueSnapshot.exists()) {
+    if (attendance?.source === 'manual') {
       transaction.delete(dailyValueReference);
+    } else if (clearAttendanceOverride) {
+      transaction.update(dailyValueReference, {
+        manual_override: null,
+        work_time_correction: null,
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      });
+      transaction.set(attendanceAuditReference, {
+        entity_path: dailyValueReference.path,
+        action: 'update',
+        actor_uid: uid,
+        occurred_at: serverTimestamp(),
+        changes: {
+          change_kind: 'attendance-override-replaced-by-absence',
+          employee_id: normalized.employeeId,
+          teta_number: normalized.tetaNumber,
+          date: normalized.startDate,
+          absence_path: absenceReference.path,
+          previous_manual_override: attendance.manual_override ?? null,
+          previous_work_time_correction:
+            attendance.work_time_correction ?? null,
+          new_manual_override: null,
+          new_work_time_correction: null,
+          balance_source_preserved: true,
+        },
+      });
     }
     transaction.set(absenceReference, {
       employee_id: normalized.employeeId,
@@ -806,6 +864,13 @@ export async function saveDayAbsence({
             ? dailyValueSnapshot.data().hours
             : null),
         new_value: normalized.absenceCode,
+        imported_attendance_preserved: importedAttendance,
+        attendance_path: attendance ? dailyValueReference.path : null,
+        previous_manual_override: attendance?.manual_override ?? null,
+        previous_work_time_correction: attendance?.work_time_correction ?? null,
+        previous_manual_attendance:
+          attendance?.source === 'manual' ? attendance : null,
+        attendance_override_cleared: clearAttendanceOverride,
         change_kind:
           normalized.absenceCode === 'L4'
             ? 'manual-l4-reported'

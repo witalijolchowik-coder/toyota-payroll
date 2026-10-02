@@ -3,6 +3,10 @@ import { vi } from 'vitest';
 
 import { SettlementGrid } from './SettlementGrid';
 import { createCalendarDays } from './monthUtils';
+import {
+  balanceDaily,
+  balanceFacts,
+} from '../../utils/attendance/balanceFixtures.test-support';
 import type {
   DailyValue,
   Department,
@@ -57,6 +61,59 @@ const department: Department = {
 };
 
 describe('SettlementGrid', () => {
+  it('shows the manual absence instead of Balance work and restores raw work after cancellation', () => {
+    const attendance = balanceDaily(
+      '2026-09-10',
+      balanceFacts({
+        credited_hours: 10,
+        extra_hours: 2,
+        actual_end_time: '16:00',
+        presence_hours: 10,
+      }),
+    );
+    const absence: Absence = {
+      id: 'manual-uw',
+      employeeId: employee.id,
+      tetaNumber: employee.tetaNumber,
+      monthId: '2026-09',
+      absenceCode: 'UW',
+      startDate: attendance.date,
+      endDate: attendance.date,
+      hoursPerDay: null,
+      source: 'manual',
+      importId: null,
+      status: 'ACTIVE',
+      note: null,
+      ...metadata,
+    };
+    const props = {
+      employees: [employee],
+      departments: [department],
+      dailyValues: [attendance],
+      days: createCalendarDays('2026-09', {
+        today: new Date('2026-10-01'),
+      }).filter((day) => day.isoDate === attendance.date),
+    };
+    const { rerender } = render(
+      <SettlementGrid {...props} absences={[absence]} />,
+    );
+    const cell = () =>
+      within(screen.getByText('Jan Kowalski').closest('tr')!).getAllByRole(
+        'cell',
+      )[1]!;
+    expect(cell()).toHaveTextContent('UW');
+    expect(cell()).not.toHaveTextContent('10 h');
+    expect(cell()).not.toHaveTextContent('+2');
+    rerender(
+      <SettlementGrid
+        {...props}
+        absences={[{ ...absence, status: 'CANCELLED' }]}
+      />,
+    );
+    expect(cell()).not.toHaveTextContent('UW');
+    expect(cell()).toHaveTextContent('10 h');
+    expect(attendance.balanceSourceFacts?.credited_hours).toBe(10);
+  });
   it('shows L4 only inside employment and hides raw Balance work after termination', () => {
     const target: Employee = {
       ...employee,

@@ -2325,8 +2325,8 @@ export const pl = {
         'Potwierdzone L4 pochodzi z importu ZUS i nie może być zmienione w tym oknie.',
       multiDayAbsenceReadOnly:
         'Ta nieobecność obejmuje kilka dni. Zmień jej zakres w module Nieobecności, aby nie usunąć pozostałych dni.',
-      importedHoursReadOnly:
-        'Oryginalne godziny z importu nie mogą zostać zastąpione nieobecnością w tym oknie.',
+      confirmBalanceAbsenceReplacement:
+        'Zastąp godziny z Bilansu nieobecnością. Dane źródłowe Bilansu pozostaną zachowane.',
       manualL4Notice:
         'Ręczne L4 zostanie zapisane jako „Zgłoszone” i będzie wymagało potwierdzenia importem ZUS.',
       workTime: {

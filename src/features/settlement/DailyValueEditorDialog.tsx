@@ -147,14 +147,18 @@ export function DailyValueEditorDialog({
   );
   const initialStart =
     value.workTimeCorrection?.actualStartTime ??
-    (facts
-      ? (facts.actual_start_time ?? '')
-      : (plannedDay?.plannedStartTime ?? ''));
+    (value.kind === 'imported-override'
+      ? ''
+      : facts
+        ? (facts.actual_start_time ?? '')
+        : (plannedDay?.plannedStartTime ?? ''));
   const initialEnd =
     value.workTimeCorrection?.actualEndTime ??
-    (facts
-      ? (facts.actual_end_time ?? '')
-      : (plannedDay?.plannedEndTime ?? ''));
+    (value.kind === 'imported-override'
+      ? ''
+      : facts
+        ? (facts.actual_end_time ?? '')
+        : (plannedDay?.plannedEndTime ?? ''));
   const [actualStartTime, setActualStartTime] = useState(initialStart);
   const [actualEndTime, setActualEndTime] = useState(initialEnd);
   const sourceTimesUnchanged =
@@ -192,9 +196,14 @@ export function DailyValueEditorDialog({
   );
   const actualTotal = sourceTimesUnchanged
     ? facts!.credited_hours
-    : inferredActual && !timeValidationError
-      ? intervalHours(inferredActual)
-      : 0;
+    : value.kind === 'imported-override' &&
+        !value.workTimeCorrection &&
+        actualStartTime === initialStart &&
+        actualEndTime === initialEnd
+      ? defaultHours
+      : inferredActual && !timeValidationError
+        ? intervalHours(inferredActual)
+        : 0;
   const effectiveParsedHours = timeValidationError
     ? parsedHours
     : ({ kind: 'value', hours: actualTotal } as const);
@@ -276,7 +285,7 @@ export function DailyValueEditorDialog({
     governingAbsence && governingAbsence.startDate !== governingAbsence.endDate,
   );
   const replacementRequired = hasExplicitHours || Boolean(governingAbsence);
-  const protectedImportedHours =
+  const hasImportedAttendance =
     value.kind === 'imported' || value.kind === 'imported-override';
 
   const clearValue = async () => {
@@ -351,18 +360,23 @@ export function DailyValueEditorDialog({
           ? null
           : value.fallbackHours,
     });
+    const importedTimesChanged =
+      hasImportedAttendance &&
+      (actualStartTime !== initialStart || actualEndTime !== initialEnd);
     const needsCorrection =
-      !sourceTimesUnchanged &&
-      (isExtraWorkDay ||
-        (effectiveParsedHours.kind === 'value' &&
-          plannedInterval &&
-          (effectiveParsedHours.hours !== selectedPlannedHours ||
-            actualStartTime !== plannedInterval.startTime ||
-            actualEndTime !== plannedInterval.endTime)));
+      importedTimesChanged ||
+      (hasImportedAttendance && Boolean(value.workTimeCorrection)) ||
+      (!sourceTimesUnchanged &&
+        (isExtraWorkDay ||
+          (effectiveParsedHours.kind === 'value' &&
+            plannedInterval &&
+            (effectiveParsedHours.hours !== selectedPlannedHours ||
+              actualStartTime !== plannedInterval.startTime ||
+              actualEndTime !== plannedInterval.endTime))));
     const currentCorrection = value.workTimeCorrection;
     const correctionDetailsChanged = needsCorrection
       ? !currentCorrection ||
-        currentCorrection.workContext !==
+        (currentCorrection.workContext ?? 'NORMATIVE') !==
           (isExtraWorkDay ? 'EXTRA' : 'NORMATIVE') ||
         currentCorrection.plannedShift !==
           (isExtraWorkDay ? null : plannedShift || null) ||
@@ -373,11 +387,21 @@ export function DailyValueEditorDialog({
         currentCorrection.actualStartTime !== actualStartTime ||
         currentCorrection.actualEndTime !== actualEndTime
       : Boolean(currentCorrection);
-    if (
+    if (hasImportedAttendance && needsCorrection && mutation === 'clear') {
+      mutation =
+        correctionDetailsChanged ||
+        normalizedNote !== value.coordinatorNote ||
+        (effectiveParsedHours.kind === 'value' &&
+          effectiveParsedHours.hours !== value.hours)
+          ? 'save'
+          : 'none';
+    }
+    if (importedTimesChanged && correctionDetailsChanged) {
+      mutation = 'save';
+    } else if (
       mutation === 'none' &&
       correctionDetailsChanged &&
-      ((!!facts && !sourceTimesUnchanged) ||
-        isExtraWorkDay ||
+      (isExtraWorkDay ||
         value.kind === 'manual' ||
         value.kind === 'imported-override')
     ) {
@@ -711,10 +735,6 @@ export function DailyValueEditorDialog({
                   <Alert severity="info">
                     {t.settlement.editor.confirmedL4ReadOnly}
                   </Alert>
-                ) : protectedImportedHours ? (
-                  <Alert severity="info">
-                    {t.settlement.editor.importedHoursReadOnly}
-                  </Alert>
                 ) : (
                   <TextField
                     select
@@ -751,14 +771,14 @@ export function DailyValueEditorDialog({
                 )}
                 {absenceCode === 'L4' &&
                 !confirmedImportedL4 &&
-                !protectedImportedHours ? (
+                !multiDayAbsence ? (
                   <Alert severity="warning">
                     {t.settlement.editor.manualL4Notice}
                   </Alert>
                 ) : null}
                 {replacementRequired &&
                 !confirmedImportedL4 &&
-                !protectedImportedHours ? (
+                !multiDayAbsence ? (
                   <FormControlLabel
                     control={
                       <Checkbox
@@ -766,7 +786,11 @@ export function DailyValueEditorDialog({
                         onChange={(_, value) => setReplacementConfirmed(value)}
                       />
                     }
-                    label={t.settlement.editor.confirmReplacement}
+                    label={
+                      hasImportedAttendance
+                        ? t.settlement.editor.confirmBalanceAbsenceReplacement
+                        : t.settlement.editor.confirmReplacement
+                    }
                   />
                 ) : null}
               </>
@@ -812,7 +836,6 @@ export function DailyValueEditorDialog({
               (tab === 'absence' &&
                 (multiDayAbsence ||
                   confirmedImportedL4 ||
-                  protectedImportedHours ||
                   (replacementRequired && !replacementConfirmed)))
             }
             startIcon={

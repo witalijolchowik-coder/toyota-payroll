@@ -3,6 +3,7 @@ import { vi } from 'vitest';
 
 import type {
   Employee,
+  Absence,
   ScheduleCorrection,
   WorkTimeCorrectionInput,
 } from '../../types/firestore';
@@ -69,6 +70,7 @@ const activeScheduleCorrection: ScheduleCorrection = {
 function renderDialog(
   overrides: {
     value?: SettlementCellValue;
+    governingAbsence?: Absence;
     plannedDay?: PlannedScheduleDay;
     activeScheduleCorrection?: ScheduleCorrection | null;
     onSaveAbsence?: (code: AbsenceCode, note: string | null) => Promise<void>;
@@ -91,19 +93,21 @@ function renderDialog(
   const onResetScheduleCorrection =
     overrides.onResetScheduleCorrection ?? vi.fn(async () => undefined);
   const onSave = overrides.onSave ?? vi.fn(async () => undefined);
+  const onClear = vi.fn(async () => undefined);
   const onWorkTimeCommitted = vi.fn(async () => undefined);
   render(
     <DailyValueEditorDialog
       employee={employee}
       day={day}
       value={overrides.value ?? value}
-      hasGoverningAbsence={false}
+      hasGoverningAbsence={Boolean(overrides.governingAbsence)}
+      governingAbsence={overrides.governingAbsence}
       plannedDay={overrides.plannedDay ?? plannedDay}
       shiftIntervals={shiftIntervals}
       activeScheduleCorrection={overrides.activeScheduleCorrection}
       onClose={vi.fn()}
       onSave={onSave}
-      onClear={vi.fn()}
+      onClear={onClear}
       onSaveScheduleCorrection={onSaveScheduleCorrection}
       onResetScheduleCorrection={onResetScheduleCorrection}
       onWorkTimeCommitted={onWorkTimeCommitted}
@@ -112,6 +116,7 @@ function renderDialog(
   );
   return {
     onSave,
+    onClear,
     onSaveAbsence,
     onSaveScheduleCorrection,
     onResetScheduleCorrection,
@@ -120,6 +125,182 @@ function renderDialog(
 }
 
 describe('DailyValueEditorDialog', () => {
+  it('preserves an unchanged imported time override matching raw hours after reopening', async () => {
+    const { onSave, onClear } = renderDialog({
+      value: {
+        ...value,
+        kind: 'imported-override',
+        workTimeCorrection: {
+          plannedShift: 'FIRST',
+          plannedStartTime: '06:00',
+          plannedEndTime: '14:00',
+          actualStartTime: '06:00',
+          actualEndTime: '14:00',
+          classificationOverride: null,
+        },
+      },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Zapisz' }));
+    await waitFor(() => expect(onSave).not.toHaveBeenCalled());
+    expect(onClear).not.toHaveBeenCalled();
+  });
+  it('saves changed Balance hours through an actual-time override', async () => {
+    const { onSave } = renderDialog({
+      value: {
+        ...value,
+        kind: 'imported',
+        balanceSourceFacts: balanceFacts(),
+      },
+    });
+    fireEvent.change(screen.getByLabelText('Rzeczywisty koniec'), {
+      target: { value: '16:00' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Zapisz' }));
+    await waitFor(() =>
+      expect(onSave).toHaveBeenCalledWith(
+        10,
+        null,
+        expect.objectContaining({
+          actualStartTime: '06:00',
+          actualEndTime: '16:00',
+        }),
+      ),
+    );
+  });
+  it.each(['UW', 'UO', 'NN', 'NI'] as const)(
+    'allows confirmed replacement of raw Balance hours with %s',
+    async (code) => {
+      const { onSaveAbsence } = renderDialog({
+        value: {
+          ...value,
+          kind: 'imported',
+          balanceSourceFacts: balanceFacts(),
+        },
+      });
+      fireEvent.click(screen.getByRole('tab', { name: 'Nieobecność' }));
+      fireEvent.mouseDown(screen.getByLabelText('Rodzaj nieobecności'));
+      fireEvent.click(
+        screen.getByRole('option', { name: new RegExp(`^${code} `) }),
+      );
+      const save = screen.getByRole('button', { name: 'Zapisz' });
+      expect(save).toBeDisabled();
+      expect(
+        screen.queryByText(/Oryginalne godziny z importu nie mogą/),
+      ).not.toBeInTheDocument();
+      fireEvent.click(
+        screen.getByRole('checkbox', {
+          name: 'Zastąp godziny z Bilansu nieobecnością. Dane źródłowe Bilansu pozostaną zachowane.',
+        }),
+      );
+      expect(save).toBeEnabled();
+      fireEvent.click(save);
+      await waitFor(() =>
+        expect(onSaveAbsence).toHaveBeenCalledWith(code, null),
+      );
+    },
+  );
+  it('also allows absence replacement of an existing imported manual override', () => {
+    renderDialog({ value: { ...value, kind: 'imported-override', hours: 6 } });
+    fireEvent.click(screen.getByRole('tab', { name: 'Nieobecność' }));
+    expect(screen.getByLabelText('Rodzaj nieobecności')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('checkbox'));
+    expect(screen.getByRole('button', { name: 'Zapisz' })).toBeEnabled();
+  });
+  it('keeps imported L4 protected even when raw Balance attendance exists', () => {
+    renderDialog({
+      value: { ...value, kind: 'imported', balanceSourceFacts: balanceFacts() },
+      governingAbsence: {
+        id: 'l4',
+        employeeId: employee.id,
+        tetaNumber: employee.tetaNumber,
+        monthId: '2026-06',
+        startDate: day.isoDate,
+        endDate: day.isoDate,
+        absenceCode: 'L4',
+        source: 'absence_import',
+        importId: 'zus',
+        status: 'ACTIVE',
+        hoursPerDay: null,
+        note: null,
+        createdAt: day.date,
+        updatedAt: day.date,
+        createdBy: 'test',
+        updatedBy: 'test',
+      },
+    });
+    expect(
+      screen.queryByLabelText('Rodzaj nieobecności'),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Zapisz' })).toBeDisabled();
+  });
+  it('saves changed Balance punches even when credited hours remain 8 and match the plan', async () => {
+    const { onSave } = renderDialog({
+      value: {
+        ...value,
+        kind: 'imported',
+        balanceSourceFacts: balanceFacts({
+          actual_start_time: '05:30',
+          actual_end_time: '14:30',
+          presence_hours: 9,
+        }),
+      },
+    });
+    fireEvent.change(screen.getByLabelText('Rzeczywisty start'), {
+      target: { value: '06:00' },
+    });
+    fireEvent.change(screen.getByLabelText('Rzeczywisty koniec'), {
+      target: { value: '14:00' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Zapisz' }));
+    await waitFor(() =>
+      expect(onSave).toHaveBeenCalledWith(8, null, {
+        workContext: 'NORMATIVE',
+        plannedShift: 'FIRST',
+        plannedStartTime: '06:00',
+        plannedEndTime: '14:00',
+        actualStartTime: '06:00',
+        actualEndTime: '14:00',
+        classificationOverride: null,
+      }),
+    );
+  });
+  it('saves explicit imported override times even when hours return to the raw quantity', async () => {
+    const { onSave } = renderDialog({
+      value: {
+        ...value,
+        kind: 'imported-override',
+        hours: 6,
+        workTimeCorrection: {
+          plannedShift: 'FIRST',
+          plannedStartTime: '06:00',
+          plannedEndTime: '14:00',
+          actualStartTime: '06:00',
+          actualEndTime: '12:00',
+          classificationOverride: null,
+        },
+      },
+    });
+    fireEvent.change(screen.getByLabelText('Rzeczywisty koniec'), {
+      target: { value: '14:00' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Zapisz' }));
+    await waitFor(() =>
+      expect(onSave).toHaveBeenCalledWith(
+        8,
+        null,
+        expect.objectContaining({
+          actualEndTime: '14:00',
+        }),
+      ),
+    );
+  });
+  it('does not fabricate timestamps or clear a quantity-only imported override on reopening', () => {
+    renderDialog({ value: { ...value, kind: 'imported-override', hours: 6 } });
+    expect(screen.getByLabelText('Rzeczywisty start')).toHaveValue('');
+    expect(screen.getByLabelText('Rzeczywisty koniec')).toHaveValue('');
+    expect(screen.getByRole('button', { name: 'Zapisz' })).toBeDisabled();
+  });
   it('shows Balance punches but keeps credited hours and extra pool on an unchanged save', async () => {
     const { onSave, onSaveScheduleCorrection } = renderDialog({
       value: {

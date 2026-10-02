@@ -25,7 +25,10 @@ import type {
 } from '../../types/firestore';
 import { resolveEmploymentCoveredAbsence } from '../../utils/absences';
 import { resolveBalanceCalendarDeviation } from '../../utils/payroll/balanceSourceDeviation';
-import { resolveAttendanceWarnings } from '../../utils/attendance';
+import {
+  resolveAttendanceWarnings,
+  manualAbsenceOverridesImportedAttendance,
+} from '../../utils/attendance';
 import {
   intervalHours,
   resolveDailyWorkTimeDeviation,
@@ -226,6 +229,11 @@ export function EmployeeCalendarDialog({
               const warnings = resolveAttendanceWarnings({
                 hasExplicitValue: (value.hours ?? 0) > 0,
                 hasActiveAbsence: absenceResolution.kind !== 'none',
+                manualAbsenceOverridesImport:
+                  manualAbsenceOverridesImportedAttendance(
+                    persistedValue,
+                    absenceResolution,
+                  ),
                 isWorkingDay:
                   plannedDay === undefined
                     ? cell.day.isWorkingDay

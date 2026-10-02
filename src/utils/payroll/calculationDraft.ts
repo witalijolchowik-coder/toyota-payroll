@@ -19,6 +19,7 @@ import {
 } from '../absences';
 import {
   resolveAttendanceWarnings,
+  manualAbsenceOverridesImportedAttendance,
   resolveEffectiveAttendanceValue,
 } from '../attendance';
 import {
@@ -776,6 +777,11 @@ export function calculateEmployeeMonthlyDraft({
           hasActiveAbsence: hasPayrollGoverningAbsence,
           isWorkingDay: isPlannedWorkingDay,
           isWithinEmployment,
+          manualAbsenceOverridesImport:
+            manualAbsenceOverridesImportedAttendance(
+              persistedValue,
+              absenceResolution,
+            ),
         });
 
         attendanceWarnings.forEach((attendanceWarning) => {
@@ -792,7 +798,7 @@ export function calculateEmployeeMonthlyDraft({
           }
         });
 
-        // Preserve the attendance source fact and conflict warning, but do
+        // Preserve the attendance source fact (and unresolved source conflicts), but do
         // not pay work/overtime or work-day allowances on an absence day.
         if (isWithinEmployment && !hasPayrollGoverningAbsence) {
           explicitHours += effective.hours;
