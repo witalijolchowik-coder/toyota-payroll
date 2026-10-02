@@ -2232,6 +2232,8 @@ export const pl = {
       manualValue: 'Ręczna wartość koordynatora.',
       importedValue:
         'Oryginalna wartość z importu. Możesz dodać korektę bez nadpisywania importu.',
+      balanceAttendanceOverridden:
+        'Obecność z Bilansu zachowana jako dane źródłowe; rozliczenie według ręcznej nieobecności.',
       importedOverride:
         'Ręczna korekta wartości z importu. Oryginalna wartość: {{original}} h.',
       scheduleAutomatic:

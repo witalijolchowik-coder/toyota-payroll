@@ -377,6 +377,11 @@ export function SettlementGrid({
                                 absenceResolution.confirmation,
                               )
                             : appearanceKeyForPlannedDay(plannedDay);
+                        const manualAbsenceOverridesImport =
+                          manualAbsenceOverridesImportedAttendance(
+                            persistedValue,
+                            absenceResolution,
+                          );
                         const hoursLabel =
                           value.hours === null
                             ? t.settlement.grid.empty
@@ -390,21 +395,19 @@ export function SettlementGrid({
                           emptyLabel: t.settlement.grid.empty,
                           displayMode,
                         });
-                        const workTimeBreakdown = resolveGridWorkTimeBreakdown({
-                          value,
-                          day,
-                          plannedDay,
-                        });
+                        const workTimeBreakdown = manualAbsenceOverridesImport
+                          ? null
+                          : resolveGridWorkTimeBreakdown({
+                              value,
+                              day,
+                              plannedDay,
+                            });
                         const hasGoverningAbsence =
                           absenceResolution.kind !== 'none';
                         const warnings = resolveAttendanceWarnings({
                           hasExplicitValue: (value.hours ?? 0) > 0,
                           hasActiveAbsence: hasGoverningAbsence,
-                          manualAbsenceOverridesImport:
-                            manualAbsenceOverridesImportedAttendance(
-                              persistedValue,
-                              absenceResolution,
-                            ),
+                          manualAbsenceOverridesImport,
                           isWorkingDay:
                             plannedDay === undefined
                               ? day.isWorkingDay
@@ -420,6 +423,7 @@ export function SettlementGrid({
                           warnings,
                           isSettled,
                           workTimeBreakdown,
+                          manualAbsenceOverridesImport,
                           t,
                         });
                         const canEdit =
@@ -522,7 +526,8 @@ export function SettlementGrid({
                                         >
                                           {absenceLabel}
                                         </Box>
-                                        {persistedValue ? (
+                                        {persistedValue &&
+                                        !manualAbsenceOverridesImport ? (
                                           <Box
                                             component="span"
                                             sx={{
@@ -1039,6 +1044,7 @@ function buildTooltip({
   warnings,
   isSettled,
   workTimeBreakdown,
+  manualAbsenceOverridesImport,
   t,
 }: {
   value: ReturnType<typeof resolveSettlementCellValue>;
@@ -1047,6 +1053,7 @@ function buildTooltip({
   warnings: AttendanceWarning[];
   isSettled: boolean;
   workTimeBreakdown: DailyWorkTimeDeviation | null;
+  manualAbsenceOverridesImport: boolean;
   t: ReturnType<typeof useTranslations>;
 }): string {
   const parts: string[] = [];
@@ -1068,7 +1075,9 @@ function buildTooltip({
     parts.push(t.settlement.grid.warnings[warning]);
   });
 
-  if (value.kind === 'imported-override') {
+  if (manualAbsenceOverridesImport) {
+    parts.push(t.settlement.grid.balanceAttendanceOverridden);
+  } else if (value.kind === 'imported-override') {
     parts.push(
       interpolate(t.settlement.grid.importedOverride, {
         original: (value.fallbackHours ?? 0).toLocaleString('pl-PL'),
@@ -1112,7 +1121,7 @@ function buildTooltip({
     }
   }
 
-  if (value.workTimeCorrection) {
+  if (value.workTimeCorrection && !manualAbsenceOverridesImport) {
     parts.push(
       interpolate(t.settlement.employeeCalendar.actualInterval, {
         start: value.workTimeCorrection.actualStartTime,

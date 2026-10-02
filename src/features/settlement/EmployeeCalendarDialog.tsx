@@ -226,14 +226,15 @@ export function EmployeeCalendarDialog({
                       absenceResolution.confirmation,
                     )
                   : appearanceKeyForPlannedDay(plannedDay);
+              const manualAbsenceOverridesImport =
+                manualAbsenceOverridesImportedAttendance(
+                  persistedValue,
+                  absenceResolution,
+                );
               const warnings = resolveAttendanceWarnings({
                 hasExplicitValue: (value.hours ?? 0) > 0,
                 hasActiveAbsence: absenceResolution.kind !== 'none',
-                manualAbsenceOverridesImport:
-                  manualAbsenceOverridesImportedAttendance(
-                    persistedValue,
-                    absenceResolution,
-                  ),
+                manualAbsenceOverridesImport,
                 isWorkingDay:
                   plannedDay === undefined
                     ? cell.day.isWorkingDay
@@ -251,41 +252,44 @@ export function EmployeeCalendarDialog({
                   : interpolate(t.settlement.grid.hours, {
                       hours: value.hours.toLocaleString('pl-PL'),
                     });
-              const workTimeBreakdown = value.balanceSourceFacts
-                ? resolveBalanceCalendarDeviation(
-                    value.balanceSourceFacts,
-                    cell.day.isoDate,
-                    cell.day.isHoliday,
-                    plannedDay,
-                  ).deviation
-                : value.workTimeCorrection
-                  ? resolveDailyWorkTimeDeviation({
-                      planned:
-                        value.workTimeCorrection.workContext !== 'EXTRA' &&
-                        value.workTimeCorrection.plannedShift &&
-                        value.workTimeCorrection.plannedStartTime &&
-                        value.workTimeCorrection.plannedEndTime
-                          ? {
-                              shift: value.workTimeCorrection.plannedShift,
-                              startTime:
-                                value.workTimeCorrection.plannedStartTime,
-                              endTime: value.workTimeCorrection.plannedEndTime,
-                            }
-                          : null,
-                      actual: {
-                        startTime: value.workTimeCorrection.actualStartTime,
-                        endTime: value.workTimeCorrection.actualEndTime,
-                      },
-                      isWorkingDay:
-                        value.workTimeCorrection.workContext === 'EXTRA'
-                          ? false
-                          : plannedDay?.status === 'WORKING' ||
-                            plannedDay?.status === 'BHP',
-                      isSaturday: cell.day.date.getUTCDay() === 6,
-                      isSunday: cell.day.date.getUTCDay() === 0,
-                      isPublicHoliday: cell.day.isHoliday,
-                    })
-                  : null;
+              const workTimeBreakdown = manualAbsenceOverridesImport
+                ? null
+                : value.balanceSourceFacts
+                  ? resolveBalanceCalendarDeviation(
+                      value.balanceSourceFacts,
+                      cell.day.isoDate,
+                      cell.day.isHoliday,
+                      plannedDay,
+                    ).deviation
+                  : value.workTimeCorrection
+                    ? resolveDailyWorkTimeDeviation({
+                        planned:
+                          value.workTimeCorrection.workContext !== 'EXTRA' &&
+                          value.workTimeCorrection.plannedShift &&
+                          value.workTimeCorrection.plannedStartTime &&
+                          value.workTimeCorrection.plannedEndTime
+                            ? {
+                                shift: value.workTimeCorrection.plannedShift,
+                                startTime:
+                                  value.workTimeCorrection.plannedStartTime,
+                                endTime:
+                                  value.workTimeCorrection.plannedEndTime,
+                              }
+                            : null,
+                        actual: {
+                          startTime: value.workTimeCorrection.actualStartTime,
+                          endTime: value.workTimeCorrection.actualEndTime,
+                        },
+                        isWorkingDay:
+                          value.workTimeCorrection.workContext === 'EXTRA'
+                            ? false
+                            : plannedDay?.status === 'WORKING' ||
+                              plannedDay?.status === 'BHP',
+                        isSaturday: cell.day.date.getUTCDay() === 6,
+                        isSunday: cell.day.date.getUTCDay() === 0,
+                        isPublicHoliday: cell.day.isHoliday,
+                      })
+                    : null;
 
               return (
                 <Tooltip
@@ -382,25 +386,28 @@ export function EmployeeCalendarDialog({
                             )}
                           </Typography>
                         ) : null}
-                        <Typography
-                          variant="body2"
-                          color={
-                            value.kind === 'manual' ||
-                            value.kind === 'imported-override'
-                              ? palette.manualCorrection.text
-                              : palette[appearanceKey].text
-                          }
-                          sx={{
-                            fontWeight:
+                        {!manualAbsenceOverridesImport ? (
+                          <Typography
+                            variant="body2"
+                            color={
                               value.kind === 'manual' ||
                               value.kind === 'imported-override'
-                                ? 800
-                                : 500,
-                          }}
-                        >
-                          {hoursLabel}
-                        </Typography>
-                        {value.workTimeCorrection ? (
+                                ? palette.manualCorrection.text
+                                : palette[appearanceKey].text
+                            }
+                            sx={{
+                              fontWeight:
+                                value.kind === 'manual' ||
+                                value.kind === 'imported-override'
+                                  ? 800
+                                  : 500,
+                            }}
+                          >
+                            {hoursLabel}
+                          </Typography>
+                        ) : null}
+                        {value.workTimeCorrection &&
+                        !manualAbsenceOverridesImport ? (
                           <Typography
                             variant="caption"
                             sx={{ color: palette.manualCorrection.text }}
