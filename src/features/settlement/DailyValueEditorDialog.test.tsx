@@ -126,6 +126,7 @@ describe('DailyValueEditorDialog', () => {
         ...value,
         kind: 'imported',
         hours: 10,
+        fallbackHours: 10,
         balanceSourceFacts: balanceFacts({
           actual_end_time: '16:30',
           credited_hours: 10,
