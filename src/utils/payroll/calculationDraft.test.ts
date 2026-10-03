@@ -329,7 +329,7 @@ describe('employee monthly calculation draft', () => {
     ['FIRST', '05:00', '14:00'],
     ['SECOND', '14:00', '23:00'],
   ] as const)(
-    'keeps %s night overtime in monthly and SOZ 100%% hours but not night allowance',
+    'keeps %s night overtime in monthly and SOZ OT100 hours but not night allowance',
     (shift, actualStartTime, actualEndTime) => {
       const monthId = '2026-09';
       const date = '2026-09-09';
@@ -386,12 +386,13 @@ describe('employee monthly calculation draft', () => {
         monthNominalHours: 176,
         records: [
           {
-            employee: employee(),
+            employee: employee({ citizenship: 'PL' }),
             identity: { pesel: '87010409887' },
             draft: result,
           },
         ],
       });
+      expect(exportPackage.soz.polishRows).toHaveLength(1);
       expect(exportPackage.soz.polishRows[0]?.cells.slice(6, 10)).toEqual([
         '176',
         '0',
