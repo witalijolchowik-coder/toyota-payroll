@@ -1,14 +1,18 @@
 import type {
+  ActualWorkingShift,
   BalanceSourceFactsDocument,
   DailyValue,
 } from '../../types/firestore';
 import type { PlannedScheduleDay } from '../schedule';
 import {
   intervalHours,
+  physicalNightHours,
   resolveDailyWorkTimeDeviation,
+  resolveScheduledNightAllowance,
   type DailyWorkTimeDeviation,
   type DailyWorkTimeDeviationInput,
   type PlannedWorkInterval,
+  type ScheduledNightAllowanceReviewReason,
 } from './workTimeDeviations';
 
 const round = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
@@ -17,7 +21,19 @@ const tolerance = 0.02;
 export interface BalanceDeviationResult {
   deviation: DailyWorkTimeDeviation;
   issues: string[];
+  nightContext: {
+    shift: ActualWorkingShift | null;
+    shiftSource: BalanceNightPlanSource;
+    inferred: boolean;
+    reviewReason: BalanceNightReviewReason | null;
+  };
 }
+
+type BalanceNightPlanSource =
+  'balance-plan' | 'manual-correction' | 'explicit-plan' | 'none';
+
+type BalanceNightReviewReason =
+  ScheduledNightAllowanceReviewReason | 'AMBIGUOUS_SCHEDULE_CORRECTION';
 
 /** Credited quantity and GODZ_ZLEC govern; punches classify, never add hours. */
 export function resolveBalanceSourceDeviation(
@@ -25,7 +41,11 @@ export function resolveBalanceSourceDeviation(
   context: Omit<
     DailyWorkTimeDeviationInput,
     'actual' | 'classificationOverride'
-  > & { plannedHours?: number },
+  > & {
+    plannedHours?: number;
+    plannedSource?: BalanceNightPlanSource;
+    nightAllowanceReviewReason?: BalanceNightReviewReason | null;
+  },
 ): BalanceDeviationResult {
   const issues: string[] = [];
   const actual =
@@ -46,6 +66,36 @@ export function resolveBalanceSourceDeviation(
     actual && (!context.isWorkingDay || context.planned)
       ? resolveDailyWorkTimeDeviation({ ...context, actual })
       : null;
+  const sourceNightAllowance = Math.min(
+    facts.credited_hours,
+    facts.night_hours,
+  );
+  // GODZ_NOC is a physical source fact. Only reliable actual/planned overlap
+  // becomes a payable allowance on a normative day; ambiguous plans keep the
+  // previous result until an operator has reviewed them.
+  const scheduledNightAllowance = context.isWorkingDay
+    ? resolveScheduledNightAllowance({
+        planned: context.planned,
+        actual,
+        fallbackNightAllowanceHours: sourceNightAllowance,
+      })
+    : null;
+  const physicalActualNight = actual
+    ? physicalNightHours(actual, context.planned)
+    : 0;
+  const hasPotentialNightImpact =
+    facts.night_hours > 0 ||
+    physicalActualNight > 0 ||
+    (analyzed?.nightOvertimeHours ?? 0) > 0;
+  const nightReviewReason =
+    context.isWorkingDay && hasPotentialNightImpact
+      ? (context.nightAllowanceReviewReason ??
+        scheduledNightAllowance?.reviewReason ??
+        null)
+      : null;
+  if (nightReviewReason) {
+    issues.push(`${nightReviewReason}_NIGHT_ALLOWANCE_REVIEW`);
+  }
   // A zero credited day without an authoritative absence is not proof of
   // eligible private time. Never consume overtime for unexplained absences.
   // Repaid/cumulative source balances are not new shortage demands either.
@@ -65,7 +115,8 @@ export function resolveBalanceSourceDeviation(
   if (facts.credited_hours > 0 && !actual) issues.push('MISSING_PUNCH');
   if (
     analyzed &&
-    Math.abs(analyzed.nightAllowanceHours - facts.night_hours) > 0.25
+    actual &&
+    Math.abs(physicalActualNight - facts.night_hours) > 0.25
   )
     issues.push('NIGHT_HOURS_DISCREPANCY');
   if (actual) {
@@ -84,11 +135,7 @@ export function resolveBalanceSourceDeviation(
   // GODZ_NOC determines the night part of the credited extra pool. Punches still
   // have to provide sufficient capacity in each category; rounding is not extra.
   const plannedNight = context.planned
-    ? resolveDailyWorkTimeDeviation({
-        planned: context.planned,
-        actual: context.planned,
-        isWorkingDay: true,
-      }).nightAllowanceHours
+    ? physicalNightHours(context.planned)
     : null;
   const plannedLength = context.planned ? intervalHours(context.planned) : null;
   const sourceNightExtra =
@@ -161,6 +208,17 @@ export function resolveBalanceSourceDeviation(
   );
   return {
     issues,
+    nightContext: {
+      shift: scheduledNightAllowance?.shift ?? null,
+      shiftSource:
+        context.plannedSource ?? (context.planned ? 'explicit-plan' : 'none'),
+      inferred: Boolean(
+        scheduledNightAllowance?.inferred ||
+        (context.plannedSource === 'balance-plan' &&
+          scheduledNightAllowance?.shift),
+      ),
+      reviewReason: nightReviewReason,
+    },
     deviation: {
       normalWorkHours: round(normal),
       privateTimeHours: round(eligibleShortage),
@@ -174,7 +232,13 @@ export function resolveBalanceSourceDeviation(
       coverableNiHours: 0,
       holidayWorkBonusEligible: Boolean(context.isPublicHoliday && extra > 0),
       nightOvertimeHours: round(nightExtra),
-      nightAllowanceHours: Math.min(facts.credited_hours, facts.night_hours),
+      nightAllowanceHours: Math.min(
+        facts.credited_hours,
+        nightReviewReason
+          ? sourceNightAllowance
+          : (scheduledNightAllowance?.nightAllowanceHours ??
+              sourceNightAllowance),
+      ),
       unresolved,
     },
   };
@@ -217,6 +281,8 @@ export function resolveBalanceCalendarDeviation(
   const weekday = new Date(`${date}T00:00:00Z`).getUTCDay();
   return resolveBalanceSourceDeviation(facts, {
     planned,
+    plannedSource: protectedPlan ? 'manual-correction' : 'balance-plan',
+    nightAllowanceReviewReason: plannedDay?.nightAllowanceReviewReason ?? null,
     plannedHours: protectedPlan ? (plannedDay.hours ?? 0) : facts.planned_hours,
     isWorkingDay: protectedPlan
       ? plannedDay.status === 'WORKING' || plannedDay.status === 'BHP'

@@ -53,6 +53,8 @@ export interface PlannedScheduleDay {
   plannedStartTime: string | null;
   plannedEndTime: string | null;
   plannedDuration: number | null;
+  /** Review annotation only: never changes the existing plan/OT interpretation. */
+  nightAllowanceReviewReason?: 'AMBIGUOUS_SCHEDULE_CORRECTION';
 }
 
 export interface MonthlyScheduleOptions {
@@ -111,6 +113,18 @@ export function generateEmployeeMonthlySchedule({
       )
       .map((correction) => [correction.date, correction]),
   );
+  const correctionCountsByDate = new Map<IsoDate, number>();
+  (options.corrections ?? []).forEach((correction) => {
+    if (
+      correction.employeeId === employee.id &&
+      correction.status === 'ACTIVE'
+    ) {
+      correctionCountsByDate.set(
+        correction.date,
+        (correctionCountsByDate.get(correction.date) ?? 0) + 1,
+      );
+    }
+  });
   const bhpDates = getBhpIsoDates(employee, days, options);
 
   return days.map((day) => {
@@ -135,11 +149,17 @@ export function generateEmployeeMonthlySchedule({
       return base;
     }
 
-    return applyScheduleCorrection(
+    const corrected = applyScheduleCorrection(
       base,
       correction,
       options.shiftHoursVersions ?? [],
     );
+    return (correctionCountsByDate.get(day.isoDate) ?? 0) > 1
+      ? {
+          ...corrected,
+          nightAllowanceReviewReason: 'AMBIGUOUS_SCHEDULE_CORRECTION',
+        }
+      : corrected;
   });
 }
 

@@ -23,6 +23,8 @@ import {
   resolveEmploymentCoveredAbsence,
   resolveGoverningAbsence,
 } from '../absences';
+import { prepareSettlementExportPackage } from '../reports/settlementExports';
+import { plannedIntervalForShift } from './workTimeDeviations';
 
 const createdAt = new Date('2026-01-01T00:00:00.000Z');
 
@@ -322,6 +324,88 @@ describe('employee monthly calculation draft', () => {
     );
     expect(result.totals.workedHours).toBe(22 * STANDARD_WORKING_DAY_HOURS);
   });
+
+  it.each([
+    ['FIRST', '05:00', '14:00'],
+    ['SECOND', '14:00', '23:00'],
+  ] as const)(
+    'keeps %s night overtime in monthly and SOZ 100%% hours but not night allowance',
+    (shift, actualStartTime, actualEndTime) => {
+      const monthId = '2026-09';
+      const date = '2026-09-09';
+      const plan = plannedIntervalForShift(shift);
+      const schedule = normativeSchedule(monthId).map((day) =>
+        day.date === date
+          ? {
+              ...day,
+              shift,
+              plannedStartTime: plan.startTime,
+              plannedEndTime: plan.endTime,
+            }
+          : day,
+      );
+      const source = dailyValue({
+        id: `employee-1_${date}`,
+        monthId,
+        date,
+        hours: 9,
+        workTimeCorrection: {
+          plannedShift: shift,
+          plannedStartTime: plan.startTime,
+          plannedEndTime: plan.endTime,
+          actualStartTime,
+          actualEndTime,
+          classificationOverride: null,
+        },
+      });
+      const originalSource = structuredClone(source);
+      const result = draft({
+        monthId,
+        dailyValues: [source],
+        plannedSchedule: schedule,
+      });
+
+      expect(result.workTime).toMatchObject({
+        normalWorkHours: 176,
+        nightHours: 0,
+        overtime50Hours: 0,
+        overtime100Hours: 1,
+        paidOvertime50Hours: 0,
+        paidOvertime100Hours: 1,
+        privateTimeHours: 0,
+        niedoczasHours: 0,
+      });
+      expect(result.totals.nominalHours).toBe(176);
+      expect(result.totals.workedHours).toBe(177);
+      expect(result.workDays.physicallyWorkedDays).toBe(22);
+      expect(result.workTime.unresolvedClassificationDays).toEqual([]);
+      expect(source).toEqual(originalSource);
+
+      const exportPackage = prepareSettlementExportPackage({
+        monthId,
+        monthNominalHours: 176,
+        records: [
+          {
+            employee: employee(),
+            identity: { pesel: '87010409887' },
+            draft: result,
+          },
+        ],
+      });
+      expect(exportPackage.soz.polishRows[0]?.cells.slice(6, 10)).toEqual([
+        '176',
+        '0',
+        '0',
+        '1',
+      ]);
+      expect(exportPackage.toyota.rows[0]?.cells.slice(14, 18)).toEqual([
+        '176',
+        '0',
+        '0',
+        '1',
+      ]);
+    },
+  );
 
   it('keeps nominal unchanged when several normatively free days contain extra work', () => {
     const result = draft({

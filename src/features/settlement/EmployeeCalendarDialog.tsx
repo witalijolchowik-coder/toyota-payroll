@@ -25,6 +25,7 @@ import type {
 } from '../../types/firestore';
 import { resolveEmploymentCoveredAbsence } from '../../utils/absences';
 import { resolveBalanceCalendarDeviation } from '../../utils/payroll/balanceSourceDeviation';
+import { plannedNightContext } from '../../utils/payroll/plannedNightContext';
 import {
   resolveAttendanceWarnings,
   manualAbsenceOverridesImportedAttendance,
@@ -263,6 +264,7 @@ export function EmployeeCalendarDialog({
                     ).deviation
                   : value.workTimeCorrection
                     ? resolveDailyWorkTimeDeviation({
+                        ...plannedNightContext(plannedDay),
                         planned:
                           value.workTimeCorrection.workContext !== 'EXTRA' &&
                           value.workTimeCorrection.plannedShift &&

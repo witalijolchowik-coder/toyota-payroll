@@ -103,9 +103,10 @@ describe('manual absence governs raw Balance attendance', () => {
       importedOverrideHours: 0,
     });
     expect(result.workTime).toMatchObject({
-      nightHours: 2,
+      nightHours: 0,
       overtime100Hours: 2,
     });
+    expect(cleared.balanceSourceFacts?.night_hours).toBe(2);
     expect(result.absences.vacationHours).toBe(0);
   });
   it('retains a subsequent explicit operator correction when the absence is cancelled', () => {

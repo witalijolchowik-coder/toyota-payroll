@@ -35,6 +35,7 @@ import {
 import type { EmployeeSettlementEntitlements } from './employeeEntitlements';
 import { dateToIsoDate, getPayrollMonthDateRange } from './month';
 import { baseSalaryForFirstToyotaEmploymentDate } from './employeeReadiness';
+import { plannedNightContext } from './plannedNightContext';
 import { resolveEffectivePayrollSetting } from './settings';
 import { getPayrollVirtualDefaultHours } from './virtualDefaults';
 import {
@@ -720,6 +721,10 @@ export function calculateEmployeeMonthlyDraft({
   ) => {
     workTimeDeviations.push(deviation);
     workTimeDeviationsByDate.set(date, deviation);
+    if (deviation.unresolved) {
+      unresolvedClassificationDays.push(date);
+      warnings.push(warning('unresolved-work-time-classification', date));
+    }
   };
   const unresolvedClassificationDays: IsoDate[] = [];
   const physicallyWorkedDates = new Set<IsoDate>();
@@ -819,12 +824,6 @@ export function calculateEmployeeMonthlyDraft({
           });
           if (deviation) {
             recordWorkTimeDeviation(day.isoDate, deviation);
-            if (deviation.unresolved) {
-              unresolvedClassificationDays.push(day.isoDate);
-              warnings.push(
-                warning('unresolved-work-time-classification', day.isoDate),
-              );
-            }
           } else if (effective.hours > 0 && !hasPayrollGoverningAbsence) {
             if (!isPlannedWorkingDay) {
               recordWorkTimeDeviation(
@@ -842,10 +841,6 @@ export function calculateEmployeeMonthlyDraft({
                 }),
               );
             } else if (effective.hours !== plannedHours) {
-              unresolvedClassificationDays.push(day.isoDate);
-              warnings.push(
-                warning('unresolved-work-time-classification', day.isoDate),
-              );
               recordWorkTimeDeviation(day.isoDate, {
                 normalWorkHours: Math.min(effective.hours, plannedHours),
                 privateTimeHours: Math.max(0, plannedHours - effective.hours),
@@ -864,6 +859,7 @@ export function calculateEmployeeMonthlyDraft({
                 day.isoDate,
                 resolveDailyWorkTimeDeviation({
                   planned: plannedIntervalForScheduleDay(plannedDay),
+                  ...plannedNightContext(plannedDay),
                   isWorkingDay: true,
                 }),
               );
@@ -886,6 +882,7 @@ export function calculateEmployeeMonthlyDraft({
           day.isoDate,
           resolveDailyWorkTimeDeviation({
             planned: plannedIntervalForScheduleDay(plannedDay),
+            ...plannedNightContext(plannedDay),
             isWorkingDay: isPlannedWorkingDay,
             isSaturday: day.date.getUTCDay() === 6,
             isSunday: day.date.getUTCDay() === 0,
@@ -1448,7 +1445,7 @@ function plannedIntervalForScheduleDay(day?: PlannedScheduleDay) {
   return plannedIntervalForShift(day?.shift ?? 'FIRST');
 }
 
-function dailyWorkTimeDeviationFromValue({
+export function dailyWorkTimeDeviationFromValue({
   value,
   day,
   plannedDay,
@@ -1489,6 +1486,7 @@ function dailyWorkTimeDeviationFromValue({
       : null;
   return resolveDailyWorkTimeDeviation({
     planned,
+    ...plannedNightContext(plannedDay),
     actual: {
       startTime: correction.actualStartTime,
       endTime: correction.actualEndTime,

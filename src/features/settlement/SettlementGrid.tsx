@@ -43,6 +43,7 @@ import type {
 } from '../../types/firestore';
 import { resolveEmploymentCoveredAbsence } from '../../utils/absences';
 import { resolveBalanceCalendarDeviation } from '../../utils/payroll/balanceSourceDeviation';
+import { plannedNightContext } from '../../utils/payroll/plannedNightContext';
 import {
   resolveAttendanceWarnings,
   manualAbsenceOverridesImportedAttendance,
@@ -858,6 +859,7 @@ function resolveGridWorkTimeBreakdown({
   if (!correction) return null;
 
   return resolveDailyWorkTimeDeviation({
+    ...plannedNightContext(plannedDay),
     planned:
       correction.workContext !== 'EXTRA' &&
       correction.plannedShift &&

@@ -162,7 +162,11 @@ export function DailyValueEditorDialog({
   const [actualStartTime, setActualStartTime] = useState(initialStart);
   const [actualEndTime, setActualEndTime] = useState(initialEnd);
   const sourceTimesUnchanged =
-    !!facts && actualStartTime === initialStart && actualEndTime === initialEnd;
+    value.kind === 'imported' &&
+    !value.workTimeCorrection &&
+    !!facts &&
+    actualStartTime === initialStart &&
+    actualEndTime === initialEnd;
   const [absenceCode, setAbsenceCode] = useState<AbsenceCode>(
     () => (governingAbsence?.absenceCode as AbsenceCode | undefined) ?? 'L4',
   );
@@ -213,6 +217,7 @@ export function DailyValueEditorDialog({
     (isExtraWorkDay || Boolean(plannedInterval && plannedShift));
   const workTimePreview = sourceTimesUnchanged
     ? resolveBalanceSourceDeviation(facts!, {
+        nightAllowanceReviewReason: plannedDay?.nightAllowanceReviewReason,
         planned: plannedInterval
           ? { ...plannedInterval, shift: plannedShift || null }
           : null,
@@ -224,6 +229,7 @@ export function DailyValueEditorDialog({
       }).deviation
     : inferredActual && canResolveWorkTime
       ? resolveDailyWorkTimeDeviation({
+          nightAllowanceReviewReason: plannedDay?.nightAllowanceReviewReason,
           planned:
             plannedInterval && plannedShift
               ? { shift: plannedShift, ...plannedInterval }

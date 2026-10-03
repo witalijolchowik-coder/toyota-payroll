@@ -410,6 +410,58 @@ describe('monthly schedule planning', () => {
     expect(worker.shiftAssignment).toBe('RED');
   });
 
+  it('annotates duplicate active corrections without changing the existing last-correction plan', () => {
+    const worker = employee({
+      departmentId: 'metal-402b',
+      shiftAssignment: 'RED',
+      employmentStartDate: date('2026-01-01'),
+    });
+    const days = createCalendarDays('2026-09');
+    const departments = [department('metal-402b', 'Metal 402B', 'THREE_SHIFT')];
+    const first = {
+      ...correction(worker, '2026-09-09', 'NIGHT_SHIFT', 'NIGHT', 8),
+      id: 'first-active',
+    };
+    const last = {
+      ...correction(worker, '2026-09-09', 'SECOND_SHIFT', 'SECOND', 8),
+      id: 'last-active',
+    };
+    const previousPlan = generateEmployeeMonthlySchedule({
+      employee: worker,
+      days,
+      departments,
+      options: { corrections: [last] },
+    });
+    const ambiguousPlan = generateEmployeeMonthlySchedule({
+      employee: worker,
+      days,
+      departments,
+      options: { corrections: [first, last] },
+    });
+
+    expect(
+      ambiguousPlan.find((day) => day.date === '2026-09-09'),
+    ).toMatchObject({
+      status: 'WORKING',
+      source: 'manual-correction',
+      shift: 'SECOND',
+      hours: 8,
+      plannedStartTime: '14:00',
+      plannedEndTime: '22:00',
+      nightAllowanceReviewReason: 'AMBIGUOUS_SCHEDULE_CORRECTION',
+    });
+    expect(
+      ambiguousPlan.map((day) => {
+        const historicalPlan = { ...day };
+        delete historicalPlan.nightAllowanceReviewReason;
+        return historicalPlan;
+      }),
+    ).toEqual(previousPlan);
+    expect(worker.shiftAssignment).toBe('RED');
+    expect(first.status).toBe('ACTIVE');
+    expect(last.status).toBe('ACTIVE');
+  });
+
   it('marks 7 August as a manual non-holiday day off without changing adjacent days', () => {
     const worker = employee({
       departmentId: 'metal-402b',

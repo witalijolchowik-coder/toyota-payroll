@@ -125,6 +125,52 @@ function renderDialog(
 }
 
 describe('DailyValueEditorDialog', () => {
+  it('previews a saved partial NIGHT override instead of preserved raw Balance hours', async () => {
+    const facts = Object.freeze(
+      balanceFacts({
+        planned_start_time: '22:00',
+        planned_end_time: '06:00',
+        actual_start_time: '22:00',
+        actual_end_time: '06:00',
+        night_hours: 8,
+      }),
+    );
+    const before = { ...facts };
+    const { onSave, onClear } = renderDialog({
+      plannedDay: {
+        ...plannedDay,
+        shift: 'NIGHT',
+        plannedStartTime: '22:00',
+        plannedEndTime: '06:00',
+      },
+      value: {
+        ...value,
+        kind: 'imported-override',
+        hours: 6,
+        balanceSourceFacts: facts,
+        workTimeCorrection: {
+          plannedShift: 'NIGHT',
+          plannedStartTime: '22:00',
+          plannedEndTime: '06:00',
+          actualStartTime: '00:00',
+          actualEndTime: '06:00',
+          classificationOverride: null,
+        },
+      },
+    });
+    expect(screen.getByLabelText('Rzeczywisty start')).toHaveValue('00:00');
+    expect(screen.getByLabelText('Rzeczywisty koniec')).toHaveValue('06:00');
+    expect(screen.getByTestId('worked-hours')).toHaveTextContent('6 h');
+    expect(screen.getByTestId('night-hours')).toHaveTextContent('6 h');
+    expect(screen.getByTestId('shortage-hours')).toHaveTextContent('2 h');
+    expect(screen.getByTestId('overtime-50-hours')).toHaveTextContent('0 h');
+    expect(screen.getByTestId('overtime-100-hours')).toHaveTextContent('0 h');
+    fireEvent.click(screen.getByRole('button', { name: 'Zapisz' }));
+    await waitFor(() => expect(onSave).not.toHaveBeenCalled());
+    expect(onClear).not.toHaveBeenCalled();
+    expect(facts).toEqual(before);
+    expect(facts.night_hours).toBe(8);
+  });
   it('preserves an unchanged imported time override matching raw hours after reopening', async () => {
     const { onSave, onClear } = renderDialog({
       value: {

@@ -1,7 +1,9 @@
 import {
   balanceMonthlyWorkTimeDeviations,
+  physicalNightHours,
   plannedIntervalForShift,
   resolveDailyWorkTimeDeviation,
+  resolveScheduledNightAllowance,
 } from './workTimeDeviations';
 
 describe('daily work-time deviations', () => {
@@ -74,7 +76,8 @@ describe('daily work-time deviations', () => {
       normalWorkHours: 8,
       overtime50Hours: 0,
       overtime100Hours: 2,
-      nightAllowanceHours: 2,
+      nightOvertimeHours: 2,
+      nightAllowanceHours: 0,
     });
     expect(result.overtime100Reasons).toContain('NIGHT');
   });
@@ -90,7 +93,8 @@ describe('daily work-time deviations', () => {
       normalWorkHours: 8,
       overtime50Hours: 0,
       overtime100Hours: 2,
-      nightAllowanceHours: 2,
+      nightOvertimeHours: 2,
+      nightAllowanceHours: 0,
     });
   });
 
@@ -182,6 +186,299 @@ describe('daily work-time deviations', () => {
       overtime50Hours: 0,
       overtime100Hours: 2,
     });
+  });
+
+  it.each([
+    ['SECOND', '14:00', '23:00', 8, 0, 1, 0, 1, 1, 0],
+    ['SECOND', '14:00', '00:00', 8, 0, 2, 0, 2, 2, 0],
+    ['FIRST', '05:00', '14:00', 8, 0, 1, 0, 1, 1, 0],
+    ['FIRST', '04:00', '14:00', 8, 0, 2, 0, 2, 2, 0],
+    ['NIGHT', '22:00', '06:00', 8, 0, 0, 0, 0, 0, 8],
+    ['NIGHT', '00:00', '06:00', 6, 2, 0, 0, 0, 0, 6],
+    ['NIGHT', '22:00', '07:00', 8, 0, 1, 1, 0, 0, 8],
+    ['NIGHT', '21:00', '06:00', 8, 0, 1, 1, 0, 0, 8],
+  ] as const)(
+    'limits ordinary %s night allowance to planned actual overlap %s–%s',
+    (
+      shift,
+      startTime,
+      endTime,
+      normalWorkHours,
+      privateTimeHours,
+      extraHours,
+      overtime50Hours,
+      overtime100Hours,
+      nightOvertimeHours,
+      nightAllowanceHours,
+    ) => {
+      expect(
+        resolveDailyWorkTimeDeviation({
+          planned: plannedIntervalForShift(shift),
+          actual: { startTime, endTime },
+          isWorkingDay: true,
+        }),
+      ).toEqual({
+        normalWorkHours,
+        privateTimeHours,
+        extraHours,
+        overtime50Hours,
+        overtime100Hours,
+        overtime100Reasons: nightOvertimeHours > 0 ? ['NIGHT'] : [],
+        coverableNiHours: 0,
+        holidayWorkBonusEligible: false,
+        nightOvertimeHours,
+        nightAllowanceHours,
+        unresolved: false,
+      });
+    },
+  );
+
+  it.each([
+    { isSaturday: true, reason: 'SATURDAY' },
+    { isSunday: true, reason: 'SUNDAY' },
+    { isPublicHoliday: true, reason: 'PUBLIC_HOLIDAY' },
+  ])(
+    'preserves $reason extra-night allowance stacking',
+    ({ reason, ...flags }) => {
+      expect(
+        resolveDailyWorkTimeDeviation({
+          // A stale weekday plan must not apply weekday suppression to extra work.
+          planned: plannedIntervalForShift('SECOND'),
+          actual: { startTime: '22:00', endTime: '06:00' },
+          isWorkingDay: false,
+          ...flags,
+        }),
+      ).toEqual({
+        normalWorkHours: 0,
+        privateTimeHours: 0,
+        extraHours: 8,
+        overtime50Hours: 0,
+        overtime100Hours: 8,
+        overtime100Reasons: [reason],
+        coverableNiHours: 0,
+        holidayWorkBonusEligible: reason === 'PUBLIC_HOLIDAY',
+        nightOvertimeHours: 8,
+        nightAllowanceHours: 8,
+        unresolved: false,
+      });
+    },
+  );
+
+  it('preserves extra-night stacking above the eight-hour threshold', () => {
+    expect(
+      resolveDailyWorkTimeDeviation({
+        actual: { startTime: '21:00', endTime: '07:00' },
+        isWorkingDay: false,
+        isSaturday: true,
+      }),
+    ).toMatchObject({
+      extraHours: 10,
+      overtime100Hours: 8,
+      overtime50Hours: 2,
+      nightOvertimeHours: 8,
+      nightAllowanceHours: 8,
+      unresolved: false,
+    });
+  });
+
+  it('retains the previous night value for a non-canonical plan and flags review', () => {
+    expect(
+      resolveDailyWorkTimeDeviation({
+        planned: { shift: 'FIRST', startTime: '07:00', endTime: '15:00' },
+        actual: { startTime: '05:00', endTime: '15:00' },
+        isWorkingDay: true,
+      }),
+    ).toEqual({
+      normalWorkHours: 8,
+      privateTimeHours: 0,
+      extraHours: 2,
+      overtime50Hours: 1,
+      overtime100Hours: 1,
+      overtime100Reasons: ['NIGHT'],
+      coverableNiHours: 0,
+      holidayWorkBonusEligible: false,
+      nightOvertimeHours: 1,
+      nightAllowanceHours: 1,
+      unresolved: true,
+    });
+  });
+
+  it('does not let a classification override hide conflicting night-plan context', () => {
+    expect(
+      resolveDailyWorkTimeDeviation({
+        planned: { shift: 'FIRST', startTime: '14:00', endTime: '22:00' },
+        actual: { startTime: '14:00', endTime: '23:00' },
+        isWorkingDay: true,
+        classificationOverride: { overtime50Hours: 1, overtime100Hours: 0 },
+      }),
+    ).toMatchObject({
+      normalWorkHours: 8,
+      extraHours: 1,
+      overtime50Hours: 1,
+      overtime100Hours: 0,
+      nightOvertimeHours: 1,
+      nightAllowanceHours: 1,
+      unresolved: true,
+    });
+  });
+
+  it('does not introduce night review for an unrelated custom daytime plan', () => {
+    expect(
+      resolveDailyWorkTimeDeviation({
+        planned: { shift: 'FIRST', startTime: '07:00', endTime: '15:00' },
+        actual: { startTime: '07:00', endTime: '15:00' },
+        isWorkingDay: true,
+      }),
+    ).toMatchObject({
+      normalWorkHours: 8,
+      extraHours: 0,
+      overtime50Hours: 0,
+      overtime100Hours: 0,
+      nightAllowanceHours: 0,
+      unresolved: false,
+    });
+  });
+
+  it('uses a protected night plan for allowance without changing the stored overtime plan', () => {
+    expect(
+      resolveDailyWorkTimeDeviation({
+        planned: plannedIntervalForShift('SECOND'),
+        nightAllowancePlanned: plannedIntervalForShift('NIGHT'),
+        actual: { startTime: '22:00', endTime: '06:00' },
+        isWorkingDay: true,
+      }),
+    ).toEqual({
+      normalWorkHours: 0,
+      privateTimeHours: 8,
+      extraHours: 8,
+      overtime50Hours: 0,
+      overtime100Hours: 8,
+      overtime100Reasons: ['NIGHT'],
+      coverableNiHours: 0,
+      holidayWorkBonusEligible: false,
+      nightOvertimeHours: 8,
+      nightAllowanceHours: 8,
+      unresolved: false,
+    });
+  });
+
+  it('preserves physical night allowance when a protected schedule correction is ambiguous', () => {
+    expect(
+      resolveDailyWorkTimeDeviation({
+        planned: plannedIntervalForShift('SECOND'),
+        nightAllowancePlanned: plannedIntervalForShift('SECOND'),
+        nightAllowanceReviewReason: 'AMBIGUOUS_SCHEDULE_CORRECTION',
+        actual: { startTime: '14:00', endTime: '23:00' },
+        isWorkingDay: true,
+        classificationOverride: { overtime100Hours: 1 },
+      }),
+    ).toMatchObject({
+      normalWorkHours: 8,
+      privateTimeHours: 0,
+      extraHours: 1,
+      overtime50Hours: 0,
+      overtime100Hours: 1,
+      nightOvertimeHours: 1,
+      nightAllowanceHours: 1,
+      unresolved: true,
+    });
+  });
+});
+
+describe('scheduled versus physical night time', () => {
+  it.each(['FIRST', 'SECOND', 'NIGHT'] as const)(
+    'safely infers %s only from an exact canonical interval',
+    (shift) => {
+      const plan = { ...plannedIntervalForShift(shift), shift: null };
+      expect(
+        resolveScheduledNightAllowance({
+          planned: plan,
+          actual: plan,
+          fallbackNightAllowanceHours: 13,
+        }),
+      ).toEqual({
+        nightAllowanceHours: shift === 'NIGHT' ? 8 : 0,
+        shift,
+        inferred: true,
+        reviewReason: null,
+      });
+    },
+  );
+
+  it.each([
+    { planned: null, reviewReason: 'MISSING_PLAN' },
+    {
+      planned: { shift: null, startTime: '14:30', endTime: '22:30' },
+      reviewReason: 'NON_CANONICAL_PLAN',
+    },
+    {
+      planned: {
+        shift: 'NIGHT' as const,
+        startTime: '14:00',
+        endTime: '22:00',
+      },
+      reviewReason: 'CONFLICTING_PLAN',
+    },
+  ])('does not guess on $reviewReason', ({ planned, reviewReason }) => {
+    expect(
+      resolveScheduledNightAllowance({
+        planned,
+        actual: { startTime: '14:00', endTime: '23:00' },
+        fallbackNightAllowanceHours: 1,
+      }),
+    ).toEqual({
+      nightAllowanceHours: 1,
+      shift: null,
+      inferred: false,
+      reviewReason,
+    });
+  });
+
+  it('preserves the prior allowance when actual punches are missing', () => {
+    expect(
+      resolveScheduledNightAllowance({
+        planned: plannedIntervalForShift('NIGHT'),
+        actual: null,
+        fallbackNightAllowanceHours: 6,
+      }),
+    ).toMatchObject({
+      nightAllowanceHours: 6,
+      shift: 'NIGHT',
+      reviewReason: 'MISSING_ACTUAL',
+    });
+  });
+
+  it('preserves the prior allowance when actual punches are invalid', () => {
+    expect(
+      resolveScheduledNightAllowance({
+        planned: plannedIntervalForShift('NIGHT'),
+        actual: { startTime: '25:00', endTime: '06:00' },
+        fallbackNightAllowanceHours: 6,
+      }),
+    ).toMatchObject({
+      nightAllowanceHours: 6,
+      shift: 'NIGHT',
+      reviewReason: 'INVALID_ACTUAL',
+    });
+  });
+
+  it('preserves physical night information independently of payable night hours', () => {
+    const actual = { startTime: '14:00', endTime: '23:00' };
+    const planned = plannedIntervalForShift('SECOND');
+    expect(physicalNightHours(actual, planned)).toBe(1);
+    expect(
+      resolveScheduledNightAllowance({
+        planned,
+        actual,
+        fallbackNightAllowanceHours: 1,
+      }).nightAllowanceHours,
+    ).toBe(0);
+    expect(
+      physicalNightHours(
+        { startTime: '00:00', endTime: '06:00' },
+        plannedIntervalForShift('NIGHT'),
+      ),
+    ).toBe(6);
   });
 });
 

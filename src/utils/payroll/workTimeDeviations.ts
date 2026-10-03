@@ -21,6 +21,8 @@ export interface WorkTimeClassificationOverride {
 
 export interface DailyWorkTimeDeviationInput {
   planned?: PlannedWorkInterval | null;
+  nightAllowancePlanned?: PlannedWorkInterval | null;
+  nightAllowanceReviewReason?: ScheduledNightAllowanceReviewReason | null;
   actual?: ClockInterval | null;
   isWorkingDay: boolean;
   isSaturday?: boolean;
@@ -119,8 +121,92 @@ export function intervalHours(interval: ClockInterval): number {
   return roundHours((normalized.end - normalized.start) / 60);
 }
 
+export type ScheduledNightAllowanceReviewReason =
+  | 'MISSING_PLAN'
+  | 'NON_CANONICAL_PLAN'
+  | 'CONFLICTING_PLAN'
+  | 'AMBIGUOUS_SCHEDULE_CORRECTION'
+  | 'MISSING_ACTUAL'
+  | 'INVALID_ACTUAL';
+
+export interface ScheduledNightAllowance {
+  nightAllowanceHours: number;
+  shift: ActualWorkingShift | null;
+  inferred: boolean;
+  reviewReason: ScheduledNightAllowanceReviewReason | null;
+}
+
+/** Physical night time is source context, not necessarily payable night allowance. */
+export function physicalNightHours(
+  interval: ClockInterval,
+  relativePlan?: ClockInterval | null,
+): number {
+  const normalized = normalizeInterval(
+    interval,
+    relativePlan ? normalizeInterval(relativePlan) : undefined,
+  );
+  return nightOverlapHours(segment(normalized.start, normalized.end));
+}
+
+/** Normative night allowance covers only actual work within a reliable planned shift. */
+export function resolveScheduledNightAllowance({
+  planned,
+  actual,
+  fallbackNightAllowanceHours,
+}: {
+  planned?: PlannedWorkInterval | null;
+  actual?: ClockInterval | null;
+  fallbackNightAllowanceHours: number;
+}): ScheduledNightAllowance {
+  const preserveForReview = (
+    reviewReason: ScheduledNightAllowanceReviewReason,
+    shift: ActualWorkingShift | null = null,
+    inferred = false,
+  ): ScheduledNightAllowance => ({
+    nightAllowanceHours: fallbackNightAllowanceHours,
+    shift,
+    inferred,
+    reviewReason,
+  });
+  if (!planned) return preserveForReview('MISSING_PLAN');
+  const canonicalShift = (
+    Object.keys(DEFAULT_SHIFT_INTERVALS) as ActualWorkingShift[]
+  ).find(
+    (shift) =>
+      DEFAULT_SHIFT_INTERVALS[shift].startTime === planned.startTime &&
+      DEFAULT_SHIFT_INTERVALS[shift].endTime === planned.endTime,
+  );
+  if (!canonicalShift) return preserveForReview('NON_CANONICAL_PLAN');
+  if (planned.shift && planned.shift !== canonicalShift) {
+    return preserveForReview('CONFLICTING_PLAN');
+  }
+  const inferred = planned.shift == null;
+  if (!actual) {
+    return preserveForReview('MISSING_ACTUAL', canonicalShift, inferred);
+  }
+  if (
+    !isValidClockTime(actual.startTime) ||
+    !isValidClockTime(actual.endTime)
+  ) {
+    return preserveForReview('INVALID_ACTUAL', canonicalShift, inferred);
+  }
+  const plan = normalizeInterval(planned);
+  const fact = normalizeInterval(actual, plan);
+  const start = Math.max(plan.start, fact.start);
+  const end = Math.min(plan.end, fact.end);
+  return {
+    nightAllowanceHours:
+      end > start ? nightOverlapHours(segment(start, end)) : 0,
+    shift: canonicalShift,
+    inferred,
+    reviewReason: null,
+  };
+}
+
 export function resolveDailyWorkTimeDeviation({
   planned,
+  nightAllowancePlanned,
+  nightAllowanceReviewReason = null,
   actual,
   isWorkingDay,
   isSaturday = false,
@@ -173,6 +259,14 @@ export function resolveDailyWorkTimeDeviation({
   const actualNightHours = nightOverlapHours(
     segment(actualInterval.start, actualInterval.end),
   );
+  const scheduledNightAllowance = resolveScheduledNightAllowance({
+    planned:
+      nightAllowancePlanned === undefined ? planned : nightAllowancePlanned,
+    actual: actual ?? planned,
+    fallbackNightAllowanceHours: actualNightHours,
+  });
+  const nightReviewReason =
+    nightAllowanceReviewReason ?? scheduledNightAllowance.reviewReason;
   const dayIs100 = isSaturday || isSunday || isPublicHoliday;
 
   const overlap = intersectionHours(plannedInterval, actualInterval);
@@ -215,8 +309,10 @@ export function resolveDailyWorkTimeDeviation({
       coverableNiHours: 0,
       holidayWorkBonusEligible: isPublicHoliday && extraHours > 0,
       nightOvertimeHours: roundHours(overtime100FromNight),
-      nightAllowanceHours: actualNightHours,
-      unresolved: false,
+      nightAllowanceHours: nightAllowanceReviewReason
+        ? actualNightHours
+        : scheduledNightAllowance.nightAllowanceHours,
+      unresolved: actualNightHours > 0 && nightReviewReason !== null,
     },
     classificationOverride,
   );
@@ -350,7 +446,7 @@ function applyClassificationOverride(
     overtime50Hours: override.overtime50Hours ?? calculated.overtime50Hours,
     overtime100Hours: override.overtime100Hours ?? calculated.overtime100Hours,
     coverableNiHours: override.coverableNiHours ?? calculated.coverableNiHours,
-    unresolved: false,
+    unresolved: calculated.unresolved,
   };
 }
 
