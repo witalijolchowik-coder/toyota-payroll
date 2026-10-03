@@ -60,8 +60,10 @@ export function auditNightShift(input: NightShiftAuditInput): {
       included,
       effectiveShift: null,
       inferred: false,
-      reviewReason: null,
-      status: 'NON_WORKING_DAY_UNCHANGED',
+      reviewReason: input.reviewReason ?? null,
+      status: input.reviewReason
+        ? 'CONFLICTING_PLAN'
+        : 'NON_WORKING_DAY_UNCHANGED',
     };
   }
   const resolved = resolveScheduledNightAllowance({

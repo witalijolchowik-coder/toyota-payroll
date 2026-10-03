@@ -71,6 +71,18 @@ describe('read-only night shift audit', () => {
       reviewReason: null,
     });
   });
+  it('does not hide conflicting ACTIVE corrections behind a day off', () => {
+    expect(
+      auditNightShift({
+        ...base,
+        isWorkingDay: false,
+        reviewReason: 'AMBIGUOUS_SCHEDULE_CORRECTION',
+      }),
+    ).toMatchObject({
+      status: 'CONFLICTING_PLAN',
+      reviewReason: 'AMBIGUOUS_SCHEDULE_CORRECTION',
+    });
+  });
   it('excludes unrelated daytime dates', () => {
     expect(
       auditNightShift({
