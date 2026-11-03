@@ -1122,6 +1122,7 @@ service cloud.firestore {
         && request.resource.data.teta_number == resource.data.teta_number
         && request.resource.data.sequence_id == resource.data.sequence_id
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'overlap_confirmed_soz',
           'start_date', 'end_date', 'status', 'note',
           'updated_at', 'updated_by'
         ])
