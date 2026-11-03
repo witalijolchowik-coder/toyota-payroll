@@ -508,7 +508,13 @@ function ShiftIndicator({
   t: ReturnType<typeof useTranslations>;
 }) {
   const color = shift
-    ? { RED: '#d2101e', WHITE: '#64748b', BLUE: '#2e90fa' }[shift]
+    ? {
+        RED: '#d2101e',
+        WHITE: '#64748b',
+        BLUE: '#2e90fa',
+        YELLOW: '#a16207',
+        ORANGE: '#ea580c',
+      }[shift]
     : '#98a2b3';
   const label = shift
     ? t.employees.table.shiftShort[shift]

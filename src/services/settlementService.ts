@@ -10,6 +10,8 @@ import {
 } from 'firebase/firestore';
 
 import { auth } from '../config/firebase';
+import { loadBrigadeScheduleDays } from './brigadeScheduleService';
+import type { BrigadeScheduleDay } from '../utils/schedule/brigadeSchedule';
 import { getMonthDateRange } from '../features/settlement/monthUtils';
 import type {
   Absence,
@@ -81,6 +83,7 @@ export class SettlementServiceError extends Error {
 }
 
 export interface SettlementMonthData {
+  brigadeScheduleDays?: BrigadeScheduleDay[];
   month: PayrollMonth;
   employees: Employee[];
   employeeEntitlements: EmployeeEntitlement[];
@@ -394,6 +397,20 @@ export async function loadSettlementMonth(
 
   return {
     month,
+    ...(departments.some(
+      (d) =>
+        d.brigadeSchedulingFrom &&
+        d.brigadeSchedulingFrom.slice(0, 7) <= monthId,
+    )
+      ? {
+          brigadeScheduleDays: await optionalSettlementLayer(
+            () => loadBrigadeScheduleDays(monthId),
+            [] as BrigadeScheduleDay[],
+            'brigadeScheduleDays',
+            sourceFailures,
+          ),
+        }
+      : {}),
     employees,
     employeeEntitlements,
     employeeAssignments,

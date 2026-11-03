@@ -263,6 +263,8 @@ export const employeeConverter = createConverter<EmployeeDocument>(
             'RED',
             'WHITE',
             'BLUE',
+            'YELLOW',
+            'ORANGE',
           ] as const),
     employment_start_date: readNullableTimestamp(
       data,
@@ -302,6 +304,15 @@ export const employmentEndEventConverter =
 
 export const departmentConverter = createConverter<DepartmentDocument>(
   (data, path) => ({
+    ...(data.brigade_scheduling_from
+      ? {
+          brigade_scheduling_from: readNonEmptyString(
+            data,
+            'brigade_scheduling_from',
+            path,
+          ),
+        }
+      : {}),
     name: readNonEmptyString(data, 'name', path),
     shift_mode: readEnum(data, 'shift_mode', path, [
       'UNKNOWN',
@@ -362,6 +373,8 @@ export const employeeAssignmentConverter =
             'RED',
             'WHITE',
             'BLUE',
+            'YELLOW',
+            'ORANGE',
           ] as const),
     valid_from: readNonEmptyString(data, 'valid_from', path),
     valid_to: readNullableString(data, 'valid_to', path),

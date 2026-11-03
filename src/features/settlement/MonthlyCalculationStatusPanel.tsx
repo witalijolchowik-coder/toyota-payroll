@@ -50,6 +50,8 @@ export function MonthlyCalculationStatusPanel({
   monthLabel,
   onReload,
   finalExportPackage,
+  manualRecalculationOnly = false,
+  calculationAllowed = true,
 }: {
   monthId: MonthId;
   month: PayrollMonth;
@@ -59,6 +61,8 @@ export function MonthlyCalculationStatusPanel({
   monthLabel: string;
   onReload: () => Promise<void>;
   finalExportPackage: SettlementExportPackage;
+  manualRecalculationOnly?: boolean;
+  calculationAllowed?: boolean;
 }) {
   const t = useTranslations();
   const [working, setWorking] = useState(false);
@@ -103,7 +107,13 @@ export function MonthlyCalculationStatusPanel({
   }, [monthId, month.isSettled]);
 
   useEffect(() => {
-    if (month.isSettled || lastAttempt.current === inputHash) return;
+    if (
+      manualRecalculationOnly ||
+      !calculationAllowed ||
+      month.isSettled ||
+      lastAttempt.current === inputHash
+    )
+      return;
     lastAttempt.current = inputHash;
     const timeout = window.setTimeout(() => {
       setWorking(true);
@@ -123,6 +133,8 @@ export function MonthlyCalculationStatusPanel({
     return () => window.clearTimeout(timeout);
   }, [
     drafts,
+    manualRecalculationOnly,
+    calculationAllowed,
     inputHash,
     month.isSettled,
     monthId,
@@ -131,6 +143,7 @@ export function MonthlyCalculationStatusPanel({
   ]);
 
   const recalculate = async () => {
+    if (!calculationAllowed) return;
     setWorking(true);
     setError(null);
     try {
@@ -183,6 +196,7 @@ export function MonthlyCalculationStatusPanel({
   };
 
   const closeMonth = async () => {
+    if (!calculationAllowed) return;
     if (
       readiness.warnings.length > 0 &&
       !window.confirm(t.settlement.calculation.lockConfirmation)
@@ -241,6 +255,19 @@ export function MonthlyCalculationStatusPanel({
       <Card>
         <CardContent sx={{ px: 2, py: '14px !important' }}>
           <Stack spacing={1}>
+            {manualRecalculationOnly ? (
+              <Alert severity="info">
+                Miesiąc obejmuje dział z planem brygadowym. Wyniki historyczne
+                nie są zapisywane automatycznie. Użyj „Przelicz miesiąc” dopiero
+                po sprawdzeniu planu.
+              </Alert>
+            ) : null}
+            {!calculationAllowed ? (
+              <Alert severity="warning">
+                Brak planu niektórych dni brygadowych. Uzupełnij jawne dni pracy
+                i dni wolne przed przeliczeniem lub zamknięciem miesiąca.
+              </Alert>
+            ) : null}
             <Stack
               direction={{ xs: 'column', lg: 'row' }}
               useFlexGap
@@ -293,7 +320,7 @@ export function MonthlyCalculationStatusPanel({
                 <Button
                   size="small"
                   startIcon={<RefreshOutlined />}
-                  disabled={working || month.isSettled}
+                  disabled={working || month.isSettled || !calculationAllowed}
                   onClick={() => void recalculate()}
                 >
                   {t.settlement.calculation.recalculate}

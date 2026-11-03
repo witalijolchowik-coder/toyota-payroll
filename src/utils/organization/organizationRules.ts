@@ -10,6 +10,8 @@ export const EMPLOYEE_COLOR_SHIFTS: EmployeeColorShift[] = [
   'RED',
   'WHITE',
   'BLUE',
+  'YELLOW',
+  'ORANGE',
 ];
 
 export const ACTUAL_WORKING_SHIFTS: ActualWorkingShift[] = [
@@ -275,7 +277,13 @@ export function canonicalDepartmentFunctionalGroup(
 export function isEmployeeColorShift(
   value: string | null,
 ): value is EmployeeColorShift {
-  return value === 'RED' || value === 'WHITE' || value === 'BLUE';
+  return (
+    value === 'RED' ||
+    value === 'WHITE' ||
+    value === 'BLUE' ||
+    value === 'YELLOW' ||
+    value === 'ORANGE'
+  );
 }
 
 export function isDepartmentShiftMode(
@@ -301,7 +309,7 @@ export function allowedColorShiftsForMode(
   if (mode === 'THREE_SHIFT') {
     return ['RED', 'WHITE', 'BLUE'];
   }
-  return [...EMPLOYEE_COLOR_SHIFTS];
+  return ['RED', 'WHITE', 'BLUE'];
 }
 
 export function resolveWeeklyRotationAssignment(

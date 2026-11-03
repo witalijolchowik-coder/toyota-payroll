@@ -268,11 +268,14 @@ export function resolveBalanceCalendarDeviation(
   isPublicHoliday: boolean,
   plannedDay?: PlannedScheduleDay,
 ): BalanceDeviationResult {
-  const protectedPlan = plannedDay?.source === 'manual-correction';
+  const protectedPlan =
+    plannedDay?.source === 'manual-correction' ||
+    plannedDay?.brigadeScheduled === true;
   const planned = protectedPlan
     ? plannedDay.plannedStartTime && plannedDay.plannedEndTime
       ? {
           shift: plannedDay.shift,
+          ...(plannedDay.brigadeScheduled ? { explicitBrigadePlan: true } : {}),
           startTime: plannedDay.plannedStartTime,
           endTime: plannedDay.plannedEndTime,
         }

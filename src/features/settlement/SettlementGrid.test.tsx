@@ -61,6 +61,60 @@ const department: Department = {
 };
 
 describe('SettlementGrid', () => {
+  it('displays an explicit twelve-hour weekend brigade plan and a weekday day off', () => {
+    const brigadeDepartment = {
+      ...department,
+      brigadeSchedulingFrom: '2026-10-01',
+    };
+    const days = createCalendarDays('2026-10', {
+      today: new Date('2026-11-01'),
+    }).filter((d) => ['2026-10-03', '2026-10-05'].includes(d.isoDate));
+    const brigadeScheduleDays = [
+      {
+        id: 'weekend',
+        departmentId: department.id,
+        brigade: 'RED' as const,
+        employeeId: null,
+        date: '2026-10-03',
+        kind: 'NIGHT' as const,
+        startTime: '18:00',
+        endTime: '06:00',
+        plannedHours: 12,
+        status: 'ACTIVE' as const,
+        note: null,
+      },
+      {
+        id: 'weekday',
+        departmentId: department.id,
+        brigade: 'RED' as const,
+        employeeId: null,
+        date: '2026-10-05',
+        kind: 'DAY_OFF' as const,
+        startTime: null,
+        endTime: null,
+        plannedHours: 0,
+        status: 'ACTIVE' as const,
+        note: null,
+      },
+    ];
+    const props = {
+      employees: [employee],
+      departments: [brigadeDepartment],
+      dailyValues: [],
+      days,
+      brigadeScheduleDays,
+    };
+    const { rerender } = render(<SettlementGrid {...props} />);
+    const cells = () =>
+      within(screen.getByText('Jan Kowalski').closest('tr')!).getAllByRole(
+        'cell',
+      );
+    expect(cells()[1]).toHaveTextContent('12 h');
+    expect(cells()[2]).toHaveTextContent('0 h');
+    rerender(<SettlementGrid {...props} displayMode="shifts" />);
+    expect(cells()[1]).toHaveTextContent('12 / N');
+    expect(cells()[2]).toHaveTextContent('W');
+  });
   it('shows the manual absence instead of Balance work and restores raw work after cancellation', () => {
     const attendance = balanceDaily(
       '2026-09-10',

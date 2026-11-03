@@ -92,6 +92,7 @@ export interface EmploymentEndEvent extends ModificationMetadata {
 }
 
 export interface Department extends ModificationMetadata {
+  brigadeSchedulingFrom?: IsoDate | null;
   id: DepartmentId;
   name: string;
   shiftMode: DepartmentShiftMode;

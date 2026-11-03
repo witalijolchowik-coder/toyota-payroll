@@ -74,6 +74,7 @@ export interface MonthCreateInput {
 }
 
 export interface DepartmentCreateInput {
+  brigadeSchedulingFrom?: IsoDate | null;
   id: DepartmentId;
   name: string;
   shiftMode: DepartmentShiftMode;
@@ -96,7 +97,7 @@ export interface DepartmentShiftCorrectionCreateInput {
 
 export type DepartmentUpdateInput = Pick<
   DepartmentCreateInput,
-  'name' | 'shiftMode' | 'active'
+  'name' | 'shiftMode' | 'active' | 'brigadeSchedulingFrom'
 >;
 
 export interface EmployeeReferenceInput {

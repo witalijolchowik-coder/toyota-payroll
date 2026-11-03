@@ -196,7 +196,7 @@ service cloud.firestore {
           || isNullableString(data.department_id))
         && (!data.keys().hasAny(['shift_assignment'])
           || data.shift_assignment == null
-          || data.shift_assignment in ['RED', 'WHITE', 'BLUE'])
+          || data.shift_assignment in ['RED', 'WHITE', 'BLUE', 'YELLOW', 'ORANGE'])
         && isNullableTimestamp(data.employment_start_date)
         && isNullableTimestamp(data.employment_end_date)
         && hasModificationMetadata(data);
@@ -213,6 +213,7 @@ service cloud.firestore {
           'updated_by'
         ])
         && data.keys().hasOnly([
+          'brigade_scheduling_from',
           'name',
           'shift_mode',
           'active',
@@ -224,6 +225,7 @@ service cloud.firestore {
           'updated_by'
         ])
         && isNonEmptyString(data.name)
+        && (!data.keys().hasAny(['brigade_scheduling_from']) || data.brigade_scheduling_from == null || isIsoDate(data.brigade_scheduling_from))
         && data.shift_mode in ['UNKNOWN', 'TWO_SHIFT', 'THREE_SHIFT']
         && data.active is bool
         && (!data.keys().hasAny(['rotation_anchor_week_start'])
@@ -345,7 +347,7 @@ service cloud.firestore {
         && employeeReferenceExists(data)
         && isNullableString(data.department_id)
         && (data.shift_assignment == null
-          || data.shift_assignment in ['RED', 'WHITE', 'BLUE'])
+          || data.shift_assignment in ['RED', 'WHITE', 'BLUE', 'YELLOW', 'ORANGE'])
         && isIsoDate(data.valid_from)
         && (data.valid_to == null || isIsoDate(data.valid_to))
         && (data.valid_to == null || data.valid_to >= data.valid_from)
@@ -1065,6 +1067,7 @@ service cloud.firestore {
         && validDepartment(request.resource.data)
         && hasUpdateMetadata(request.resource.data)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'brigade_scheduling_from',
           'name',
           'shift_mode',
           'active',
@@ -1644,6 +1647,34 @@ service cloud.firestore {
         allow delete: if isAuthenticated()
           && monthExistsAndIsOpen(monthId)
           && resource.data.source == 'manual';
+      }
+
+      match /brigadeScheduleDays/{dayId} {
+        function validBrigadeDay(data) {
+          return data.keys().hasAll(['department_id','brigade','employee_id','date','kind','start_time','end_time','planned_hours','status','note','created_at','created_by','updated_at','updated_by'])
+            && data.keys().hasOnly(['department_id','brigade','employee_id','date','kind','start_time','end_time','planned_hours','status','note','created_at','created_by','updated_at','updated_by'])
+            && isNonEmptyString(data.department_id)
+            && data.brigade in ['RED','WHITE','BLUE','YELLOW','ORANGE']
+            && (data.employee_id == null || (isNonEmptyString(data.employee_id) && exists(/databases/$(database)/documents/employees/$(data.employee_id))))
+            && isIsoDate(data.date) && data.date[0:7] == monthId
+            && dayId == data.department_id + '_' + data.brigade + '_' + (data.employee_id == null ? 'brigade' : data.employee_id) + '_' + data.date
+            && exists(/databases/$(database)/documents/departments/$(data.department_id))
+            && get(/databases/$(database)/documents/departments/$(data.department_id)).data.active == true
+            && get(/databases/$(database)/documents/departments/$(data.department_id)).data.brigade_scheduling_from <= data.date
+            && data.status in ['ACTIVE','CANCELLED'] && isNullableString(data.note)
+            && data.planned_hours is number && data.planned_hours >= 0 && data.planned_hours <= 24
+            && ((data.kind == 'DAY_OFF' && data.planned_hours == 0 && data.start_time == null && data.end_time == null)
+              || (data.kind in ['DAY','NIGHT'] && data.planned_hours > 0 && isClockTime(data.start_time) && isClockTime(data.end_time) && data.start_time != data.end_time
+                && data.planned_hours*60 >= ((int(data.end_time[0:2])*60+int(data.end_time[3:5])-int(data.start_time[0:2])*60-int(data.start_time[3:5])+1440)%1440)-0.001
+                && data.planned_hours*60 <= ((int(data.end_time[0:2])*60+int(data.end_time[3:5])-int(data.start_time[0:2])*60-int(data.start_time[3:5])+1440)%1440)+0.001))
+            && hasModificationMetadata(data);
+        }
+        allow read: if isAuthenticated();
+        allow create: if isAuthenticated() && monthExistsAndIsOpen(monthId) && validBrigadeDay(request.resource.data) && request.resource.data.status == 'ACTIVE' && hasCreateMetadata(request.resource.data);
+        allow update: if isAuthenticated() && monthExistsAndIsOpen(monthId) && validBrigadeDay(request.resource.data) && hasUpdateMetadata(request.resource.data)
+          && request.resource.data.department_id == resource.data.department_id && request.resource.data.brigade == resource.data.brigade
+          && request.resource.data.employee_id == resource.data.employee_id && request.resource.data.date == resource.data.date;
+        allow delete: if false;
       }
 
       match /scheduleCorrections/{correctionId} {

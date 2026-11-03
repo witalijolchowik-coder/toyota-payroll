@@ -46,6 +46,12 @@ export function DepartmentFormDialog({
     department?.shiftMode ?? 'UNKNOWN',
   );
   const [active, setActive] = useState(department?.active ?? true);
+  const [brigadeEnabled, setBrigadeEnabled] = useState(
+    Boolean(department?.brigadeSchedulingFrom),
+  );
+  const [brigadeFrom, setBrigadeFrom] = useState(
+    department?.brigadeSchedulingFrom ?? '',
+  );
   const [showValidation, setShowValidation] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(false);
@@ -56,8 +62,13 @@ export function DepartmentFormDialog({
   );
 
   const handleSubmit = async () => {
+    const brigadeConfigurationChanged =
+      brigadeEnabled || Boolean(department?.brigadeSchedulingFrom);
     setShowValidation(true);
-    if (!isValidDepartmentName(name)) {
+    if (
+      !isValidDepartmentName(name) ||
+      (brigadeEnabled && !/^\d{4}-\d{2}-\d{2}$/.test(brigadeFrom))
+    ) {
       return;
     }
 
@@ -70,12 +81,18 @@ export function DepartmentFormDialog({
               name: normalizedName,
               shiftMode,
               active,
+              ...(brigadeConfigurationChanged
+                ? { brigadeSchedulingFrom: brigadeEnabled ? brigadeFrom : null }
+                : {}),
             }
           : {
               id: generatedId,
               name: normalizedName,
               shiftMode,
               active,
+              ...(brigadeConfigurationChanged
+                ? { brigadeSchedulingFrom: brigadeEnabled ? brigadeFrom : null }
+                : {}),
             },
       );
       onClose();
@@ -153,6 +170,32 @@ export function DepartmentFormDialog({
               {t.organization.shiftModes.THREE_SHIFT}
             </MenuItem>
           </TextField>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={brigadeEnabled}
+                onChange={(e) => setBrigadeEnabled(e.target.checked)}
+              />
+            }
+            label="Grafik brygadowy — jawny plan dni (opcjonalnie)"
+          />
+          {brigadeEnabled ? (
+            <>
+              <TextField
+                type="date"
+                label="Grafik brygadowy obowiązuje od"
+                value={brigadeFrom}
+                onChange={(e) => setBrigadeFrom(e.target.value)}
+                slotProps={{ inputLabel: { shrink: true } }}
+                required
+              />
+              <Alert severity="warning">
+                Tylko ten dział: nominał z zapisanych planów dni. Brak planu
+                blokuje przeliczenie. Zmiana nie przelicza historycznych
+                wyników.
+              </Alert>
+            </>
+          ) : null}
           <FormControlLabel
             control={
               <Switch

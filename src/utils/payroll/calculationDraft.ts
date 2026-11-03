@@ -61,6 +61,7 @@ import {
 } from '../employees';
 
 export type PayrollDraftWarningCode =
+  | 'missing-brigade-schedule'
   | 'employee-not-participating'
   | 'missing-employment-start'
   | 'missing-first-toyota-employment-date'
@@ -735,6 +736,13 @@ export function calculateEmployeeMonthlyDraft({
   if (participatesInMonth) {
     createPayrollMonthCalendar(monthId, calendarOptions).forEach((day) => {
       const plannedDay = plannedScheduleByDate.get(day.isoDate);
+      if (plannedDay?.brigadeScheduled && plannedDay.status === 'UNRESOLVED')
+        warnings.push({
+          code: 'missing-brigade-schedule',
+          date: day.isoDate,
+          message:
+            'Brak jawnie skonfigurowanego planu brygady — uzupełnij plan przed przeliczeniem.',
+        });
       const isPlannedWorkingDay = plannedDay
         ? plannedDay.status === 'WORKING' || plannedDay.status === 'BHP'
         : day.isWorkingDay;
@@ -1437,6 +1445,7 @@ export function calculateMonthlyDrafts({
 function plannedIntervalForScheduleDay(day?: PlannedScheduleDay) {
   if (day?.plannedStartTime && day.plannedEndTime && day.shift) {
     return {
+      ...(day.brigadeScheduled ? { explicitBrigadePlan: true } : {}),
       shift: day.shift,
       startTime: day.plannedStartTime,
       endTime: day.plannedEndTime,

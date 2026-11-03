@@ -93,6 +93,7 @@ import { SettlementGrid } from './SettlementGrid';
 import { SettlementLegend } from './SettlementLegend';
 import { useSettlementMonth } from './useSettlementMonth';
 import { MonthlyCalculationStatusPanel } from './MonthlyCalculationStatusPanel';
+import { BrigadeCalendarPanel } from './BrigadeCalendarPanel';
 import { createMonthlyCalculationInputHash } from '../../services/monthlyCalculationService';
 
 interface SettlementMonthViewProps {
@@ -265,6 +266,7 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
           publicHolidayNames,
           assignments: data.employeeAssignments,
           corrections: data.scheduleCorrections,
+          brigadeScheduleDays: data.brigadeScheduleDays,
           departmentShiftCorrections: data.departmentShiftCorrections,
           shiftHoursVersions: data.shiftHoursVersions,
         },
@@ -331,6 +333,9 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
     entitlements: data.employeeEntitlements,
     assignments: data.employeeAssignments,
     scheduleCorrections: data.scheduleCorrections,
+    ...(data.brigadeScheduleDays
+      ? { brigadeScheduleDays: data.brigadeScheduleDays }
+      : {}),
     departments: data.departments,
     shiftHoursVersions: data.shiftHoursVersions,
     departmentShiftCorrections: data.departmentShiftCorrections,
@@ -590,6 +595,22 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
       {participatingEmployees.length > 0 ? (
         <>
           <MonthlyCalculationStatusPanel
+            manualRecalculationOnly={data.departments.some(
+              (d) =>
+                d.brigadeSchedulingFrom &&
+                participatingEmployees.some(
+                  (e) =>
+                    e.departmentId === d.id ||
+                    data.employeeAssignments.some(
+                      (a) => a.employeeId === e.id && a.departmentId === d.id,
+                    ),
+                ),
+            )}
+            calculationAllowed={
+              !calculationDrafts.some((d) =>
+                d.warnings.some((w) => w.code === 'missing-brigade-schedule'),
+              )
+            }
             monthId={monthId}
             month={data.month}
             drafts={calculationDrafts}
@@ -598,6 +619,16 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
             monthLabel={monthFormatter.format(range.start)}
             onReload={reload}
             finalExportPackage={finalExportPackage}
+          />
+          <BrigadeCalendarPanel
+            key={monthId}
+            monthId={monthId}
+            departments={data.departments}
+            employees={participatingEmployees}
+            assignments={data.employeeAssignments}
+            plans={data.brigadeScheduleDays ?? []}
+            locked={data.month.isSettled}
+            onReload={reload}
           />
           <CalendarConstructorToolbar
             selectedTool={selectedTool}
@@ -679,6 +710,12 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
                     {t.organization.shifts.WHITE}
                   </MenuItem>
                   <MenuItem value="BLUE">{t.organization.shifts.BLUE}</MenuItem>
+                  <MenuItem value="YELLOW">
+                    {t.organization.shifts.YELLOW}
+                  </MenuItem>
+                  <MenuItem value="ORANGE">
+                    {t.organization.shifts.ORANGE}
+                  </MenuItem>
                 </TextField>
                 <TextField
                   select
@@ -782,6 +819,7 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
             departments={data.departments}
             employeeAssignments={data.employeeAssignments}
             scheduleCorrections={data.scheduleCorrections}
+            brigadeScheduleDays={data.brigadeScheduleDays}
             departmentShiftCorrections={data.departmentShiftCorrections}
             shiftHoursVersions={data.shiftHoursVersions}
             publicHolidays={publicHolidays}
@@ -1009,6 +1047,7 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
             options: {
               assignments: data.employeeAssignments,
               corrections: data.scheduleCorrections,
+              brigadeScheduleDays: data.brigadeScheduleDays,
               departmentShiftCorrections: data.departmentShiftCorrections,
               shiftHoursVersions: data.shiftHoursVersions,
               publicHolidays,

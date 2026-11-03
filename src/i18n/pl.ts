@@ -459,6 +459,8 @@ export const pl = {
         RED: 'Red',
         WHITE: 'White',
         BLUE: 'Blue',
+        YELLOW: 'Yellow',
+        ORANGE: 'Orange',
       },
       status: 'Status',
       actions: 'Działania',
@@ -1118,6 +1120,8 @@ export const pl = {
       RED: 'Zmiana Red',
       WHITE: 'Zmiana White',
       BLUE: 'Zmiana Blue',
+      YELLOW: 'Brygada Yellow',
+      ORANGE: 'Brygada Orange',
     },
     shiftModes: {
       UNKNOWN: 'Nie skonfigurowano',
@@ -1980,6 +1984,8 @@ export const pl = {
           'Automatycznie wykryta premia świąteczna wymaga potwierdzenia koordynatora.',
         'critical-read-failure':
           'Nie udało się odczytać części danych źródłowych. Wartości zależne pozostają nierozstrzygnięte.',
+        'missing-brigade-schedule':
+          'Brak jawnego planu brygady — uzupełnij dni pracy i dni wolne.',
       },
     },
     review: {

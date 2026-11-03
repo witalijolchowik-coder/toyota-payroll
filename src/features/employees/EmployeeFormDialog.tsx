@@ -348,6 +348,12 @@ export function EmployeeFormDialog({
                 <MenuItem value="RED">{t.organization.shifts.RED}</MenuItem>
                 <MenuItem value="WHITE">{t.organization.shifts.WHITE}</MenuItem>
                 <MenuItem value="BLUE">{t.organization.shifts.BLUE}</MenuItem>
+                <MenuItem value="YELLOW">
+                  {t.organization.shifts.YELLOW}
+                </MenuItem>
+                <MenuItem value="ORANGE">
+                  {t.organization.shifts.ORANGE}
+                </MenuItem>
               </TextField>
             </Stack>
 

@@ -2504,6 +2504,117 @@ describe('Firestore security rules', () => {
     await assertFails(deleteDoc(setting));
   });
 
+  it('accepts five color assignments and explicit department opt-in without changing rotation rules', async () => {
+    await seedEmployee('employee-1');
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const department = doc(firestore, 'departments/headliner-bmw');
+    await assertSucceeds(
+      setDoc(department, {
+        name: 'Headliner BMW',
+        shift_mode: 'THREE_SHIFT',
+        active: true,
+        brigade_scheduling_from: '2026-10-01',
+        ...modificationMetadata(uid),
+      }),
+    );
+    for (const color of ['YELLOW', 'ORANGE'])
+      await assertSucceeds(
+        updateDoc(doc(firestore, 'employees/employee-1'), {
+          shift_assignment: color,
+          updated_at: serverTimestamp(),
+          updated_by: uid,
+        }),
+      );
+    await assertSucceeds(
+      setDoc(doc(firestore, 'employeeAssignments/orange'), {
+        employee_id: 'employee-1',
+        teta_number: 'TETA-1001',
+        department_id: 'headliner-bmw',
+        shift_assignment: 'ORANGE',
+        valid_from: '2026-10-01',
+        valid_to: null,
+        status: 'ACTIVE',
+        note: null,
+        ...modificationMetadata(uid),
+      }),
+    );
+    await assertFails(
+      updateDoc(department, {
+        brigade_scheduling_from: 'not-a-date',
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+  });
+  it('saves explicit twelve-hour brigade days and rejects unconfigured, inconsistent and locked writes', async () => {
+    await seedMonth('2026-10', false);
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    await testEnvironment.withSecurityRulesDisabled(async (context) => {
+      await setDoc(doc(context.firestore(), 'departments/headliner-bmw'), {
+        active: true,
+        brigade_scheduling_from: '2026-10-01',
+      });
+      await setDoc(doc(context.firestore(), 'departments/non-brigade'), {
+        active: true,
+      });
+    });
+    const ref = doc(
+      firestore,
+      'months/2026-10/brigadeScheduleDays/headliner-bmw_YELLOW_brigade_2026-10-04',
+    );
+    const value = {
+      department_id: 'headliner-bmw',
+      brigade: 'YELLOW',
+      employee_id: null,
+      date: '2026-10-04',
+      kind: 'NIGHT',
+      start_time: '18:00',
+      end_time: '06:00',
+      planned_hours: 12,
+      status: 'ACTIVE',
+      note: null,
+      ...modificationMetadata(uid),
+    };
+    await assertSucceeds(setDoc(ref, value));
+    await assertFails(
+      updateDoc(ref, {
+        planned_hours: 8,
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertSucceeds(
+      updateDoc(ref, {
+        kind: 'DAY_OFF',
+        start_time: null,
+        end_time: null,
+        planned_hours: 0,
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertFails(
+      setDoc(
+        doc(
+          firestore,
+          'months/2026-10/brigadeScheduleDays/non-brigade_YELLOW_brigade_2026-10-04',
+        ),
+        { ...value, department_id: 'non-brigade' },
+      ),
+    );
+    await assertFails(deleteDoc(ref));
+    await seedMonth('2026-10', true);
+    await assertFails(
+      updateDoc(ref, {
+        note: 'locked',
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+  });
+
   it('allows live-shaped contract history and soft cancellation for an approved user', async () => {
     await seedEmployee('employee-1');
     const uid = 'coordinator-1';

@@ -125,6 +125,9 @@ export async function createDepartment(
   }
 
   await setDoc(doc(repositories.departments, normalized.id), {
+    ...(normalized.brigadeSchedulingFrom
+      ? { brigade_scheduling_from: normalized.brigadeSchedulingFrom }
+      : {}),
     name: canonical.uiName,
     shift_mode: normalized.shiftMode,
     active: normalized.active,
@@ -153,6 +156,9 @@ export async function updateDepartment(
   }
 
   await updateDoc(doc(repositories.departments, departmentId), {
+    ...('brigadeSchedulingFrom' in normalized
+      ? { brigade_scheduling_from: normalized.brigadeSchedulingFrom ?? null }
+      : {}),
     name: canonical.uiName,
     shift_mode: normalized.shiftMode,
     active: normalized.active,

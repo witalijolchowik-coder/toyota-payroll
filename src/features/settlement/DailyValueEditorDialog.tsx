@@ -115,7 +115,7 @@ export function DailyValueEditorDialog({
   const facts = value.balanceSourceFacts;
   const sourcePlan = facts ? balancePlannedInterval(facts) : null;
   const isNormativeWorkingDay =
-    facts && !activeScheduleCorrection
+    facts && !activeScheduleCorrection && !plannedDay?.brigadeScheduled
       ? facts.planned_hours > 0
       : plannedDay
         ? plannedDay.status === 'WORKING' || plannedDay.status === 'BHP'
@@ -123,7 +123,7 @@ export function DailyValueEditorDialog({
   const isExtraWorkDay =
     value.workTimeCorrection?.workContext === 'EXTRA' || !isNormativeWorkingDay;
   const plannedHours =
-    facts && !activeScheduleCorrection
+    facts && !activeScheduleCorrection && !plannedDay?.brigadeScheduled
       ? facts.planned_hours
       : (plannedDay?.hours ?? (day.isWorkingDay ? 8 : 0));
   const defaultHours =
@@ -138,7 +138,7 @@ export function DailyValueEditorDialog({
   );
   const initialPlannedShift = isExtraWorkDay
     ? ''
-    : activeScheduleCorrection
+    : activeScheduleCorrection || plannedDay?.brigadeScheduled
       ? plannedShiftFromSchedule
       : (value.workTimeCorrection?.plannedShift ??
         (facts ? (sourcePlan?.shift ?? '') : plannedShiftFromSchedule));
@@ -177,11 +177,19 @@ export function DailyValueEditorDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const employeeName = `${employee.lastName} ${employee.firstName}`;
   const plannedInterval =
-    isNormativeWorkingDay && plannedShift
-      ? shiftIntervals[plannedShift]
-      : sourceTimesUnchanged
-        ? sourcePlan
-        : null;
+    plannedDay?.brigadeScheduled &&
+    plannedShift === plannedDay.shift &&
+    plannedDay.plannedStartTime &&
+    plannedDay.plannedEndTime
+      ? {
+          startTime: plannedDay.plannedStartTime,
+          endTime: plannedDay.plannedEndTime,
+        }
+      : isNormativeWorkingDay && plannedShift
+        ? shiftIntervals[plannedShift]
+        : sourceTimesUnchanged
+          ? sourcePlan
+          : null;
   const selectedPlannedHours = plannedInterval
     ? intervalHours(plannedInterval)
     : plannedHours;

@@ -122,6 +122,9 @@ export function mapDepartmentDocument(
   document: DepartmentDocument,
 ): Department {
   return {
+    ...(document.brigade_scheduling_from
+      ? { brigadeSchedulingFrom: document.brigade_scheduling_from }
+      : {}),
     id,
     name: document.name,
     shiftMode: document.shift_mode,

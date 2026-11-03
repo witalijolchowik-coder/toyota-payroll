@@ -21,6 +21,11 @@ import {
   resolveDepartmentRotationShift,
   resolveShiftInterval,
 } from './shiftConfiguration';
+import {
+  isBrigadeScheduleEnabled,
+  resolveBrigadeScheduleDay,
+  type BrigadeScheduleDay,
+} from './brigadeSchedule';
 
 export type PlannedScheduleSource =
   | 'automatic'
@@ -39,6 +44,7 @@ export type PlannedScheduleStatus =
   | 'UNRESOLVED';
 
 export interface PlannedScheduleDay {
+  brigadeScheduled?: true;
   employeeId: string;
   date: IsoDate;
   status: PlannedScheduleStatus;
@@ -58,6 +64,7 @@ export interface PlannedScheduleDay {
 }
 
 export interface MonthlyScheduleOptions {
+  brigadeScheduleDays?: readonly BrigadeScheduleDay[];
   publicHolidays?: ReadonlySet<IsoDate>;
   publicHolidayNames?: ReadonlyMap<IsoDate, string>;
   overrides?: PayrollCalendarOverrideMap;
@@ -129,7 +136,7 @@ export function generateEmployeeMonthlySchedule({
 
   return days.map((day) => {
     const correction = correctionsByDate.get(day.isoDate);
-    const base = resolveAutomaticScheduleDay({
+    let base = resolveAutomaticScheduleDay({
       employee,
       day,
       departmentsById,
@@ -139,12 +146,59 @@ export function generateEmployeeMonthlySchedule({
       departmentShiftCorrections: options.departmentShiftCorrections ?? [],
       shiftHoursVersions: options.shiftHoursVersions ?? [],
     });
+    const assignment = resolveEffectiveAssignment(
+      employee,
+      day.isoDate,
+      options.assignments,
+    );
+    const department = assignment.departmentId
+      ? departmentsById.get(assignment.departmentId)
+      : null;
+    const brigadeEnabled = isBrigadeScheduleEnabled(department, day.isoDate);
+    if (brigadeEnabled && base.status !== 'OUTSIDE_EMPLOYMENT') {
+      const configured = resolveBrigadeScheduleDay(
+        options.brigadeScheduleDays ?? [],
+        employee.id,
+        assignment.departmentId!,
+        assignment.shiftAssignment,
+        day.isoDate,
+      );
+      base = {
+        ...base,
+        brigadeScheduled: true,
+        departmentId: assignment.departmentId,
+        shiftAssignment: assignment.shiftAssignment,
+        source: 'calendar',
+        status: configured
+          ? configured.kind === 'DAY_OFF'
+            ? 'DAY_OFF'
+            : 'WORKING'
+          : 'UNRESOLVED',
+        hours: configured ? configured.plannedHours : null,
+        shift:
+          configured && configured.kind !== 'DAY_OFF'
+            ? configured.kind === 'NIGHT'
+              ? 'NIGHT'
+              : 'FIRST'
+            : null,
+        label: configured
+          ? configured.kind === 'DAY_OFF'
+            ? 'W'
+            : `${configured.plannedHours} / ${configured.kind === 'NIGHT' ? 'N' : 'D'}`
+          : '!',
+        reason:
+          configured?.note ?? (configured ? null : 'brigade-schedule-missing'),
+        plannedStartTime: configured?.startTime ?? null,
+        plannedEndTime: configured?.endTime ?? null,
+        plannedDuration: configured?.plannedHours ?? null,
+      };
+    }
 
     if (
       !correction ||
       base.status === 'OUTSIDE_EMPLOYMENT' ||
-      base.status === 'DAY_OFF' ||
-      base.status === 'PUBLIC_HOLIDAY'
+      (!brigadeEnabled &&
+        (base.status === 'DAY_OFF' || base.status === 'PUBLIC_HOLIDAY'))
     ) {
       return base;
     }

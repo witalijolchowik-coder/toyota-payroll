@@ -23,7 +23,7 @@ export interface EmployeeSortState {
 const departmentOrder = CANONICAL_DEPARTMENTS.map(
   (department) => department.uiName,
 );
-const shiftOrder = ['RED', 'WHITE', 'BLUE'];
+const shiftOrder = ['RED', 'WHITE', 'BLUE', 'YELLOW', 'ORANGE'];
 
 export function employeeMatchesListMode(
   employee: Employee,

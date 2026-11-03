@@ -9,6 +9,7 @@ export interface ClockInterval {
 }
 
 export interface PlannedWorkInterval extends ClockInterval {
+  explicitBrigadePlan?: boolean;
   shift: ActualWorkingShift | null;
 }
 
@@ -169,13 +170,17 @@ export function resolveScheduledNightAllowance({
     reviewReason,
   });
   if (!planned) return preserveForReview('MISSING_PLAN');
-  const canonicalShift = (
-    Object.keys(DEFAULT_SHIFT_INTERVALS) as ActualWorkingShift[]
-  ).find(
-    (shift) =>
-      DEFAULT_SHIFT_INTERVALS[shift].startTime === planned.startTime &&
-      DEFAULT_SHIFT_INTERVALS[shift].endTime === planned.endTime,
-  );
+  const canonicalShift =
+    (Object.keys(DEFAULT_SHIFT_INTERVALS) as ActualWorkingShift[]).find(
+      (shift) =>
+        DEFAULT_SHIFT_INTERVALS[shift].startTime === planned.startTime &&
+        DEFAULT_SHIFT_INTERVALS[shift].endTime === planned.endTime,
+    ) ??
+    (planned.explicitBrigadePlan &&
+    isValidClockTime(planned.startTime) &&
+    isValidClockTime(planned.endTime)
+      ? planned.shift
+      : undefined);
   if (!canonicalShift) return preserveForReview('NON_CANONICAL_PLAN');
   if (planned.shift && planned.shift !== canonicalShift) {
     return preserveForReview('CONFLICTING_PLAN');

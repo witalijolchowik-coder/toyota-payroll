@@ -9,7 +9,7 @@ export function plannedNightContext(
   'nightAllowancePlanned' | 'nightAllowanceReviewReason'
 > {
   return {
-    ...(day?.source === 'manual-correction'
+    ...(day?.source === 'manual-correction' || day?.brigadeScheduled
       ? {
           nightAllowancePlanned:
             day.plannedStartTime && day.plannedEndTime
@@ -17,6 +17,9 @@ export function plannedNightContext(
                   shift: day.shift,
                   startTime: day.plannedStartTime,
                   endTime: day.plannedEndTime,
+                  ...(day.brigadeScheduled
+                    ? { explicitBrigadePlan: true }
+                    : {}),
                 }
               : null,
         }

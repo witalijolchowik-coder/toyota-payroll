@@ -10,7 +10,7 @@ export type EmployeeGender = 'K' | 'M';
 export type MedicalExaminationType =
   'PRODUKCJA' | 'MAGAZYNIER' | 'PRODUKCJA_HL_PU';
 
-export type EmployeeColorShift = 'RED' | 'WHITE' | 'BLUE';
+export type EmployeeColorShift = 'RED' | 'WHITE' | 'BLUE' | 'YELLOW' | 'ORANGE';
 export type ActualWorkingShift = 'FIRST' | 'SECOND' | 'NIGHT';
 export type DepartmentShiftMode = 'UNKNOWN' | 'TWO_SHIFT' | 'THREE_SHIFT';
 export type EmployeeAssignmentStatus = 'ACTIVE' | 'CANCELLED';
@@ -84,6 +84,7 @@ export interface EmploymentEndEventDocument
 }
 
 export interface DepartmentDocument extends ModificationMetadataDocument {
+  brigade_scheduling_from?: IsoDate | null;
   name: string;
   shift_mode: DepartmentShiftMode;
   active: boolean;

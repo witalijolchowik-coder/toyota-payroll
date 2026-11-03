@@ -15,6 +15,7 @@ import {
 } from './firestoreService';
 
 const BLOCKING_WARNINGS = new Set([
+  'missing-brigade-schedule',
   'missing-employment-start',
   'missing-first-toyota-employment-date',
   'missing-teta',
@@ -77,6 +78,12 @@ export async function persistMonthlyCalculation({
   inputHash: string;
   force?: boolean;
 }): Promise<CalculationPersistenceResult> {
+  if (
+    drafts.some((d) =>
+      d.warnings.some((w) => w.code === 'missing-brigade-schedule'),
+    )
+  )
+    throw new Error('Brak planu brygady — rozliczenie pozostaje bez zmian');
   const firestore = getFirestoreClient();
   const repositories = getFirestoreRepositories();
   const actorUid = auth?.currentUser?.uid;

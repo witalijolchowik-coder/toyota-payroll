@@ -76,6 +76,7 @@ import { buildCalendarEmployeeRows } from './settlementCalendarLayout';
 import { EffectiveAssignmentLabel } from './EffectiveAssignmentLabel';
 
 interface SettlementGridProps {
+  brigadeScheduleDays?: import('../../utils/schedule/brigadeSchedule').BrigadeScheduleDay[];
   employees: Employee[];
   days: CalendarDay[];
   dailyValues: DailyValue[];
@@ -123,6 +124,7 @@ export function SettlementGrid({
   departments = [],
   employeeAssignments = [],
   scheduleCorrections = [],
+  brigadeScheduleDays = [],
   departmentShiftCorrections = [],
   shiftHoursVersions = [],
   publicHolidays,
@@ -262,6 +264,7 @@ export function SettlementGrid({
                   options: {
                     assignments: employeeAssignments,
                     corrections: scheduleCorrections,
+                    brigadeScheduleDays,
                     departmentShiftCorrections,
                     shiftHoursVersions,
                     publicHolidays,
