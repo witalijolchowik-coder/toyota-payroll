@@ -70,6 +70,7 @@ export interface Employee extends ModificationMetadata {
 }
 
 export interface EmployeeContract extends ModificationMetadata {
+  overlapConfirmedInSoz?: boolean;
   id: string;
   employeeId: EmployeeId;
   tetaNumber: TetaNumber;

@@ -6,6 +6,8 @@ import {
   Alert,
   Button,
   Chip,
+  Checkbox,
+  FormControlLabel,
   Dialog,
   DialogActions,
   DialogContent,
@@ -56,6 +58,7 @@ interface Props {
       startDate: string;
       endDate: string | null;
       note: string | null;
+      overlapConfirmedInSoz?: boolean;
     },
     expectedRevision: string,
   ) => Promise<void>;
@@ -132,6 +135,7 @@ export function EmployeeContractsDialog({
   const [startDate, setStartDate] = useState(continuation.startDate ?? '');
   const [endDate, setEndDate] = useState('');
   const [note, setNote] = useState('');
+  const [overlapConfirmedInSoz, setOverlapConfirmedInSoz] = useState(false);
   const [reason, setReason] = useState('');
   const [employmentEndDate, setEmploymentEndDate] = useState(() => {
     const initialLatest = resolveLatestContract(employee);
@@ -201,6 +205,7 @@ export function EmployeeContractsDialog({
   };
 
   const beginCreate = () => {
+    setOverlapConfirmedInSoz(false);
     setEditing('new');
     setStartDate(continuation.startDate ?? '');
     setEndDate('');
@@ -211,6 +216,7 @@ export function EmployeeContractsDialog({
     setCancellationTarget(null);
   };
   const beginEdit = (contract: EmployeeContract) => {
+    setOverlapConfirmedInSoz(contract.overlapConfirmedInSoz === true);
     setEditing(contract);
     setStartDate(contract.startDate);
     setEndDate(contract.endDate ?? '');
@@ -225,6 +231,7 @@ export function EmployeeContractsDialog({
     const issues = validateEmployeeContract(
       {
         id: editing === 'new' ? '' : (editing?.id ?? ''),
+        overlapConfirmedInSoz,
         startDate,
         endDate: endDate || null,
       },
@@ -253,12 +260,14 @@ export function EmployeeContractsDialog({
             startDate,
             endDate: endDate || null,
             note: note.trim() || null,
+            overlapConfirmedInSoz,
           },
           contractState.revision,
         );
       } else if (editing) {
         if (impact?.action !== 'update' || impact.contractId !== editing.id) {
           const value = await onPreviewUpdate(editing, {
+            overlapConfirmedInSoz,
             startDate,
             endDate: endDate || null,
             note: note.trim() || null,
@@ -271,6 +280,7 @@ export function EmployeeContractsDialog({
           currentEmployee.id,
           editing.id,
           {
+            overlapConfirmedInSoz,
             startDate,
             endDate: endDate || null,
             note: note.trim() || null,
@@ -393,6 +403,13 @@ export function EmployeeContractsDialog({
             </Alert>
           ) : null}
           {error ? <Alert severity="error">{error}</Alert> : null}
+          {contracts.some(
+            (c) => c.status === 'ACTIVE' && c.overlapConfirmedInSoz,
+          ) ? (
+            <Alert severity="info">
+              Nakładające się okresy umów — potwierdzone w SOZ
+            </Alert>
+          ) : null}
           {contracts.length === 0 && currentEmployee.employmentStartDate ? (
             <Alert
               severity="info"
@@ -439,6 +456,7 @@ export function EmployeeContractsDialog({
                   value={startDate}
                   onChange={(event) => {
                     setStartDate(event.target.value);
+                    setOverlapConfirmedInSoz(false);
                     setImpact(null);
                   }}
                   slotProps={{ inputLabel: { shrink: true } }}
@@ -450,6 +468,7 @@ export function EmployeeContractsDialog({
                   value={endDate}
                   onChange={(event) => {
                     setEndDate(event.target.value);
+                    setOverlapConfirmedInSoz(false);
                     setImpact(null);
                   }}
                   slotProps={{ inputLabel: { shrink: true } }}
@@ -467,6 +486,18 @@ export function EmployeeContractsDialog({
               {impact?.action === 'update' ? (
                 <ContractImpactAlert impact={impact.value} />
               ) : null}
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={overlapConfirmedInSoz}
+                    onChange={(event) => {
+                      setOverlapConfirmedInSoz(event.target.checked);
+                      setImpact(null);
+                    }}
+                  />
+                }
+                label="Potwierdzam w SOZ nakładające się okresy umów"
+              />
               <Stack
                 direction="row"
                 spacing={1}

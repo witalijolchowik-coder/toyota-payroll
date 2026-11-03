@@ -88,6 +88,7 @@ export function mapEmployeeContractDocument(
   document: EmployeeContractDocument,
 ): EmployeeContract {
   return {
+    overlapConfirmedInSoz: document.overlap_confirmed_soz === true,
     id,
     employeeId: document.employee_id,
     tetaNumber: document.teta_number,

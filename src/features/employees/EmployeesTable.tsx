@@ -582,6 +582,9 @@ function CurrentContractCell({
 }) {
   const period = resolveCurrentEmploymentPeriod(employee);
   const overdue = requiresContractDecision(employee);
+  const confirmedOverlap = employee.contracts?.some(
+    (c) => c.status === 'ACTIVE' && c.overlapConfirmedInSoz,
+  );
 
   if (!period) {
     return (
@@ -595,6 +598,11 @@ function CurrentContractCell({
 
   return (
     <Stack spacing={0.25}>
+      {confirmedOverlap ? (
+        <Typography variant="caption" color="info.main">
+          Nakładające się okresy umów — potwierdzone w SOZ
+        </Typography>
+      ) : null}
       {overdue ? (
         <Typography
           variant="caption"

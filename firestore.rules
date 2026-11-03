@@ -361,11 +361,14 @@ service cloud.firestore {
           'created_at', 'created_by', 'updated_at', 'updated_by'
         ])
         && data.keys().hasOnly([
+          'overlap_confirmed_soz',
           'employee_id', 'teta_number', 'sequence_id',
           'start_date', 'end_date', 'status', 'note',
           'created_at', 'created_by', 'updated_at', 'updated_by'
         ])
         && employeeReferenceExists(data)
+        && (!data.keys().hasAny(['overlap_confirmed_soz'])
+          || data.overlap_confirmed_soz is bool)
         && isNonEmptyString(data.sequence_id)
         && isIsoDate(data.start_date)
         && (data.end_date == null || isIsoDate(data.end_date))

@@ -28,6 +28,69 @@ const metadata = {
   updatedBy: 'tester',
 };
 
+describe('SOZ-confirmed overlapping contracts', () => {
+  const old = contract('old', '2026-06-08', '2026-09-07');
+  const next = contract('new', '2026-09-06', '2027-03-07');
+  it('blocks an unconfirmed overlap', () => {
+    expect(validateEmployeeContract(next, [old])[0]?.code).toBe('overlap');
+  });
+  it('accepts only explicit confirmation, while still rejecting duplicates', () => {
+    const confirmed = { ...next, overlapConfirmedInSoz: true };
+    expect(validateEmployeeContract(confirmed, [old])).toEqual([]);
+    expect(
+      validateEmployeeContract({ ...confirmed, id: 'copy' }, [next])[0]?.code,
+    ).toBe('duplicate');
+  });
+  it('selects the latest start during the overlap and never reports it overdue', () => {
+    const e = employee([old, next]);
+    expect(
+      resolveCurrentContract(e, new Date('2026-09-06T00:00:00Z'))?.id,
+    ).toBe('new');
+    expect(
+      resolveCurrentContract(e, new Date('2026-11-03T00:00:00Z'))?.id,
+    ).toBe('new');
+    expect(requiresContractDecision(e, new Date('2026-11-03T00:00:00Z'))).toBe(
+      false,
+    );
+  });
+  it('merges overlaps into one coverage interval without duplicate hours', () => {
+    const coverage = mergeEmploymentCoverage([old, next]);
+    expect(coverage).toEqual([
+      { startDate: '2026-06-08', endDate: '2027-03-07' },
+    ]);
+    const e = employee([{ ...old, overlapConfirmedInSoz: true }, next]);
+    expect(isDateCoveredByContracts(e, '2026-09-06')).toBe(true);
+    const workingDates = Array.from(
+      { length: 30 },
+      (_, i) => new Date(Date.UTC(2026, 8, i + 1)),
+    ).filter((d) => d.getUTCDay() !== 0 && d.getUTCDay() !== 6);
+    expect(
+      workingDates.filter((d) =>
+        isDateCoveredByContracts(e, d.toISOString().slice(0, 10)),
+      ).length * 8,
+    ).toBe(176);
+    expect(
+      calculateEmploymentLimit(e, new Date('2026-09-07T00:00:00Z')),
+    ).toEqual(
+      calculateEmploymentLimit(
+        employee([contract('merged', '2026-06-08', '2027-03-07')]),
+        new Date('2026-09-07T00:00:00Z'),
+      ),
+    );
+  });
+  it('does not mark an employee overdue when an older-start contract still covers today', () => {
+    expect(
+      requiresContractDecision(
+        employee([
+          contract('long', '2026-01-01', '2027-01-01'),
+          contract('short', '2026-09-01', '2026-09-30'),
+        ]),
+        new Date('2026-11-03T00:00:00Z'),
+      ),
+    ).toBe(false);
+  });
+});
+
 function contract(
   id: string,
   startDate: string,

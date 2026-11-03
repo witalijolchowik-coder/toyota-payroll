@@ -169,7 +169,10 @@ export function planLegacyContractMigration(
 }
 
 export function validateEmployeeContract(
-  candidate: Pick<EmployeeContract, 'id' | 'startDate' | 'endDate'>,
+  candidate: Pick<
+    EmployeeContract,
+    'id' | 'startDate' | 'endDate' | 'overlapConfirmedInSoz'
+  >,
   contracts: readonly EmployeeContract[],
 ): ContractValidationIssue[] {
   if (candidate.endDate && candidate.endDate < candidate.startDate) {
@@ -192,7 +195,7 @@ export function validateEmployeeContract(
       contract.startDate <= candidateEnd &&
       (contract.endDate ?? '9999-12-31') >= candidate.startDate,
   );
-  return overlap
+  return overlap && candidate.overlapConfirmedInSoz !== true
     ? [{ code: 'overlap', conflictingContractId: overlap.id }]
     : [];
 }
@@ -203,11 +206,13 @@ export function resolveCurrentContract(
 ): EmployeeContract | null {
   const todayIso = isoDate(today);
   return (
-    activeContracts(employee).find(
-      (contract) =>
-        contract.startDate <= todayIso &&
-        (!contract.endDate || contract.endDate >= todayIso),
-    ) ?? null
+    [...activeContracts(employee)]
+      .reverse()
+      .find(
+        (contract) =>
+          contract.startDate <= todayIso &&
+          (!contract.endDate || contract.endDate >= todayIso),
+      ) ?? null
   );
 }
 
@@ -433,6 +438,7 @@ export function requiresContractDecision(
   employee: Pick<Employee, 'contracts' | 'employmentEndEvents'>,
   today = new Date(),
 ): boolean {
+  if (resolveCurrentContract(employee, today)) return false;
   const latest = resolveLatestContract(employee);
   if (!latest?.endDate || latest.endDate >= isoDate(today)) return false;
   const ended = latestEmploymentEnd(employee);

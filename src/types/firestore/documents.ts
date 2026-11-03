@@ -67,6 +67,7 @@ export interface EmployeeDocument extends ModificationMetadataDocument {
 
 export interface EmployeeContractDocument
   extends EmployeeReferenceDocument, ModificationMetadataDocument {
+  overlap_confirmed_soz?: boolean;
   sequence_id: string;
   start_date: IsoDate;
   end_date: IsoDate | null;

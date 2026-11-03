@@ -280,6 +280,7 @@ export const employeeConverter = createConverter<EmployeeDocument>(
 
 export const employeeContractConverter =
   createConverter<EmployeeContractDocument>((data, path) => ({
+    overlap_confirmed_soz: data.overlap_confirmed_soz === true,
     ...employeeReference(data, path),
     sequence_id: readNonEmptyString(data, 'sequence_id', path),
     start_date: readNonEmptyString(data, 'start_date', path),

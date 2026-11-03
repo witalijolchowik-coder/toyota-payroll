@@ -2537,6 +2537,20 @@ describe('Firestore security rules', () => {
         updated_by: uid,
       }),
     );
+    await assertSucceeds(
+      updateDoc(reference, {
+        overlap_confirmed_soz: true,
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
+    await assertFails(
+      updateDoc(reference, {
+        overlap_confirmed_soz: 'yes',
+        updated_at: serverTimestamp(),
+        updated_by: uid,
+      }),
+    );
     await assertFails(deleteDoc(reference));
   });
 

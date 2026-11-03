@@ -132,6 +132,24 @@ function renderDialog(options: {
 }
 
 describe('EmployeeContractsDialog canonical contract session', () => {
+  it('shows the informational SOZ confirmation in the employee record', async () => {
+    const current = employee([
+      contract('old', '2026-06-08', '2026-09-07'),
+      {
+        ...contract('new', '2026-09-06', '2027-03-07'),
+        overlapConfirmedInSoz: true,
+      },
+    ]);
+    renderDialog({
+      initial: current,
+      onReload: vi.fn().mockResolvedValue(state(current)),
+    });
+    expect(
+      await screen.findByText(
+        'Nakładające się okresy umów — potwierdzone w SOZ',
+      ),
+    ).toBeVisible();
+  });
   it('allows early employment termination while the current contract is still open', async () => {
     const current = employee([contract('current', '2026-06-01', null)]);
     const onReload = vi.fn().mockResolvedValue(state(current));

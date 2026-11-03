@@ -252,7 +252,10 @@ export async function previewEmployeeTerminationImpact(
 }
 
 function throwValidation(
-  candidate: Pick<EmployeeContract, 'id' | 'startDate' | 'endDate'>,
+  candidate: Pick<
+    EmployeeContract,
+    'id' | 'startDate' | 'endDate' | 'overlapConfirmedInSoz'
+  >,
   contracts: readonly EmployeeContract[],
 ) {
   const issue = validateEmployeeContract(candidate, contracts)[0];
@@ -278,7 +281,12 @@ export async function createEmployeeContract(
   const { repositories, uid } = requireContext();
   const { employee } = await currentMutationState(employeeId, expectedRevision);
   throwValidation(
-    { id: '', startDate: input.startDate, endDate: input.endDate },
+    {
+      id: '',
+      startDate: input.startDate,
+      endDate: input.endDate,
+      overlapConfirmedInSoz: input.overlapConfirmedInSoz,
+    },
     activeContracts(employee),
   );
   const impact = await monthImpactForPeriods([input]);
@@ -291,6 +299,7 @@ export async function createEmployeeContract(
     employee_id: employee.id,
     teta_number: employee.tetaNumber,
     sequence_id: input.sequenceId,
+    overlap_confirmed_soz: input.overlapConfirmedInSoz === true,
     start_date: input.startDate,
     end_date: input.endDate,
     status: 'ACTIVE',
@@ -344,6 +353,7 @@ export async function createEmployeeContract(
     actorUid: uid,
     changes: {
       operation: 'employee-contract-created',
+      overlap_confirmed_soz: input.overlapConfirmedInSoz === true,
       employee_id: employee.id,
       sequence_id: input.sequenceId,
       start_date: input.startDate,
@@ -365,7 +375,12 @@ export async function updateEmployeeContract(
   const { employee } = await currentMutationState(employeeId, expectedRevision);
   const contract = currentContract(employee, contractId);
   throwValidation(
-    { id: contract.id, startDate: input.startDate, endDate: input.endDate },
+    {
+      id: contract.id,
+      startDate: input.startDate,
+      endDate: input.endDate,
+      overlapConfirmedInSoz: input.overlapConfirmedInSoz,
+    },
     activeContracts(employee),
   );
   const impact = await monthImpactForPeriods([
@@ -378,6 +393,7 @@ export async function updateEmployeeContract(
   const batch = writeBatch(repositories.employeeContracts.firestore);
   batch.update(repositories.employeeContract(contract.id), {
     start_date: input.startDate,
+    overlap_confirmed_soz: input.overlapConfirmedInSoz === true,
     end_date: input.endDate,
     note: input.note,
     updated_at: serverTimestamp(),

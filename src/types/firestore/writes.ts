@@ -50,6 +50,7 @@ export interface EmployeeCreateInput {
 export type EmployeeUpdateInput = Partial<EmployeeCreateInput>;
 
 export interface EmployeeContractCreateInput extends EmployeeReferenceInput {
+  overlapConfirmedInSoz?: boolean;
   sequenceId: string;
   startDate: IsoDate;
   endDate: IsoDate | null;
@@ -58,7 +59,7 @@ export interface EmployeeContractCreateInput extends EmployeeReferenceInput {
 
 export type EmployeeContractUpdateInput = Pick<
   EmployeeContractCreateInput,
-  'startDate' | 'endDate' | 'note'
+  'startDate' | 'endDate' | 'note' | 'overlapConfirmedInSoz'
 >;
 
 export interface EmploymentEndCreateInput extends EmployeeReferenceInput {
