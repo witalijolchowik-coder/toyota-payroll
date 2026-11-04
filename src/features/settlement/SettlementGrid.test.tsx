@@ -67,6 +67,67 @@ const department: Department = {
 };
 
 describe('SettlementGrid', () => {
+  it('uses the same compact row sizing and daily cell structure for a colorless individual schedule', () => {
+    const individual = {
+      ...employee,
+      id: 'individual',
+      tetaNumber: 'TETA-1002',
+      firstName: 'Anna',
+      lastName: 'Nowak',
+      departmentId: 'utrzymanie-ruchu',
+      shiftAssignment: null,
+    };
+    const maintenance: Department = {
+      ...department,
+      id: 'utrzymanie-ruchu',
+      name: 'Utrzymanie Ruchu',
+      individualSchedulingOnly: true,
+      brigadeSchedulingFrom: '2026-10-01',
+    };
+    render(
+      <SettlementGrid
+        employees={[employee, individual]}
+        departments={[department, maintenance]}
+        days={createCalendarDays('2026-10', {
+          today: new Date('2026-11-04'),
+        }).slice(0, 1)}
+        dailyValues={[]}
+        brigadeScheduleDays={october2026Schedule(null, individual.id)}
+        displayMode="hours"
+      />,
+    );
+    const ordinaryRow = screen.getByText('Jan Kowalski').closest('tr')!;
+    const individualRow = screen.getByText('Anna Nowak').closest('tr')!;
+    const ordinaryDay = within(ordinaryRow).getAllByRole('cell')[1]!;
+    const individualDay = within(individualRow).getAllByRole('cell')[1]!;
+    expect(ordinaryDay).toHaveTextContent(/^8 h$/);
+    expect(individualDay).toHaveTextContent(/^8 h$/);
+    const layout = (node: Element): unknown => {
+      const style = getComputedStyle(node);
+      return [
+        node.tagName,
+        style.display,
+        style.height,
+        style.minHeight,
+        style.paddingTop,
+        style.paddingBottom,
+        style.lineHeight,
+        [...node.children].map(layout),
+      ];
+    };
+    // jsdom does not lay out pixels; compare the row/cell sizing styles and
+    // every daily-cell wrapper, so a second plan line fails this test.
+    expect(getComputedStyle(individualRow).height).toBe(
+      getComputedStyle(ordinaryRow).height,
+    );
+    expect(getComputedStyle(individualRow).minHeight).toBe(
+      getComputedStyle(ordinaryRow).minHeight,
+    );
+    expect(layout(individualDay)).toEqual(layout(ordinaryDay));
+    expect(
+      within(individualRow).queryByText(/Plan indywidualny|^Plan:/),
+    ).not.toBeInTheDocument();
+  });
   it('uses a noncanonical individual-only department from the monthly loader in the grid, nominal and export', () => {
     const maintenance: Department = {
       ...department,
@@ -123,48 +184,81 @@ describe('SettlementGrid', () => {
       ),
     );
     view.rerender(<SettlementGrid {...props} displayMode="hours" />);
-    expect(cells()[0]).toHaveTextContent('Plan: II · 8 h');
-    expect(cells()[1]).toHaveTextContent('Plan: II · 8 h');
-    expect(cells()[30]).toHaveTextContent('Plan: N12 · 12 h');
+    expect(cells()[0]).toHaveTextContent(/^8 h$/);
+    expect(cells()[1]).toHaveTextContent(/^8 h$/);
+    expect(cells()[30]).toHaveTextContent(/^12 h$/);
+    expect(
+      screen.queryByText(/Plan indywidualny|Brak grupy · plan|^Plan:/),
+    ).not.toBeInTheDocument();
     const plannedSchedule = generateEmployeeMonthlySchedule({
       employee: worker,
       days,
       departments,
       options: { assignments, brigadeScheduleDays },
     });
-    const draft = calculateEmployeeMonthlyDraft({
-      monthId: '2026-10',
-      employee: worker,
-      dailyValues: [],
-      absences: [],
-      adjustments: [],
-      payrollSettings: [],
-      plannedSchedule,
-    });
-    expect(draft.totals.nominalHours).toBe(148);
-    const workbook = XLSX.read(
-      buildSettlementExportPackageForMonth({
+    const calculate = (schedule: typeof plannedSchedule) =>
+      calculateEmployeeMonthlyDraft({
         monthId: '2026-10',
-        employees: [worker],
-        departments,
-        days,
+        employee: worker,
         dailyValues: [],
-        drafts: [draft],
-        reviewStates: [],
-        publicHolidays: new Set(),
-        plannedSchedulesByEmployeeId: new Map([[worker.id, plannedSchedule]]),
-      }).toyota.workbook,
-      { type: 'array' },
-    );
-    const rows = XLSX.utils
-      .sheet_to_json<(string | number)[]>(workbook.Sheets['Plan brygad']!, {
-        header: 1,
-      })
-      .slice(1);
+        absences: [],
+        adjustments: [],
+        payrollSettings: [],
+        plannedSchedule: schedule,
+      });
+    const draft = calculate(plannedSchedule);
+    expect(draft.totals.nominalHours).toBe(148);
+    const exportRows = (schedule: typeof plannedSchedule) => {
+      const workbook = XLSX.read(
+        buildSettlementExportPackageForMonth({
+          monthId: '2026-10',
+          employees: [worker],
+          departments,
+          days,
+          dailyValues: [],
+          drafts: [calculate(schedule)],
+          reviewStates: [],
+          publicHolidays: new Set(),
+          plannedSchedulesByEmployeeId: new Map([[worker.id, schedule]]),
+        }).toyota.workbook,
+        { type: 'array' },
+      );
+      return XLSX.utils
+        .sheet_to_json<(string | number)[]>(workbook.Sheets['Plan brygad']!, {
+          header: 1,
+        })
+        .slice(1);
+    };
+    const rows = exportRows(plannedSchedule);
     expect(rows).toHaveLength(31);
     expect(rows[27]?.slice(2)).toEqual(['WN', 0]);
     expect(rows[30]?.slice(2)).toEqual(['N12', 12]);
     expect(rows.reduce((sum, row) => sum + Number(row[3]), 0)).toBe(148);
+    const correction = {
+      ...dayOffCorrection(),
+      id: 'october-day-off',
+      monthId: '2026-10',
+      date: '2026-10-01',
+    };
+    const corrected = generateEmployeeMonthlySchedule({
+      employee: worker,
+      days,
+      departments,
+      options: { assignments, brigadeScheduleDays, corrections: [correction] },
+    });
+    view.rerender(
+      <SettlementGrid
+        {...props}
+        displayMode="hours"
+        scheduleCorrections={[correction]}
+      />,
+    );
+    expect(cells()[0]).toHaveTextContent('0 h');
+    expect(cells()[1]).toHaveTextContent('8 h');
+    expect(calculate(corrected).totals.nominalHours).toBe(140);
+    expect(
+      exportRows(corrected).reduce((sum, row) => sum + Number(row[3]), 0),
+    ).toBe(140);
   });
   it('shows DW and N for ordinary non-working weekend days in shifts mode', () => {
     render(

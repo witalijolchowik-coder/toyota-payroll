@@ -568,23 +568,6 @@ export function SettlementGrid({
                                         t={t}
                                       />
                                     )}
-                                    {displayMode === 'hours' &&
-                                    isColorlessIndividualPlan(plannedDay) &&
-                                    plannedDay ? (
-                                      <Typography
-                                        component="span"
-                                        variant="caption"
-                                        sx={{
-                                          display: 'block',
-                                          lineHeight: 1.1,
-                                        }}
-                                      >
-                                        Plan:{' '}
-                                        {compactBrigadeShiftLabel(plannedDay) ??
-                                          plannedDay.label}{' '}
-                                        · {plannedDay.hours} h
-                                      </Typography>
-                                    ) : null}
                                   </Box>
                                 </ButtonBase>
                               </Box>

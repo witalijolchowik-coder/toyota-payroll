@@ -13,7 +13,7 @@ import { generateEmployeeMonthlySchedule } from '../../utils/schedule';
 import { october2026Schedule } from '../../utils/schedule/october2026.test-support';
 import { compactBrigadeShiftLabel } from './compactBrigadeShiftLabel';
 
-it('renders a colorless individual plan with its own shift codes and 148 planned hours', () => {
+it('renders a colorless plan in the ordinary calendar layout', () => {
   const employee = { ...balanceEmployee(), departmentId: 'utrzymanie-ruchu' };
   const department = {
     id: employee.departmentId,
@@ -49,9 +49,9 @@ it('renders a colorless individual plan with its own shift codes and 148 planned
       plannedSchedule={plannedSchedule}
     />,
   );
-  expect(screen.getByText('Plan indywidualny: 148 h')).toBeVisible();
-  expect(screen.getAllByText(/^II ·/)).toHaveLength(2);
-  expect(screen.getAllByText(/^I ·/)).toHaveLength(15);
+  expect(screen.queryByText(/Plan indywidualny/)).not.toBeInTheDocument();
+  expect(screen.getAllByText('Planowane: 14:00–22:00, 8 h.')).toHaveLength(2);
+  expect(screen.getAllByText('Planowane: 06:00–14:00, 8 h.')).toHaveLength(15);
   expect(screen.getByText(/^N12 ·/)).toBeVisible();
   expect(screen.getByText('WN')).toBeVisible();
   expect(screen.queryByText(/Brak grupy · plan/)).not.toBeInTheDocument();

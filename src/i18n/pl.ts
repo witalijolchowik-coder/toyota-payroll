@@ -2206,8 +2206,6 @@ export const pl = {
     effectiveAssignment: {
       variable: 'Zmiana zmienna',
       missing: 'Brak grupy · plan: pierwsza zmiana',
-      individualPlan: 'Plan indywidualny',
-      individualPlannedHours: 'Plan indywidualny: {{hours}} h',
       segment: '{{start}}–{{end}}: {{department}} · {{shift}} ({{source}})',
       historySource: 'historia przypisań',
       masterSource: 'kartoteka pracownika',

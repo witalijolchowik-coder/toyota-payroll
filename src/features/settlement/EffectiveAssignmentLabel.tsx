@@ -48,9 +48,15 @@ export function EffectiveAssignmentLabel({
     ? (departmentNames.get(presentation.departmentId) ??
       presentation.departmentId)
     : t.organization.departments.unassigned;
-  const shiftLabel = hasIndividualPlan
-    ? t.settlement.effectiveAssignment.individualPlan
-    : presentation.kind === 'VARIABLE'
+  if (hasIndividualPlan && presentation.kind === 'MISSING_SHIFT') {
+    return showDepartment ? (
+      <Typography component="span" variant="caption" noWrap>
+        {stableDepartment}
+      </Typography>
+    ) : null;
+  }
+  const shiftLabel =
+    presentation.kind === 'VARIABLE'
       ? t.settlement.effectiveAssignment.variable
       : presentation.kind === 'MISSING_SHIFT'
         ? t.settlement.effectiveAssignment.missing
@@ -69,12 +75,9 @@ export function EffectiveAssignmentLabel({
     const department = segment.departmentId
       ? (departmentNames.get(segment.departmentId) ?? segment.departmentId)
       : t.organization.departments.unassigned;
-    const shift =
-      hasIndividualPlan && !segment.shiftAssignment
-        ? t.settlement.effectiveAssignment.individualPlan
-        : segment.shiftAssignment
-          ? t.organization.shifts[segment.shiftAssignment]
-          : t.settlement.effectiveAssignment.missing;
+    const shift = segment.shiftAssignment
+      ? t.organization.shifts[segment.shiftAssignment]
+      : t.settlement.effectiveAssignment.missing;
     return interpolate(t.settlement.effectiveAssignment.segment, {
       start: formatDate(segment.startDate),
       end: formatDate(segment.endDate),
@@ -97,7 +100,7 @@ export function EffectiveAssignmentLabel({
               {detail}
             </Typography>
           ))}
-          {presentation.hasMissingShift && !hasIndividualPlan ? (
+          {presentation.hasMissingShift ? (
             <Typography variant="caption" sx={{ fontWeight: 700 }}>
               {t.settlement.effectiveAssignment.missingWarning}
             </Typography>
@@ -117,7 +120,7 @@ export function EffectiveAssignmentLabel({
         <Typography component="span" variant="caption" noWrap>
           {label}
         </Typography>
-        {presentation.hasMissingShift && !hasIndividualPlan ? (
+        {presentation.hasMissingShift ? (
           <WarningAmberOutlined
             aria-label={t.settlement.effectiveAssignment.missingWarning}
             color="warning"
