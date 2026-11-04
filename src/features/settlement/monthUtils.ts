@@ -17,7 +17,7 @@ import {
   activeContracts,
   employeeContractsOverlapRange,
   isDateCoveredByContracts,
-  validateEmployeeContract,
+  hasValidEmployeeContractHistory,
 } from '../../utils/employees';
 import type { PlannedScheduleDay } from '../../utils/schedule';
 
@@ -131,11 +131,7 @@ export function resolveMonthlyEmployeeParticipation(
       result.missingContractHistory.push(employee);
       return;
     }
-    if (
-      contracts.some(
-        (contract) => validateEmployeeContract(contract, contracts).length > 0,
-      )
-    ) {
+    if (!hasValidEmployeeContractHistory(contracts)) {
       result.invalidContractHistory.push(employee);
       return;
     }

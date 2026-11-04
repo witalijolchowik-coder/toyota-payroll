@@ -174,6 +174,7 @@ export function validateEmployeeContract(
     'id' | 'startDate' | 'endDate' | 'overlapConfirmedInSoz'
   >,
   contracts: readonly EmployeeContract[],
+  options: { validateStoredHistory?: boolean } = {},
 ): ContractValidationIssue[] {
   if (candidate.endDate && candidate.endDate < candidate.startDate) {
     return [{ code: 'invalid-range' }];
@@ -193,11 +194,29 @@ export function validateEmployeeContract(
   const overlap = others.find(
     (contract) =>
       contract.startDate <= candidateEnd &&
-      (contract.endDate ?? '9999-12-31') >= candidate.startDate,
+      (contract.endDate ?? '9999-12-31') >= candidate.startDate &&
+      // Reading a stored pair must not depend on which contract is the candidate.
+      // Writes still require confirmation on the contract being saved.
+      !(
+        options.validateStoredHistory && contract.overlapConfirmedInSoz === true
+      ),
   );
   return overlap && candidate.overlapConfirmedInSoz !== true
     ? [{ code: 'overlap', conflictingContractId: overlap.id }]
     : [];
+}
+
+export function hasValidEmployeeContractHistory(
+  contracts: readonly EmployeeContract[],
+): boolean {
+  return contracts
+    .filter((contract) => contract.status === 'ACTIVE')
+    .every(
+      (contract) =>
+        validateEmployeeContract(contract, contracts, {
+          validateStoredHistory: true,
+        }).length === 0,
+    );
 }
 
 export function resolveCurrentContract(

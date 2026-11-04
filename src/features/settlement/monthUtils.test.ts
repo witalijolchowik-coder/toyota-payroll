@@ -224,6 +224,45 @@ describe('payroll-period employee participation', () => {
     ).toEqual([worker]);
   });
 
+  it('admits a stored SOZ-confirmed overlap once, regardless of contract order', () => {
+    const old = {
+      ...employee().contracts![0]!,
+      id: 'old',
+      startDate: '2026-08-07',
+      endDate: '2026-09-06',
+    };
+    const confirmed = {
+      ...old,
+      id: 'confirmed',
+      startDate: '2026-09-06',
+      endDate: '2027-03-07',
+      overlapConfirmedInSoz: true,
+    };
+    const october = getMonthDateRange('2026-10');
+    for (const contracts of [
+      [old, confirmed],
+      [confirmed, old],
+    ]) {
+      const worker = employee({ contracts });
+      expect(resolveMonthlyEmployeeParticipation([worker], october)).toEqual({
+        participants: [worker],
+        missingContractHistory: [],
+        invalidContractHistory: [],
+      });
+    }
+    for (const contracts of [
+      [old, { ...confirmed, startDate: old.startDate, endDate: old.endDate }],
+      [old, { ...confirmed, endDate: '2026-09-05' }],
+      [old, confirmed, { ...old, id: 'unconfirmed', startDate: '2026-09-01' }],
+    ]) {
+      const worker = employee({ contracts });
+      expect(
+        resolveMonthlyEmployeeParticipation([worker], october)
+          .invalidContractHistory,
+      ).toEqual([worker]);
+    }
+  });
+
   it('distinguishes missing and invalid contract history from no June coverage', () => {
     const missing = employee({ contracts: [] });
     const outside = employee({
