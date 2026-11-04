@@ -49,6 +49,7 @@ import { EffectiveAssignmentLabel } from './EffectiveAssignmentLabel';
 import {
   calendarDayOffLabel,
   compactBrigadeShiftLabel,
+  isColorlessIndividualPlan,
 } from './compactBrigadeShiftLabel';
 
 interface EmployeeCalendarDialogProps {
@@ -101,6 +102,7 @@ export function EmployeeCalendarDialog({
   const plannedScheduleByDate = new Map(
     plannedSchedule.map((day) => [day.date, day]),
   );
+  const individualPlan = plannedSchedule.filter(isColorlessIndividualPlan);
   const employeeAbsences = absences.filter(
     (absence) => absence.employeeId === employee.id,
   );
@@ -165,10 +167,24 @@ export function EmployeeCalendarDialog({
                   dates={days.map((day) => day.isoDate)}
                   assignments={employeeAssignments}
                   departments={departments}
+                  hasIndividualPlan={individualPlan.length > 0}
                   showDepartment
                 />
               }
             />
+            {individualPlan.length > 0 ? (
+              <Chip
+                variant="outlined"
+                label={interpolate(
+                  t.settlement.effectiveAssignment.individualPlannedHours,
+                  {
+                    hours: individualPlan
+                      .reduce((total, day) => total + (day.hours ?? 0), 0)
+                      .toLocaleString('pl-PL'),
+                  },
+                )}
+              />
+            ) : null}
           </Stack>
 
           {isSettled ? (
@@ -386,7 +402,10 @@ export function EmployeeCalendarDialog({
                         plannedDay.plannedEndTime &&
                         plannedDay.plannedDuration !== null ? (
                           <Typography variant="caption" color="text.secondary">
-                            {compactShift ? `${compactShift} · ` : null}
+                            {compactShift ||
+                            isColorlessIndividualPlan(plannedDay)
+                              ? `${compactShift ?? plannedDay.label} · `
+                              : null}
                             {interpolate(
                               t.settlement.editor.workTime.planDetails,
                               {

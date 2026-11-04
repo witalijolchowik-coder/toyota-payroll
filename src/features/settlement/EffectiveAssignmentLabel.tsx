@@ -17,6 +17,7 @@ interface EffectiveAssignmentLabelProps {
   assignments: readonly EmployeeAssignment[];
   departments: readonly Department[];
   showDepartment?: boolean;
+  hasIndividualPlan?: boolean;
 }
 
 const dateFormatter = new Intl.DateTimeFormat('pl-PL', {
@@ -32,6 +33,7 @@ export function EffectiveAssignmentLabel({
   assignments,
   departments,
   showDepartment = false,
+  hasIndividualPlan = false,
 }: EffectiveAssignmentLabelProps) {
   const t = useTranslations();
   const presentation = resolveEffectiveAssignmentPresentation({
@@ -46,8 +48,9 @@ export function EffectiveAssignmentLabel({
     ? (departmentNames.get(presentation.departmentId) ??
       presentation.departmentId)
     : t.organization.departments.unassigned;
-  const shiftLabel =
-    presentation.kind === 'VARIABLE'
+  const shiftLabel = hasIndividualPlan
+    ? t.settlement.effectiveAssignment.individualPlan
+    : presentation.kind === 'VARIABLE'
       ? t.settlement.effectiveAssignment.variable
       : presentation.kind === 'MISSING_SHIFT'
         ? t.settlement.effectiveAssignment.missing
@@ -66,9 +69,12 @@ export function EffectiveAssignmentLabel({
     const department = segment.departmentId
       ? (departmentNames.get(segment.departmentId) ?? segment.departmentId)
       : t.organization.departments.unassigned;
-    const shift = segment.shiftAssignment
-      ? t.organization.shifts[segment.shiftAssignment]
-      : t.settlement.effectiveAssignment.missing;
+    const shift =
+      hasIndividualPlan && !segment.shiftAssignment
+        ? t.settlement.effectiveAssignment.individualPlan
+        : segment.shiftAssignment
+          ? t.organization.shifts[segment.shiftAssignment]
+          : t.settlement.effectiveAssignment.missing;
     return interpolate(t.settlement.effectiveAssignment.segment, {
       start: formatDate(segment.startDate),
       end: formatDate(segment.endDate),
@@ -91,7 +97,7 @@ export function EffectiveAssignmentLabel({
               {detail}
             </Typography>
           ))}
-          {presentation.hasMissingShift ? (
+          {presentation.hasMissingShift && !hasIndividualPlan ? (
             <Typography variant="caption" sx={{ fontWeight: 700 }}>
               {t.settlement.effectiveAssignment.missingWarning}
             </Typography>
@@ -111,7 +117,7 @@ export function EffectiveAssignmentLabel({
         <Typography component="span" variant="caption" noWrap>
           {label}
         </Typography>
-        {presentation.hasMissingShift ? (
+        {presentation.hasMissingShift && !hasIndividualPlan ? (
           <WarningAmberOutlined
             aria-label={t.settlement.effectiveAssignment.missingWarning}
             color="warning"

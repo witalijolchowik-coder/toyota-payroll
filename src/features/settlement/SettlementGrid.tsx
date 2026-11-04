@@ -77,6 +77,7 @@ import { EffectiveAssignmentLabel } from './EffectiveAssignmentLabel';
 import {
   calendarDayOffLabel,
   compactBrigadeShiftLabel,
+  isColorlessIndividualPlan,
 } from './compactBrigadeShiftLabel';
 
 interface SettlementGridProps {
@@ -347,6 +348,9 @@ export function SettlementGrid({
                             dates={days.map((day) => day.isoDate)}
                             assignments={employeeAssignments}
                             departments={departments}
+                            hasIndividualPlan={Array.from(
+                              plannedScheduleByDate.values(),
+                            ).some(isColorlessIndividualPlan)}
                           />
                         </Box>
                       </TableCell>
@@ -564,6 +568,23 @@ export function SettlementGrid({
                                         t={t}
                                       />
                                     )}
+                                    {displayMode === 'hours' &&
+                                    isColorlessIndividualPlan(plannedDay) &&
+                                    plannedDay ? (
+                                      <Typography
+                                        component="span"
+                                        variant="caption"
+                                        sx={{
+                                          display: 'block',
+                                          lineHeight: 1.1,
+                                        }}
+                                      >
+                                        Plan:{' '}
+                                        {compactBrigadeShiftLabel(plannedDay) ??
+                                          plannedDay.label}{' '}
+                                        · {plannedDay.hours} h
+                                      </Typography>
+                                    ) : null}
                                   </Box>
                                 </ButtonBase>
                               </Box>

@@ -1,5 +1,13 @@
 import type { PlannedScheduleDay } from '../../utils/schedule';
 
+export function isColorlessIndividualPlan(day?: PlannedScheduleDay) {
+  return (
+    day?.brigadeScheduled === true &&
+    day.shiftAssignment === null &&
+    (day.status === 'WORKING' || day.status === 'DAY_OFF')
+  );
+}
+
 export function calendarDayOffLabel(day?: PlannedScheduleDay) {
   if (day?.status === 'PUBLIC_HOLIDAY') return 'ŚW';
   if (day?.status !== 'DAY_OFF') return null;
