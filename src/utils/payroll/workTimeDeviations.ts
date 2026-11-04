@@ -21,6 +21,7 @@ export interface WorkTimeClassificationOverride {
 }
 
 export interface DailyWorkTimeDeviationInput {
+  recordedAttendance?: { date: string; creditedHours: number | null };
   planned?: PlannedWorkInterval | null;
   nightAllowancePlanned?: PlannedWorkInterval | null;
   nightAllowanceReviewReason?: ScheduledNightAllowanceReviewReason | null;
@@ -209,6 +210,7 @@ export function resolveScheduledNightAllowance({
 }
 
 export function resolveDailyWorkTimeDeviation({
+  recordedAttendance,
   planned,
   nightAllowancePlanned,
   nightAllowanceReviewReason = null,
@@ -292,6 +294,25 @@ export function resolveDailyWorkTimeDeviation({
   const overtime50Hours = dayIs100
     ? 0
     : roundHours(Math.max(0, extraHours - overtime100Hours));
+  // One-off approved credited treatment for the October 2026 rollback.
+  // Include the already classified night overtime in the allowance, not in
+  // credited work a second time. Do not change elapsed-time arithmetic.
+  const includeOctoberNightOvertime =
+    recordedAttendance?.date === '2026-10-24' &&
+    recordedAttendance.creditedHours === 12 &&
+    nightAllowancePlanned?.explicitBrigadePlan === true &&
+    nightAllowancePlanned.shift === 'NIGHT' &&
+    nightAllowancePlanned.startTime === '18:00' &&
+    nightAllowancePlanned.endTime === '05:00' &&
+    planned.shift === 'NIGHT' &&
+    planned.startTime === '18:00' &&
+    planned.endTime === '05:00' &&
+    actual?.startTime === '18:00' &&
+    actual.endTime === '06:00' &&
+    overtime100Hours === 1 &&
+    overtime100FromNight === 1 &&
+    !classificationOverride &&
+    !nightReviewReason;
 
   return applyClassificationOverride(
     {
@@ -316,7 +337,9 @@ export function resolveDailyWorkTimeDeviation({
       nightOvertimeHours: roundHours(overtime100FromNight),
       nightAllowanceHours: nightAllowanceReviewReason
         ? actualNightHours
-        : scheduledNightAllowance.nightAllowanceHours,
+        : includeOctoberNightOvertime
+          ? actualNightHours
+          : scheduledNightAllowance.nightAllowanceHours,
       unresolved: actualNightHours > 0 && nightReviewReason !== null,
     },
     classificationOverride,

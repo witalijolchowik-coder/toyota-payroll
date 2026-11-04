@@ -273,6 +273,10 @@ export function EmployeeCalendarDialog({
                     ).deviation
                   : value.workTimeCorrection
                     ? resolveDailyWorkTimeDeviation({
+                        recordedAttendance: {
+                          date: cell.day.isoDate,
+                          creditedHours: value.hours,
+                        },
                         ...plannedNightContext(plannedDay),
                         planned:
                           value.workTimeCorrection.workContext !== 'EXTRA' &&
@@ -299,6 +303,8 @@ export function EmployeeCalendarDialog({
                         isSaturday: cell.day.date.getUTCDay() === 6,
                         isSunday: cell.day.date.getUTCDay() === 0,
                         isPublicHoliday: cell.day.isHoliday,
+                        classificationOverride:
+                          value.workTimeCorrection.classificationOverride,
                       })
                     : null;
 

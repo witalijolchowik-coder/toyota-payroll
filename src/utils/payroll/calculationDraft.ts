@@ -1495,6 +1495,10 @@ export function dailyWorkTimeDeviationFromValue({
       : null;
   return resolveDailyWorkTimeDeviation({
     planned,
+    recordedAttendance: {
+      date: day.isoDate,
+      creditedHours: value.manualOverride?.hours ?? value.hours,
+    },
     ...plannedNightContext(plannedDay),
     actual: {
       startTime: correction.actualStartTime,

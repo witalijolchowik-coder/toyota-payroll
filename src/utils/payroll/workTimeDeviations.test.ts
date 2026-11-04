@@ -7,6 +7,46 @@ import {
 } from './workTimeDeviations';
 
 describe('daily work-time deviations', () => {
+  it('includes the approved October 24 night overtime in the allowance exactly once', () => {
+    const planned = {
+      shift: 'NIGHT' as const,
+      startTime: '18:00',
+      endTime: '05:00',
+      explicitBrigadePlan: true,
+    };
+    const actual = { startTime: '18:00', endTime: '06:00' };
+    const input = {
+      planned,
+      nightAllowancePlanned: planned,
+      actual,
+      isWorkingDay: true,
+      isSaturday: true,
+      recordedAttendance: { date: '2026-10-24', creditedHours: 12 },
+    };
+    expect(resolveDailyWorkTimeDeviation(input)).toMatchObject({
+      normalWorkHours: 11,
+      extraHours: 1,
+      overtime100Hours: 1,
+      nightAllowanceHours: 8,
+    });
+    for (const unqualified of [
+      { ...input, recordedAttendance: undefined },
+      {
+        ...input,
+        recordedAttendance: { date: '2026-10-31', creditedHours: 12 },
+      },
+      {
+        ...input,
+        recordedAttendance: { date: '2026-10-24', creditedHours: 11 },
+      },
+      { ...input, actual: undefined },
+    ]) {
+      expect(
+        resolveDailyWorkTimeDeviation(unqualified).nightAllowanceHours,
+      ).toBe(7);
+    }
+  });
+
   it('treats the default planned shift as 8h normal work', () => {
     expect(
       resolveDailyWorkTimeDeviation({

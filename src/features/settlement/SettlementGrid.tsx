@@ -876,6 +876,7 @@ function resolveGridWorkTimeBreakdown({
   if (!correction) return null;
 
   return resolveDailyWorkTimeDeviation({
+    recordedAttendance: { date: day.isoDate, creditedHours: value.hours },
     ...plannedNightContext(plannedDay),
     planned:
       correction.workContext !== 'EXTRA' &&
