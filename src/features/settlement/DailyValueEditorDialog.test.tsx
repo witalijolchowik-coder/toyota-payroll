@@ -380,20 +380,44 @@ describe('DailyValueEditorDialog', () => {
     expect(screen.getByTestId('worked-hours')).toHaveTextContent('8 h');
     expect(screen.getByRole('button', { name: 'Zapisz' })).toBeDisabled();
   });
-  it('shows the plan once and separates the work-time metrics', () => {
+  it('shows the plan without suggesting unconfirmed attendance', () => {
     renderDialog();
 
     expect(screen.getAllByText(/06:00–14:00/)).toHaveLength(1);
-    expect(screen.getByTestId('worked-hours')).toHaveTextContent('8 h');
-    expect(screen.getByTestId('shortage-hours')).toHaveTextContent('0 h');
-    expect(screen.getByTestId('overtime-50-hours')).toHaveTextContent('0 h');
-    expect(screen.getByTestId('overtime-100-hours')).toHaveTextContent('0 h');
-    expect(screen.getByTestId('night-hours')).toHaveTextContent('0 h');
-    expect(screen.getByText('Zgodne z planem')).toBeInTheDocument();
+    expect(screen.getByLabelText('Rzeczywisty start')).toHaveValue('');
+    expect(screen.getByLabelText('Rzeczywisty koniec')).toHaveValue('');
+    expect(screen.queryByTestId('worked-hours')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Zapisz' })).toBeDisabled();
   });
+
+  it.each([0, 12])(
+    'keeps %s recorded hours separate from a D12 plan without actual punches',
+    (hours) => {
+      renderDialog({
+        value: { ...value, kind: 'manual', hours, fallbackHours: 12 },
+        plannedDay: {
+          ...plannedDay,
+          brigadeScheduled: true,
+          hours: 12,
+          plannedEndTime: '18:00',
+          plannedDuration: 12,
+        },
+      });
+      expect(screen.getByText(/06:00–18:00/)).toBeInTheDocument();
+      expect(screen.getByLabelText('Rzeczywisty start')).toHaveValue('');
+      expect(screen.getByLabelText('Rzeczywisty koniec')).toHaveValue('');
+      expect(screen.getByTestId('worked-hours')).toHaveTextContent(
+        `${hours} h`,
+      );
+      expect(screen.getByRole('button', { name: 'Zapisz' })).toBeDisabled();
+    },
+  );
 
   it('derives overtime or shortage previews from the actual interval', () => {
     renderDialog();
+    fireEvent.change(screen.getByLabelText('Rzeczywisty start'), {
+      target: { value: '06:00' },
+    });
 
     fireEvent.change(screen.getByLabelText('Rzeczywisty koniec'), {
       target: { value: '16:00' },
@@ -420,6 +444,12 @@ describe('DailyValueEditorDialog', () => {
         plannedEndTime: '06:00',
       },
     });
+    fireEvent.change(screen.getByLabelText('Rzeczywisty start'), {
+      target: { value: '22:00' },
+    });
+    fireEvent.change(screen.getByLabelText('Rzeczywisty koniec'), {
+      target: { value: '06:00' },
+    });
 
     expect(screen.getByTestId('night-hours')).toHaveTextContent('8 h');
   });
@@ -431,9 +461,9 @@ describe('DailyValueEditorDialog', () => {
     fireEvent.mouseDown(screen.getByLabelText('Planowana zmiana'));
     fireEvent.click(screen.getByRole('option', { name: 'Nocna zmiana' }));
 
-    expect(screen.getByLabelText('Rzeczywisty start')).toHaveValue('22:00');
-    expect(screen.getByLabelText('Rzeczywisty koniec')).toHaveValue('06:00');
-    expect(screen.getByTestId('night-hours')).toHaveTextContent('8 h');
+    expect(screen.getByLabelText('Rzeczywisty start')).toHaveValue('');
+    expect(screen.getByLabelText('Rzeczywisty koniec')).toHaveValue('');
+    expect(screen.queryByTestId('night-hours')).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Zapisz' }));
     await waitFor(() =>
@@ -448,6 +478,9 @@ describe('DailyValueEditorDialog', () => {
 
     fireEvent.mouseDown(screen.getByLabelText('Planowana zmiana'));
     fireEvent.click(screen.getByRole('option', { name: 'Nocna zmiana' }));
+    fireEvent.change(screen.getByLabelText('Rzeczywisty start'), {
+      target: { value: '22:00' },
+    });
     fireEvent.change(screen.getByLabelText('Rzeczywisty koniec'), {
       target: { value: '08:00' },
     });

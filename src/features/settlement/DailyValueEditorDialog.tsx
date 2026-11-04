@@ -151,14 +151,14 @@ export function DailyValueEditorDialog({
       ? ''
       : facts
         ? (facts.actual_start_time ?? '')
-        : (plannedDay?.plannedStartTime ?? ''));
+        : '');
   const initialEnd =
     value.workTimeCorrection?.actualEndTime ??
     (value.kind === 'imported-override'
       ? ''
       : facts
         ? (facts.actual_end_time ?? '')
-        : (plannedDay?.plannedEndTime ?? ''));
+        : '');
   const [actualStartTime, setActualStartTime] = useState(initialStart);
   const [actualEndTime, setActualEndTime] = useState(initialEnd);
   const sourceTimesUnchanged =
@@ -201,6 +201,9 @@ export function DailyValueEditorDialog({
           endTime: actualEndTime,
         }
       : null;
+  const scheduleNeedsSave =
+    isNormativeWorkingDay && plannedShift !== initialPlannedShift;
+  const scheduleOnly = scheduleNeedsSave && !actualStartTime && !actualEndTime;
   const timeValidationError = Boolean(
     inferredActual &&
     (!isValidClockTime(inferredActual.startTime) ||
@@ -215,7 +218,9 @@ export function DailyValueEditorDialog({
       ? defaultHours
       : inferredActual && !timeValidationError
         ? intervalHours(inferredActual)
-        : 0;
+        : value.kind === 'manual'
+          ? (value.hours ?? 0)
+          : 0;
   const effectiveParsedHours = timeValidationError
     ? parsedHours
     : ({ kind: 'value', hours: actualTotal } as const);
@@ -356,11 +361,29 @@ export function DailyValueEditorDialog({
     }
     if (
       timeValidationError ||
-      !inferredActual ||
+      (!inferredActual && !scheduleOnly) ||
       (isNormativeWorkingDay && (!plannedShift || !plannedInterval))
     )
       return;
     const normalizedNote = note.trim() || null;
+    if (scheduleOnly && plannedShift) {
+      setIsSubmitting(true);
+      setSubmitError(null);
+      try {
+        await onSaveScheduleCorrection(
+          plannedShift,
+          selectedPlannedHours,
+          normalizedNote,
+        );
+        await onWorkTimeCommitted('saved');
+        onClose();
+      } catch (error) {
+        setSubmitError(serviceErrorMessage(error, 'save', t));
+      } finally {
+        setIsSubmitting(false);
+      }
+      return;
+    }
     let mutation = decideDailyValueMutation({
       parsed: effectiveParsedHours,
       currentKind: value.kind,
@@ -378,6 +401,7 @@ export function DailyValueEditorDialog({
       hasImportedAttendance &&
       (actualStartTime !== initialStart || actualEndTime !== initialEnd);
     const needsCorrection =
+      Boolean(inferredActual && !hasImportedAttendance) ||
       importedTimesChanged ||
       (hasImportedAttendance && Boolean(value.workTimeCorrection)) ||
       (!sourceTimesUnchanged &&
@@ -410,7 +434,13 @@ export function DailyValueEditorDialog({
           ? 'save'
           : 'none';
     }
-    if (importedTimesChanged && correctionDetailsChanged) {
+    if (
+      correctionDetailsChanged &&
+      (importedTimesChanged ||
+        (!hasImportedAttendance &&
+          inferredActual &&
+          (actualStartTime !== initialStart || actualEndTime !== initialEnd)))
+    ) {
       mutation = 'save';
     } else if (
       mutation === 'none' &&
@@ -421,8 +451,6 @@ export function DailyValueEditorDialog({
     ) {
       mutation = 'save';
     }
-    const scheduleNeedsSave =
-      isNormativeWorkingDay && plannedShift !== initialPlannedShift;
     if (mutation === 'none' && !scheduleNeedsSave) return onClose();
     if (effectiveParsedHours.kind !== 'value' || !inferredActual) return;
 
@@ -555,24 +583,11 @@ export function DailyValueEditorDialog({
                         size="small"
                         label={t.settlement.editor.workTime.plannedShift}
                         value={plannedShift}
-                        onChange={(event) => {
-                          const next = event.target.value as ActualWorkingShift;
-                          const previousInterval = plannedInterval;
-                          const followsPreviousPlan = Boolean(
-                            previousInterval &&
-                            actualStartTime === previousInterval.startTime &&
-                            actualEndTime === previousInterval.endTime,
-                          );
-                          const interval = shiftIntervals[next];
-                          setPlannedShift(next);
-                          if (
-                            !facts &&
-                            (!actualStartTime || followsPreviousPlan)
+                        onChange={(event) =>
+                          setPlannedShift(
+                            event.target.value as ActualWorkingShift,
                           )
-                            setActualStartTime(interval.startTime);
-                          if (!facts && (!actualEndTime || followsPreviousPlan))
-                            setActualEndTime(interval.endTime);
-                        }}
+                        }
                       >
                         <MenuItem value="FIRST">
                           {t.organization.actualWorkingShifts.FIRST}
@@ -629,7 +644,6 @@ export function DailyValueEditorDialog({
                       label={t.settlement.editor.workTime.actualStart}
                       value={actualStartTime}
                       onValueChange={setActualStartTime}
-                      placeholder={plannedInterval?.startTime ?? ''}
                       error={timeValidationError}
                       helperText={
                         timeValidationError
@@ -643,7 +657,6 @@ export function DailyValueEditorDialog({
                       label={t.settlement.editor.workTime.actualEnd}
                       value={actualEndTime}
                       onValueChange={setActualEndTime}
-                      placeholder={plannedInterval?.endTime ?? ''}
                       error={timeValidationError}
                       helperText={t.settlement.editor.workTime.optional}
                       invalidMessage={t.input.exactTimeInvalid}
@@ -731,6 +744,15 @@ export function DailyValueEditorDialog({
                         </Typography>
                       </Box>
                     </Box>
+                  ) : value.kind === 'manual' &&
+                    !actualStartTime &&
+                    !actualEndTime ? (
+                    <WorkTimeMetric
+                      testId="worked-hours"
+                      label={t.settlement.editor.workTime.metrics.worked}
+                      hours={actualTotal}
+                      colors={palette.worked}
+                    />
                   ) : null}
                   {validationError ? (
                     <Alert severity="error">
@@ -842,7 +864,7 @@ export function DailyValueEditorDialog({
             disabled={
               isSubmitting ||
               (tab === 'hours' &&
-                (!inferredActual ||
+                ((!inferredActual && !scheduleOnly) ||
                   (isNormativeWorkingDay && !plannedShift) ||
                   multiDayAbsence ||
                   confirmedImportedL4 ||
