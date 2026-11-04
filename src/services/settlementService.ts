@@ -132,6 +132,24 @@ async function optionalSettlementLayer<T>(
   }
 }
 
+export function resolveSettlementDepartments(
+  mapped: readonly Department[],
+): Department[] {
+  const canonical = canonicalDepartmentsFallback();
+  const canonicalIds = new Set(canonical.map((department) => department.id));
+  const byId = new Map(mapped.map((department) => [department.id, department]));
+  return [
+    ...canonical.map((fallback) => byId.get(fallback.id) ?? fallback),
+    // Keep explicitly configured individual calendars without admitting legacy
+    // department aliases or enabling department-wide brigade scheduling.
+    ...mapped.filter(
+      (department) =>
+        !canonicalIds.has(department.id) &&
+        department.individualSchedulingOnly === true,
+    ),
+  ];
+}
+
 export async function loadSettlementMonth(
   monthId: MonthId,
   options: LoadSettlementMonthOptions = {},
@@ -220,20 +238,10 @@ export async function loadSettlementMonth(
         const snapshot = await getDocs(
           query(repositories.departments, orderBy('name')),
         );
-        const mapped = snapshot.docs
-          .map((document) =>
+        return resolveSettlementDepartments(
+          snapshot.docs.map((document) =>
             mapDepartmentDocument(document.id, document.data()),
-          )
-          .filter((department) =>
-            canonicalDepartmentsFallback().some(
-              (canonical) => canonical.id === department.id,
-            ),
-          );
-        const byId = new Map(
-          mapped.map((department) => [department.id, department]),
-        );
-        return canonicalDepartmentsFallback().map(
-          (fallback) => byId.get(fallback.id) ?? fallback,
+          ),
         );
       },
       canonicalDepartmentsFallback(),

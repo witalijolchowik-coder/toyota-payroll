@@ -3,6 +3,12 @@ import { vi } from 'vitest';
 
 import { SettlementGrid } from './SettlementGrid';
 import { createCalendarDays } from './monthUtils';
+import { resolveSettlementDepartments } from '../../services/settlementService';
+import { generateEmployeeMonthlySchedule } from '../../utils/schedule';
+import { calculateEmployeeMonthlyDraft } from '../../utils/payroll';
+import { october2026Schedule } from '../../utils/schedule/october2026.test-support';
+import { buildSettlementExportPackageForMonth } from './settlementExportBuilder';
+import * as XLSX from 'xlsx';
 import {
   balanceDaily,
   balanceFacts,
@@ -61,6 +67,105 @@ const department: Department = {
 };
 
 describe('SettlementGrid', () => {
+  it('uses a noncanonical individual-only department from the monthly loader in the grid, nominal and export', () => {
+    const maintenance: Department = {
+      ...department,
+      id: 'utrzymanie-ruchu',
+      name: 'Utrzymanie Ruchu',
+      shiftMode: 'UNKNOWN',
+      brigadeSchedulingFrom: '2026-10-01',
+      individualSchedulingOnly: true,
+    };
+    const departments = resolveSettlementDepartments([
+      maintenance,
+      { ...department, id: 'legacy-custom' },
+    ]);
+    expect(departments.some((d) => d.id === 'legacy-custom')).toBe(false);
+    const worker = {
+      ...employee,
+      departmentId: maintenance.id,
+      shiftAssignment: null,
+    };
+    const assignments: EmployeeAssignment[] = [
+      {
+        ...metadata,
+        id: 'individual-assignment',
+        employeeId: worker.id,
+        tetaNumber: worker.tetaNumber,
+        departmentId: maintenance.id,
+        shiftAssignment: null,
+        validFrom: '2026-10-01',
+        validTo: null,
+        status: 'ACTIVE',
+        note: null,
+      },
+    ];
+    const days = createCalendarDays('2026-10', {
+      today: new Date('2026-11-04'),
+    });
+    const brigadeScheduleDays = october2026Schedule(null, worker.id);
+    const props = {
+      employees: [worker],
+      departments,
+      employeeAssignments: assignments,
+      days,
+      dailyValues: [],
+      brigadeScheduleDays,
+    };
+    const view = render(<SettlementGrid {...props} displayMode="shifts" />);
+    const cells = () =>
+      within(screen.getByText('Jan Kowalski').closest('tr')!)
+        .getAllByRole('cell')
+        .slice(1);
+    expect(cells().map((c) => c.textContent)).toEqual(
+      'II II DW N I I I I I DW N I I I I I DW N I I I I I DW N WR WR WN WR WR N12'.split(
+        ' ',
+      ),
+    );
+    view.rerender(<SettlementGrid {...props} displayMode="hours" />);
+    expect(cells()[0]).toHaveTextContent('Plan: II · 8 h');
+    expect(cells()[1]).toHaveTextContent('Plan: II · 8 h');
+    expect(cells()[30]).toHaveTextContent('Plan: N12 · 12 h');
+    const plannedSchedule = generateEmployeeMonthlySchedule({
+      employee: worker,
+      days,
+      departments,
+      options: { assignments, brigadeScheduleDays },
+    });
+    const draft = calculateEmployeeMonthlyDraft({
+      monthId: '2026-10',
+      employee: worker,
+      dailyValues: [],
+      absences: [],
+      adjustments: [],
+      payrollSettings: [],
+      plannedSchedule,
+    });
+    expect(draft.totals.nominalHours).toBe(148);
+    const workbook = XLSX.read(
+      buildSettlementExportPackageForMonth({
+        monthId: '2026-10',
+        employees: [worker],
+        departments,
+        days,
+        dailyValues: [],
+        drafts: [draft],
+        reviewStates: [],
+        publicHolidays: new Set(),
+        plannedSchedulesByEmployeeId: new Map([[worker.id, plannedSchedule]]),
+      }).toyota.workbook,
+      { type: 'array' },
+    );
+    const rows = XLSX.utils
+      .sheet_to_json<(string | number)[]>(workbook.Sheets['Plan brygad']!, {
+        header: 1,
+      })
+      .slice(1);
+    expect(rows).toHaveLength(31);
+    expect(rows[27]?.slice(2)).toEqual(['WN', 0]);
+    expect(rows[30]?.slice(2)).toEqual(['N12', 12]);
+    expect(rows.reduce((sum, row) => sum + Number(row[3]), 0)).toBe(148);
+  });
   it('shows DW and N for ordinary non-working weekend days in shifts mode', () => {
     render(
       <SettlementGrid
