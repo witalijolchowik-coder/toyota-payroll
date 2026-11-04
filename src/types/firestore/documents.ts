@@ -85,6 +85,7 @@ export interface EmploymentEndEventDocument
 
 export interface DepartmentDocument extends ModificationMetadataDocument {
   brigade_scheduling_from?: IsoDate | null;
+  individual_scheduling_only?: boolean;
   name: string;
   shift_mode: DepartmentShiftMode;
   active: boolean;

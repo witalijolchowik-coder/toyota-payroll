@@ -39,6 +39,7 @@ export function SettlementExportPanel({
   drafts,
   reviewStates,
   publicHolidays,
+  plannedSchedulesByEmployeeId,
   mode = 'preview',
   finalArtifacts = null,
 }: SettlementExportPanelProps) {
@@ -54,6 +55,7 @@ export function SettlementExportPanel({
         drafts,
         reviewStates,
         publicHolidays,
+        plannedSchedulesByEmployeeId,
         mode,
       }),
     [
@@ -64,6 +66,7 @@ export function SettlementExportPanel({
       employees,
       monthId,
       publicHolidays,
+      plannedSchedulesByEmployeeId,
       reviewStates,
       mode,
     ],

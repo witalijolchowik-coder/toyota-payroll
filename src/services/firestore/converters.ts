@@ -304,6 +304,9 @@ export const employmentEndEventConverter =
 
 export const departmentConverter = createConverter<DepartmentDocument>(
   (data, path) => ({
+    ...(data.individual_scheduling_only === true
+      ? { individual_scheduling_only: true }
+      : {}),
     ...(data.brigade_scheduling_from
       ? {
           brigade_scheduling_from: readNonEmptyString(

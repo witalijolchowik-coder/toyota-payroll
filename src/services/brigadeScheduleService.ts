@@ -28,6 +28,7 @@ export async function loadBrigadeScheduleDays(
       employeeId: v.employee_id ?? null,
       date: v.date,
       kind: v.kind,
+      dayOffCode: v.day_off_code ?? undefined,
       startTime: v.start_time,
       endTime: v.end_time,
       plannedHours: v.planned_hours,
@@ -57,7 +58,7 @@ export async function saveBrigadeScheduleDays(
   const refs = days.map((d) =>
     doc(
       firestore,
-      `months/${d.date.slice(0, 7)}/brigadeScheduleDays/${d.departmentId}_${d.brigade}_${d.employeeId ?? 'brigade'}_${d.date}`,
+      `months/${d.date.slice(0, 7)}/brigadeScheduleDays/${d.departmentId}_${d.brigade ?? 'individual'}_${d.employeeId ?? 'brigade'}_${d.date}`,
     ),
   );
   await runTransaction(firestore, async (tx) => {
@@ -87,6 +88,7 @@ export async function saveBrigadeScheduleDays(
         employee_id: d.employeeId,
         date: d.date,
         kind: d.kind,
+        day_off_code: d.dayOffCode ?? null,
         start_time: d.startTime,
         end_time: d.endTime,
         planned_hours: d.plannedHours,
@@ -117,6 +119,7 @@ export async function saveBrigadeScheduleDays(
           operation: 'brigade-schedule-day-saved',
           planned_hours: d.plannedHours,
           kind: d.kind,
+          day_off_code: d.dayOffCode ?? null,
           employee_id: d.employeeId,
           brigade: d.brigade,
           date: d.date,

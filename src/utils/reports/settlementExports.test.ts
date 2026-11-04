@@ -12,6 +12,38 @@ import {
 } from './settlementExports';
 
 describe('settlement export formats', () => {
+  it('preserves each planned day-off code without changing payroll rows', () => {
+    const record = exportRecord({ id: '1', tetaNumber: 'T1' });
+    const codes = ['N', 'DW', 'WN', 'WR', 'ŚW', 'D12', 'N12'];
+    const input = { monthId: '2026-10', monthNominalHours: 176 };
+    const baseline = prepareSettlementExportPackage({
+      ...input,
+      records: [record],
+    });
+    const result = prepareSettlementExportPackage({
+      ...input,
+      records: [
+        {
+          ...record,
+          dailyCells: codes.map((planCode, index) => ({
+            dayOfMonth: index + 1,
+            hours: 0,
+            planCode,
+            plannedHours: index >= 5 ? 12 : 0,
+          })),
+        },
+      ],
+    });
+    expect(result.toyota.rows).toEqual(baseline.toyota.rows);
+    const workbook = XLSX.read(result.toyota.workbook, { type: 'array' });
+    expect(workbook.SheetNames).toEqual(['Godziny', 'Plan brygad']);
+    expect(
+      XLSX.utils
+        .sheet_to_json<string[]>(workbook.Sheets['Plan brygad']!, { header: 1 })
+        .slice(1)
+        .map((row) => row[2]),
+    ).toEqual(codes);
+  });
   it('distinguishes unfinished previews from final close artifacts', () => {
     const input = {
       monthId: '2026-06' as const,

@@ -8,6 +8,62 @@ import {
 } from '../../utils/attendance/balanceFixtures.test-support';
 import { createCalendarDays } from './monthUtils';
 import { EmployeeCalendarDialog } from './EmployeeCalendarDialog';
+import type { PlannedScheduleDay } from '../../utils/schedule';
+import { compactBrigadeShiftLabel } from './compactBrigadeShiftLabel';
+
+it.each([
+  ['FIRST', '06:00', '18:00', 'D12'],
+  ['NIGHT', '18:00', '06:00', 'N12'],
+] as const)(
+  'labels a 12-hour %s plan in the personal calendar',
+  (shift, start, end, label) => {
+    const employee = balanceEmployee();
+    const date = '2026-09-10';
+    const plannedDay: PlannedScheduleDay = {
+      employeeId: employee.id,
+      date,
+      status: 'WORKING',
+      source: 'calendar',
+      brigadeScheduled: true,
+      hours: 12,
+      plannedDuration: 12,
+      shift,
+      plannedStartTime: start,
+      plannedEndTime: end,
+      label: 'legacy',
+      departmentId: employee.departmentId,
+      shiftAssignment: employee.shiftAssignment,
+      reason: null,
+      holidayName: null,
+    };
+    render(
+      <EmployeeCalendarDialog
+        employee={employee}
+        monthLabel="wrzesień 2026"
+        days={createCalendarDays('2026-09', {
+          today: new Date('2026-10-01'),
+        }).filter((d) => d.isoDate === date)}
+        dailyValues={[]}
+        absences={[]}
+        departments={[]}
+        employeeAssignments={[]}
+        isSettled={false}
+        onClose={vi.fn()}
+        onEditDay={vi.fn()}
+        plannedSchedule={[plannedDay]}
+      />,
+    );
+    expect(screen.getByText(new RegExp(`^${label} ·`))).toBeInTheDocument();
+    expect(
+      compactBrigadeShiftLabel({
+        ...plannedDay,
+        status: 'DAY_OFF',
+        label: 'N',
+        hours: 0,
+      }),
+    ).toBeNull();
+  },
+);
 
 it('shows manual UW instead of suppressed Balance work in the personal calendar', () => {
   const employee = balanceEmployee();

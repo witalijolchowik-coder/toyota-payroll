@@ -2615,6 +2615,54 @@ describe('Firestore security rules', () => {
     );
   });
 
+  it('persists all five day-off codes on a colorless individual calendar', async () => {
+    await seedEmployee('employee-1');
+    await seedMonth('2026-10', false);
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    await assertSucceeds(
+      setDoc(doc(firestore, 'departments/utrzymanie-ruchu'), {
+        name: 'Utrzymanie Ruchu',
+        active: true,
+        shift_mode: 'UNKNOWN',
+        brigade_scheduling_from: '2026-10-01',
+        individual_scheduling_only: true,
+        ...modificationMetadata(uid),
+      }),
+    );
+    for (const [index, code] of ['N', 'DW', 'WN', 'WR', 'ŚW'].entries()) {
+      const date = `2026-10-0${index + 1}`;
+      const ref = doc(
+        firestore,
+        `months/2026-10/brigadeScheduleDays/utrzymanie-ruchu_individual_employee-1_${date}`,
+      );
+      await assertSucceeds(
+        setDoc(ref, {
+          department_id: 'utrzymanie-ruchu',
+          brigade: null,
+          employee_id: 'employee-1',
+          date,
+          kind: 'DAY_OFF',
+          day_off_code: code,
+          start_time: null,
+          end_time: null,
+          planned_hours: 0,
+          status: 'ACTIVE',
+          note: null,
+          ...modificationMetadata(uid),
+        }),
+      );
+      expect((await getDoc(ref)).data()?.day_off_code).toBe(code);
+      await assertFails(
+        updateDoc(ref, {
+          day_off_code: 'DV',
+          updated_at: serverTimestamp(),
+          updated_by: uid,
+        }),
+      );
+    }
+  });
+
   it('allows live-shaped contract history and soft cancellation for an approved user', async () => {
     await seedEmployee('employee-1');
     const uid = 'coordinator-1';

@@ -214,6 +214,7 @@ service cloud.firestore {
         ])
         && data.keys().hasOnly([
           'brigade_scheduling_from',
+          'individual_scheduling_only',
           'name',
           'shift_mode',
           'active',
@@ -225,6 +226,7 @@ service cloud.firestore {
           'updated_by'
         ])
         && isNonEmptyString(data.name)
+        && data.get('individual_scheduling_only', false) is bool
         && (!data.keys().hasAny(['brigade_scheduling_from']) || data.brigade_scheduling_from == null || isIsoDate(data.brigade_scheduling_from))
         && data.shift_mode in ['UNKNOWN', 'TWO_SHIFT', 'THREE_SHIFT']
         && data.active is bool
@@ -1652,16 +1654,18 @@ service cloud.firestore {
       match /brigadeScheduleDays/{dayId} {
         function validBrigadeDay(data) {
           return data.keys().hasAll(['department_id','brigade','employee_id','date','kind','start_time','end_time','planned_hours','status','note','created_at','created_by','updated_at','updated_by'])
-            && data.keys().hasOnly(['department_id','brigade','employee_id','date','kind','start_time','end_time','planned_hours','status','note','created_at','created_by','updated_at','updated_by'])
+            && data.keys().hasOnly(['department_id','brigade','employee_id','date','kind','day_off_code','start_time','end_time','planned_hours','status','note','created_at','created_by','updated_at','updated_by'])
             && isNonEmptyString(data.department_id)
-            && data.brigade in ['RED','WHITE','BLUE','YELLOW','ORANGE']
+            && (data.brigade in ['RED','WHITE','BLUE','YELLOW','ORANGE'] || (data.brigade == null && data.employee_id != null))
             && (data.employee_id == null || (isNonEmptyString(data.employee_id) && exists(/databases/$(database)/documents/employees/$(data.employee_id))))
             && isIsoDate(data.date) && data.date[0:7] == monthId
-            && dayId == data.department_id + '_' + data.brigade + '_' + (data.employee_id == null ? 'brigade' : data.employee_id) + '_' + data.date
+            && dayId == data.department_id + '_' + (data.brigade == null ? 'individual' : data.brigade) + '_' + (data.employee_id == null ? 'brigade' : data.employee_id) + '_' + data.date
             && exists(/databases/$(database)/documents/departments/$(data.department_id))
             && get(/databases/$(database)/documents/departments/$(data.department_id)).data.active == true
+            && (!get(/databases/$(database)/documents/departments/$(data.department_id)).data.get('individual_scheduling_only', false) || data.brigade == null)
             && get(/databases/$(database)/documents/departments/$(data.department_id)).data.brigade_scheduling_from <= data.date
             && data.status in ['ACTIVE','CANCELLED'] && isNullableString(data.note)
+            && (data.get('day_off_code', null) == null || (data.kind == 'DAY_OFF' && data.day_off_code in ['N','DW','WN','WR','ŚW']))
             && data.planned_hours is number && data.planned_hours >= 0 && data.planned_hours <= 24
             && ((data.kind == 'DAY_OFF' && data.planned_hours == 0 && data.start_time == null && data.end_time == null)
               || (data.kind in ['DAY','NIGHT'] && data.planned_hours > 0 && isClockTime(data.start_time) && isClockTime(data.end_time) && data.start_time != data.end_time

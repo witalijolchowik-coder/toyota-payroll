@@ -163,41 +163,56 @@ export function generateEmployeeMonthlySchedule({
         assignment.shiftAssignment,
         day.isoDate,
       );
-      base = {
-        ...base,
-        brigadeScheduled: true,
-        departmentId: assignment.departmentId,
-        shiftAssignment: assignment.shiftAssignment,
-        source: 'calendar',
-        status: configured
-          ? configured.kind === 'DAY_OFF'
-            ? 'DAY_OFF'
-            : 'WORKING'
-          : 'UNRESOLVED',
-        hours: configured ? configured.plannedHours : null,
-        shift:
-          configured && configured.kind !== 'DAY_OFF'
-            ? configured.kind === 'NIGHT'
-              ? 'NIGHT'
-              : 'FIRST'
-            : null,
-        label: configured
-          ? configured.kind === 'DAY_OFF'
-            ? 'W'
-            : `${configured.plannedHours} / ${configured.kind === 'NIGHT' ? 'N' : 'D'}`
-          : '!',
-        reason:
-          configured?.note ?? (configured ? null : 'brigade-schedule-missing'),
-        plannedStartTime: configured?.startTime ?? null,
-        plannedEndTime: configured?.endTime ?? null,
-        plannedDuration: configured?.plannedHours ?? null,
-      };
+      if (
+        configured ||
+        (!department?.individualSchedulingOnly &&
+          assignment.shiftAssignment !== null)
+      )
+        base = {
+          ...base,
+          brigadeScheduled: true,
+          departmentId: assignment.departmentId,
+          shiftAssignment: assignment.shiftAssignment,
+          source: 'calendar',
+          status: configured
+            ? configured.kind === 'DAY_OFF'
+              ? 'DAY_OFF'
+              : 'WORKING'
+            : 'UNRESOLVED',
+          hours: configured ? configured.plannedHours : null,
+          shift:
+            configured && configured.kind !== 'DAY_OFF'
+              ? configured.kind === 'NIGHT'
+                ? 'NIGHT'
+                : configured.startTime === '14:00' &&
+                    configured.endTime === '22:00'
+                  ? 'SECOND'
+                  : 'FIRST'
+              : null,
+          label: configured
+            ? configured.kind === 'DAY_OFF'
+              ? (configured.dayOffCode ?? 'W')
+              : configured.plannedHours === 8
+                ? configured.kind === 'NIGHT'
+                  ? 'III'
+                  : configured.startTime === '14:00'
+                    ? 'II'
+                    : 'I'
+                : `${configured.plannedHours} / ${configured.kind === 'NIGHT' ? 'N' : 'D'}`
+            : '!',
+          reason:
+            configured?.note ??
+            (configured ? null : 'brigade-schedule-missing'),
+          plannedStartTime: configured?.startTime ?? null,
+          plannedEndTime: configured?.endTime ?? null,
+          plannedDuration: configured?.plannedHours ?? null,
+        };
     }
 
     if (
       !correction ||
       base.status === 'OUTSIDE_EMPLOYMENT' ||
-      (!brigadeEnabled &&
+      (!base.brigadeScheduled &&
         (base.status === 'DAY_OFF' || base.status === 'PUBLIC_HOLIDAY'))
     ) {
       return base;

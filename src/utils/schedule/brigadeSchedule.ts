@@ -5,13 +5,17 @@ import type {
 } from '../../types/firestore';
 import { intervalHours, isValidClockTime } from '../payroll/workTimeDeviations';
 
+export const BRIGADE_DAY_OFF_CODES = ['N', 'DW', 'WN', 'WR', 'ŚW'] as const;
+export type BrigadeDayOffCode = (typeof BRIGADE_DAY_OFF_CODES)[number];
+
 export interface BrigadeScheduleDay {
   id: string;
   departmentId: string;
-  brigade: EmployeeColorShift;
+  brigade: EmployeeColorShift | null;
   employeeId: string | null;
   date: IsoDate;
   kind: 'DAY' | 'NIGHT' | 'DAY_OFF';
+  dayOffCode?: BrigadeDayOffCode;
   startTime: string | null;
   endTime: string | null;
   plannedHours: number;
@@ -41,14 +45,21 @@ export function validateBrigadeScheduleDay(day: BrigadeScheduleDay): boolean {
   if (
     !day.departmentId ||
     !['ACTIVE', 'CANCELLED'].includes(day.status) ||
-    !['RED', 'WHITE', 'BLUE', 'YELLOW', 'ORANGE'].includes(day.brigade)
+    !(day.brigade === null
+      ? Boolean(day.employeeId)
+      : ['RED', 'WHITE', 'BLUE', 'YELLOW', 'ORANGE'].includes(day.brigade))
   )
     return false;
   if (day.kind === 'DAY_OFF')
     return (
-      day.plannedHours === 0 && day.startTime === null && day.endTime === null
+      day.plannedHours === 0 &&
+      day.startTime === null &&
+      day.endTime === null &&
+      (day.dayOffCode === undefined ||
+        BRIGADE_DAY_OFF_CODES.includes(day.dayOffCode))
     );
   return (
+    day.dayOffCode === undefined &&
     ['DAY', 'NIGHT'].includes(day.kind) &&
     Boolean(
       day.startTime &&

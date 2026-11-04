@@ -12,6 +12,8 @@ import {
 } from '../../utils/payroll';
 import { canonicalDepartmentOfficialName } from '../../utils/organization';
 import { prepareSettlementExportPackage } from '../../utils/reports';
+import type { PlannedScheduleDay } from '../../utils/schedule';
+import { compactBrigadeShiftLabel } from './compactBrigadeShiftLabel';
 import {
   dailyValueLookupKey,
   resolveSettlementCellValue,
@@ -27,6 +29,10 @@ export interface SettlementExportBuildInput {
   drafts: EmployeeMonthlyCalculationDraft[];
   reviewStates: SettlementReviewState[];
   publicHolidays: ReadonlySet<string>;
+  plannedSchedulesByEmployeeId?: ReadonlyMap<
+    string,
+    readonly PlannedScheduleDay[]
+  >;
   mode?: 'preview' | 'final';
 }
 
@@ -39,6 +45,7 @@ export function buildSettlementExportPackageForMonth({
   drafts,
   reviewStates,
   publicHolidays,
+  plannedSchedulesByEmployeeId,
   mode = 'preview',
 }: SettlementExportBuildInput) {
   const departmentsById = new Map(
@@ -61,6 +68,11 @@ export function buildSettlementExportPackageForMonth({
     const employee = employeesById.get(draft.employeeId);
     if (!employee) return [];
     const reviewItem = reviewItemsByEmployeeId.get(employee.id);
+    const planByDate = new Map(
+      plannedSchedulesByEmployeeId
+        ?.get(employee.id)
+        ?.map((day) => [day.date, day]),
+    );
     return [
       {
         employee,
@@ -77,16 +89,25 @@ export function buildSettlementExportPackageForMonth({
         draft,
         reviewStatus: reviewItem?.effectiveStatus,
         unresolvedIssueCount: reviewItem?.unresolvedIssueCount ?? 0,
-        dailyCells: days.map((day) => ({
-          dayOfMonth: day.dayOfMonth,
-          hours: resolveSettlementCellValue({
-            employee,
-            day,
-            persistedValue: dailyValuesByEmployeeAndDate.get(
-              dailyValueLookupKey(employee.id, day.isoDate),
-            ),
-          }).hours,
-        })),
+        dailyCells: days.map((day) => {
+          const planned = planByDate.get(day.isoDate);
+          return {
+            dayOfMonth: day.dayOfMonth,
+            hours: resolveSettlementCellValue({
+              employee,
+              day,
+              persistedValue: dailyValuesByEmployeeAndDate.get(
+                dailyValueLookupKey(employee.id, day.isoDate),
+              ),
+            }).hours,
+            ...(planned?.brigadeScheduled && planned.hours !== null
+              ? {
+                  planCode: compactBrigadeShiftLabel(planned) ?? planned.label,
+                  plannedHours: planned.hours,
+                }
+              : {}),
+          };
+        }),
       },
     ];
   });

@@ -354,6 +354,7 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
     drafts: calculationDrafts,
     reviewStates: data.reviewStates,
     publicHolidays,
+    plannedSchedulesByEmployeeId,
     mode: 'final',
   });
   const draftsByEmployeeId = new Map(
@@ -848,6 +849,7 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
             onSaveReview={saveReviewState}
           />
           <SettlementExportPanel
+            plannedSchedulesByEmployeeId={plannedSchedulesByEmployeeId}
             monthId={monthId}
             employees={participatingEmployees}
             departments={data.departments}

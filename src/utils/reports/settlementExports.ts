@@ -20,6 +20,8 @@ export interface ExportEmployeeIdentity {
 export interface SettlementExportDailyCell {
   dayOfMonth: number;
   hours: number | null;
+  planCode?: string;
+  plannedHours?: number;
 }
 
 export interface SettlementExportRecord {
@@ -519,6 +521,20 @@ export function prepareSettlementExportPackage({
         sheetName: 'Godziny',
         headers: TOYOTA_EXPORT_HEADERS,
         rows: toyotaRows.map((row) => row.cells),
+        plannedCalendarRows: records.flatMap((record) =>
+          (record.dailyCells ?? []).flatMap((day) =>
+            day.planCode
+              ? [
+                  [
+                    record.employee.tetaNumber,
+                    `${monthId}-${String(day.dayOfMonth).padStart(2, '0')}`,
+                    day.planCode,
+                    day.plannedHours ?? 0,
+                  ],
+                ]
+              : [],
+          ),
+        ),
         unfinished: incomplete,
       }),
     },
@@ -1052,11 +1068,13 @@ function escapeCsvCell(value: string) {
 }
 
 function renderXlsxWorkbook({
+  plannedCalendarRows = [],
   sheetName,
   headers,
   rows,
   unfinished,
 }: {
+  plannedCalendarRows?: (string | number)[][];
   sheetName: string;
   headers: readonly string[];
   rows: readonly string[][];
@@ -1088,6 +1106,16 @@ function renderXlsxWorkbook({
   }
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+  if (plannedCalendarRows.length) {
+    XLSX.utils.book_append_sheet(
+      workbook,
+      XLSX.utils.aoa_to_sheet([
+        ['TETA', 'Data', 'Kod planu', 'Planowane godziny'],
+        ...plannedCalendarRows,
+      ]),
+      'Plan brygad',
+    );
+  }
   const output = XLSX.write(workbook, {
     bookType: 'xlsx',
     type: 'array',

@@ -74,6 +74,10 @@ import {
 } from '../../utils/calendarAppearance';
 import { buildCalendarEmployeeRows } from './settlementCalendarLayout';
 import { EffectiveAssignmentLabel } from './EffectiveAssignmentLabel';
+import {
+  calendarDayOffLabel,
+  compactBrigadeShiftLabel,
+} from './compactBrigadeShiftLabel';
 
 interface SettlementGridProps {
   brigadeScheduleDays?: import('../../utils/schedule/brigadeSchedule').BrigadeScheduleDay[];
@@ -706,7 +710,8 @@ function departmentIcon(
     'pl-PL',
   );
   if (key.includes('szwal')) return <CheckroomOutlined />;
-  if (key.includes('monta')) return <BuildOutlined />;
+  if (key.includes('monta') || key.includes('utrzymanie'))
+    return <BuildOutlined />;
   if (key.includes('metal')) return <PrecisionManufacturingOutlined />;
   if (key.includes('magaz')) return <Inventory2Outlined />;
   if (key.includes('headliner')) return <ViewStreamOutlined />;
@@ -839,7 +844,12 @@ function cellDisplayLabel({
     return hoursLabel;
   }
 
-  return plannedDay?.label ?? (value.hours === null ? emptyLabel : hoursLabel);
+  return (
+    compactBrigadeShiftLabel(plannedDay) ??
+    calendarDayOffLabel(plannedDay) ??
+    plannedDay?.label ??
+    (value.hours === null ? emptyLabel : hoursLabel)
+  );
 }
 
 function resolveGridWorkTimeBreakdown({

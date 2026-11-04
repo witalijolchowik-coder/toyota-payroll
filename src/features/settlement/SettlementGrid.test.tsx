@@ -61,6 +61,24 @@ const department: Department = {
 };
 
 describe('SettlementGrid', () => {
+  it('shows DW and N for ordinary non-working weekend days in shifts mode', () => {
+    render(
+      <SettlementGrid
+        employees={[employee]}
+        departments={[department]}
+        dailyValues={[]}
+        days={createCalendarDays('2026-10', {
+          today: new Date('2026-11-01'),
+        }).filter((d) => ['2026-10-03', '2026-10-04'].includes(d.isoDate))}
+        displayMode="shifts"
+      />,
+    );
+    const cells = within(
+      screen.getByText('Jan Kowalski').closest('tr')!,
+    ).getAllByRole('cell');
+    expect(cells[1]).toHaveTextContent(/^DW$/);
+    expect(cells[2]).toHaveTextContent(/^N$/);
+  });
   it('displays an explicit twelve-hour weekend brigade plan and a weekday day off', () => {
     const brigadeDepartment = {
       ...department,
@@ -112,7 +130,7 @@ describe('SettlementGrid', () => {
     expect(cells()[1]).toHaveTextContent('12 h');
     expect(cells()[2]).toHaveTextContent('0 h');
     rerender(<SettlementGrid {...props} displayMode="shifts" />);
-    expect(cells()[1]).toHaveTextContent('12 / N');
+    expect(cells()[1]).toHaveTextContent('N12');
     expect(cells()[2]).toHaveTextContent('W');
   });
   it('shows the manual absence instead of Balance work and restores raw work after cancellation', () => {

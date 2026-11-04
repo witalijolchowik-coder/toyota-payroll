@@ -18,7 +18,11 @@ import type {
 import { EMPLOYEE_COLOR_SHIFTS } from '../../utils/organization';
 import { resolveEffectiveAssignment } from '../../utils/schedule';
 import { intervalHours } from '../../utils/payroll/workTimeDeviations';
-import type { BrigadeScheduleDay } from '../../utils/schedule/brigadeSchedule';
+import {
+  BRIGADE_DAY_OFF_CODES,
+  type BrigadeDayOffCode,
+  type BrigadeScheduleDay,
+} from '../../utils/schedule/brigadeSchedule';
 import { saveBrigadeScheduleDays } from '../../services/brigadeScheduleService';
 
 export function BrigadeCalendarPanel({
@@ -45,11 +49,14 @@ export function BrigadeCalendarPanel({
       d.brigadeSchedulingFrom.slice(0, 7) <= monthId,
   );
   const [departmentId, setDepartmentId] = useState(available[0]?.id ?? '');
-  const [brigade, setBrigade] = useState<EmployeeColorShift>('WHITE');
+  const [brigade, setBrigade] = useState<EmployeeColorShift | ''>(
+    available[0]?.individualSchedulingOnly ? '' : 'WHITE',
+  );
   const [employeeId, setEmployeeId] = useState('');
   const [from, setFrom] = useState(monthId + '-01'),
     [to, setTo] = useState(monthId + '-01');
   const [kind, setKind] = useState<BrigadeScheduleDay['kind']>('DAY');
+  const [dayOffCode, setDayOffCode] = useState<BrigadeDayOffCode>('DW');
   const [start, setStart] = useState('06:00'),
     [end, setEnd] = useState('18:00');
   const [note, setNote] = useState(''),
@@ -59,12 +66,14 @@ export function BrigadeCalendarPanel({
   if (!available.length) return null;
   const members = employees.filter((e) => {
     const a = resolveEffectiveAssignment(e, from, assignments);
-    return a.departmentId === departmentId && a.shiftAssignment === brigade;
+    return (
+      a.departmentId === departmentId && a.shiftAssignment === (brigade || null)
+    );
   });
   const selected = plans.find(
     (p) =>
       p.departmentId === departmentId &&
-      p.brigade === brigade &&
+      p.brigade === (brigade || null) &&
       (p.employeeId ?? '') === employeeId &&
       p.date === from &&
       p.status === 'ACTIVE',
@@ -93,10 +102,11 @@ export function BrigadeCalendarPanel({
         values.push({
           id: '',
           departmentId,
-          brigade,
+          brigade: brigade || null,
           employeeId: employeeId || null,
           date,
           kind,
+          ...(kind === 'DAY_OFF' ? { dayOffCode } : {}),
           startTime: kind === 'DAY_OFF' ? null : start,
           endTime: kind === 'DAY_OFF' ? null : end,
           plannedHours: hours,
@@ -149,6 +159,12 @@ export function BrigadeCalendarPanel({
                   value={departmentId}
                   onChange={(e) => {
                     setDepartmentId(e.target.value);
+                    setBrigade(
+                      available.find((d) => d.id === e.target.value)
+                        ?.individualSchedulingOnly
+                        ? ''
+                        : 'WHITE',
+                    );
                     setEmployeeId('');
                   }}
                   fullWidth
@@ -164,16 +180,21 @@ export function BrigadeCalendarPanel({
                   label="Brygada"
                   value={brigade}
                   onChange={(e) => {
-                    setBrigade(e.target.value as EmployeeColorShift);
+                    setBrigade(e.target.value as EmployeeColorShift | '');
                     setEmployeeId('');
                   }}
                   fullWidth
                 >
-                  {EMPLOYEE_COLOR_SHIFTS.map((b) => (
+                  {(!available.find((d) => d.id === departmentId)
+                    ?.individualSchedulingOnly
+                    ? EMPLOYEE_COLOR_SHIFTS
+                    : []
+                  ).map((b) => (
                     <MenuItem key={b} value={b}>
                       {b}
                     </MenuItem>
                   ))}
+                  <MenuItem value="">Bez brygady — plan indywidualny</MenuItem>
                 </TextField>
                 <TextField
                   select
@@ -182,13 +203,40 @@ export function BrigadeCalendarPanel({
                   onChange={(e) => setEmployeeId(e.target.value)}
                   fullWidth
                 >
-                  <MenuItem value="">Cała brygada</MenuItem>
+                  <MenuItem value="" disabled={!brigade}>
+                    {brigade ? 'Cała brygada' : 'Wybierz pracownika'}
+                  </MenuItem>
                   {members.map((e) => (
                     <MenuItem key={e.id} value={e.id}>
                       {e.lastName} {e.firstName}
                     </MenuItem>
                   ))}
                 </TextField>
+                {kind === 'DAY_OFF' ? (
+                  <TextField
+                    select
+                    label="Rodzaj dnia wolnego"
+                    value={dayOffCode}
+                    onChange={(e) =>
+                      setDayOffCode(e.target.value as BrigadeDayOffCode)
+                    }
+                  >
+                    {BRIGADE_DAY_OFF_CODES.map((code) => (
+                      <MenuItem key={code} value={code}>
+                        {code} —{' '}
+                        {
+                          {
+                            N: 'Niedziela wolna',
+                            DW: 'Dzień wolny',
+                            WN: 'Wolne za niedzielę',
+                            WR: 'Wolne rozkładowe',
+                            ŚW: 'Święto',
+                          }[code]
+                        }
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                ) : null}
               </Stack>
               <Stack direction={{ xs: 'column', md: 'row' }} spacing={1}>
                 <TextField
@@ -252,7 +300,7 @@ export function BrigadeCalendarPanel({
               <Typography variant="body2">
                 Zapis na {from}:{' '}
                 {selected
-                  ? `${selected.kind}, ${selected.plannedHours} h${selected.startTime ? ' ' + selected.startTime + '–' + selected.endTime : ''}`
+                  ? `${selected.dayOffCode ?? selected.kind}, ${selected.plannedHours} h${selected.startTime ? ' ' + selected.startTime + '–' + selected.endTime : ''}`
                   : 'Brak aktywnego wpisu'}
                 . Pracownicy brygady na tę datę: {members.length}.
               </Typography>
@@ -260,6 +308,7 @@ export function BrigadeCalendarPanel({
                 <Button
                   onClick={() => {
                     setKind(selected.kind);
+                    setDayOffCode(selected.dayOffCode ?? 'DW');
                     setStart(selected.startTime ?? '06:00');
                     setEnd(selected.endTime ?? '18:00');
                     setNote(selected.note ?? '');
@@ -272,7 +321,9 @@ export function BrigadeCalendarPanel({
               <Stack direction="row" spacing={1}>
                 <Button
                   variant="contained"
-                  disabled={locked || busy || !departmentId}
+                  disabled={
+                    locked || busy || !departmentId || (!brigade && !employeeId)
+                  }
                   onClick={() => void save()}
                 >
                   Zapisz plan

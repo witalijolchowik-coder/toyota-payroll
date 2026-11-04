@@ -46,6 +46,10 @@ import {
   appearanceKeyForPlannedDay,
 } from '../../utils/calendarAppearance';
 import { EffectiveAssignmentLabel } from './EffectiveAssignmentLabel';
+import {
+  calendarDayOffLabel,
+  compactBrigadeShiftLabel,
+} from './compactBrigadeShiftLabel';
 
 interface EmployeeCalendarDialogProps {
   employee: Employee;
@@ -200,6 +204,8 @@ export function EmployeeCalendarDialog({
               }
               const persistedValue = dailyValuesByDate.get(cell.day.isoDate);
               const plannedDay = plannedScheduleByDate.get(cell.day.isoDate);
+              const compactShift = compactBrigadeShiftLabel(plannedDay);
+              const dayOffLabel = calendarDayOffLabel(plannedDay);
               const value = resolveSettlementCellValue({
                 employee,
                 day: cell.day,
@@ -371,10 +377,16 @@ export function EmployeeCalendarDialog({
                             {absenceLabel}
                           </Typography>
                         ) : null}
+                        {dayOffLabel ? (
+                          <Typography variant="caption" color="text.secondary">
+                            {dayOffLabel}
+                          </Typography>
+                        ) : null}
                         {plannedDay?.plannedStartTime &&
                         plannedDay.plannedEndTime &&
                         plannedDay.plannedDuration !== null ? (
                           <Typography variant="caption" color="text.secondary">
+                            {compactShift ? `${compactShift} · ` : null}
                             {interpolate(
                               t.settlement.editor.workTime.planDetails,
                               {

@@ -122,6 +122,9 @@ export function mapDepartmentDocument(
   document: DepartmentDocument,
 ): Department {
   return {
+    ...(document.individual_scheduling_only
+      ? { individualSchedulingOnly: true }
+      : {}),
     ...(document.brigade_scheduling_from
       ? { brigadeSchedulingFrom: document.brigade_scheduling_from }
       : {}),

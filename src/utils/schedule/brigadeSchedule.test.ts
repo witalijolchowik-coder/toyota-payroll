@@ -8,6 +8,7 @@ import {
 import { resolveDailyWorkTimeDeviation } from '../payroll/workTimeDeviations';
 import { plannedNightContext } from '../payroll/plannedNightContext';
 import { generateEmployeeMonthlySchedule } from './monthlySchedule';
+import { october2026Schedule } from './october2026.test-support';
 import {
   resolveBrigadeScheduleDay,
   validateBrigadeScheduleDay,
@@ -101,6 +102,58 @@ const calculate = (plan: ReturnType<typeof schedule>, worker = employee) =>
   });
 
 describe('explicit department opt-in brigade calendar', () => {
+  it.each([
+    ['ORANGE', 124],
+    ['YELLOW', 124],
+    ['RED', 148],
+    ['WHITE', 176],
+    ['BLUE', 148],
+    [null, 148],
+  ] as const)(
+    'validates the complete October %s calendar and nominal',
+    (brigade, nominal) => {
+      const entries = october2026Schedule(
+        brigade,
+        brigade === null ? employee.id : null,
+      );
+      const dept = {
+        ...department,
+        id: entries[0]!.departmentId,
+        individualSchedulingOnly: brigade === null,
+      };
+      const worker = {
+        ...employee,
+        departmentId: dept.id,
+        shiftAssignment: brigade,
+      };
+      expect(entries.map((d) => d.date)).toEqual(days.map((d) => d.isoDate));
+      expect(entries.every(validateBrigadeScheduleDay)).toBe(true);
+      const plan = schedule(JSON.parse(JSON.stringify(entries)), worker, dept);
+      expect(plan.map((d) => d.hours)).toEqual(
+        entries.map((d) => d.plannedHours),
+      );
+      expect(calculate(plan, worker).totals.nominalHours).toBe(nominal);
+      for (const [index, entry] of entries.entries()) {
+        if (entry.dayOffCode) expect(plan[index]?.label).toBe(entry.dayOffCode);
+        if (entry.startTime === '14:00')
+          expect(plan[index]?.shift).toBe('SECOND');
+        if (entry.startTime === '18:00')
+          expect(plan[index]).toMatchObject({
+            date: entry.date,
+            plannedStartTime: '18:00',
+            plannedEndTime: '06:00',
+            hours: 12,
+          });
+      }
+    },
+  );
+
+  it('keeps the default plan for employees without a brigade or individual plan', () => {
+    const worker = { ...employee, shiftAssignment: null };
+    expect(schedule(october2026Schedule('RED'), worker)).toEqual(
+      schedule([], worker, { ...department, brigadeSchedulingFrom: undefined }),
+    );
+  });
   it.each(CANONICAL_DEPARTMENTS.map((d) => [d.id, d] as const))(
     'preserves the complete non-brigade payroll for %s',
     (_, definition) => {
