@@ -1178,14 +1178,13 @@ function renderXlsxWorkbook({
     XLSX.utils.book_append_sheet(workbook, summary, 'Nominały');
   }
   if (plannedCalendarRows.length) {
-    XLSX.utils.book_append_sheet(
-      workbook,
-      XLSX.utils.aoa_to_sheet([
-        ['TETA', 'Data', 'Kod planu', 'Planowane godziny'],
-        ...plannedCalendarRows,
-      ]),
-      'Plan brygad',
-    );
+    const planSheet = XLSX.utils.aoa_to_sheet([
+      ['TETA', 'Data', 'Kod planu', 'Planowane godziny'],
+      ...plannedCalendarRows,
+    ]);
+    planSheet['!cols'] = [{ wch: 18 }, { wch: 14 }, { wch: 12 }, { wch: 22 }];
+    planSheet['!rows'] = [{ hpt: 24 }];
+    XLSX.utils.book_append_sheet(workbook, planSheet, 'Plan brygad');
   }
   const output = XLSX.write(workbook, {
     bookType: 'xlsx',

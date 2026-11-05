@@ -31,6 +31,7 @@ import type {
   SettlementTotalsDocument,
 } from '../../types/firestore';
 import {
+  InvalidFirestoreDocumentError,
   readBoolean,
   readEnum,
   readNonEmptyString,
@@ -213,9 +214,52 @@ function readShiftIntervals(data: DocumentData, path: string) {
   ) as ShiftHoursVersionDocument['intervals'];
 }
 
+function readMonthlySalaryRates(data: DocumentData, path: string) {
+  const rates = data.monthly_salary_rates;
+  if (!Array.isArray(rates) || rates.length > 12) {
+    throw new InvalidFirestoreDocumentError(
+      path,
+      'monthly_salary_rates',
+      'a list of at most 12 dated rates',
+    );
+  }
+  let previous = '';
+  return rates.map((value: unknown) => {
+    const rate = readObject({ rate: value }, 'rate', path);
+    const valid_from = readString(rate, 'valid_from', path);
+    const gross_monthly = readNumber(rate, 'gross_monthly', path);
+    if (
+      !/^[0-9]{4}-(0[1-9]|1[0-2])$/.test(valid_from) ||
+      valid_from <= previous ||
+      gross_monthly <= 0 ||
+      gross_monthly > 1000000
+    ) {
+      throw new InvalidFirestoreDocumentError(
+        path,
+        'monthly_salary_rates',
+        'ordered unique months with positive gross rates',
+      );
+    }
+    previous = valid_from;
+    return { valid_from, gross_monthly };
+  });
+}
+
 export const employeeConverter = createConverter<EmployeeDocument>(
   (data, path) => ({
     teta_number: readString(data, 'teta_number', path),
+    ...(data.monthly_salary_rates !== undefined
+      ? { monthly_salary_rates: readMonthlySalaryRates(data, path) }
+      : {}),
+    ...(data.payroll_report_teta_number !== undefined
+      ? {
+          payroll_report_teta_number: readOptionalNullableString(
+            data,
+            'payroll_report_teta_number',
+            path,
+          ),
+        }
+      : {}),
     first_name: readNonEmptyString(data, 'first_name', path),
     last_name: readNonEmptyString(data, 'last_name', path),
     pesel: readOptionalNullableString(data, 'pesel', path) ?? null,

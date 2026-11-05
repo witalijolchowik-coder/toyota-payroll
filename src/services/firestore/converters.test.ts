@@ -69,6 +69,8 @@ describe('Firestore converters', () => {
     const document = employeeConverter.fromFirestore(
       snapshot('employees/employee-1', {
         teta_number: 'TETA-1001',
+        monthly_salary_rates: [{ valid_from: '2026-10', gross_monthly: 6248 }],
+        payroll_report_teta_number: 'WT-07832652',
         first_name: 'Test',
         last_name: 'Employee',
         pesel: '87010409887',
@@ -97,6 +99,8 @@ describe('Firestore converters', () => {
     expect(mapEmployeeDocument('employee-1', document)).toMatchObject({
       id: 'employee-1',
       tetaNumber: 'TETA-1001',
+      monthlySalaryRates: [{ validFrom: '2026-10', grossMonthly: 6248 }],
+      payrollReportTetaNumber: 'WT-07832652',
       pesel: '87010409887',
       passportNumber: null,
       foreignDocumentNumber: null,
