@@ -34,7 +34,7 @@ import {
 } from './calendar';
 import type { EmployeeSettlementEntitlements } from './employeeEntitlements';
 import { dateToIsoDate, getPayrollMonthDateRange } from './month';
-import { baseSalaryForFirstToyotaEmploymentDate } from './employeeReadiness';
+import { resolveEmployeeMonthlyGrossSalary } from './employeeReadiness';
 import { plannedNightContext } from './plannedNightContext';
 import { resolveEffectivePayrollSetting } from './settings';
 import { getPayrollVirtualDefaultHours } from './virtualDefaults';
@@ -674,9 +674,7 @@ export function calculateEmployeeMonthlyDraft({
   ) {
     warnings.push(warning('missing-soz-identity'));
   }
-  const baseSalaryBrutto = baseSalaryForFirstToyotaEmploymentDate(
-    employee.firstToyotaEmploymentDate,
-  );
+  const baseSalaryBrutto = resolveEmployeeMonthlyGrossSalary(employee, monthId);
   if (baseSalaryBrutto === null) {
     warnings.push(warning('missing-first-toyota-employment-date'));
   }

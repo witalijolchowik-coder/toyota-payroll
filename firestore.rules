@@ -120,6 +120,34 @@ service cloud.firestore {
         && get(/databases/$(database)/documents/months/$(monthId)).data.is_settled == false;
     }
 
+    function validMonthlySalaryRateAt(rates, i) {
+      return rates.size() <= i || (
+        rates[i] is map
+        && rates[i].keys().hasAll(['valid_from','gross_monthly'])
+        && rates[i].keys().hasOnly(['valid_from','gross_monthly'])
+        && rates[i].valid_from is string
+        && rates[i].valid_from.matches('^[0-9]{4}-(0[1-9]|1[0-2])$')
+        && rates[i].gross_monthly is number
+        && rates[i].gross_monthly > 0
+        && rates[i].gross_monthly <= 1000000
+        && (i == 0 || rates[i].valid_from > rates[i-1].valid_from)
+      );
+    }
+    function validMonthlySalaryRates(rates) {
+      return rates is list && rates.size() <= 12
+        && validMonthlySalaryRateAt(rates, 0)
+        && validMonthlySalaryRateAt(rates, 1)
+        && validMonthlySalaryRateAt(rates, 2)
+        && validMonthlySalaryRateAt(rates, 3)
+        && validMonthlySalaryRateAt(rates, 4)
+        && validMonthlySalaryRateAt(rates, 5)
+        && validMonthlySalaryRateAt(rates, 6)
+        && validMonthlySalaryRateAt(rates, 7)
+        && validMonthlySalaryRateAt(rates, 8)
+        && validMonthlySalaryRateAt(rates, 9)
+        && validMonthlySalaryRateAt(rates, 10)
+        && validMonthlySalaryRateAt(rates, 11);
+    }
     function validEmployee(data) {
       return data.keys().hasAll([
           'teta_number',
@@ -144,6 +172,8 @@ service cloud.firestore {
           'citizenship',
           'gender',
           'first_toyota_employment_date',
+          'monthly_salary_rates',
+          'payroll_report_teta_number',
           'medical_examination_date',
           'medical_valid_until',
           'medical_examination_type',
@@ -160,6 +190,10 @@ service cloud.firestore {
         && data.teta_number is string
         && isNonEmptyString(data.first_name)
         && isNonEmptyString(data.last_name)
+        && (!data.keys().hasAny(['monthly_salary_rates'])
+          || validMonthlySalaryRates(data.monthly_salary_rates))
+        && (!data.keys().hasAny(['payroll_report_teta_number'])
+          || isNullableString(data.payroll_report_teta_number))
         && (!data.keys().hasAny(['pesel']) || isNullableString(data.pesel))
         && (!data.keys().hasAny(['passport_number'])
           || isNullableString(data.passport_number))
@@ -1101,6 +1135,8 @@ service cloud.firestore {
           'gender',
           'first_toyota_employment_date',
           'medical_examination_date',
+          'monthly_salary_rates',
+          'payroll_report_teta_number',
           'medical_valid_until',
           'medical_examination_type',
           'is_active',

@@ -45,6 +45,8 @@ export interface CalendarAppearanceDocument extends ModificationMetadataDocument
 }
 
 export interface EmployeeDocument extends ModificationMetadataDocument {
+  monthly_salary_rates?: { valid_from: string; gross_monthly: number }[];
+  payroll_report_teta_number?: TetaNumber | null;
   teta_number: TetaNumber;
   first_name: string;
   last_name: string;

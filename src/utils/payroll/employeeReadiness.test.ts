@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   baseSalaryForFirstToyotaEmploymentDate,
+  resolveEmployeeMonthlyGrossSalary,
   hasCurrentStatusConflict,
   isEmployeeActiveOnDate,
   preserveFirstToyotaEmploymentDate,
@@ -11,6 +12,36 @@ import {
 const date = (value: string) => new Date(`${value}T00:00:00.000Z`);
 
 describe('employee readiness helpers', () => {
+  it('applies individual salary versions only from their effective month', () => {
+    const worker = {
+      firstToyotaEmploymentDate: date('2026-04-01'),
+      monthlySalaryRates: [{ validFrom: '2026-10', grossMonthly: 6248 }],
+    };
+    expect(resolveEmployeeMonthlyGrossSalary(worker, '2026-09')).toBe(5160);
+    expect(resolveEmployeeMonthlyGrossSalary(worker, '2026-10')).toBe(6248);
+    expect(resolveEmployeeMonthlyGrossSalary(worker, '2026-11')).toBe(6248);
+    expect(
+      resolveEmployeeMonthlyGrossSalary(
+        {
+          ...worker,
+          monthlySalaryRates: [
+            ...worker.monthlySalaryRates,
+            { validFrom: '2027-01', grossMonthly: 6500 },
+          ],
+        },
+        '2026-10',
+      ),
+    ).toBe(6248);
+    expect(
+      resolveEmployeeMonthlyGrossSalary(
+        {
+          ...worker,
+          monthlySalaryRates: [{ validFrom: '2026-10', grossMonthly: 6035 }],
+        },
+        '2026-10',
+      ),
+    ).toBe(6035);
+  });
   it('keeps employment active after contract expiry until an explicit end', () => {
     const employee = {
       contracts: [

@@ -61,6 +61,17 @@ export function mapEmployeeDocument(
   return {
     id,
     tetaNumber: document.teta_number,
+    ...(document.monthly_salary_rates
+      ? {
+          monthlySalaryRates: document.monthly_salary_rates.map((rate) => ({
+            validFrom: rate.valid_from,
+            grossMonthly: rate.gross_monthly,
+          })),
+        }
+      : {}),
+    ...(document.payroll_report_teta_number
+      ? { payrollReportTetaNumber: document.payroll_report_teta_number }
+      : {}),
     firstName: document.first_name,
     lastName: document.last_name,
     pesel: document.pesel ?? null,

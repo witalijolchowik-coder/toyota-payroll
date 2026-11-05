@@ -76,3 +76,16 @@ export function preserveFirstToyotaEmploymentDate(
 ): Date | null {
   return existing ?? submitted ?? null;
 }
+
+export function resolveEmployeeMonthlyGrossSalary(
+  employee: Pick<Employee, 'firstToyotaEmploymentDate' | 'monthlySalaryRates'>,
+  monthId: string,
+): number | null {
+  const rate = [...(employee.monthlySalaryRates ?? [])]
+    .filter((rate) => rate.validFrom <= monthId)
+    .sort((a, b) => b.validFrom.localeCompare(a.validFrom))[0];
+  return (
+    rate?.grossMonthly ??
+    baseSalaryForFirstToyotaEmploymentDate(employee.firstToyotaEmploymentDate)
+  );
+}

@@ -827,6 +827,38 @@ describe('Firestore security rules', () => {
     await assertFails(deleteDoc(employee));
   });
 
+  it('validates versioned salary rates and report identifiers without editing source TETA', async () => {
+    await seedEmployee('salary-worker');
+    const uid = 'coordinator-1';
+    const firestore = testEnvironment.authenticatedContext(uid).firestore();
+    const reference = doc(firestore, 'employees/salary-worker');
+    const metadata = { updated_at: serverTimestamp(), updated_by: uid };
+    await assertSucceeds(
+      updateDoc(reference, {
+        monthly_salary_rates: [{ valid_from: '2026-10', gross_monthly: 6248 }],
+        payroll_report_teta_number: 'WT-07832652',
+        ...metadata,
+      }),
+    );
+    expect((await getDoc(reference)).data()!.teta_number).toBe('TETA-1001');
+    for (const rates of [
+      [{ valid_from: '2026-13', gross_monthly: 6248 }],
+      [{ valid_from: '2026-10', gross_monthly: -1 }],
+      [{ valid_from: '2026-10', gross_monthly: '6248' }],
+      [
+        { valid_from: '2026-10', gross_monthly: 6248 },
+        { valid_from: '2026-10', gross_monthly: 6035 },
+      ],
+      [
+        { valid_from: '2026-10', gross_monthly: 6248 },
+        { valid_from: '2026-09', gross_monthly: 6035 },
+      ],
+    ])
+      await assertFails(
+        updateDoc(reference, { monthly_salary_rates: rates, ...metadata }),
+      );
+  });
+
   it('allows preparation without TETA and rejects invalid fields or actor spoofing', async () => {
     const uid = 'coordinator-1';
     const firestore = testEnvironment.authenticatedContext(uid).firestore();

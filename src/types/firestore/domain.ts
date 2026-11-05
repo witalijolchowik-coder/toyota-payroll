@@ -46,6 +46,8 @@ export interface ModificationMetadata {
 }
 
 export interface Employee extends ModificationMetadata {
+  monthlySalaryRates?: { validFrom: MonthId; grossMonthly: number }[];
+  payrollReportTetaNumber?: TetaNumber | null;
   id: EmployeeId;
   tetaNumber: TetaNumber;
   firstName: string;

@@ -27,7 +27,13 @@ export interface SettlementExportDailyCell {
 export interface SettlementExportRecord {
   employee: Pick<Employee, 'id' | 'tetaNumber' | 'firstName' | 'lastName'> &
     Partial<
-      Pick<Employee, 'citizenship' | 'gender' | 'firstToyotaEmploymentDate'>
+      Pick<
+        Employee,
+        | 'citizenship'
+        | 'gender'
+        | 'firstToyotaEmploymentDate'
+        | 'payrollReportTetaNumber'
+      >
     >;
   departmentName?: string | null;
   identity?: ExportEmployeeIdentity | null;
@@ -455,9 +461,18 @@ export function prepareSettlementExportPackage({
   monthNominalHours: number;
   mode?: 'auto' | 'preview' | 'final';
 }): SettlementExportPackage {
-  const sortedRecords = [...records].sort((first, second) =>
-    employeeName(first).localeCompare(employeeName(second), 'pl-PL'),
-  );
+  const sortedRecords = records
+    .map((record) => ({
+      ...record,
+      employee: {
+        ...record.employee,
+        tetaNumber:
+          record.employee.payrollReportTetaNumber ?? record.employee.tetaNumber,
+      },
+    }))
+    .sort((first, second) =>
+      employeeName(first).localeCompare(employeeName(second), 'pl-PL'),
+    );
   const warnings = buildExportReadinessWarnings(sortedRecords);
   const toyotaRows = sortedRecords.map((record) =>
     mapToyotaExportRow(record, monthId, monthNominalHours),
@@ -518,10 +533,29 @@ export function prepareSettlementExportPackage({
       headers: [...TOYOTA_EXPORT_HEADERS],
       rows: toyotaRows,
       workbook: renderXlsxWorkbook({
+        nominalRows: sortedRecords.map((record) => [
+          record.employee.lastName + ' ' + record.employee.firstName,
+          record.employee.tetaNumber,
+          record.draft.employment.fullMonthScheduleNominalHours !== undefined
+            ? (record.draft.employment.fullMonthScheduleNominalHours ?? '')
+            : record.draft.employment.fullCalendarMonth
+              ? record.draft.totals.nominalHours
+              : '',
+          record.draft.totals.nominalHours,
+          monthNominalHours,
+          record.draft.components.baseSalaryBrutto ?? '',
+          record.draft.attendance.workedHoursTotal,
+          record.draft.workTime.paidOvertime50Hours,
+          record.draft.workTime.paidOvertime100Hours,
+          record.draft.workTime.nightHours,
+          record.draft.absences.vacationHours,
+          record.draft.absences.l4Hours,
+          record.draft.absences.otherAbsenceHours,
+        ]),
         sheetName: 'Godziny',
         headers: TOYOTA_EXPORT_HEADERS,
         rows: toyotaRows.map((row) => row.cells),
-        plannedCalendarRows: records.flatMap((record) =>
+        plannedCalendarRows: sortedRecords.flatMap((record) =>
           (record.dailyCells ?? []).flatMap((day) =>
             day.planCode
               ? [
@@ -1068,12 +1102,14 @@ function escapeCsvCell(value: string) {
 }
 
 function renderXlsxWorkbook({
+  nominalRows = [],
   plannedCalendarRows = [],
   sheetName,
   headers,
   rows,
   unfinished,
 }: {
+  nominalRows?: (string | number)[][];
   plannedCalendarRows?: (string | number)[][];
   sheetName: string;
   headers: readonly string[];
@@ -1106,6 +1142,34 @@ function renderXlsxWorkbook({
   }
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, worksheet, sheetName);
+  if (nominalRows.length) {
+    const summary = XLSX.utils.aoa_to_sheet([
+      [
+        'Pracownik',
+        'TETA',
+        'Nominał harmonogramu — pełny miesiąc',
+        'Nominał — okres zatrudnienia',
+        'Nominał ustawowy / referencyjny',
+        'Stawka brutto PLN',
+        'Godziny faktyczne / rozliczone',
+        'Nadgodziny 50%',
+        'Nadgodziny 100%',
+        'Godziny dodatku nocnego',
+        'UW h',
+        'L4 h',
+        'Inne absencje h',
+      ],
+      ...nominalRows,
+    ]);
+    summary['!cols'] = [
+      { wch: 32 },
+      { wch: 18 },
+      ...Array.from({ length: 11 }, () => ({ wch: 19 })),
+    ];
+    summary['!rows'] = [{ hpt: 60 }];
+    summary['!autofilter'] = { ref: 'A1:M' + (nominalRows.length + 1) };
+    XLSX.utils.book_append_sheet(workbook, summary, 'Nominały');
+  }
   if (plannedCalendarRows.length) {
     XLSX.utils.book_append_sheet(
       workbook,

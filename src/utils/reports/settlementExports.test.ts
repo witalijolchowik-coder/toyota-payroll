@@ -12,6 +12,38 @@ import {
 } from './settlementExports';
 
 describe('settlement export formats', () => {
+  it('keeps full schedule, employment nominal, statutory norm and corrected TETA separate', () => {
+    const record = exportRecord({ id: '1', tetaNumber: 'WT-00000001' });
+    record.employee.payrollReportTetaNumber = 'WT-07832652';
+    record.draft.employment.fullMonthScheduleNominalHours = 148;
+    record.draft.totals.nominalHours = 52;
+    const result = prepareSettlementExportPackage({
+      monthId: '2026-10',
+      monthNominalHours: 176,
+      records: [record],
+      mode: 'final',
+    });
+    const workbook = XLSX.read(result.toyota.workbook, { type: 'array' });
+    const rows = XLSX.utils.sheet_to_json<(string | number)[]>(
+      workbook.Sheets['Nominały']!,
+      { header: 1 },
+    );
+    expect(rows[1]!.slice(1, 5)).toEqual(['WT-07832652', 148, 52, 176]);
+    expect(result.toyota.rows[0]!.tetaNumber).toBe('WT-07832652');
+    expect(record.employee.tetaNumber).toBe('WT-00000001');
+    expect(
+      result.toyota.rows[0]!.cells[
+        TOYOTA_EXPORT_HEADERS.indexOf('Czas nominalny')
+      ],
+    ).toBe('176');
+    expect(
+      result.toyota.rows[0]!.cells[
+        TOYOTA_EXPORT_HEADERS.indexOf(
+          'Harmonogram - nominał pracownika na dany miesiąc',
+        )
+      ],
+    ).toBe('52');
+  });
   it('preserves each planned day-off code without changing payroll rows', () => {
     const record = exportRecord({ id: '1', tetaNumber: 'T1' });
     const codes = ['N', 'DW', 'WN', 'WR', 'ŚW', 'D12', 'N12'];
@@ -36,7 +68,7 @@ describe('settlement export formats', () => {
     });
     expect(result.toyota.rows).toEqual(baseline.toyota.rows);
     const workbook = XLSX.read(result.toyota.workbook, { type: 'array' });
-    expect(workbook.SheetNames).toEqual(['Godziny', 'Plan brygad']);
+    expect(workbook.SheetNames).toEqual(['Godziny', 'Nominały', 'Plan brygad']);
     expect(
       XLSX.utils
         .sheet_to_json<string[]>(workbook.Sheets['Plan brygad']!, { header: 1 })
@@ -337,7 +369,7 @@ describe('settlement export formats', () => {
       new Uint8Array([0x50, 0x4b]),
     );
     const workbook = XLSX.read(result.toyota.workbook, { type: 'array' });
-    expect(workbook.SheetNames).toEqual(['Godziny']);
+    expect(workbook.SheetNames).toEqual(['Godziny', 'Nominały']);
     expect(
       XLSX.utils.sheet_to_json<string[]>(workbook.Sheets.Godziny!, {
         header: 1,
