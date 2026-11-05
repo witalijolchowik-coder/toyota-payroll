@@ -92,7 +92,7 @@ describe('settlement export formats', () => {
       result.toyota.rows[0]!.cells[
         TOYOTA_EXPORT_HEADERS.indexOf('Czas nominalny')
       ],
-    ).toBe('176');
+    ).toBe('148');
     expect(
       result.toyota.rows[0]!.cells[
         TOYOTA_EXPORT_HEADERS.indexOf(
@@ -101,6 +101,76 @@ describe('settlement export formats', () => {
       ],
     ).toBe('52');
   });
+  it.each([124, 148, 176, 160, 0])(
+    'uses full-month scheduled nominal %s consistently in Toyota and both SOZ groups without changing other values',
+    (scheduled) => {
+      const records = [{ pesel: '87010409887' }, { passport: 'TEST12345' }].map(
+        (identity, index) => {
+          const record = exportRecord({
+            id: String(index),
+            tetaNumber: `T${index}`,
+            identity,
+          });
+          record.draft.employment.fullMonthScheduleNominalHours = scheduled;
+          record.draft.totals.nominalHours = 40;
+          return record;
+        },
+      );
+      const before = JSON.stringify(records);
+      const input = {
+        monthId: '2026-10',
+        monthNominalHours: 176,
+        mode: 'final' as const,
+      };
+      const result = prepareSettlementExportPackage({ ...input, records });
+      const baseline = prepareSettlementExportPackage({
+        ...input,
+        records: records.map((record) => ({
+          ...record,
+          draft: {
+            ...record.draft,
+            employment: {
+              ...record.draft.employment,
+              fullMonthScheduleNominalHours: 176,
+            },
+          },
+        })),
+      });
+      const compare = (
+        rows: { cells: string[] }[],
+        oldRows: { cells: string[] }[],
+        headers: readonly string[],
+      ) => {
+        const column = headers.indexOf('Czas nominalny');
+        expect(rows).toHaveLength(oldRows.length);
+        rows.forEach((row, index) =>
+          expect(row.cells).toEqual(
+            oldRows[index]!.cells.map((value, i) =>
+              i === column ? String(scheduled) : value,
+            ),
+          ),
+        );
+      };
+      compare(result.toyota.rows, baseline.toyota.rows, TOYOTA_EXPORT_HEADERS);
+      compare(result.soz.polishRows, baseline.soz.polishRows, SOZ_CSV_HEADERS);
+      compare(
+        result.soz.foreignRows,
+        baseline.soz.foreignRows,
+        SOZ_CSV_HEADERS,
+      );
+      const book = XLSX.read(result.toyota.workbook, { type: 'array' });
+      const nominalRows = XLSX.utils.sheet_to_json<(string | number)[]>(
+        book.Sheets['Nominały']!,
+        { header: 1 },
+      );
+      expect(nominalRows.slice(1).map((row) => row.slice(2, 5))).toEqual([
+        [scheduled, 40, 176],
+        [scheduled, 40, 176],
+      ]);
+      expect(JSON.stringify(records)).toBe(before);
+    },
+  );
+
   it('preserves each planned day-off code without changing payroll rows', () => {
     const record = exportRecord({ id: '1', tetaNumber: 'T1' });
     const codes = ['N', 'DW', 'WN', 'WR', 'ŚW', 'D12', 'N12'];

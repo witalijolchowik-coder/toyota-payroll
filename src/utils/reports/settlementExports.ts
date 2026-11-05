@@ -70,13 +70,7 @@ function reportMonthlyReference(
   monthId: string,
   reference: number,
 ) {
-  const scheduled =
-    record.draft.employment.fullMonthScheduleNominalHours ??
-    (record.draft.employment.fullCalendarMonth
-      ? record.draft.totals.nominalHours
-      : null);
-  const reported = reportedFullMonthNominal(record, monthId);
-  return reported !== null && reported !== scheduled ? reported : reference;
+  return reportedFullMonthNominal(record, monthId) ?? reference;
 }
 
 export interface ExportReadinessWarning {
