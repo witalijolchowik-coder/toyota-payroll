@@ -1161,11 +1161,18 @@ function renderXlsxWorkbook({
       ],
       ...nominalRows,
     ]);
-    summary['!cols'] = [
-      { wch: 32 },
-      { wch: 18 },
-      ...Array.from({ length: 11 }, () => ({ wch: 19 })),
-    ];
+    summary['!cols'] = Array.from({ length: 13 }, (_, column) => ({
+      wch: Math.max(
+        14,
+        String(summary[XLSX.utils.encode_cell({ r: 0, c: column })]?.v ?? '')
+          .length + 2,
+        column === 0 ? 34 : 0,
+      ),
+    }));
+    for (let row = 1; row <= nominalRows.length; row++) {
+      const salary = summary[XLSX.utils.encode_cell({ r: row, c: 5 })];
+      if (salary?.t === 'n') salary.z = '#,##0.00';
+    }
     summary['!rows'] = [{ hpt: 60 }];
     summary['!autofilter'] = { ref: 'A1:M' + (nominalRows.length + 1) };
     XLSX.utils.book_append_sheet(workbook, summary, 'Nominały');
