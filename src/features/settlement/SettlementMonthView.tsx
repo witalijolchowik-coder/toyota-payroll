@@ -76,6 +76,7 @@ import {
 } from './monthUtils';
 import {
   generateEmployeeMonthlySchedule,
+  scheduledNominalHours,
   resolveEffectiveAssignment,
   resolveShiftInterval,
   type PlannedScheduleDay,
@@ -273,6 +274,28 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
       }),
     ]),
   );
+  const fullMonthScheduleNominalsByEmployeeId = new Map(
+    participatingEmployees.map((employee) => [
+      employee.id,
+      scheduledNominalHours(
+        generateEmployeeMonthlySchedule({
+          employee,
+          days,
+          departments: data.departments,
+          options: {
+            fullMonthReference: true,
+            publicHolidays,
+            publicHolidayNames,
+            assignments: data.employeeAssignments,
+            corrections: data.scheduleCorrections,
+            brigadeScheduleDays: data.brigadeScheduleDays,
+            departmentShiftCorrections: data.departmentShiftCorrections,
+            shiftHoursVersions: data.shiftHoursVersions,
+          },
+        }),
+      ),
+    ]),
+  );
   const calculationDraftsBase = data.month.isSettled
     ? []
     : calculateMonthlyDrafts({
@@ -305,6 +328,7 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
         depositWithholdingEvidenceByEpisodeId:
           data.depositWithholdingEvidenceByEpisodeId,
         plannedSchedulesByEmployeeId,
+        fullMonthScheduleNominalsByEmployeeId,
         calendarOptions: { publicHolidays },
       });
   const dynamicCalculationDrafts = data.sourceFailures.length

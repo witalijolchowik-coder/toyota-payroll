@@ -7,7 +7,10 @@ import {
 } from '../payroll';
 import { resolveDailyWorkTimeDeviation } from '../payroll/workTimeDeviations';
 import { plannedNightContext } from '../payroll/plannedNightContext';
-import { generateEmployeeMonthlySchedule } from './monthlySchedule';
+import {
+  generateEmployeeMonthlySchedule,
+  scheduledNominalHours,
+} from './monthlySchedule';
 import { october2026Schedule } from './october2026.test-support';
 import {
   resolveBrigadeScheduleDay,
@@ -102,6 +105,99 @@ const calculate = (plan: ReturnType<typeof schedule>, worker = employee) =>
   });
 
 describe('explicit department opt-in brigade calendar', () => {
+  it.each([
+    ['YELLOW', 123],
+    ['ORANGE', 124],
+    ['RED', 148],
+    ['BLUE', 148],
+    ['WHITE', 176],
+  ] as const)(
+    'derives Headliner %s reference nominal from dates, including the rollback override',
+    (brigade, total) => {
+      const worker = { ...employee, shiftAssignment: brigade };
+      const plans = october2026Schedule(brigade);
+      if (brigade === 'YELLOW')
+        plans.push({
+          ...plans.find((p) => p.date === '2026-10-24')!,
+          id: 'rollback-individual',
+          employeeId: worker.id,
+          endTime: '05:00',
+          plannedHours: 11,
+        });
+      const plan = schedule(plans, worker);
+      expect(scheduledNominalHours(plan)).toBe(total);
+      expect(calculate(plan, worker).totals.nominalHours).toBe(total);
+    },
+  );
+
+  it('separates a full reference month from employment coverage without changing payroll', () => {
+    const plans = october2026Schedule('BLUE');
+    const worker: Employee = {
+      ...employee,
+      shiftAssignment: 'BLUE',
+      contracts: [
+        { ...employee.contracts![0]!, startDate: '2026-10-19', endDate: null },
+      ],
+    };
+    const covered = schedule(plans, worker);
+    const full = generateEmployeeMonthlySchedule({
+      employee: worker,
+      days,
+      departments: [department],
+      options: { brigadeScheduleDays: plans, fullMonthReference: true },
+    });
+    expect(scheduledNominalHours(full)).toBe(148);
+    expect(scheduledNominalHours(covered)).toBe(52);
+    expect(
+      covered.slice(0, 18).every((d) => d.status === 'OUTSIDE_EMPLOYMENT'),
+    ).toBe(true);
+    const baseline = calculate(covered, worker);
+    const informational = calculateEmployeeMonthlyDraft({
+      monthId: '2026-10',
+      employee: worker,
+      dailyValues: [],
+      absences: [],
+      payrollSettings: [],
+      adjustments: [],
+      plannedSchedule: covered,
+      fullMonthScheduleNominalHours: scheduledNominalHours(full),
+    });
+    expect(informational).toEqual({
+      ...baseline,
+      employment: {
+        ...baseline.employment,
+        fullMonthScheduleNominalHours: 148,
+      },
+    });
+  });
+
+  it.each(['metal-402b', 'szwalnia-toyota', 'montaz-toyota'])(
+    'never applies Headliner RED hours to %s',
+    (departmentId) => {
+      const worker = {
+        ...employee,
+        departmentId,
+        shiftAssignment: 'RED' as const,
+      };
+      const otherDepartment = {
+        ...department,
+        id: departmentId,
+        brigadeSchedulingFrom: null,
+      };
+      const plan = generateEmployeeMonthlySchedule({
+        employee: worker,
+        days,
+        departments: [department, otherDepartment],
+        options: {
+          brigadeScheduleDays: october2026Schedule('RED'),
+          fullMonthReference: true,
+        },
+      });
+      expect(scheduledNominalHours(plan)).toBe(176);
+      expect(plan.every((d) => !d.brigadeScheduled)).toBe(true);
+    },
+  );
+
   it.each([
     ['ORANGE', 124],
     ['YELLOW', 124],

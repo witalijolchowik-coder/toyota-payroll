@@ -449,8 +449,19 @@ function SettlementReviewDetailsDialog({
           <Divider />
 
           <ReviewSection title={t.settlement.review.details.workTime}>
+            {item.draft.employment.fullMonthScheduleNominalHours !==
+            undefined ? (
+              <Typography>
+                Nominał harmonogramu — pełny miesiąc:{' '}
+                {item.draft.employment.fullMonthScheduleNominalHours === null
+                  ? 'brak kompletnego planu'
+                  : formatHours(
+                      item.draft.employment.fullMonthScheduleNominalHours,
+                    )}
+              </Typography>
+            ) : null}
             <Typography>
-              {t.settlement.draft.table.nominal}:{' '}
+              Nominał — okres zatrudnienia:{' '}
               {formatHours(item.draft.totals.nominalHours)}
             </Typography>
             <Typography>

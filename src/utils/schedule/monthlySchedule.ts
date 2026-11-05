@@ -64,6 +64,8 @@ export interface PlannedScheduleDay {
 }
 
 export interface MonthlyScheduleOptions {
+  /** Reference plan only; never use this mode for attendance or payroll coverage. */
+  fullMonthReference?: boolean;
   brigadeScheduleDays?: readonly BrigadeScheduleDay[];
   publicHolidays?: ReadonlySet<IsoDate>;
   publicHolidayNames?: ReadonlyMap<IsoDate, string>;
@@ -72,6 +74,18 @@ export interface MonthlyScheduleOptions {
   corrections?: readonly ScheduleCorrection[];
   departmentShiftCorrections?: readonly DepartmentShiftCorrection[];
   shiftHoursVersions?: readonly ShiftHoursVersion[];
+}
+
+export function scheduledNominalHours(
+  schedule: readonly PlannedScheduleDay[],
+): number | null {
+  if (schedule.some((day) => day.status === 'UNRESOLVED')) return null;
+  return schedule.reduce(
+    (total, day) =>
+      total +
+      (day.status === 'WORKING' || day.status === 'BHP' ? (day.hours ?? 0) : 0),
+    0,
+  );
 }
 
 export type EffectiveAssignmentSource =
@@ -145,6 +159,7 @@ export function generateEmployeeMonthlySchedule({
       publicHolidayNames: options.publicHolidayNames,
       departmentShiftCorrections: options.departmentShiftCorrections ?? [],
       shiftHoursVersions: options.shiftHoursVersions ?? [],
+      fullMonthReference: options.fullMonthReference,
     });
     const assignment = resolveEffectiveAssignment(
       employee,
@@ -419,6 +434,7 @@ function resolveAutomaticScheduleDay({
   publicHolidayNames,
   departmentShiftCorrections,
   shiftHoursVersions,
+  fullMonthReference = false,
 }: {
   employee: Employee;
   day: { date: Date; isoDate: IsoDate; isWorkingDay: boolean };
@@ -428,8 +444,12 @@ function resolveAutomaticScheduleDay({
   publicHolidayNames?: ReadonlyMap<IsoDate, string>;
   departmentShiftCorrections: readonly DepartmentShiftCorrection[];
   shiftHoursVersions: readonly ShiftHoursVersion[];
+  fullMonthReference?: boolean;
 }): PlannedScheduleDay {
-  if (!isDateWithinEmployeePeriod(employee, day.isoDate)) {
+  if (
+    !fullMonthReference &&
+    !isDateWithinEmployeePeriod(employee, day.isoDate)
+  ) {
     return createScheduleDay(employee, day.isoDate, {
       status: 'OUTSIDE_EMPLOYMENT',
       source: 'outside-employment',

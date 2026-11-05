@@ -210,7 +210,7 @@ export function PayrollDraftPanel({
                     {t.settlement.draft.table.shiftAssignment}
                   </TableCell>
                   <TableCell align="right">
-                    {t.settlement.draft.table.nominal}
+                    Nominał — okres zatrudnienia
                   </TableCell>
                   <TableCell align="right">
                     {t.settlement.draft.table.worked}
@@ -268,6 +268,24 @@ export function PayrollDraftPanel({
                       </TableCell>
                       <TableCell align="right">
                         {formatHours(draft.totals.nominalHours, t)}
+                        {draft.employment.fullMonthScheduleNominalHours !==
+                        undefined ? (
+                          <Typography
+                            variant="caption"
+                            sx={{ display: 'block' }}
+                            color="text.secondary"
+                          >
+                            Pełny miesiąc (harmonogram):{' '}
+                            {draft.employment.fullMonthScheduleNominalHours ===
+                            null
+                              ? 'brak kompletnego planu'
+                              : formatHours(
+                                  draft.employment
+                                    .fullMonthScheduleNominalHours,
+                                  t,
+                                )}
+                          </Typography>
+                        ) : null}
                       </TableCell>
                       <TableCell align="right">
                         {formatHours(draft.totals.workedHours, t)}

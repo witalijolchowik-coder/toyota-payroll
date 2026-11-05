@@ -142,6 +142,8 @@ export interface EmployeeMonthlyCalculationDraft {
     participatesInMonth: boolean;
     fullCalendarMonth: boolean;
     individualNominalHours: number;
+    /** Informational full-month plan; never a salary/statutory divisor. */
+    fullMonthScheduleNominalHours?: number | null;
   };
   attendance: {
     workedHoursTotal: number;
@@ -251,6 +253,7 @@ export interface MonthlyCalculationDraftInput {
   entitlements?: EmployeeSettlementEntitlements | null;
   calendarOptions?: PayrollCalendarOptions;
   plannedSchedule?: readonly PlannedScheduleDay[];
+  fullMonthScheduleNominalHours?: number | null;
   depositReturnOverride?: number | null;
   holidayWorkBonusDecision?: HolidayWorkBonusDecision | null;
   depositWithholdingEvidence?: HousingDepositWithholdingEvidence | null;
@@ -275,6 +278,7 @@ export interface MonthlyCalculationDraftsInput extends Omit<
     string,
     readonly PlannedScheduleDay[]
   >;
+  fullMonthScheduleNominalsByEmployeeId?: ReadonlyMap<string, number | null>;
   depositReturnOverridesByEmployeeId?: ReadonlyMap<string, number | null>;
   holidayWorkBonusDecisionsByEmployeeId?: ReadonlyMap<
     string,
@@ -617,6 +621,7 @@ export function calculateEmployeeMonthlyDraft({
   entitlements = null,
   calendarOptions = {},
   plannedSchedule,
+  fullMonthScheduleNominalHours,
   depositReturnOverride = null,
   holidayWorkBonusDecision = null,
   depositWithholdingEvidence = null,
@@ -1296,6 +1301,9 @@ export function calculateEmployeeMonthlyDraft({
       participatesInMonth,
       fullCalendarMonth,
       individualNominalHours,
+      ...(fullMonthScheduleNominalHours !== undefined
+        ? { fullMonthScheduleNominalHours }
+        : {}),
     },
     attendance: {
       workedHoursTotal: explicitHours + virtualHours,
@@ -1416,6 +1424,7 @@ export function calculateMonthlyDrafts({
   employees,
   entitlementsByEmployeeId,
   plannedSchedulesByEmployeeId,
+  fullMonthScheduleNominalsByEmployeeId,
   depositReturnOverridesByEmployeeId,
   holidayWorkBonusDecisionsByEmployeeId,
   depositWithholdingEvidenceByEpisodeId,
@@ -1438,6 +1447,9 @@ export function calculateMonthlyDrafts({
           : null;
       })(),
       plannedSchedule: plannedSchedulesByEmployeeId?.get(employee.id),
+      fullMonthScheduleNominalHours: fullMonthScheduleNominalsByEmployeeId?.get(
+        employee.id,
+      ),
     }),
   );
 }
