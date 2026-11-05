@@ -84,6 +84,10 @@ import {
 import { parseDailyHoursInput } from './dailyValueEntry';
 import { PayrollDraftPanel } from './PayrollDraftPanel';
 import {
+  monthlyNominalForReport,
+  monthlyScheduleReportingContext,
+} from '../../utils/reports/monthlyNominalPresentation';
+import {
   getPublicHolidayNamesForYear,
   getPublicHolidaysForYear,
 } from './publicHolidays';
@@ -294,6 +298,19 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
           },
         }),
       ),
+    ]),
+  );
+  const reportedMonthlyNominals = new Map(
+    participatingEmployees.map((employee) => [
+      employee.id,
+      monthlyNominalForReport({
+        monthId,
+        scheduledHours:
+          fullMonthScheduleNominalsByEmployeeId.get(employee.id) ?? null,
+        context: monthlyScheduleReportingContext(
+          plannedSchedulesByEmployeeId.get(employee.id) ?? [],
+        ),
+      }),
     ]),
   );
   const calculationDraftsBase = data.month.isSettled
@@ -857,6 +874,7 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
             onOpenEmployeeCalendar={setFocusedEmployee}
           />
           <SettlementReviewPanel
+            reportedMonthlyNominals={reportedMonthlyNominals}
             drafts={calculationDrafts}
             employees={participatingEmployees}
             departments={data.departments}
@@ -886,6 +904,7 @@ export function SettlementMonthView({ monthId }: SettlementMonthViewProps) {
             finalArtifacts={data.closedVersion?.artifacts ?? null}
           />
           <PayrollDraftPanel
+            reportedMonthlyNominals={reportedMonthlyNominals}
             drafts={filteredDrafts}
             employees={filteredEmployees}
             departments={data.departments}

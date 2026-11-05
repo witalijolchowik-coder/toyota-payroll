@@ -12,6 +12,63 @@ import {
 } from './settlementExports';
 
 describe('settlement export formats', () => {
+  it.each([{ pesel: '87010409887' }, { passport: 'TEST12345' }])(
+    'exports Yellow 124 monthly reference without changing individual nominal or payroll (%j)',
+    (identity) => {
+      const record = exportRecord({
+        id: 'yellow',
+        tetaNumber: 'YELLOW',
+        identity,
+      });
+      record.draft.employment.fullMonthScheduleNominalHours = 123;
+      record.draft.totals.nominalHours = 40;
+      const before = JSON.stringify(record);
+      const input = {
+        monthId: '2026-10',
+        monthNominalHours: 176,
+        mode: 'final' as const,
+      };
+      const baseline = prepareSettlementExportPackage({
+        ...input,
+        records: [record],
+      });
+      const corrected = prepareSettlementExportPackage({
+        ...input,
+        records: [
+          {
+            ...record,
+            monthlyScheduleContext: {
+              departmentId: 'headliner-bmw',
+              brigade: 'YELLOW',
+            },
+          },
+        ],
+      });
+      const index = TOYOTA_EXPORT_HEADERS.indexOf('Czas nominalny');
+      expect(corrected.toyota.rows[0]!.cells).toEqual(
+        baseline.toyota.rows[0]!.cells.map((v, i) => (i === index ? '124' : v)),
+      );
+      const baseSoz = [
+        ...baseline.soz.polishRows,
+        ...baseline.soz.foreignRows,
+      ][0]!;
+      const newSoz = [
+        ...corrected.soz.polishRows,
+        ...corrected.soz.foreignRows,
+      ][0]!;
+      const sozIndex = SOZ_CSV_HEADERS.indexOf('Czas nominalny');
+      expect(newSoz.cells).toEqual(
+        baseSoz.cells.map((v, i) => (i === sozIndex ? '124' : v)),
+      );
+      const workbook = XLSX.read(corrected.toyota.workbook, { type: 'array' });
+      const nominal = XLSX.utils.sheet_to_json<(string | number)[]>(
+        workbook.Sheets['Nominały']!,
+        { header: 1 },
+      );
+      expect(nominal[1]!.slice(2, 5)).toEqual([124, 40, 176]);
+      expect(JSON.stringify(record)).toBe(before);
+    },
+  );
   it('keeps full schedule, employment nominal, statutory norm and corrected TETA separate', () => {
     const record = exportRecord({ id: '1', tetaNumber: 'WT-00000001' });
     record.employee.payrollReportTetaNumber = 'WT-07832652';

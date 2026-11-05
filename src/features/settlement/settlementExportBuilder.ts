@@ -14,6 +14,7 @@ import { canonicalDepartmentOfficialName } from '../../utils/organization';
 import { prepareSettlementExportPackage } from '../../utils/reports';
 import type { PlannedScheduleDay } from '../../utils/schedule';
 import { compactBrigadeShiftLabel } from './compactBrigadeShiftLabel';
+import { monthlyScheduleReportingContext } from '../../utils/reports/monthlyNominalPresentation';
 import {
   dailyValueLookupKey,
   resolveSettlementCellValue,
@@ -75,6 +76,9 @@ export function buildSettlementExportPackageForMonth({
     );
     return [
       {
+        monthlyScheduleContext: monthlyScheduleReportingContext(
+          plannedSchedulesByEmployeeId?.get(employee.id) ?? [],
+        ),
         employee,
         departmentName:
           canonicalDepartmentOfficialName(employee.departmentId) ??

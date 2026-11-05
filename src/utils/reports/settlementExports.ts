@@ -2,6 +2,10 @@ import type { Employee, MonthId } from '../../types/firestore';
 import type { EmployeeMonthlyCalculationDraft } from '../payroll';
 import * as XLSX from 'xlsx';
 import { absenceTypeName, type AbsenceExportRow } from './absenceWorkbook';
+import {
+  monthlyNominalForReport,
+  type MonthlyScheduleReportingContext,
+} from './monthlyNominalPresentation';
 
 export type SozWorkerGroup = 'polish' | 'foreign' | 'missing-identity';
 export type ExportReadinessWarningCode =
@@ -25,6 +29,7 @@ export interface SettlementExportDailyCell {
 }
 
 export interface SettlementExportRecord {
+  monthlyScheduleContext?: MonthlyScheduleReportingContext | null;
   employee: Pick<Employee, 'id' | 'tetaNumber' | 'firstName' | 'lastName'> &
     Partial<
       Pick<
@@ -41,6 +46,37 @@ export interface SettlementExportRecord {
   reviewStatus?: 'DRAFT' | 'NEEDS_REVIEW' | 'NEEDS_CORRECTION' | 'CHECKED';
   unresolvedIssueCount?: number;
   dailyCells?: readonly SettlementExportDailyCell[];
+}
+
+function reportedFullMonthNominal(
+  record: SettlementExportRecord,
+  monthId: string,
+) {
+  const scheduledHours =
+    record.draft.employment.fullMonthScheduleNominalHours !== undefined
+      ? record.draft.employment.fullMonthScheduleNominalHours
+      : record.draft.employment.fullCalendarMonth
+        ? record.draft.totals.nominalHours
+        : null;
+  return monthlyNominalForReport({
+    monthId,
+    scheduledHours,
+    context: record.monthlyScheduleContext,
+  });
+}
+
+function reportMonthlyReference(
+  record: SettlementExportRecord,
+  monthId: string,
+  reference: number,
+) {
+  const scheduled =
+    record.draft.employment.fullMonthScheduleNominalHours ??
+    (record.draft.employment.fullCalendarMonth
+      ? record.draft.totals.nominalHours
+      : null);
+  const reported = reportedFullMonthNominal(record, monthId);
+  return reported !== null && reported !== scheduled ? reported : reference;
 }
 
 export interface ExportReadinessWarning {
@@ -536,11 +572,7 @@ export function prepareSettlementExportPackage({
         nominalRows: sortedRecords.map((record) => [
           record.employee.lastName + ' ' + record.employee.firstName,
           record.employee.tetaNumber,
-          record.draft.employment.fullMonthScheduleNominalHours !== undefined
-            ? (record.draft.employment.fullMonthScheduleNominalHours ?? '')
-            : record.draft.employment.fullCalendarMonth
-              ? record.draft.totals.nominalHours
-              : '',
+          reportedFullMonthNominal(record, monthId) ?? '',
           record.draft.totals.nominalHours,
           monthNominalHours,
           record.draft.components.baseSalaryBrutto ?? '',
@@ -772,7 +804,7 @@ function mapToyotaExportRow(
       formatNumber(paidOvertime50),
       formatNumber(paidOvertime100),
       formatNumber(draft.totals.nominalHours),
-      formatNumber(monthNominalHours),
+      formatNumber(reportMonthlyReference(record, monthId, monthNominalHours)),
       formatNumber(absence('NN')),
       formatNumber(absence('NU')),
       formatNumber(absence('NI')),
@@ -833,7 +865,9 @@ function mapSozExportRow(
     draft.workTime.paidOvertime100Hours,
   );
   cells[sozColumn.employeeNominal] = formatNumber(draft.totals.nominalHours);
-  cells[sozColumn.monthNominal] = formatNumber(monthNominalHours);
+  cells[sozColumn.monthNominal] = formatNumber(
+    reportMonthlyReference(record, monthId, monthNominalHours),
+  );
   cells[sozColumn.nnHours] = formatNumber(draft.absences.nnHours);
   const absence = (code: string) =>
     draft.absences.groups.find((absenceGroup) => absenceGroup.code === code)
@@ -1147,7 +1181,7 @@ function renderXlsxWorkbook({
       [
         'Pracownik',
         'TETA',
-        'Nominał harmonogramu — pełny miesiąc',
+        'Nominał miesięczny (raport)',
         'Nominał — okres zatrudnienia',
         'Nominał ustawowy / referencyjny',
         'Stawka brutto PLN',

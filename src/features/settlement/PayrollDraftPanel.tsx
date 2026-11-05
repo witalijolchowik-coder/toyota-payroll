@@ -22,6 +22,7 @@ import type {
 } from '../../utils/payroll';
 
 interface PayrollDraftPanelProps {
+  reportedMonthlyNominals?: ReadonlyMap<string, number | null>;
   drafts: EmployeeMonthlyCalculationDraft[];
   employees: Employee[];
   departments: Department[];
@@ -33,6 +34,7 @@ const currencyFormatter = new Intl.NumberFormat('pl-PL', {
 });
 
 export function PayrollDraftPanel({
+  reportedMonthlyNominals,
   drafts,
   employees,
   departments,
@@ -275,13 +277,23 @@ export function PayrollDraftPanel({
                             sx={{ display: 'block' }}
                             color="text.secondary"
                           >
-                            Pełny miesiąc (harmonogram):{' '}
+                            Pełny miesiąc (
+                            {reportedMonthlyNominals?.get(draft.employeeId) !==
+                              undefined &&
+                            reportedMonthlyNominals.get(draft.employeeId) !==
+                              draft.employment.fullMonthScheduleNominalHours
+                              ? 'raport'
+                              : 'harmonogram'}
+                            ):{' '}
                             {draft.employment.fullMonthScheduleNominalHours ===
                             null
                               ? 'brak kompletnego planu'
                               : formatHours(
-                                  draft.employment
-                                    .fullMonthScheduleNominalHours,
+                                  reportedMonthlyNominals?.get(
+                                    draft.employeeId,
+                                  ) ??
+                                    draft.employment
+                                      .fullMonthScheduleNominalHours,
                                   t,
                                 )}
                           </Typography>

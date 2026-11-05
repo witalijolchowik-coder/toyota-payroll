@@ -49,6 +49,7 @@ import {
 } from '../../utils/payroll';
 
 interface SettlementReviewPanelProps {
+  reportedMonthlyNominals?: ReadonlyMap<string, number | null>;
   drafts: EmployeeMonthlyCalculationDraft[];
   employees: Employee[];
   departments: Department[];
@@ -81,6 +82,7 @@ const holidayWorkBonusDecisions: HolidayWorkBonusDecision[] = [
 ];
 
 export function SettlementReviewPanel({
+  reportedMonthlyNominals,
   drafts,
   employees,
   departments,
@@ -282,6 +284,9 @@ export function SettlementReviewPanel({
 
       {selectedItem ? (
         <SettlementReviewDetailsDialog
+          reportedMonthlyNominal={reportedMonthlyNominals?.get(
+            selectedItem.draft.employeeId,
+          )}
           item={selectedItem}
           employee={employeesById.get(selectedItem.draft.employeeId) ?? null}
           departmentsById={departmentsById}
@@ -299,6 +304,7 @@ export function SettlementReviewPanel({
 }
 
 function SettlementReviewDetailsDialog({
+  reportedMonthlyNominal,
   item,
   employee,
   departmentsById,
@@ -307,6 +313,7 @@ function SettlementReviewDetailsDialog({
   onOpenEmployeeCalendar,
   onSaveReview,
 }: {
+  reportedMonthlyNominal?: number | null;
   item: EmployeeSettlementReviewItem;
   employee: Employee | null;
   departmentsById: Map<string, Department>;
@@ -452,11 +459,12 @@ function SettlementReviewDetailsDialog({
             {item.draft.employment.fullMonthScheduleNominalHours !==
             undefined ? (
               <Typography>
-                Nominał harmonogramu — pełny miesiąc:{' '}
+                Nominał miesięczny — pełny miesiąc:{' '}
                 {item.draft.employment.fullMonthScheduleNominalHours === null
                   ? 'brak kompletnego planu'
                   : formatHours(
-                      item.draft.employment.fullMonthScheduleNominalHours,
+                      reportedMonthlyNominal ??
+                        item.draft.employment.fullMonthScheduleNominalHours,
                     )}
               </Typography>
             ) : null}
