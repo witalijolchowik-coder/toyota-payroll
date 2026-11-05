@@ -7,6 +7,51 @@ import {
 } from './absenceWorkbook';
 
 describe('absence workbook', () => {
+  it.each([
+    ['2026-09-30', '2026-10-02'],
+    ['2026-10-24', '2026-11-03'],
+  ] as const)(
+    'exports complete date-only periods without timezone shifts: %s – %s',
+    async (startDate, endDate) => {
+      const bytes = await renderAbsenceWorkbook(
+        [
+          {
+            lastName: 'TEST',
+            firstName: 'JAN',
+            passport: '',
+            pesel: '',
+            type: 'Zwolnienie lekarskie',
+            code: 'L4',
+            startDate,
+            endDate,
+            workingDayCount: 2,
+            workingHours: 24,
+            note: '',
+          },
+        ],
+        '2026-10',
+      );
+      const workbook = new ExcelJS.Workbook();
+      await workbook.xlsx.load(
+        bytes as unknown as Parameters<typeof workbook.xlsx.load>[0],
+      );
+      const sheet = workbook.getWorksheet('Absencja')!;
+      expect((sheet.getCell('G2').value as Date).toISOString()).toBe(
+        `${startDate}T00:00:00.000Z`,
+      );
+      expect((sheet.getCell('H2').value as Date).toISOString()).toBe(
+        `${endDate}T00:00:00.000Z`,
+      );
+      expect(sheet.getCell('I2').value).toBe(2);
+      expect(sheet.getCell('J2').value).toBe(24);
+      expect(sheet.getCell('G2').numFmt).toBe('m/d/yy');
+      expect(workbook.worksheets.map((item) => item.name)).toEqual([
+        'Absencja',
+        'Słownik',
+      ]);
+    },
+  );
+
   it('reproduces the Absencja and Słownik structure with canonical codes', async () => {
     const rows: AbsenceExportRow[] = [
       {

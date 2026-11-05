@@ -151,8 +151,8 @@ export async function renderAbsenceWorkbook(
       row.pesel || null,
       row.type,
       row.code,
-      isoDateToLocalDate(row.startDate),
-      isoDateToLocalDate(row.endDate),
+      isoDateToExcelDate(row.startDate),
+      isoDateToExcelDate(row.endDate),
       row.workingDayCount,
       row.workingHours,
       row.note,
@@ -263,7 +263,9 @@ export function absenceTypeName(code: string) {
   );
 }
 
-function isoDateToLocalDate(value: IsoDate) {
+function isoDateToExcelDate(value: IsoDate) {
   const [year, month, day] = value.split('-').map(Number);
-  return new Date(year, month - 1, day);
+  // Excel dates are timezone-free serials; local midnight would shift the date
+  // when ExcelJS converts a Date to its UTC-based serial representation.
+  return new Date(Date.UTC(year, month - 1, day));
 }

@@ -288,6 +288,62 @@ function normativeSchedule(monthId: MonthId = '2026-06'): PlannedScheduleDay[] {
 }
 
 describe('employee monthly calculation draft', () => {
+  it('retains cross-month L4 periods while counting only October scheduled dates', () => {
+    const schedule = normativeSchedule('2026-10').map((day) => ({
+      ...day,
+      hours: day.status === 'WORKING' ? 12 : 0,
+      plannedDuration: day.status === 'WORKING' ? 12 : 0,
+    }));
+    const result = draft({
+      monthId: '2026-10',
+      plannedSchedule: schedule,
+      absences: [
+        absence({
+          id: 'from-september',
+          monthId: '2026-09',
+          startDate: '2026-09-30',
+          endDate: '2026-10-02',
+        }),
+        absence({
+          id: 'into-november',
+          monthId: '2026-10',
+          startDate: '2026-10-30',
+          endDate: '2026-11-03',
+        }),
+        absence({
+          id: 'cancelled-duplicate',
+          monthId: '2026-10',
+          startDate: '2026-10-02',
+          endDate: '2026-10-02',
+          status: 'CANCELLED',
+        }),
+      ],
+    });
+    expect(result.absences.periods).toMatchObject([
+      {
+        id: 'from-september',
+        startDate: '2026-09-30',
+        endDate: '2026-10-02',
+        workingDayCount: 2,
+        workingHours: 24,
+      },
+      {
+        id: 'into-november',
+        startDate: '2026-10-30',
+        endDate: '2026-11-03',
+        workingDayCount: 1,
+        workingHours: 12,
+      },
+    ]);
+    expect(result.absences.periods).toHaveLength(2);
+    expect(result.absences.l4Hours).toBe(36);
+    expect(
+      result.absences.periods
+        .flatMap((period) => period.workingDates)
+        .map((day) => day.date),
+    ).toEqual(['2026-10-01', '2026-10-02', '2026-10-30']);
+  });
+
   it('keeps 11h nominal separate from 13h actual across the Warsaw rollback, with absence precedence', () => {
     const worker = employee({
       employmentStartDate: utcDate('2026-10-24'),
