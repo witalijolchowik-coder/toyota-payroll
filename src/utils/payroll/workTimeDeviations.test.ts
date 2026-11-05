@@ -2,6 +2,7 @@ import {
   balanceMonthlyWorkTimeDeviations,
   physicalNightHours,
   plannedIntervalForShift,
+  octoberRollbackRepeatedHours,
   resolveDailyWorkTimeDeviation,
   resolveScheduledNightAllowance,
 } from './workTimeDeviations';
@@ -21,19 +22,19 @@ describe('daily work-time deviations', () => {
       actual,
       isWorkingDay: true,
       isSaturday: true,
-      recordedAttendance: { date: '2026-10-24', creditedHours: 12 },
+      recordedAttendance: { date: '2026-10-24', creditedHours: 13 },
     };
     expect(resolveDailyWorkTimeDeviation(input)).toMatchObject({
-      normalWorkHours: 11,
+      normalWorkHours: 12,
       extraHours: 1,
       overtime100Hours: 1,
-      nightAllowanceHours: 8,
+      nightAllowanceHours: 9,
     });
     for (const unqualified of [
       { ...input, recordedAttendance: undefined },
       {
         ...input,
-        recordedAttendance: { date: '2026-10-31', creditedHours: 12 },
+        recordedAttendance: { date: '2026-10-31', creditedHours: 13 },
       },
       {
         ...input,
@@ -45,6 +46,18 @@ describe('daily work-time deviations', () => {
         resolveDailyWorkTimeDeviation(unqualified).nightAllowanceHours,
       ).toBe(7);
     }
+  });
+
+  it('counts Warsaw rollback only for the confirmed planned/actual shift pair', () => {
+    const planned = { startTime: '18:00', endTime: '05:00' };
+    const actual = { startTime: '18:00', endTime: '06:00' };
+    expect(octoberRollbackRepeatedHours('2026-10-24', planned, actual)).toBe(1);
+    expect(octoberRollbackRepeatedHours('2026-10-23', planned, actual)).toBe(0);
+    expect(octoberRollbackRepeatedHours('2026-10-31', planned, actual)).toBe(0);
+    expect(octoberRollbackRepeatedHours('2026-10-24', planned, null)).toBe(0);
+    expect(octoberRollbackRepeatedHours('2026-10-24', planned, planned)).toBe(
+      0,
+    );
   });
 
   it('treats the default planned shift as 8h normal work', () => {

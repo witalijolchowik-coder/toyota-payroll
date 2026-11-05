@@ -123,6 +123,60 @@ export function intervalHours(interval: ClockInterval): number {
   return roundHours((normalized.end - normalized.start) / 60);
 }
 
+/** The approved October shift keeps clock-based nominal but credits elapsed work. */
+export function octoberRollbackRepeatedHours(
+  date: string | undefined,
+  planned: ClockInterval | null | undefined,
+  actual: ClockInterval | null | undefined,
+): number {
+  if (
+    date !== '2026-10-24' ||
+    planned?.startTime !== '18:00' ||
+    planned.endTime !== '05:00' ||
+    actual?.startTime !== '18:00' ||
+    actual.endTime !== '06:00'
+  )
+    return 0;
+  const elapsed = (interval: ClockInterval) => {
+    const localStart = Date.parse(`${date}T${interval.startTime}:00Z`);
+    const localEnd =
+      Date.parse(`${date}T${interval.endTime}:00Z`) +
+      (interval.endTime < interval.startTime ? 86400000 : 0);
+    const formatter = new Intl.DateTimeFormat('en-GB', {
+      timeZone: 'Europe/Warsaw',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    });
+    const instant = (local: number) => {
+      const expected = new Date(local).toISOString().slice(0, 16);
+      const matches: number[] = [];
+      for (let offset = -180; offset <= 180; offset += 30) {
+        const utc = local - offset * 60000;
+        const parts = Object.fromEntries(
+          formatter.formatToParts(utc).map((p) => [p.type, p.value]),
+        );
+        const rendered = `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+        if (rendered === expected) matches.push(utc);
+      }
+      return matches.length === 1 ? matches[0]! : null;
+    };
+    const start = instant(localStart),
+      end = instant(localEnd);
+    return start !== null && end !== null ? (end - start) / 3600000 : null;
+  };
+  const planElapsed = elapsed(planned),
+    actualElapsed = elapsed(actual);
+  if (planElapsed === null || actualElapsed === null) return 0;
+  const repeated = planElapsed - intervalHours(planned);
+  return repeated === 1 && actualElapsed - intervalHours(actual) === repeated
+    ? repeated
+    : 0;
+}
+
 export type ScheduledNightAllowanceReviewReason =
   | 'MISSING_PLAN'
   | 'NON_CANONICAL_PLAN'
@@ -294,12 +348,9 @@ export function resolveDailyWorkTimeDeviation({
   const overtime50Hours = dayIs100
     ? 0
     : roundHours(Math.max(0, extraHours - overtime100Hours));
-  // One-off approved credited treatment for the October 2026 rollback.
-  // Include the already classified night overtime in the allowance, not in
-  // credited work a second time. Do not change elapsed-time arithmetic.
-  const includeOctoberNightOvertime =
-    recordedAttendance?.date === '2026-10-24' &&
-    recordedAttendance.creditedHours === 12 &&
+  // The rollback hour lies inside regular planned work, not the 05–06 overtime.
+  const repeatedHours =
+    recordedAttendance?.creditedHours === 13 &&
     nightAllowancePlanned?.explicitBrigadePlan === true &&
     nightAllowancePlanned.shift === 'NIGHT' &&
     nightAllowancePlanned.startTime === '18:00' &&
@@ -312,11 +363,13 @@ export function resolveDailyWorkTimeDeviation({
     overtime100Hours === 1 &&
     overtime100FromNight === 1 &&
     !classificationOverride &&
-    !nightReviewReason;
+    !nightReviewReason
+      ? octoberRollbackRepeatedHours(recordedAttendance.date, planned, actual)
+      : 0;
 
   return applyClassificationOverride(
     {
-      normalWorkHours: overlap,
+      normalWorkHours: overlap + repeatedHours,
       privateTimeHours,
       extraHours,
       overtime50Hours,
@@ -337,8 +390,8 @@ export function resolveDailyWorkTimeDeviation({
       nightOvertimeHours: roundHours(overtime100FromNight),
       nightAllowanceHours: nightAllowanceReviewReason
         ? actualNightHours
-        : includeOctoberNightOvertime
-          ? actualNightHours
+        : repeatedHours
+          ? actualNightHours + repeatedHours
           : scheduledNightAllowance.nightAllowanceHours,
       unresolved: actualNightHours > 0 && nightReviewReason !== null,
     },

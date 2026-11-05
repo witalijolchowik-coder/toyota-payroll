@@ -288,6 +288,80 @@ function normativeSchedule(monthId: MonthId = '2026-06'): PlannedScheduleDay[] {
 }
 
 describe('employee monthly calculation draft', () => {
+  it('keeps 11h nominal separate from 13h actual across the Warsaw rollback, with absence precedence', () => {
+    const worker = employee({
+      employmentStartDate: utcDate('2026-10-24'),
+      employmentEndDate: utcDate('2026-10-24'),
+      employmentEndEvents: [explicitEmploymentEnd('2026-10-24')],
+    });
+    const plan: PlannedScheduleDay = {
+      employeeId: worker.id,
+      date: '2026-10-24',
+      departmentId: 'headliner-bmw',
+      shiftAssignment: 'YELLOW',
+      source: 'calendar',
+      status: 'WORKING',
+      shift: 'NIGHT',
+      label: '11 / N',
+      hours: 11,
+      brigadeScheduled: true,
+      plannedStartTime: '18:00',
+      plannedEndTime: '05:00',
+      plannedDuration: 11,
+      reason: null,
+      holidayName: null,
+    };
+    const attendance = dailyValue({
+      date: plan.date,
+      monthId: '2026-10',
+      hours: 13,
+      workTimeCorrection: {
+        workContext: 'NORMATIVE',
+        plannedShift: 'NIGHT',
+        plannedStartTime: '18:00',
+        plannedEndTime: '05:00',
+        actualStartTime: '18:00',
+        actualEndTime: '06:00',
+        classificationOverride: null,
+      },
+    });
+    const input = {
+      monthId: '2026-10' as const,
+      employee: worker,
+      plannedSchedule: [plan],
+      dailyValues: [attendance],
+      absences: [] as Absence[],
+      payrollSettings: [],
+      adjustments: [],
+    };
+    const draft = calculateEmployeeMonthlyDraft(input);
+    expect(draft.totals.nominalHours).toBe(11);
+    expect(draft.attendance.workedHoursTotal).toBe(13);
+    expect(draft.workTime).toMatchObject({
+      normalWorkHours: 12,
+      overtime100Hours: 1,
+      paidOvertime100Hours: 1,
+      nightHours: 9,
+    });
+    expect(calculateEmployeeMonthlyDraft(input)).toEqual(draft);
+    const onLeave = calculateEmployeeMonthlyDraft({
+      ...input,
+      absences: [
+        absence({
+          monthId: '2026-10',
+          absenceCode: 'UW',
+          startDate: plan.date,
+          endDate: plan.date,
+        }),
+      ],
+    });
+    expect(onLeave.attendance.workedHoursTotal).toBe(0);
+    expect(onLeave.workTime).toMatchObject({
+      overtime100Hours: 0,
+      nightHours: 0,
+    });
+    expect(attendance.hours).toBe(13);
+  });
   it('marks an employee outside the month as non-participating', () => {
     const result = draft({
       target: employee({

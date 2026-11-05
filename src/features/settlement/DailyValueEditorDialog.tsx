@@ -43,10 +43,12 @@ import type {
 import { ABSENCE_CODES, type AbsenceCode } from '../../utils/absences';
 import {
   intervalHours,
+  octoberRollbackRepeatedHours,
   isValidClockTime,
   resolveDailyWorkTimeDeviation,
   resolvePlanToFactOutcomes,
 } from '../../utils/payroll';
+import { plannedNightContext } from '../../utils/payroll/plannedNightContext';
 import type { PlannedScheduleDay } from '../../utils/schedule';
 import {
   balancePlannedInterval,
@@ -217,7 +219,12 @@ export function DailyValueEditorDialog({
         actualEndTime === initialEnd
       ? defaultHours
       : inferredActual && !timeValidationError
-        ? intervalHours(inferredActual)
+        ? intervalHours(inferredActual) +
+          octoberRollbackRepeatedHours(
+            day.isoDate,
+            plannedInterval,
+            inferredActual,
+          )
         : value.kind === 'manual'
           ? (value.hours ?? 0)
           : 0;
@@ -242,6 +249,8 @@ export function DailyValueEditorDialog({
       }).deviation
     : inferredActual && canResolveWorkTime
       ? resolveDailyWorkTimeDeviation({
+          recordedAttendance: { date: day.isoDate, creditedHours: actualTotal },
+          ...plannedNightContext(plannedDay),
           nightAllowanceReviewReason: plannedDay?.nightAllowanceReviewReason,
           planned:
             plannedInterval && plannedShift

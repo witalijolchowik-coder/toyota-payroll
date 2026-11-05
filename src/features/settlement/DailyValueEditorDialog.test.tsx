@@ -70,6 +70,7 @@ const activeScheduleCorrection: ScheduleCorrection = {
 function renderDialog(
   overrides: {
     value?: SettlementCellValue;
+    day?: typeof day;
     governingAbsence?: Absence;
     plannedDay?: PlannedScheduleDay;
     activeScheduleCorrection?: ScheduleCorrection | null;
@@ -98,7 +99,7 @@ function renderDialog(
   render(
     <DailyValueEditorDialog
       employee={employee}
-      day={day}
+      day={overrides.day ?? day}
       value={overrides.value ?? value}
       hasGoverningAbsence={Boolean(overrides.governingAbsence)}
       governingAbsence={overrides.governingAbsence}
@@ -125,6 +126,41 @@ function renderDialog(
 }
 
 describe('DailyValueEditorDialog', () => {
+  it('shows 13 actual and 9 night hours without changing the 11h rollback plan', () => {
+    const rollbackDay = createCalendarDays('2026-10')[23]!;
+    renderDialog({
+      day: rollbackDay,
+      plannedDay: {
+        ...plannedDay,
+        date: rollbackDay.isoDate,
+        hours: 11,
+        brigadeScheduled: true,
+        shift: 'NIGHT',
+        plannedStartTime: '18:00',
+        plannedEndTime: '05:00',
+        plannedDuration: 11,
+      },
+      value: {
+        ...value,
+        kind: 'manual',
+        hours: 13,
+        workTimeCorrection: {
+          workContext: 'NORMATIVE',
+          plannedShift: 'NIGHT',
+          plannedStartTime: '18:00',
+          plannedEndTime: '05:00',
+          actualStartTime: '18:00',
+          actualEndTime: '06:00',
+          classificationOverride: null,
+        },
+      },
+    });
+    expect(screen.getByLabelText('Rzeczywisty start')).toHaveValue('18:00');
+    expect(screen.getByLabelText('Rzeczywisty koniec')).toHaveValue('06:00');
+    expect(screen.getByTestId('worked-hours')).toHaveTextContent('13 h');
+    expect(screen.getByTestId('night-hours')).toHaveTextContent('9 h');
+    expect(screen.getByTestId('overtime-100-hours')).toHaveTextContent('1 h');
+  });
   it('previews a saved partial NIGHT override instead of preserved raw Balance hours', async () => {
     const facts = Object.freeze(
       balanceFacts({
